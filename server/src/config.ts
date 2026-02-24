@@ -13,4 +13,6 @@ export const CONFIG = {
   TIEBREAK_DEFENSE_TIME: 30000,      // 30 sec per rules
   RESULT_DISPLAY_TIME: 6000,         // 6 sec
   RECONNECT_GRACE_PERIOD: 60000,     // 60 sec
+  BOT_ACTION_DELAY_MIN: 1000,        // 1 sec min bot delay
+  BOT_ACTION_DELAY_MAX: 3000,        // 3 sec max bot delay
 };

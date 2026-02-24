@@ -62,6 +62,7 @@ export interface PlayerInfo {
   alive: boolean;
   revealedAttributes: Attribute[];
   isHost: boolean;
+  isBot: boolean;
 }
 
 export interface PublicGameState {
@@ -99,6 +100,8 @@ export interface ClientEvents {
   'game:useAction': (data: { targetPlayerId?: string }) => void;
   'vote:cast': (data: { targetPlayerId: string }) => void;
   'game:playAgain': () => void;
+  'room:addBot': () => void;
+  'room:removeBot': (data: { playerId: string }) => void;
 }
 
 // Server -> Client

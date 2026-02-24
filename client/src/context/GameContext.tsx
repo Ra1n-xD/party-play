@@ -21,6 +21,8 @@ interface GameContextType {
   playAgain: () => void;
   leaveRoom: () => void;
   clearError: () => void;
+  addBot: () => void;
+  removeBot: (playerId: string) => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -142,6 +144,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const clearError = useCallback(() => setError(null), []);
 
+  const addBot = useCallback(() => {
+    socket.emit('room:addBot');
+  }, []);
+
+  const removeBot = useCallback((botPlayerId: string) => {
+    socket.emit('room:removeBot', { playerId: botPlayerId });
+  }, []);
+
   return (
     <GameContext.Provider
       value={{
@@ -163,6 +173,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         playAgain: playAgainFn,
         leaveRoom,
         clearError,
+        addBot,
+        removeBot,
       }}
     >
       {children}

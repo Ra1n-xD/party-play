@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { ClientEvents, ServerEvents } from '../../shared/types.js';
-import { createRoom, joinRoom, getRoom, removePlayer, Room, Player } from './roomManager.js';
+import { createRoom, joinRoom, getRoom, removePlayer, addBotToRoom, removeBotFromRoom, Room, Player } from './roomManager.js';
 import { startGame, revealAttribute, castVote, useAction, resetGame, broadcastState } from './gameEngine.js';
 import { CONFIG } from './config.js';
 
@@ -166,6 +166,46 @@ export function registerHandlers(io: IOServer): void {
       }
 
       resetGame(room, io);
+    });
+
+    socket.on('room:addBot', () => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+
+      if (info.playerId !== room.hostId) {
+        socket.emit('room:error', { message: 'Только хост может добавлять ботов' });
+        return;
+      }
+
+      const bot = addBotToRoom(room);
+      if (!bot) {
+        socket.emit('room:error', { message: 'Невозможно добавить бота' });
+        return;
+      }
+
+      broadcastState(room, io);
+    });
+
+    socket.on('room:removeBot', ({ playerId: botId }) => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+
+      if (info.playerId !== room.hostId) {
+        socket.emit('room:error', { message: 'Только хост может удалять ботов' });
+        return;
+      }
+
+      const removed = removeBotFromRoom(room, botId);
+      if (!removed) {
+        socket.emit('room:error', { message: 'Невозможно удалить этого игрока' });
+        return;
+      }
+
+      broadcastState(room, io);
     });
 
     socket.on('room:leave', () => {

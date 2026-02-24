@@ -176,9 +176,12 @@ export function GameScreen() {
           {otherPlayers.map(player => (
             <div key={player.id} className={`player-card ${!player.alive ? 'eliminated' : ''} ${!player.connected ? 'disconnected' : ''}`}>
               <div className="player-header">
-                <span className="player-name">{player.name}</span>
+                <span className="player-name">
+                  {player.isBot && <span className="bot-badge">BOT</span>}
+                  {player.name}
+                </span>
                 {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
-                {!player.connected && <span className="dc-badge">Отключён</span>}
+                {!player.connected && !player.isBot && <span className="dc-badge">Отключён</span>}
                 {player.id === gameState.lastEliminatedPlayerId && (
                   <span className="last-elim-badge">Голосует</span>
                 )}
