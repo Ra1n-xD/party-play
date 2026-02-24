@@ -6,6 +6,7 @@ import { catastrophes } from './data/catastrophes.js';
 import { bunkerCards as allBunkerCardsData } from './data/bunkers.js';
 import { randomPick, shuffle } from './utils.js';
 import { CONFIG } from './config.js';
+import { scheduleBotActions } from './botManager.js';
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 
@@ -709,6 +710,7 @@ export function buildPublicState(room: Room): PublicGameState {
     alive: p.alive,
     revealedAttributes: p.revealedIndices.map(i => p.character?.attributes[i]).filter(Boolean) as Attribute[],
     isHost: p.id === room.hostId,
+    isBot: p.isBot,
   }));
 
   // Count voters (alive + last eliminated)
@@ -787,4 +789,7 @@ function getVoters_fromState(room: Room): Player[] {
 export function broadcastState(room: Room, io: IOServer): void {
   const state = buildPublicState(room);
   io.to(room.code).emit('game:state', state);
+
+  // Schedule bot actions after state broadcast
+  scheduleBotActions(room, io);
 }

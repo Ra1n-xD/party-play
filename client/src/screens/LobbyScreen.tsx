@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useGame } from '../context/GameContext';
 
 export function LobbyScreen() {
-  const { roomCode, playerId, gameState, setReady, startGame, leaveRoom, error } = useGame();
+  const { roomCode, playerId, gameState, setReady, startGame, leaveRoom, addBot, removeBot, error } = useGame();
   const [copied, setCopied] = useState(false);
 
   if (!gameState || !roomCode) return null;
@@ -12,6 +12,8 @@ export function LobbyScreen() {
   const allReady = gameState.players.every(p => p.ready || p.isHost);
   const enoughPlayers = gameState.players.length >= 4;
   const bunkerCapacity = Math.floor(gameState.players.length / 2);
+  const botCount = gameState.players.filter(p => p.isBot).length;
+  const canAddBot = gameState.players.length < 16;
 
   const copyCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -34,24 +36,38 @@ export function LobbyScreen() {
         <div className="lobby-info">
           <span>Игроков: {gameState.players.length}/16</span>
           <span>В бункер попадут: {bunkerCapacity}</span>
+          {botCount > 0 && <span>Ботов: {botCount}</span>}
         </div>
 
         <div className="player-list">
           {gameState.players.map(player => (
-            <div key={player.id} className={`player-item ${player.id === playerId ? 'is-me' : ''}`}>
+            <div key={player.id} className={`player-item ${player.id === playerId ? 'is-me' : ''} ${player.isBot ? 'is-bot' : ''}`}>
               <span className="player-name">
                 {player.isHost && <span className="host-badge">H</span>}
+                {player.isBot && <span className="bot-badge">BOT</span>}
                 {player.name}
                 {player.id === playerId && <span className="me-badge">(вы)</span>}
               </span>
-              <span className={`ready-status ${player.ready || player.isHost ? 'ready' : ''}`}>
-                {player.ready || player.isHost ? 'Готов' : 'Не готов'}
+              <span className="player-item-right">
+                <span className={`ready-status ${player.ready || player.isHost ? 'ready' : ''}`}>
+                  {player.ready || player.isHost ? 'Готов' : 'Не готов'}
+                </span>
+                {isHost && player.isBot && (
+                  <button className="btn-remove-bot" onClick={() => removeBot(player.id)}>
+                    x
+                  </button>
+                )}
               </span>
             </div>
           ))}
         </div>
 
         <div className="lobby-actions">
+          {isHost && canAddBot && (
+            <button className="btn btn-bot" onClick={addBot}>
+              + Добавить бота
+            </button>
+          )}
           {!isHost && (
             <button
               className={`btn ${me?.ready ? 'btn-secondary' : 'btn-primary'}`}

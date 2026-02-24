@@ -101,7 +101,10 @@ export function VoteScreen() {
           {candidates.map(player => (
             <div key={player.id} className="vote-candidate">
               <div className="candidate-info">
-                <span className="candidate-name">{player.name}</span>
+                <span className="candidate-name">
+                  {player.isBot && <span className="bot-badge">BOT</span>}
+                  {player.name}
+                </span>
                 <div className="candidate-attrs">
                   {player.revealedAttributes.map((attr, i) => (
                     <span key={i} className="mini-tag">{attr.label}: {attr.value}</span>

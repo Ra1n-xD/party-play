@@ -11,7 +11,7 @@ app.use(cors());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: '*',
     methods: ['GET', 'POST'],
   },
 });
@@ -22,6 +22,6 @@ app.get('/', (_req, res) => {
 
 registerHandlers(io);
 
-httpServer.listen(CONFIG.PORT, () => {
-  console.log(`🏠 Bunker server running on http://localhost:${CONFIG.PORT}`);
+httpServer.listen(CONFIG.PORT, '0.0.0.0', () => {
+  console.log(`Bunker server running on http://0.0.0.0:${CONFIG.PORT}`);
 });

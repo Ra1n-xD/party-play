@@ -9,6 +9,7 @@ export interface Player {
   ready: boolean;
   connected: boolean;
   alive: boolean;
+  isBot: boolean;
   character: Character | null;
   revealedIndices: number[];
   hasVoted: boolean;
@@ -62,6 +63,7 @@ export function createRoom(socketId: string, playerName: string): { room: Room; 
     ready: false,
     connected: true,
     alive: true,
+    isBot: false,
     character: null,
     revealedIndices: [],
     hasVoted: false,
@@ -97,6 +99,7 @@ export function joinRoom(roomCode: string, socketId: string, playerName: string)
     ready: false,
     connected: true,
     alive: true,
+    isBot: false,
     character: null,
     revealedIndices: [],
     hasVoted: false,
@@ -140,4 +143,55 @@ export function getAlivePlayers(room: Room): Player[] {
 
 export function getAllRooms(): Map<string, Room> {
   return rooms;
+}
+
+const BOT_NAMES = [
+  'Алексей', 'Мария', 'Дмитрий', 'Елена', 'Сергей', 'Анна', 'Иван', 'Ольга',
+  'Андрей', 'Наталья', 'Михаил', 'Екатерина', 'Павел', 'Татьяна', 'Николай',
+  'Светлана', 'Владимир', 'Ирина', 'Артём', 'Юлия', 'Роман', 'Виктория',
+  'Максим', 'Ксения', 'Денис', 'Марина', 'Кирилл', 'Дарья',
+];
+
+export function addBotToRoom(room: Room): Player | null {
+  if (room.gameState && room.gameState.phase !== 'LOBBY') return null;
+  if (room.players.size >= CONFIG.MAX_PLAYERS) return null;
+
+  // Pick unused bot name
+  const usedNames = new Set(Array.from(room.players.values()).map(p => p.name));
+  const available = BOT_NAMES.filter(n => !usedNames.has(n));
+  const name = available.length > 0
+    ? available[Math.floor(Math.random() * available.length)]
+    : `Бот ${room.players.size + 1}`;
+
+  const playerId = generatePlayerId();
+  const player: Player = {
+    id: playerId,
+    socketId: '',
+    name,
+    ready: true,
+    connected: true,
+    alive: true,
+    isBot: true,
+    character: null,
+    revealedIndices: [],
+    hasVoted: false,
+    votedFor: null,
+    actionUsed: false,
+    immuneThisRound: false,
+    doubleVoteThisRound: false,
+  };
+
+  room.players.set(playerId, player);
+  room.allPlayerIds.push(playerId);
+  return player;
+}
+
+export function removeBotFromRoom(room: Room, playerId: string): boolean {
+  const player = room.players.get(playerId);
+  if (!player || !player.isBot) return false;
+  if (room.gameState && room.gameState.phase !== 'LOBBY') return false;
+
+  room.players.delete(playerId);
+  room.allPlayerIds = room.allPlayerIds.filter(id => id !== playerId);
+  return true;
 }
