@@ -4,14 +4,9 @@ import { healthConditions } from './data/health.js';
 import { hobbies } from './data/hobbies.js';
 import { baggage } from './data/baggage.js';
 import { facts } from './data/facts.js';
+import { biologyCards } from './data/biology.js';
 import { actionCards } from './data/actions.js';
 import { randomPick } from './utils.js';
-
-function generateAge(): number {
-  const base = Math.random() + Math.random() + Math.random();
-  const normalized = base / 3;
-  return Math.floor(18 + normalized * 62);
-}
 
 export function generateCharacter(usedProfessions: Set<string>): Character {
   let profession;
@@ -22,9 +17,21 @@ export function generateCharacter(usedProfessions: Set<string>): Character {
   } while (usedProfessions.has(profession.title) && attempts < 100);
   usedProfessions.add(profession.title);
 
-  const age = generateAge();
-  const gender = randomPick(['Мужчина', 'Женщина']);
+  const bio = randomPick(biologyCards);
+  const health = randomPick(healthConditions);
+  const hobby = randomPick(hobbies);
+  const bag = randomPick(baggage);
+  const fact = randomPick(facts);
   const actionCard = randomPick(actionCards);
+
+  // Build bio display value
+  let bioValue = bio.title;
+  if (bio.gender && bio.age !== null) {
+    bioValue = `${bio.gender}, ${bio.age} лет`;
+    if (bio.orientation && bio.orientation !== 'Гетеро') {
+      bioValue += `, ${bio.orientation}`;
+    }
+  }
 
   // 6 attributes per original rules: Profession, Biology, Health, Hobby, Baggage, Fact
   const attributes: Attribute[] = [
@@ -32,32 +39,37 @@ export function generateCharacter(usedProfessions: Set<string>): Character {
       type: 'profession',
       label: 'Профессия',
       value: profession.title,
-      detail: profession.description,
+      image: profession.image,
     },
     {
       type: 'bio',
-      label: 'Биоданные',
-      value: `${gender}, ${age} лет`,
+      label: 'Биология',
+      value: bioValue,
+      image: bio.image,
     },
     {
       type: 'health',
       label: 'Здоровье',
-      value: randomPick(healthConditions),
+      value: health.title,
+      image: health.image,
     },
     {
       type: 'hobby',
       label: 'Хобби',
-      value: randomPick(hobbies),
+      value: hobby.title,
+      image: hobby.image,
     },
     {
       type: 'baggage',
       label: 'Багаж',
-      value: randomPick(baggage),
+      value: bag.title,
+      image: bag.image,
     },
     {
       type: 'fact',
       label: 'Доп. факт',
-      value: randomPick(facts),
+      value: fact.title,
+      image: fact.image,
     },
   ];
 

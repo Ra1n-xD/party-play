@@ -1,9 +1,10 @@
 import { Server } from 'socket.io';
-import { PublicGameState, PlayerInfo, Attribute, ServerEvents, ClientEvents, BunkerCard } from '../../shared/types.js';
+import { PublicGameState, PlayerInfo, Attribute, ServerEvents, ClientEvents, BunkerCard, ThreatCard } from '../../shared/types.js';
 import { Room, GameState, Player, getAlivePlayers } from './roomManager.js';
 import { generateCharacter } from './characterGenerator.js';
 import { catastrophes } from './data/catastrophes.js';
 import { bunkerCards as allBunkerCardsData } from './data/bunkers.js';
+import { threatCards as allThreatCardsData } from './data/threats.js';
 import { randomPick, shuffle } from './utils.js';
 import { CONFIG } from './config.js';
 import { scheduleBotActions } from './botManager.js';
@@ -59,6 +60,9 @@ export function startGame(room: Room, io: IOServer): void {
   const shuffledBunkerCards = shuffle([...allBunkerCardsData]);
   const gameBunkerCards = shuffledBunkerCards.slice(0, CONFIG.BUNKER_CARDS_COUNT);
 
+  // Pick a random threat card (revealed with last bunker card)
+  const threatCard = randomPick(allThreatCardsData);
+
   // Generate characters
   const usedProfessions = new Set<string>();
   for (const player of room.players.values()) {
@@ -81,6 +85,7 @@ export function startGame(room: Room, io: IOServer): void {
     catastrophe,
     bunkerCards: gameBunkerCards,
     revealedBunkerCount: 0,
+    threatCard,
     bunkerCapacity,
     turnOrder: [],
     currentTurnIndex: 0,
@@ -532,121 +537,115 @@ export function useAction(room: Room, playerId: string, targetPlayerId: string |
   let result = '';
 
   switch (action.id) {
-    case 'swap_profession':
-      if (target?.character && player.character) {
-        const temp = player.character.attributes[0];
-        player.character.attributes[0] = target.character.attributes[0];
-        target.character.attributes[0] = temp;
-        result = `${player.name} обменялся профессией с ${target.name}`;
-      }
-      break;
-
-    case 'reveal_other':
-      if (target) {
-        const unrevealed = [];
-        for (let i = 0; i < (target.character?.attributes.length || 0); i++) {
-          if (!target.revealedIndices.includes(i)) unrevealed.push(i);
-        }
-        if (unrevealed.length > 0) {
-          target.revealedIndices.push(unrevealed[0]);
-          result = `${player.name} раскрыл характеристику игрока ${target.name}`;
-        }
-      }
-      break;
-
     case 'double_vote':
       player.doubleVoteThisRound = true;
-      result = `${player.name} получил двойной голос в этом раунде`;
+      result = `${player.name} использовал «${action.title}»: голос считается за два`;
       break;
 
-    case 'immunity':
-      player.immuneThisRound = true;
-      result = `${player.name} получил иммунитет в этом раунде`;
-      break;
-
-    case 'peek':
-      if (target?.character) {
-        const unrevealed = [];
-        for (let i = 0; i < target.character.attributes.length; i++) {
-          if (!target.revealedIndices.includes(i)) unrevealed.push(i);
-        }
-        if (unrevealed.length > 0) {
-          const attr = target.character.attributes[unrevealed[0]];
-          result = `Вы подсмотрели: ${attr.label} — ${attr.value}`;
-          const socket = io.sockets.sockets.get(player.socketId);
-          if (socket) {
-            socket.emit('game:actionResult', {
-              playerId: player.id,
-              actionTitle: action.title,
-              result,
-            });
-          }
-          io.to(room.code).emit('game:actionResult', {
-            playerId: player.id,
-            actionTitle: action.title,
-            targetPlayerId: target.id,
-            result: `${player.name} подсмотрел характеристику игрока ${target.name}`,
-          });
-          broadcastState(room, io);
-          return { success: true, result };
-        }
+    case 'discredit':
+      if (target) {
+        // Mark target's vote as not counting (we use doubleVote = false and hasVoted = true trick)
+        // For simplicity: just announce it — the actual mechanic is social
+        result = `${player.name} использовал «${action.title}» на ${target.name}: голос не учитывается`;
       }
       break;
 
-    case 'swap_health':
-      if (target?.character && player.character) {
-        const playerHealthIdx = player.character.attributes.findIndex(a => a.type === 'health');
-        const targetHealthIdx = target.character.attributes.findIndex(a => a.type === 'health');
-        if (playerHealthIdx !== -1 && targetHealthIdx !== -1) {
-          const temp = player.character.attributes[playerHealthIdx];
-          player.character.attributes[playerHealthIdx] = target.character.attributes[targetHealthIdx];
-          target.character.attributes[targetHealthIdx] = temp;
-          result = `${player.name} обменялся здоровьем с ${target.name}`;
-        }
+    case 'kompromat':
+      if (target) {
+        result = `${player.name} использовал «${action.title}» на ${target.name}: голоса против удваиваются, но ${player.name} не голосует`;
       }
       break;
 
     case 'swap_baggage':
-      if (target?.character && player.character) {
-        const playerBagIdx = player.character.attributes.findIndex(a => a.type === 'baggage');
-        const targetBagIdx = target.character.attributes.findIndex(a => a.type === 'baggage');
-        if (playerBagIdx !== -1 && targetBagIdx !== -1) {
-          const temp = player.character.attributes[playerBagIdx];
-          player.character.attributes[playerBagIdx] = target.character.attributes[targetBagIdx];
-          target.character.attributes[targetBagIdx] = temp;
-          result = `${player.name} обменялся багажом с ${target.name}`;
+    case 'swap_bio':
+    case 'swap_health':
+    case 'swap_facts':
+    case 'swap_hobby': {
+      const typeMap: Record<string, string> = {
+        'swap_baggage': 'baggage',
+        'swap_bio': 'bio',
+        'swap_health': 'health',
+        'swap_facts': 'fact',
+        'swap_hobby': 'hobby',
+      };
+      const attrType = typeMap[action.id];
+      if (target?.character && player.character && attrType) {
+        const pIdx = player.character.attributes.findIndex(a => a.type === attrType);
+        const tIdx = target.character.attributes.findIndex(a => a.type === attrType);
+        if (pIdx !== -1 && tIdx !== -1) {
+          const temp = player.character.attributes[pIdx];
+          player.character.attributes[pIdx] = target.character.attributes[tIdx];
+          target.character.attributes[tIdx] = temp;
+          result = `${player.name} обменялся картой с ${target.name}`;
+        }
+      }
+      break;
+    }
+
+    case 'fake_diploma':
+      if (target?.character) {
+        const usedProf = new Set<string>();
+        const newChar = generateCharacter(usedProf);
+        const profIdx = target.character.attributes.findIndex(a => a.type === 'profession');
+        if (profIdx !== -1) {
+          target.character.attributes[profIdx] = newChar.attributes[0];
+          result = `${player.name} подменил профессию игрока ${target.name}`;
         }
       }
       break;
 
-    case 'hide_attribute':
-      if (player.revealedIndices.length > 0) {
-        player.revealedIndices.pop();
-        result = `${player.name} скрыл одну из своих характеристик`;
+    case 'bad_pills':
+      if (target?.character) {
+        const usedProf = new Set<string>();
+        const newChar = generateCharacter(usedProf);
+        const healthIdx = target.character.attributes.findIndex(a => a.type === 'health');
+        const newHealthIdx = newChar.attributes.findIndex(a => a.type === 'health');
+        if (healthIdx !== -1 && newHealthIdx !== -1) {
+          target.character.attributes[healthIdx] = newChar.attributes[newHealthIdx];
+          result = `${player.name} подменил здоровье игрока ${target.name}`;
+        }
       }
       break;
 
-    case 'veto':
-      result = `${player.name} сохранил право вето`;
+    case 'good_pills':
+      if (target) {
+        // Remove the health card (un-reveal it)
+        const healthIdx = target.character?.attributes.findIndex(a => a.type === 'health');
+        if (healthIdx !== undefined && healthIdx !== -1) {
+          const revIdx = target.revealedIndices.indexOf(healthIdx);
+          if (revIdx !== -1) {
+            target.revealedIndices.splice(revIdx, 1);
+          }
+          result = `${player.name} сбросил карту здоровья игрока ${target.name}`;
+        }
+      }
       break;
 
-    case 'fortune':
-      if (player.character) {
-        const usedProf = new Set<string>();
-        const newChar = generateCharacter(usedProf);
-        const unrevealed = player.character.attributes
-          .map((_, i) => i)
-          .filter(i => !player.revealedIndices.includes(i));
-        if (unrevealed.length > 0) {
-          const idx = unrevealed[Math.floor(Math.random() * unrevealed.length)];
-          player.character.attributes[idx] = newChar.attributes[idx % newChar.attributes.length];
-          result = `${player.name} перегенерировал одну из своих характеристик`;
+    case 'steal_baggage':
+      if (target?.character && player.character) {
+        const pBagIdx = player.character.attributes.findIndex(a => a.type === 'baggage');
+        const tBagIdx = target.character.attributes.findIndex(a => a.type === 'baggage');
+        if (pBagIdx !== -1 && tBagIdx !== -1) {
+          player.character.attributes[pBagIdx] = target.character.attributes[tBagIdx];
+          // Target gets a new random baggage
+          const usedProf = new Set<string>();
+          const newChar = generateCharacter(usedProf);
+          const newBagIdx = newChar.attributes.findIndex(a => a.type === 'baggage');
+          if (newBagIdx !== -1) {
+            target.character.attributes[tBagIdx] = newChar.attributes[newBagIdx];
+          }
+          result = `${player.name} забрал багаж у ${target.name}`;
         }
       }
       break;
 
     default:
-      result = `${player.name} использовал карту: ${action.title}`;
+      // Cards that are primarily social/RP — just announce usage
+      result = `${player.name} использовал «${action.title}»`;
+      if (target) {
+        result += ` на ${target.name}`;
+      }
+      break;
   }
 
   io.to(room.code).emit('game:actionResult', {
@@ -739,6 +738,7 @@ export function buildPublicState(room: Room): PublicGameState {
     totalRounds: CONFIG.TOTAL_ROUNDS,
     catastrophe: gs?.catastrophe || null,
     revealedBunkerCards,
+    threatCard: (gs && gs.revealedBunkerCount >= gs.bunkerCards.length) ? gs.threatCard : null,
     bunkerCapacity: gs?.bunkerCapacity || 0,
     players,
     currentTurnPlayerId: gs?.phase === 'ROUND_REVEAL' ? gs.turnOrder[gs.currentTurnIndex] || null : null,

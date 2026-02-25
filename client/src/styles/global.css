@@ -1019,6 +1019,151 @@ body {
   to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
+/* ============ CARD IMAGES ============ */
+.card-image {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  display: block;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.card-image:hover {
+  transform: scale(1.02);
+}
+
+.catastrophe-image {
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.catastrophe-card {
+  cursor: pointer;
+  text-align: center;
+}
+
+.bunker-cards-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bunker-card-item {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  border: 1px solid var(--border);
+  transition: border-color 0.3s;
+}
+
+.bunker-card-item.newly-revealed {
+  border-color: var(--accent);
+  animation: pulse 1s ease;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 12px rgba(245, 158, 11, 0.4); }
+}
+
+.bunker-card-image {
+  max-width: 100%;
+}
+
+.bunker-card-title {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.bunker-card-desc {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.bunker-capacity {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.threat-card-panel {
+  margin-top: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.threat-card-panel h3 {
+  color: var(--danger);
+  margin-bottom: 8px;
+}
+
+.threat-card-item {
+  text-align: center;
+}
+
+.threat-card-image {
+  max-width: 250px;
+  margin: 0 auto;
+}
+
+.threat-card-title {
+  display: block;
+  font-weight: 600;
+}
+
+.threat-card-desc {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.attr-card-image {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.mini-card-image {
+  max-width: 120px;
+  border-radius: 4px;
+}
+
+.attribute-card.action-card {
+  border-color: #7c3aed;
+}
+
+.attribute-card.action-card.used {
+  opacity: 0.5;
+}
+
+.expanded-card-modal {
+  max-width: 500px;
+  text-align: center;
+}
+
+.expanded-card-image {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.last-elim-badge {
+  background: var(--warning, #f59e0b);
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 /* ============ RESPONSIVE ============ */
 @media (max-width: 480px) {
   .logo h1 {
@@ -1042,6 +1187,22 @@ body {
   .vote-bar-name {
     width: 70px;
     font-size: 0.8rem;
+  }
+
+  .catastrophe-image {
+    max-width: 200px;
+  }
+
+  .bunker-cards-list {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+
+  .threat-card-image {
+    max-width: 180px;
+  }
+
+  .mini-card-image {
+    max-width: 90px;
   }
 }
 
