@@ -186,19 +186,6 @@ function startRevealPhase(room: Room, io: IOServer): void {
   room.gameState.turnOrder = [...aliveIds.slice(startFrom), ...aliveIds.slice(0, startFrom)];
   room.gameState.currentTurnIndex = 0;
 
-  // Round 1: auto-reveal profession (index 0) for all players
-  if (room.gameState.roundNumber === 1) {
-    for (const player of alivePlayers) {
-      if (player.character && !player.revealedIndices.includes(0)) {
-        player.revealedIndices.push(0);
-      }
-    }
-    // Skip the manual reveal phase in round 1 — go straight to discussion/voting
-    broadcastState(room, io);
-    afterRevealPhase(room, io);
-    return;
-  }
-
   broadcastState(room, io);
 }
 
@@ -237,7 +224,10 @@ export function revealAttribute(room: Room, playerId: string, attributeIndex: nu
   }
 
   let idxToReveal: number;
-  if (attributeIndex !== undefined && unrevealed.includes(attributeIndex)) {
+  if (room.gameState.roundNumber === 1) {
+    // Round 1: must reveal profession (index 0)
+    idxToReveal = 0;
+  } else if (attributeIndex !== undefined && unrevealed.includes(attributeIndex)) {
     idxToReveal = attributeIndex;
   } else {
     // Default: reveal next unrevealed
