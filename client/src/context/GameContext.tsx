@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { socket } from '../socket';
-import { PublicGameState, Character, GamePhase } from '../../../shared/types';
+import { PublicGameState, Character, AttributeType } from '../../../shared/types';
 
 interface GameContextType {
   connected: boolean;
@@ -9,21 +9,25 @@ interface GameContextType {
   gameState: PublicGameState | null;
   myCharacter: Character | null;
   error: string | null;
-  actionResult: string | null;
   createRoom: (name: string) => void;
   joinRoom: (code: string, name: string) => void;
   rejoinRoom: (code: string, pid: string) => void;
   setReady: (ready: boolean) => void;
   startGame: () => void;
   revealAttribute: (attributeIndex?: number) => void;
+  revealActionCard: () => void;
   castVote: (targetId: string) => void;
-  useAction: (targetId?: string) => void;
   endGame: () => void;
   playAgain: () => void;
   leaveRoom: () => void;
   clearError: () => void;
   addBot: () => void;
   removeBot: (playerId: string) => void;
+  adminShuffleAll: (attributeType: AttributeType) => void;
+  adminSwapAttribute: (player1Id: string, player2Id: string, attributeType: AttributeType) => void;
+  adminReplaceAttribute: (targetPlayerId: string, attributeType: AttributeType) => void;
+  adminPause: () => void;
+  adminUnpause: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -35,7 +39,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [gameState, setGameState] = useState<PublicGameState | null>(null);
   const [myCharacter, setMyCharacter] = useState<Character | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [actionResult, setActionResult] = useState<string | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
@@ -72,11 +75,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setMyCharacter(character);
     });
 
-    socket.on('game:actionResult', ({ result }) => {
-      setActionResult(result);
-      setTimeout(() => setActionResult(null), 5000);
-    });
-
     // Try to rejoin on page reload
     const savedRoom = sessionStorage.getItem('bunker_room');
     const savedPlayer = sessionStorage.getItem('bunker_player');
@@ -92,7 +90,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socket.off('room:error');
       socket.off('game:state');
       socket.off('game:character');
-      socket.off('game:actionResult');
     };
   }, []);
 
@@ -120,12 +117,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit('game:revealAttribute', { attributeIndex });
   }, []);
 
-  const castVoteFn = useCallback((targetId: string) => {
-    socket.emit('vote:cast', { targetPlayerId: targetId });
+  const revealActionCardFn = useCallback(() => {
+    socket.emit('game:revealActionCard');
   }, []);
 
-  const useActionFn = useCallback((targetId?: string) => {
-    socket.emit('game:useAction', { targetPlayerId: targetId });
+  const castVoteFn = useCallback((targetId: string) => {
+    socket.emit('vote:cast', { targetPlayerId: targetId });
   }, []);
 
   const endGame = useCallback(() => {
@@ -157,6 +154,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit('room:removeBot', { playerId: botPlayerId });
   }, []);
 
+  const adminShuffleAllFn = useCallback((attributeType: AttributeType) => {
+    socket.emit('admin:shuffleAll', { attributeType });
+  }, []);
+
+  const adminSwapAttributeFn = useCallback((player1Id: string, player2Id: string, attributeType: AttributeType) => {
+    socket.emit('admin:swapAttribute', { player1Id, player2Id, attributeType });
+  }, []);
+
+  const adminReplaceAttributeFn = useCallback((targetPlayerId: string, attributeType: AttributeType) => {
+    socket.emit('admin:replaceAttribute', { targetPlayerId, attributeType });
+  }, []);
+
+  const adminPauseFn = useCallback(() => {
+    socket.emit('admin:pause');
+  }, []);
+
+  const adminUnpauseFn = useCallback(() => {
+    socket.emit('admin:unpause');
+  }, []);
+
   return (
     <GameContext.Provider
       value={{
@@ -166,21 +183,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         gameState,
         myCharacter,
         error,
-        actionResult,
         createRoom,
         joinRoom,
         rejoinRoom,
         setReady,
         startGame: startGameFn,
         revealAttribute: revealAttributeFn,
+        revealActionCard: revealActionCardFn,
         castVote: castVoteFn,
-        useAction: useActionFn,
         endGame,
         playAgain: playAgainFn,
         leaveRoom,
         clearError,
         addBot,
         removeBot,
+        adminShuffleAll: adminShuffleAllFn,
+        adminSwapAttribute: adminSwapAttributeFn,
+        adminReplaceAttribute: adminReplaceAttributeFn,
+        adminPause: adminPauseFn,
+        adminUnpause: adminUnpauseFn,
       }}
     >
       {children}

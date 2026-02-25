@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import { ServerEvents, ClientEvents } from '../../shared/types.js';
 import { Room, Player, getAlivePlayers } from './roomManager.js';
-import { revealAttribute, castVote, useAction } from './gameEngine.js';
+import { revealAttribute, castVote } from './gameEngine.js';
 import { CONFIG } from './config.js';
 
 type IOServer = Server<ClientEvents, ServerEvents>;
@@ -29,14 +29,6 @@ function randomDelay(): number {
     Math.random() * (CONFIG.BOT_ACTION_DELAY_MAX - CONFIG.BOT_ACTION_DELAY_MIN);
 }
 
-function getAliveBots(room: Room): Player[] {
-  return Array.from(room.players.values()).filter(p => p.isBot && p.alive);
-}
-
-function getAllBots(room: Room): Player[] {
-  return Array.from(room.players.values()).filter(p => p.isBot);
-}
-
 export function scheduleBotActions(room: Room, io: IOServer): void {
   if (!room.gameState) return;
 
@@ -52,9 +44,6 @@ export function scheduleBotActions(room: Room, io: IOServer): void {
     case 'ROUND_VOTE':
     case 'ROUND_VOTE_TIEBREAK':
       scheduleBotVotes(room, io);
-      break;
-    case 'ROUND_DISCUSSION':
-      scheduleBotActions_discussion(room, io);
       break;
   }
 }
@@ -139,34 +128,3 @@ function scheduleBotVotes(room: Room, io: IOServer): void {
   }
 }
 
-function scheduleBotActions_discussion(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
-
-  // 30% chance for each bot to use action during discussion
-  const aliveBots = getAliveBots(room);
-
-  for (const bot of aliveBots) {
-    if (bot.actionUsed || !bot.character) continue;
-    if (Math.random() > 0.3) continue; // 30% chance
-
-    const delay = randomDelay() + 2000; // Extra delay for discussion
-
-    const timer = setTimeout(() => {
-      if (!room.gameState || room.gameState.phase !== 'ROUND_DISCUSSION') return;
-      if (bot.actionUsed || !bot.character) return;
-
-      const action = bot.character.actionCard;
-      let targetId: string | undefined;
-
-      if (action.targetRequired) {
-        const alivePlayers = getAlivePlayers(room).filter(p => p.id !== bot.id);
-        if (alivePlayers.length === 0) return;
-        targetId = alivePlayers[Math.floor(Math.random() * alivePlayers.length)].id;
-      }
-
-      useAction(room, bot.id, targetId, io);
-    }, delay);
-
-    addBotTimer(room.code, timer);
-  }
-}

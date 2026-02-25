@@ -694,10 +694,15 @@ body {
   color: var(--text-muted);
 }
 
+.action-card-display {
+  margin-top: 12px;
+}
+
 .character-actions {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  margin-top: 12px;
 }
 
 .eliminated-badge {
@@ -1121,6 +1126,150 @@ body {
 
 .expanded-player-modal .attributes-grid {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+/* ============ ADMIN PANEL ============ */
+.admin-panel {
+  margin-top: 12px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 165, 0, 0.3);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.btn-admin-toggle {
+  width: 100%;
+  background: rgba(255, 165, 0, 0.1);
+  color: #ffa500;
+  border: none;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.btn-admin-toggle:hover {
+  background: rgba(255, 165, 0, 0.2);
+}
+
+.admin-panel-body {
+  padding: 12px 16px;
+}
+
+.admin-actions-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-admin {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 12px;
+  background: rgba(255, 165, 0, 0.15);
+  color: #ffa500;
+  border: 1px solid rgba(255, 165, 0, 0.3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.btn-admin:hover {
+  background: rgba(255, 165, 0, 0.25);
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-form h4 {
+  margin: 0;
+  color: #ffa500;
+  font-size: 0.95rem;
+}
+
+.admin-form label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.admin-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-chip {
+  padding: 6px 12px;
+  background: var(--bg-main);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.admin-chip:hover {
+  border-color: #ffa500;
+  color: var(--text-main);
+}
+
+.admin-chip.active {
+  background: rgba(255, 165, 0, 0.2);
+  border-color: #ffa500;
+  color: #ffa500;
+}
+
+.admin-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ============ PAUSE OVERLAY ============ */
+.pause-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.pause-content {
+  text-align: center;
+  color: var(--text-main);
+}
+
+.pause-icon {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.pause-content h2 {
+  font-size: 2.5rem;
+  margin: 0 0 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pause-content p {
+  font-size: 1rem;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ============ TOASTS ============ */

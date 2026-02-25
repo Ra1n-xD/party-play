@@ -23,7 +23,6 @@ export function generateCharacter(usedProfessions: Set<string>): Character {
   const bag = randomPick(baggage);
   const fact = randomPick(facts);
   const actionCard = randomPick(actionCards);
-
   // Build bio display value
   let bioValue = bio.title;
   if (bio.gender && bio.age !== null) {
@@ -76,6 +75,5 @@ export function generateCharacter(usedProfessions: Set<string>): Character {
   return {
     attributes,
     actionCard,
-    actionUsed: false,
   };
 }

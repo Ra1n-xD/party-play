@@ -35,6 +35,28 @@ function AppContent() {
   }
 }
 
+function PauseOverlay() {
+  const { gameState, playerId } = useGame();
+  if (!gameState?.paused) return null;
+  const me = gameState.players.find(p => p.id === playerId);
+  if (me?.isHost) return null;
+
+  return (
+    <div className="pause-overlay">
+      <div className="pause-content">
+        <span className="pause-icon">⏸</span>
+        <h2>Пауза</h2>
+        <p>Хост приостановил игру</p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
-  return <AppContent />;
+  return (
+    <>
+      <AppContent />
+      <PauseOverlay />
+    </>
+  );
 }

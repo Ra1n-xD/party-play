@@ -40,6 +40,21 @@ export function ResultsScreen() {
             </div>
           ))}
         </div>
+        {/* Action card (desktop) */}
+        {player.actionCard && (
+          <div className="result-desktop action-card-display">
+            <div className="attribute-card revealed" data-attr-type="action">
+              <div className="attr-content">
+                {player.actionCard.image && <img src={player.actionCard.image} alt={player.actionCard.title} className="attr-card-image" />}
+                <div className="attr-text">
+                  <span className="attr-label">Особое условие</span>
+                  <span className="attr-value">{player.actionCard.title}</span>
+                  <span className="attr-detail">{player.actionCard.description}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Mobile: compact tags */}
         <div className="result-mobile">
           {attrs.map((attr, i) => (
@@ -51,6 +66,11 @@ export function ResultsScreen() {
               <span className="result-tag-label">{attr.label}:</span> {attr.value}
             </span>
           ))}
+          {player.actionCard && (
+            <span className="result-tag tag-revealed" data-attr-type="action">
+              <span className="result-tag-label">Особое условие:</span> {player.actionCard.title}
+            </span>
+          )}
         </div>
       </div>
     );
