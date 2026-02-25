@@ -14,8 +14,7 @@ export type AttributeType =
   | 'health'
   | 'hobby'
   | 'baggage'
-  | 'fact'
-  | 'action';
+  | 'fact';
 
 export interface ActionCard {
   id: string;
@@ -28,7 +27,6 @@ export interface ActionCard {
 export interface Character {
   attributes: Attribute[];
   actionCard: ActionCard;
-  actionUsed: boolean;
 }
 
 // ============ Bunker Cards ============
@@ -76,6 +74,8 @@ export interface PlayerInfo {
   alive: boolean;
   revealedAttributes: Attribute[];
   allAttributes?: FullAttribute[];
+  actionCard?: ActionCard;
+  actionCardRevealed: boolean;
   isHost: boolean;
   isBot: boolean;
 }
@@ -101,6 +101,7 @@ export interface PublicGameState {
   lastEliminatedPlayerId: string | null;
   tiebreakCandidateIds: string[] | null;
   phaseEndTime: number | null;
+  paused: boolean;
 }
 
 // ============ Socket Events ============
@@ -114,7 +115,12 @@ export interface ClientEvents {
   'player:ready': (data: { ready: boolean }) => void;
   'game:start': () => void;
   'game:revealAttribute': (data: { attributeIndex?: number }) => void;
-  'game:useAction': (data: { targetPlayerId?: string }) => void;
+  'game:revealActionCard': () => void;
+  'admin:shuffleAll': (data: { attributeType: AttributeType }) => void;
+  'admin:swapAttribute': (data: { player1Id: string; player2Id: string; attributeType: AttributeType }) => void;
+  'admin:replaceAttribute': (data: { targetPlayerId: string; attributeType: AttributeType }) => void;
+  'admin:pause': () => void;
+  'admin:unpause': () => void;
   'vote:cast': (data: { targetPlayerId: string }) => void;
   'game:endGame': () => void;
   'game:playAgain': () => void;
@@ -129,6 +135,5 @@ export interface ServerEvents {
   'room:error': (data: { message: string }) => void;
   'game:state': (data: PublicGameState) => void;
   'game:character': (data: Character) => void;
-  'game:actionResult': (data: { playerId: string; actionTitle: string; targetPlayerId?: string; result: string }) => void;
   'game:eliminated': (data: { playerId: string; playerName: string }) => void;
 }

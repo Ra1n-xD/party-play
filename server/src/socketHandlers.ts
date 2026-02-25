@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { ClientEvents, ServerEvents } from '../../shared/types.js';
 import { createRoom, joinRoom, getRoom, removePlayer, addBotToRoom, removeBotFromRoom, Room, Player } from './roomManager.js';
-import { startGame, revealAttribute, castVote, useAction, forceEndGame, resetGame, broadcastState } from './gameEngine.js';
+import { startGame, revealAttribute, revealActionCard, castVote, forceEndGame, resetGame, broadcastState, adminShuffleAll, adminSwapAttribute, adminReplaceAttribute, pauseGame, unpauseGame } from './gameEngine.js';
 import { CONFIG } from './config.js';
 
 type IOServer = Server<ClientEvents, ServerEvents>;
@@ -130,6 +130,18 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
+    socket.on('game:revealActionCard', () => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+
+      const success = revealActionCard(room, info.playerId, io);
+      if (!success) {
+        socket.emit('room:error', { message: 'Невозможно раскрыть особое условие сейчас' });
+      }
+    });
+
     socket.on('vote:cast', ({ targetPlayerId }) => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
@@ -139,18 +151,6 @@ export function registerHandlers(io: IOServer): void {
       const success = castVote(room, info.playerId, targetPlayerId, io);
       if (!success) {
         socket.emit('room:error', { message: 'Невозможно проголосовать' });
-      }
-    });
-
-    socket.on('game:useAction', ({ targetPlayerId }) => {
-      const info = socketRoomMap.get(socket.id);
-      if (!info) return;
-      const room = getRoom(info.roomCode);
-      if (!room) return;
-
-      const result = useAction(room, info.playerId, targetPlayerId, io);
-      if (!result.success) {
-        socket.emit('room:error', { message: result.result });
       }
     });
 
@@ -220,6 +220,81 @@ export function registerHandlers(io: IOServer): void {
       }
 
       broadcastState(room, io);
+    });
+
+    socket.on('admin:shuffleAll', ({ attributeType }) => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+      if (info.playerId !== room.hostId) {
+        socket.emit('room:error', { message: 'Только хост может использовать админ-панель' });
+        return;
+      }
+      const result = adminShuffleAll(room, attributeType, io);
+      if (!result.success) {
+        socket.emit('room:error', { message: result.error });
+      }
+    });
+
+    socket.on('admin:swapAttribute', ({ player1Id, player2Id, attributeType }) => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+      if (info.playerId !== room.hostId) {
+        socket.emit('room:error', { message: 'Только хост может использовать админ-панель' });
+        return;
+      }
+      const result = adminSwapAttribute(room, player1Id, player2Id, attributeType, io);
+      if (!result.success) {
+        socket.emit('room:error', { message: result.error });
+      }
+    });
+
+    socket.on('admin:replaceAttribute', ({ targetPlayerId, attributeType }) => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+      if (info.playerId !== room.hostId) {
+        socket.emit('room:error', { message: 'Только хост может использовать админ-панель' });
+        return;
+      }
+      const result = adminReplaceAttribute(room, targetPlayerId, attributeType, io);
+      if (!result.success) {
+        socket.emit('room:error', { message: result.error });
+      }
+    });
+
+    socket.on('admin:pause', () => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+      if (info.playerId !== room.hostId) {
+        socket.emit('room:error', { message: 'Только хост может ставить игру на паузу' });
+        return;
+      }
+      const result = pauseGame(room, io);
+      if (!result.success) {
+        socket.emit('room:error', { message: result.error });
+      }
+    });
+
+    socket.on('admin:unpause', () => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+      if (info.playerId !== room.hostId) {
+        socket.emit('room:error', { message: 'Только хост может снимать паузу' });
+        return;
+      }
+      const result = unpauseGame(room, io);
+      if (!result.success) {
+        socket.emit('room:error', { message: result.error });
+      }
     });
 
     socket.on('room:leave', () => {

@@ -14,9 +14,8 @@ export interface Player {
   revealedIndices: number[];
   hasVoted: boolean;
   votedFor: string | null;
-  actionUsed: boolean;
   immuneThisRound: boolean;
-  doubleVoteThisRound: boolean;
+  actionCardRevealed: boolean;
 }
 
 export interface GameState {
@@ -38,6 +37,9 @@ export interface GameState {
   tiebreakCandidateIds: string[];    // Players tied in voting (for tiebreak)
   phaseTimer: ReturnType<typeof setTimeout> | null;
   phaseEndTime: number | null;
+  paused: boolean;
+  pausedTimeRemaining: number | null;
+  pausedCallback: (() => void) | null;
 }
 
 export interface Room {
@@ -69,9 +71,8 @@ export function createRoom(socketId: string, playerName: string): { room: Room; 
     revealedIndices: [],
     hasVoted: false,
     votedFor: null,
-    actionUsed: false,
     immuneThisRound: false,
-    doubleVoteThisRound: false,
+    actionCardRevealed: false,
   };
 
   const room: Room = {
@@ -105,9 +106,8 @@ export function joinRoom(roomCode: string, socketId: string, playerName: string)
     revealedIndices: [],
     hasVoted: false,
     votedFor: null,
-    actionUsed: false,
     immuneThisRound: false,
-    doubleVoteThisRound: false,
+    actionCardRevealed: false,
   };
 
   room.players.set(playerId, player);
@@ -177,9 +177,8 @@ export function addBotToRoom(room: Room): Player | null {
     revealedIndices: [],
     hasVoted: false,
     votedFor: null,
-    actionUsed: false,
     immuneThisRound: false,
-    doubleVoteThisRound: false,
+    actionCardRevealed: false,
   };
 
   room.players.set(playerId, player);

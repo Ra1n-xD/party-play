@@ -72,9 +72,7 @@ export function startGame(room: Room, io: IOServer): void {
     player.revealedIndices = [];
     player.hasVoted = false;
     player.votedFor = null;
-    player.actionUsed = false;
     player.immuneThisRound = false;
-    player.doubleVoteThisRound = false;
   }
 
   const playerIds = Array.from(room.players.keys());
@@ -99,6 +97,9 @@ export function startGame(room: Room, io: IOServer): void {
     tiebreakCandidateIds: [],
     phaseTimer: null,
     phaseEndTime: null,
+    paused: false,
+    pausedTimeRemaining: null,
+    pausedCallback: null,
   };
 
   // Send each player their character privately
@@ -122,11 +123,14 @@ function schedulePhaseTransition(room: Room, io: IOServer, delay: number, callba
     clearTimeout(room.gameState.phaseTimer);
   }
   if (room.gameState) {
+    // Save callback so it can be resumed after unpause
+    room.gameState.pausedCallback = callback;
     room.gameState.phaseEndTime = Date.now() + delay;
     room.gameState.phaseTimer = setTimeout(() => {
       if (room.gameState) {
         room.gameState.phaseTimer = null;
         room.gameState.phaseEndTime = null;
+        room.gameState.pausedCallback = null;
       }
       callback();
     }, delay);
@@ -380,9 +384,7 @@ function tallyVotes(room: Room, io: IOServer): void {
 
   for (const [voterId, targetId] of room.gameState.votes) {
     if (!voteCounts.has(targetId)) continue;
-    const voter = room.players.get(voterId);
-    const voteWeight = voter?.doubleVoteThisRound ? 2 : 1;
-    voteCounts.set(targetId, (voteCounts.get(targetId) || 0) + voteWeight);
+    voteCounts.set(targetId, (voteCounts.get(targetId) || 0) + 1);
   }
 
   // Find max votes
@@ -471,7 +473,6 @@ function eliminatePlayer(room: Room, playerId: string, io: IOServer): void {
   // Reset round-specific flags
   for (const p of room.players.values()) {
     p.immuneThisRound = false;
-    p.doubleVoteThisRound = false;
   }
 
   schedulePhaseTransition(room, io, CONFIG.RESULT_DISPLAY_TIME, () => {
@@ -516,161 +517,159 @@ function advanceRoundOrEnd(room: Room, io: IOServer): void {
   }
 }
 
-export function useAction(room: Room, playerId: string, targetPlayerId: string | undefined, io: IOServer): { success: boolean; result: string } {
-  if (!room.gameState) return { success: false, result: 'Игра не запущена' };
-  if (room.gameState.phase !== 'ROUND_REVEAL' && room.gameState.phase !== 'ROUND_DISCUSSION') {
-    return { success: false, result: 'Сейчас нельзя использовать карту действия' };
-  }
+// ============ Reveal Action Card ============
+
+export function revealActionCard(room: Room, playerId: string, io: IOServer): boolean {
+  if (!room.gameState) return false;
+  // Can reveal in any phase except voting
+  const phase = room.gameState.phase;
+  if (phase === 'ROUND_VOTE' || phase === 'ROUND_VOTE_TIEBREAK') return false;
 
   const player = room.players.get(playerId);
-  if (!player || !player.alive || !player.character) return { success: false, result: 'Игрок не найден' };
-  if (player.actionUsed) return { success: false, result: 'Карта действия уже использована' };
+  if (!player || !player.character || player.actionCardRevealed) return false;
 
-  const action = player.character.actionCard;
-  let target: Player | undefined;
+  player.actionCardRevealed = true;
+  broadcastState(room, io);
+  return true;
+}
 
-  if (action.targetRequired) {
-    if (!targetPlayerId) return { success: false, result: 'Требуется выбрать цель' };
-    target = room.players.get(targetPlayerId);
-    if (!target || !target.alive) return { success: false, result: 'Цель недоступна' };
-  }
+// ============ Admin Panel Functions ============
 
-  player.actionUsed = true;
-  player.character.actionUsed = true;
-  let result = '';
+export function adminShuffleAll(room: Room, attributeType: string, io: IOServer): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
 
-  switch (action.id) {
-    case 'double_vote':
-      player.doubleVoteThisRound = true;
-      result = `${player.name} использовал «${action.title}»: голос считается за два`;
-      break;
+  const alivePlayers = getAlivePlayers(room).filter(p => p.character);
+  if (alivePlayers.length < 2) return { success: false, error: 'Недостаточно игроков' };
 
-    case 'discredit':
-      if (target) {
-        // Mark target's vote as not counting (we use doubleVote = false and hasVoted = true trick)
-        // For simplicity: just announce it — the actual mechanic is social
-        result = `${player.name} использовал «${action.title}» на ${target.name}: голос не учитывается`;
-      }
-      break;
-
-    case 'kompromat':
-      if (target) {
-        result = `${player.name} использовал «${action.title}» на ${target.name}: голоса против удваиваются, но ${player.name} не голосует`;
-      }
-      break;
-
-    case 'swap_baggage':
-    case 'swap_bio':
-    case 'swap_health':
-    case 'swap_facts':
-    case 'swap_hobby': {
-      const typeMap: Record<string, string> = {
-        'swap_baggage': 'baggage',
-        'swap_bio': 'bio',
-        'swap_health': 'health',
-        'swap_facts': 'fact',
-        'swap_hobby': 'hobby',
-      };
-      const attrType = typeMap[action.id];
-      if (target?.character && player.character && attrType) {
-        const pIdx = player.character.attributes.findIndex(a => a.type === attrType);
-        const tIdx = target.character.attributes.findIndex(a => a.type === attrType);
-        if (pIdx !== -1 && tIdx !== -1) {
-          const temp = player.character.attributes[pIdx];
-          player.character.attributes[pIdx] = target.character.attributes[tIdx];
-          target.character.attributes[tIdx] = temp;
-          result = `${player.name} обменялся картой с ${target.name}`;
-        }
-      }
-      break;
-    }
-
-    case 'fake_diploma':
-      if (target?.character) {
-        const usedProf = new Set<string>();
-        const newChar = generateCharacter(usedProf);
-        const profIdx = target.character.attributes.findIndex(a => a.type === 'profession');
-        if (profIdx !== -1) {
-          target.character.attributes[profIdx] = newChar.attributes[0];
-          result = `${player.name} подменил профессию игрока ${target.name}`;
-        }
-      }
-      break;
-
-    case 'bad_pills':
-      if (target?.character) {
-        const usedProf = new Set<string>();
-        const newChar = generateCharacter(usedProf);
-        const healthIdx = target.character.attributes.findIndex(a => a.type === 'health');
-        const newHealthIdx = newChar.attributes.findIndex(a => a.type === 'health');
-        if (healthIdx !== -1 && newHealthIdx !== -1) {
-          target.character.attributes[healthIdx] = newChar.attributes[newHealthIdx];
-          result = `${player.name} подменил здоровье игрока ${target.name}`;
-        }
-      }
-      break;
-
-    case 'good_pills':
-      if (target) {
-        // Remove the health card (un-reveal it)
-        const healthIdx = target.character?.attributes.findIndex(a => a.type === 'health');
-        if (healthIdx !== undefined && healthIdx !== -1) {
-          const revIdx = target.revealedIndices.indexOf(healthIdx);
-          if (revIdx !== -1) {
-            target.revealedIndices.splice(revIdx, 1);
-          }
-          result = `${player.name} сбросил карту здоровья игрока ${target.name}`;
-        }
-      }
-      break;
-
-    case 'steal_baggage':
-      if (target?.character && player.character) {
-        const pBagIdx = player.character.attributes.findIndex(a => a.type === 'baggage');
-        const tBagIdx = target.character.attributes.findIndex(a => a.type === 'baggage');
-        if (pBagIdx !== -1 && tBagIdx !== -1) {
-          player.character.attributes[pBagIdx] = target.character.attributes[tBagIdx];
-          // Target gets a new random baggage
-          const usedProf = new Set<string>();
-          const newChar = generateCharacter(usedProf);
-          const newBagIdx = newChar.attributes.findIndex(a => a.type === 'baggage');
-          if (newBagIdx !== -1) {
-            target.character.attributes[tBagIdx] = newChar.attributes[newBagIdx];
-          }
-          result = `${player.name} забрал багаж у ${target.name}`;
-        }
-      }
-      break;
-
-    default:
-      // Cards that are primarily social/RP — just announce usage
-      result = `${player.name} использовал «${action.title}»`;
-      if (target) {
-        result += ` на ${target.name}`;
-      }
-      break;
-  }
-
-  io.to(room.code).emit('game:actionResult', {
-    playerId: player.id,
-    actionTitle: action.title,
-    targetPlayerId: target?.id,
-    result,
-  });
-
-  if (target) {
-    const targetSocket = io.sockets.sockets.get(target.socketId);
-    if (targetSocket && target.character) {
-      targetSocket.emit('game:character', target.character);
+  // Collect all attributes of this type
+  const attrs: { playerIdx: number; attrIdx: number; attr: any }[] = [];
+  for (const player of alivePlayers) {
+    const idx = player.character!.attributes.findIndex(a => a.type === attributeType);
+    if (idx !== -1) {
+      attrs.push({ playerIdx: 0, attrIdx: idx, attr: player.character!.attributes[idx] });
     }
   }
-  const playerSocket = io.sockets.sockets.get(player.socketId);
-  if (playerSocket && player.character) {
-    playerSocket.emit('game:character', player.character);
+
+  if (attrs.length < 2) return { success: false, error: 'Недостаточно карт для перемешивания' };
+
+  // Shuffle attributes
+  const shuffled = shuffle(attrs.map(a => a.attr));
+
+  // Redistribute
+  let i = 0;
+  for (const player of alivePlayers) {
+    const idx = player.character!.attributes.findIndex(a => a.type === attributeType);
+    if (idx !== -1 && i < shuffled.length) {
+      player.character!.attributes[idx] = shuffled[i];
+      i++;
+    }
+  }
+
+  // Resend characters to all affected players
+  for (const player of alivePlayers) {
+    const sock = io.sockets.sockets.get(player.socketId);
+    if (sock && player.character) {
+      sock.emit('game:character', player.character);
+    }
   }
 
   broadcastState(room, io);
-  return { success: true, result };
+  return { success: true, error: '' };
+}
+
+export function adminSwapAttribute(room: Room, p1Id: string, p2Id: string, attributeType: string, io: IOServer): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
+
+  const p1 = room.players.get(p1Id);
+  const p2 = room.players.get(p2Id);
+  if (!p1?.character || !p2?.character) return { success: false, error: 'Игрок не найден' };
+
+  const idx1 = p1.character.attributes.findIndex(a => a.type === attributeType);
+  const idx2 = p2.character.attributes.findIndex(a => a.type === attributeType);
+  if (idx1 === -1 || idx2 === -1) return { success: false, error: 'Атрибут не найден' };
+
+  // Swap
+  const temp = p1.character.attributes[idx1];
+  p1.character.attributes[idx1] = p2.character.attributes[idx2];
+  p2.character.attributes[idx2] = temp;
+
+  // Resend characters
+  for (const p of [p1, p2]) {
+    const sock = io.sockets.sockets.get(p.socketId);
+    if (sock && p.character) {
+      sock.emit('game:character', p.character);
+    }
+  }
+
+  broadcastState(room, io);
+  return { success: true, error: '' };
+}
+
+export function adminReplaceAttribute(room: Room, targetPlayerId: string, attributeType: string, io: IOServer): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
+
+  const player = room.players.get(targetPlayerId);
+  if (!player?.character) return { success: false, error: 'Игрок не найден' };
+
+  const idx = player.character.attributes.findIndex(a => a.type === attributeType);
+  if (idx === -1) return { success: false, error: 'Атрибут не найден' };
+
+  // Generate a new character to get a fresh attribute of the right type
+  const usedProf = new Set<string>();
+  const newChar = generateCharacter(usedProf);
+  const newIdx = newChar.attributes.findIndex(a => a.type === attributeType);
+  if (newIdx === -1) return { success: false, error: 'Не удалось сгенерировать новую карту' };
+
+  player.character.attributes[idx] = newChar.attributes[newIdx];
+
+  // Resend character
+  const sock = io.sockets.sockets.get(player.socketId);
+  if (sock && player.character) {
+    sock.emit('game:character', player.character);
+  }
+
+  broadcastState(room, io);
+  return { success: true, error: '' };
+}
+
+// ============ Pause / Unpause ============
+
+export function pauseGame(room: Room, io: IOServer): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
+  if (room.gameState.paused) return { success: false, error: 'Игра уже на паузе' };
+
+  room.gameState.paused = true;
+
+  // Save remaining time and clear the timer
+  if (room.gameState.phaseTimer && room.gameState.phaseEndTime) {
+    const remaining = Math.max(0, room.gameState.phaseEndTime - Date.now());
+    room.gameState.pausedTimeRemaining = remaining;
+    clearTimeout(room.gameState.phaseTimer);
+    room.gameState.phaseTimer = null;
+    room.gameState.phaseEndTime = null;
+  }
+
+  broadcastState(room, io);
+  return { success: true, error: '' };
+}
+
+export function unpauseGame(room: Room, io: IOServer): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
+  if (!room.gameState.paused) return { success: false, error: 'Игра не на паузе' };
+
+  room.gameState.paused = false;
+
+  // Resume timer with remaining time
+  if (room.gameState.pausedTimeRemaining != null && room.gameState.pausedCallback) {
+    const remaining = room.gameState.pausedTimeRemaining;
+    const callback = room.gameState.pausedCallback;
+    room.gameState.pausedTimeRemaining = null;
+    room.gameState.pausedCallback = null;
+    schedulePhaseTransition(room, io, remaining, callback);
+  }
+
+  broadcastState(room, io);
+  return { success: true, error: '' };
 }
 
 export function forceEndGame(room: Room, io: IOServer): void {
@@ -692,9 +691,8 @@ export function resetGame(room: Room, io: IOServer): void {
     player.revealedIndices = [];
     player.hasVoted = false;
     player.votedFor = null;
-    player.actionUsed = false;
     player.immuneThisRound = false;
-    player.doubleVoteThisRound = false;
+    player.actionCardRevealed = false;
   }
 
   broadcastState(room, io);
@@ -712,23 +710,19 @@ export function buildPublicState(room: Room): PublicGameState {
       connected: p.connected,
       alive: p.alive,
       revealedAttributes: p.revealedIndices.map(i => p.character?.attributes[i]).filter(Boolean) as Attribute[],
+      actionCardRevealed: p.actionCardRevealed,
       isHost: p.id === room.hostId,
       isBot: p.isBot,
     };
+    // Show action card if revealed by player or at game over
+    if (p.character && (p.actionCardRevealed || isGameOver)) {
+      info.actionCard = p.character.actionCard;
+    }
     if (isGameOver && p.character) {
       const allAttrs: FullAttribute[] = p.character.attributes.map((attr, i) => ({
         ...attr,
         wasRevealed: revealedSet.has(i),
       }));
-      // Add action card as an attribute entry
-      allAttrs.push({
-        type: 'action',
-        label: 'Особое условие',
-        value: p.character.actionCard.title,
-        detail: p.character.actionCard.description,
-        image: p.character.actionCard.image,
-        wasRevealed: false,
-      });
       info.allAttributes = allAttrs;
     }
     return info;
@@ -744,7 +738,7 @@ export function buildPublicState(room: Room): PublicGameState {
     voteResults = {};
     for (const player of room.players.values()) {
       if (player.votedFor) {
-        voteResults[player.votedFor] = (voteResults[player.votedFor] || 0) + (player.doubleVoteThisRound ? 2 : 1);
+        voteResults[player.votedFor] = (voteResults[player.votedFor] || 0) + 1;
       }
     }
   }
@@ -785,6 +779,7 @@ export function buildPublicState(room: Room): PublicGameState {
     lastEliminatedPlayerId: gs?.lastEliminatedId || null,
     tiebreakCandidateIds: gs?.tiebreakCandidateIds?.length ? gs.tiebreakCandidateIds : null,
     phaseEndTime: gs?.phaseEndTime || null,
+    paused: gs?.paused || false,
   };
 }
 
