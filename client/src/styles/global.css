@@ -613,6 +613,24 @@ body {
   opacity: 0.7;
 }
 
+.attr-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.attr-card-image {
+  width: 70px;
+  height: auto;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.attr-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .attr-label {
   display: block;
   font-size: 0.75rem;
@@ -723,6 +741,9 @@ body {
 
 .mini-attr {
   font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .mini-label {
@@ -1124,14 +1145,11 @@ body {
   margin-top: 4px;
 }
 
-.attr-card-image {
-  max-width: 100%;
-  border-radius: var(--radius-sm);
-}
-
 .mini-card-image {
-  max-width: 120px;
-  border-radius: 4px;
+  width: 40px;
+  height: auto;
+  border-radius: 3px;
+  flex-shrink: 0;
 }
 
 .attribute-card.action-card {
@@ -1189,20 +1207,12 @@ body {
     font-size: 0.8rem;
   }
 
-  .catastrophe-image {
-    max-width: 200px;
-  }
-
-  .bunker-cards-list {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  }
-
-  .threat-card-image {
-    max-width: 180px;
+  .attr-card-image {
+    width: 55px;
   }
 
   .mini-card-image {
-    max-width: 90px;
+    width: 32px;
   }
 }
 
