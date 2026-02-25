@@ -64,6 +64,10 @@ export interface Catastrophe {
   image?: string;
 }
 
+export interface FullAttribute extends Attribute {
+  wasRevealed: boolean;
+}
+
 export interface PlayerInfo {
   id: string;
   name: string;
@@ -71,6 +75,7 @@ export interface PlayerInfo {
   connected: boolean;
   alive: boolean;
   revealedAttributes: Attribute[];
+  allAttributes?: FullAttribute[];
   isHost: boolean;
   isBot: boolean;
 }
@@ -81,6 +86,7 @@ export interface PublicGameState {
   totalRounds: number;
   catastrophe: Catastrophe | null;
   revealedBunkerCards: BunkerCard[];
+  totalBunkerCards: number;
   threatCard: ThreatCard | null;
   bunkerCapacity: number;
   players: PlayerInfo[];
@@ -110,6 +116,7 @@ export interface ClientEvents {
   'game:revealAttribute': (data: { attributeIndex?: number }) => void;
   'game:useAction': (data: { targetPlayerId?: string }) => void;
   'vote:cast': (data: { targetPlayerId: string }) => void;
+  'game:endGame': () => void;
   'game:playAgain': () => void;
   'room:addBot': () => void;
   'room:removeBot': (data: { playerId: string }) => void;

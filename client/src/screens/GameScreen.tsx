@@ -134,8 +134,96 @@ export function GameScreen() {
         </div>
       )}
 
-      {/* All Players (including self) */}
-      <div className="players-grid">
+      {/* Desktop: My Character (separate card grid) */}
+      <div className="my-character desktop-only">
+        <h3>Ваш персонаж {!me?.alive && <span className="eliminated-badge">ИЗГНАН</span>}</h3>
+        <div className="attributes-grid">
+          {myCharacter.attributes.map((attr, i) => {
+            const isRevealed = revealedIndices.has(i);
+            return (
+              <div key={i} className={`attribute-card ${isRevealed ? 'revealed' : 'hidden'}`} data-attr-type={attr.type}>
+                <div className="attr-content">
+                  {attr.image && <img src={attr.image} alt={attr.value} className="attr-card-image" />}
+                  <div className="attr-text">
+                    <span className="attr-label">{attr.label}</span>
+                    <span className="attr-value">{attr.value}</span>
+                    {attr.detail && <span className="attr-detail">{attr.detail}</span>}
+                  </div>
+                </div>
+                {!isRevealed && <span className="attr-status">Скрыто</span>}
+              </div>
+            );
+          })}
+          <div className={`attribute-card action-card ${myCharacter.actionUsed ? 'used' : ''}`}>
+            <div className="attr-content">
+              {myCharacter.actionCard.image && <img src={myCharacter.actionCard.image} alt={myCharacter.actionCard.title} className="attr-card-image" />}
+              <div className="attr-text">
+                <span className="attr-label">Особое условие</span>
+                <span className="attr-value">{myCharacter.actionCard.title}</span>
+                <span className="attr-detail">{myCharacter.actionCard.description}</span>
+              </div>
+            </div>
+            {myCharacter.actionUsed && <span className="attr-status">Использовано</span>}
+          </div>
+        </div>
+
+        <div className="character-actions">
+          {canReveal && (
+            <button className="btn btn-primary btn-reveal" onClick={() => {
+              if (gameState.roundNumber === 1) {
+                revealAttribute(0);
+              } else {
+                setShowAttrPicker(true);
+              }
+            }}>
+              Раскрыть характеристику
+            </button>
+          )}
+          {canUseAction && (
+            <button className="btn btn-action" onClick={handleUseAction}>
+              Использовать: {myCharacter.actionCard.title}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Desktop: Other Players */}
+      <div className="players-grid desktop-only">
+        <h3>Игроки ({gameState.players.filter(p => p.alive).length} в игре)</h3>
+        <div className="players-list">
+          {otherPlayers.map(player => (
+            <div key={player.id} className={`player-card ${!player.alive ? 'eliminated' : ''} ${!player.connected ? 'disconnected' : ''}`} onClick={() => setExpandedPlayerId(player.id)}>
+              <div className="player-header">
+                <span className="player-name">
+                  {player.isBot && <span className="bot-badge">BOT</span>}
+                  {player.name}
+                </span>
+                {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
+                {!player.connected && !player.isBot && <span className="dc-badge">Отключён</span>}
+                {player.id === gameState.lastEliminatedPlayerId && (
+                  <span className="last-elim-badge">Голосует</span>
+                )}
+              </div>
+              <div className="player-attributes">
+                {player.revealedAttributes.length === 0 ? (
+                  <span className="no-attrs">Пока ничего не раскрыто</span>
+                ) : (
+                  player.revealedAttributes.map((attr, i) => (
+                    <div key={i} className="mini-attr" data-attr-type={attr.type}>
+                      {attr.image && <img src={attr.image} alt={attr.value} className="mini-card-image" />}
+                      <span className="mini-label">{attr.label}:</span>
+                      <span className="mini-value">{attr.value}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Mobile: All Players in one grid */}
+      <div className="players-grid mobile-only">
         <h3>Игроки ({gameState.players.filter(p => p.alive).length} в игре)</h3>
         <div className="players-list">
           {allPlayers.map(player => {
@@ -150,9 +238,6 @@ export function GameScreen() {
                   </span>
                   {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
                   {!player.connected && !player.isBot && <span className="dc-badge">Отключён</span>}
-                  {player.id === gameState.lastEliminatedPlayerId && (
-                    <span className="last-elim-badge">Голосует</span>
-                  )}
                 </div>
                 <div className="player-attributes">
                   {isMe ? (
@@ -161,7 +246,6 @@ export function GameScreen() {
                         const isRevealed = revealedIndices.has(i);
                         return (
                           <div key={i} className={`mini-attr ${isRevealed ? '' : 'attr-hidden'}`} data-attr-type={attr.type}>
-                            {attr.image && <img src={attr.image} alt={attr.value} className="mini-card-image" />}
                             <span className="mini-label">{attr.label}:</span>
                             <span className="mini-value">{attr.value}</span>
                             {!isRevealed && <span className="mini-hidden-tag">скрыто</span>}
@@ -169,10 +253,8 @@ export function GameScreen() {
                         );
                       })}
                       <div className={`mini-attr ${myCharacter.actionUsed ? 'attr-used' : ''}`} data-attr-type="action">
-                        {myCharacter.actionCard.image && <img src={myCharacter.actionCard.image} alt={myCharacter.actionCard.title} className="mini-card-image" />}
                         <span className="mini-label">Особое условие:</span>
                         <span className="mini-value">{myCharacter.actionCard.title}</span>
-                        {myCharacter.actionUsed && <span className="mini-hidden-tag">использовано</span>}
                       </div>
                     </>
                   ) : (
@@ -181,7 +263,6 @@ export function GameScreen() {
                     ) : (
                       player.revealedAttributes.map((attr, i) => (
                         <div key={i} className="mini-attr" data-attr-type={attr.type}>
-                          {attr.image && <img src={attr.image} alt={attr.value} className="mini-card-image" />}
                           <span className="mini-label">{attr.label}:</span>
                           <span className="mini-value">{attr.value}</span>
                         </div>
@@ -193,26 +274,26 @@ export function GameScreen() {
             );
           })}
         </div>
-      </div>
 
-      {/* Action buttons */}
-      <div className="character-actions">
-        {canReveal && (
-          <button className="btn btn-primary btn-reveal" onClick={() => {
-            if (gameState.roundNumber === 1) {
-              revealAttribute(0);
-            } else {
-              setShowAttrPicker(true);
-            }
-          }}>
-            Раскрыть характеристику
-          </button>
-        )}
-        {canUseAction && (
-          <button className="btn btn-action" onClick={handleUseAction}>
-            Использовать: {myCharacter.actionCard.title}
-          </button>
-        )}
+        {/* Mobile action buttons */}
+        <div className="character-actions">
+          {canReveal && (
+            <button className="btn btn-primary btn-reveal" onClick={() => {
+              if (gameState.roundNumber === 1) {
+                revealAttribute(0);
+              } else {
+                setShowAttrPicker(true);
+              }
+            }}>
+              Раскрыть характеристику
+            </button>
+          )}
+          {canUseAction && (
+            <button className="btn btn-action" onClick={handleUseAction}>
+              Использовать: {myCharacter.actionCard.title}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Attribute Picker Modal */}
