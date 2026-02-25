@@ -140,7 +140,7 @@ export function GameScreen() {
           {myCharacter.attributes.map((attr, i) => {
             const isRevealed = revealedIndices.has(i);
             return (
-              <div key={i} className={`attribute-card ${isRevealed ? 'revealed' : 'hidden'}`}>
+              <div key={i} className={`attribute-card ${isRevealed ? 'revealed' : 'hidden'}`} data-attr-type={attr.type}>
                 <div className="attr-content">
                   {attr.image && <img src={attr.image} alt={attr.value} className="attr-card-image" />}
                   <div className="attr-text">
@@ -210,7 +210,7 @@ export function GameScreen() {
                   <span className="no-attrs">Пока ничего не раскрыто</span>
                 ) : (
                   player.revealedAttributes.map((attr, i) => (
-                    <div key={i} className="mini-attr">
+                    <div key={i} className="mini-attr" data-attr-type={attr.type}>
                       {attr.image && <img src={attr.image} alt={attr.value} className="mini-card-image" />}
                       <span className="mini-label">{attr.label}:</span>
                       <span className="mini-value">{attr.value}</span>
