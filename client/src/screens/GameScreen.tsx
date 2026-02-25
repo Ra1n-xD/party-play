@@ -107,7 +107,7 @@ export function GameScreen() {
           {/* Bunker Cards - revealed gradually */}
           {gameState.revealedBunkerCards.length > 0 && (
             <div className="bunker-cards-panel">
-              <h3>Бункер ({gameState.revealedBunkerCards.length}/5 карт)</h3>
+              <h3>Бункер ({gameState.revealedBunkerCards.length}/{gameState.totalBunkerCards} карт)</h3>
               <div className="bunker-cards-list">
                 {gameState.revealedBunkerCards.map((card, i) => (
                   <div key={i} className={`bunker-card-item ${i === gameState.revealedBunkerCards.length - 1 && gameState.phase === 'BUNKER_EXPLORE' ? 'newly-revealed' : ''}`}>

@@ -126,10 +126,7 @@ function scheduleBotVotes(room: Room, io: IOServer): void {
           .map(id => room.players.get(id))
           .filter((p): p is Player => !!p && p.alive && p.id !== bot.id);
       } else {
-        // Prefer voting for non-bots (makes it more interesting)
-        const alivePlayers = getAlivePlayers(room).filter(p => p.id !== bot.id);
-        const humans = alivePlayers.filter(p => !p.isBot);
-        candidates = humans.length > 0 ? humans : alivePlayers;
+        candidates = getAlivePlayers(room).filter(p => p.id !== bot.id);
       }
 
       if (candidates.length === 0) return;

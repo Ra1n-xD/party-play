@@ -856,7 +856,7 @@ body {
 }
 
 .results-container {
-  max-width: 700px;
+  max-width: 900px;
   margin: 0 auto;
   width: 100%;
   text-align: center;
@@ -911,24 +911,47 @@ body {
   margin-bottom: 8px;
 }
 
-.result-attrs {
-  display: flex;
-  flex-direction: column;
+.result-player .attributes-grid {
+  text-align: left;
+}
+
+/* Results: desktop grid / mobile tags toggle */
+.result-desktop { display: grid; }
+.result-mobile { display: none; }
+
+.result-tag {
+  display: inline-flex;
+  align-items: center;
   gap: 3px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  border: 1px solid transparent;
 }
 
-.result-attr {
-  font-size: 0.85rem;
-}
-
-.result-attr-label {
-  color: var(--text-muted);
-}
-
-.result-attr-value {
+.result-tag.tag-revealed {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
   color: var(--text-primary);
-  font-weight: 500;
 }
+
+.result-tag.tag-hidden {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+.result-tag-label {
+  font-weight: 600;
+}
+
+.result-tag[data-attr-type="profession"] .result-tag-label { color: #f59e0b; }
+.result-tag[data-attr-type="bio"] .result-tag-label { color: #ec4899; }
+.result-tag[data-attr-type="health"] .result-tag-label { color: #10b981; }
+.result-tag[data-attr-type="hobby"] .result-tag-label { color: #6366f1; }
+.result-tag[data-attr-type="baggage"] .result-tag-label { color: #f97316; }
+.result-tag[data-attr-type="fact"] .result-tag-label { color: #06b6d4; }
+.result-tag[data-attr-type="action"] .result-tag-label { color: #a855f7; }
 
 /* ============ VOTE BARS ============ */
 .last-vote-results {
@@ -1233,6 +1256,16 @@ body {
 
   .mini-card-image {
     width: 32px;
+  }
+
+  .result-desktop {
+    display: none !important;
+  }
+
+  .result-mobile {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 4px;
   }
 }
 
