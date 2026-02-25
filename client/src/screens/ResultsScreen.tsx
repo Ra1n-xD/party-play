@@ -29,14 +29,8 @@ export function ResultsScreen() {
             <div className="bunker-cards-list">
               {gameState.revealedBunkerCards.map((card, i) => (
                 <div key={i} className="bunker-card-item">
-                  {card.image ? (
-                    <img src={card.image} alt={card.title} className="card-image bunker-card-image" />
-                  ) : (
-                    <>
-                      <span className="bunker-card-title">{card.title}</span>
-                      <span className="bunker-card-desc">{card.description}</span>
-                    </>
-                  )}
+                  <span className="bunker-card-title">{card.title}</span>
+                  <span className="bunker-card-desc">{card.description}</span>
                 </div>
               ))}
             </div>

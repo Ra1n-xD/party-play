@@ -7,7 +7,6 @@ export function GameScreen() {
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [showAttrPicker, setShowAttrPicker] = useState(false);
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
   if (!gameState || !myCharacter) return null;
 
@@ -100,16 +99,9 @@ export function GameScreen() {
       {/* Catastrophe Info */}
       {gameState.catastrophe && (
         <div className="scenario-panel">
-          <div className="catastrophe-card" onClick={() => setExpandedCard(expandedCard === 'catastrophe' ? null : 'catastrophe')}>
-            {gameState.catastrophe.image && (
-              <img src={gameState.catastrophe.image} alt={gameState.catastrophe.title} className="card-image catastrophe-image" />
-            )}
-            {!gameState.catastrophe.image && (
-              <>
-                <h3>{gameState.catastrophe.title}</h3>
-                <p>{gameState.catastrophe.description}</p>
-              </>
-            )}
+          <div className="catastrophe-card">
+            <h3>{gameState.catastrophe.title}</h3>
+            <p>{gameState.catastrophe.description}</p>
           </div>
 
           {/* Bunker Cards - revealed gradually */}
@@ -119,14 +111,8 @@ export function GameScreen() {
               <div className="bunker-cards-list">
                 {gameState.revealedBunkerCards.map((card, i) => (
                   <div key={i} className={`bunker-card-item ${i === gameState.revealedBunkerCards.length - 1 && gameState.phase === 'BUNKER_EXPLORE' ? 'newly-revealed' : ''}`}>
-                    {card.image ? (
-                      <img src={card.image} alt={card.title} className="card-image bunker-card-image" />
-                    ) : (
-                      <>
-                        <span className="bunker-card-title">{card.title}</span>
-                        <span className="bunker-card-desc">{card.description}</span>
-                      </>
-                    )}
+                    <span className="bunker-card-title">{card.title}</span>
+                    <span className="bunker-card-desc">{card.description}</span>
                   </div>
                 ))}
               </div>
@@ -139,14 +125,8 @@ export function GameScreen() {
             <div className="threat-card-panel">
               <h3>Угроза</h3>
               <div className="threat-card-item">
-                {gameState.threatCard.image ? (
-                  <img src={gameState.threatCard.image} alt={gameState.threatCard.title} className="card-image threat-card-image" />
-                ) : (
-                  <>
-                    <span className="threat-card-title">{gameState.threatCard.title}</span>
-                    <span className="threat-card-desc">{gameState.threatCard.description}</span>
-                  </>
-                )}
+                <span className="threat-card-title">{gameState.threatCard.title}</span>
+                <span className="threat-card-desc">{gameState.threatCard.description}</span>
               </div>
             </div>
           )}
@@ -302,24 +282,6 @@ export function GameScreen() {
                 Отмена
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Expanded Card Modal */}
-      {expandedCard && (
-        <div className="modal-overlay" onClick={() => setExpandedCard(null)}>
-          <div className="modal expanded-card-modal" onClick={e => e.stopPropagation()}>
-            {expandedCard === 'catastrophe' && gameState.catastrophe && (
-              <>
-                {gameState.catastrophe.image && (
-                  <img src={gameState.catastrophe.image} alt={gameState.catastrophe.title} className="expanded-card-image" />
-                )}
-                <h3>{gameState.catastrophe.title}</h3>
-                <p>{gameState.catastrophe.description}</p>
-              </>
-            )}
-            <button className="btn btn-secondary" onClick={() => setExpandedCard(null)}>Закрыть</button>
           </div>
         </div>
       )}
