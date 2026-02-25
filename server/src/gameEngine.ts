@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { PublicGameState, PlayerInfo, Attribute, ServerEvents, ClientEvents, BunkerCard, ThreatCard } from '../../shared/types.js';
+import { PublicGameState, PlayerInfo, Attribute, FullAttribute, ServerEvents, ClientEvents, BunkerCard, ThreatCard } from '../../shared/types.js';
 import { Room, GameState, Player, getAlivePlayers } from './roomManager.js';
 import { generateCharacter } from './characterGenerator.js';
 import { catastrophes } from './data/catastrophes.js';
@@ -56,12 +56,13 @@ export function startGame(room: Room, io: IOServer): void {
 
   const catastrophe = randomPick(catastrophes);
 
-  // Pick 5 random bunker cards
+  // Dynamic bunker cards count based on player count
+  const bunkerCardsCount = playerCount <= 4 ? 3 : playerCount <= 5 ? 4 : 5;
   const shuffledBunkerCards = shuffle([...allBunkerCardsData]);
-  const gameBunkerCards = shuffledBunkerCards.slice(0, CONFIG.BUNKER_CARDS_COUNT);
+  const gameBunkerCards = shuffledBunkerCards.slice(0, bunkerCardsCount);
 
-  // Pick a random threat card (revealed with last bunker card)
-  const threatCard = randomPick(allThreatCardsData);
+  // Threat card only for 6+ players
+  const threatCard = playerCount >= 6 ? randomPick(allThreatCardsData) : null;
 
   // Generate characters
   const usedProfessions = new Set<string>();
@@ -151,12 +152,14 @@ function startNewRound(room: Room, io: IOServer): void {
 function startBunkerExplore(room: Room, io: IOServer): void {
   if (!room.gameState) return;
 
-  room.gameState.phase = 'BUNKER_EXPLORE';
-
-  // Reveal next bunker card
-  if (room.gameState.revealedBunkerCount < room.gameState.bunkerCards.length) {
-    room.gameState.revealedBunkerCount++;
+  // Skip explore phase if all bunker cards already revealed
+  if (room.gameState.revealedBunkerCount >= room.gameState.bunkerCards.length) {
+    startRevealPhase(room, io);
+    return;
   }
+
+  room.gameState.phase = 'BUNKER_EXPLORE';
+  room.gameState.revealedBunkerCount++;
 
   broadcastState(room, io);
 
@@ -691,16 +694,37 @@ export function resetGame(room: Room, io: IOServer): void {
 
 export function buildPublicState(room: Room): PublicGameState {
   const gs = room.gameState;
-  const players: PlayerInfo[] = Array.from(room.players.values()).map(p => ({
-    id: p.id,
-    name: p.name,
-    ready: p.ready,
-    connected: p.connected,
-    alive: p.alive,
-    revealedAttributes: p.revealedIndices.map(i => p.character?.attributes[i]).filter(Boolean) as Attribute[],
-    isHost: p.id === room.hostId,
-    isBot: p.isBot,
-  }));
+  const isGameOver = gs?.phase === 'GAME_OVER';
+  const players: PlayerInfo[] = Array.from(room.players.values()).map(p => {
+    const revealedSet = new Set(p.revealedIndices);
+    const info: PlayerInfo = {
+      id: p.id,
+      name: p.name,
+      ready: p.ready,
+      connected: p.connected,
+      alive: p.alive,
+      revealedAttributes: p.revealedIndices.map(i => p.character?.attributes[i]).filter(Boolean) as Attribute[],
+      isHost: p.id === room.hostId,
+      isBot: p.isBot,
+    };
+    if (isGameOver && p.character) {
+      const allAttrs: FullAttribute[] = p.character.attributes.map((attr, i) => ({
+        ...attr,
+        wasRevealed: revealedSet.has(i),
+      }));
+      // Add action card as an attribute entry
+      allAttrs.push({
+        type: 'action',
+        label: 'Особое условие',
+        value: p.character.actionCard.title,
+        detail: p.character.actionCard.description,
+        image: p.character.actionCard.image,
+        wasRevealed: false,
+      });
+      info.allAttributes = allAttrs;
+    }
+    return info;
+  });
 
   // Count voters (alive + last eliminated)
   const voters = gs ? getVoters_fromState(room) : [];
@@ -738,6 +762,7 @@ export function buildPublicState(room: Room): PublicGameState {
     totalRounds: CONFIG.TOTAL_ROUNDS,
     catastrophe: gs?.catastrophe || null,
     revealedBunkerCards,
+    totalBunkerCards: gs?.bunkerCards.length || 0,
     threatCard: (gs && gs.revealedBunkerCount >= gs.bunkerCards.length) ? gs.threatCard : null,
     bunkerCapacity: gs?.bunkerCapacity || 0,
     players,

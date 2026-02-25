@@ -1,7 +1,7 @@
 import { useGame } from '../context/GameContext';
 
 export function ResultsScreen() {
-  const { gameState, playerId, myCharacter, playAgain } = useGame();
+  const { gameState, playerId, playAgain } = useGame();
 
   if (!gameState) return null;
 
@@ -10,6 +10,51 @@ export function ResultsScreen() {
   const survivors = gameState.players.filter(p => p.alive);
   const eliminated = gameState.players.filter(p => !p.alive);
   const iSurvived = me?.alive ?? false;
+
+  const renderPlayerCard = (player: typeof gameState.players[0]) => {
+    const attrs = player.allAttributes || player.revealedAttributes.map(a => ({ ...a, wasRevealed: true }));
+
+    return (
+      <div key={player.id} className={`result-player ${player.id === playerId ? 'is-me' : ''}`}>
+        <div className="result-player-name">
+          {player.isBot && <span className="bot-badge">BOT</span>}
+          {player.name} {player.id === playerId && '(вы)'}
+        </div>
+        {/* Desktop: card grid */}
+        <div className="result-desktop attributes-grid">
+          {attrs.map((attr, i) => (
+            <div
+              key={i}
+              className={`attribute-card ${attr.wasRevealed ? 'revealed' : 'hidden'}`}
+              data-attr-type={attr.type}
+            >
+              <div className="attr-content">
+                {attr.image && <img src={attr.image} alt={attr.value} className="attr-card-image" />}
+                <div className="attr-text">
+                  <span className="attr-label">{attr.label}</span>
+                  <span className="attr-value">{attr.value}</span>
+                  {attr.detail && <span className="attr-detail">{attr.detail}</span>}
+                </div>
+              </div>
+              {!attr.wasRevealed && <span className="attr-status">Скрыто</span>}
+            </div>
+          ))}
+        </div>
+        {/* Mobile: compact tags */}
+        <div className="result-mobile">
+          {attrs.map((attr, i) => (
+            <span
+              key={i}
+              className={`result-tag ${attr.wasRevealed ? 'tag-revealed' : 'tag-hidden'}`}
+              data-attr-type={attr.type}
+            >
+              <span className="result-tag-label">{attr.label}:</span> {attr.value}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="screen results-screen">
@@ -37,62 +82,28 @@ export function ResultsScreen() {
           </div>
         )}
 
+        {/* Threat card */}
+        {gameState.threatCard && (
+          <div className="threat-card-panel">
+            <h3>Угроза</h3>
+            <div className="threat-card-item">
+              <span className="threat-card-title">{gameState.threatCard.title}</span>
+              <span className="threat-card-desc">{gameState.threatCard.description}</span>
+            </div>
+          </div>
+        )}
+
         <div className="results-groups">
           <div className="results-group survivors">
             <h3>В бункере ({survivors.length})</h3>
-            {survivors.map(player => (
-              <div key={player.id} className={`result-player ${player.id === playerId ? 'is-me' : ''}`}>
-                <div className="result-player-name">{player.name} {player.id === playerId && '(вы)'}</div>
-                <div className="result-attrs">
-                  {player.revealedAttributes.map((attr, i) => (
-                    <div key={i} className="result-attr">
-                      <span className="result-attr-label">{attr.label}:</span>
-                      <span className="result-attr-value">{attr.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+            {survivors.map(renderPlayerCard)}
           </div>
 
           <div className="results-group eliminated-group">
             <h3>Изгнанные ({eliminated.length})</h3>
-            {eliminated.map(player => (
-              <div key={player.id} className={`result-player ${player.id === playerId ? 'is-me' : ''}`}>
-                <div className="result-player-name">{player.name} {player.id === playerId && '(вы)'}</div>
-                <div className="result-attrs">
-                  {player.revealedAttributes.map((attr, i) => (
-                    <div key={i} className="result-attr">
-                      <span className="result-attr-label">{attr.label}:</span>
-                      <span className="result-attr-value">{attr.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+            {eliminated.map(renderPlayerCard)}
           </div>
         </div>
-
-        {/* My full character (including hidden card) */}
-        {myCharacter && (
-          <div className="results-my-full">
-            <h3>Ваш полный персонаж</h3>
-            <div className="result-attrs">
-              {myCharacter.attributes.map((attr, i) => (
-                <div key={i} className="result-attr">
-                  <span className="result-attr-label">{attr.label}:</span>
-                  <span className="result-attr-value">{attr.value}</span>
-                  {attr.detail && <span className="result-attr-detail">{attr.detail}</span>}
-                </div>
-              ))}
-              <div className="result-attr">
-                <span className="result-attr-label">Особое условие:</span>
-                <span className="result-attr-value">{myCharacter.actionCard.title}</span>
-                <span className="result-attr-detail">{myCharacter.actionCard.description}</span>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Vote Results */}
         {gameState.voteResults && Object.keys(gameState.voteResults).length > 0 && (
