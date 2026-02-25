@@ -7,6 +7,7 @@ export function GameScreen() {
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [showAttrPicker, setShowAttrPicker] = useState(false);
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
   if (!gameState || !myCharacter) return null;
 
@@ -140,7 +141,7 @@ export function GameScreen() {
           {allPlayers.map(player => {
             const isMe = player.id === playerId;
             return (
-              <div key={player.id} className={`player-card ${isMe ? 'is-me' : ''} ${!player.alive ? 'eliminated' : ''} ${!player.connected ? 'disconnected' : ''}`}>
+              <div key={player.id} className={`player-card ${isMe ? 'is-me' : ''} ${!player.alive ? 'eliminated' : ''} ${!player.connected ? 'disconnected' : ''}`} onClick={() => setExpandedPlayerId(player.id)}>
                 <div className="player-header">
                   <span className="player-name">
                     {player.isBot && <span className="bot-badge">BOT</span>}
@@ -269,6 +270,85 @@ export function GameScreen() {
           </div>
         </div>
       )}
+
+      {/* Expanded Player Modal */}
+      {expandedPlayerId && (() => {
+        const player = gameState.players.find(p => p.id === expandedPlayerId);
+        if (!player) return null;
+        const isMe = player.id === playerId;
+        const attrs = isMe ? myCharacter.attributes : [];
+        const revealedAttrs = player.revealedAttributes;
+
+        return (
+          <div className="modal-overlay" onClick={() => setExpandedPlayerId(null)}>
+            <div className="modal expanded-player-modal" onClick={e => e.stopPropagation()}>
+              <div className="expanded-player-header">
+                <h3>
+                  {player.isBot && <span className="bot-badge">BOT</span>}
+                  {player.name}
+                  {isMe && <span className="me-badge">ВЫ</span>}
+                </h3>
+                {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
+              </div>
+              <div className="attributes-grid">
+                {isMe ? (
+                  <>
+                    {attrs.map((attr, i) => {
+                      const isRevealed = revealedIndices.has(i);
+                      return (
+                        <div key={i} className={`attribute-card ${isRevealed ? 'revealed' : 'hidden'}`} data-attr-type={attr.type}>
+                          <div className="attr-content">
+                            {attr.image && <img src={attr.image} alt={attr.value} className="attr-card-image" />}
+                            <div className="attr-text">
+                              <span className="attr-label">{attr.label}</span>
+                              <span className="attr-value">{attr.value}</span>
+                              {attr.detail && <span className="attr-detail">{attr.detail}</span>}
+                            </div>
+                          </div>
+                          {!isRevealed && <span className="attr-status">Скрыто</span>}
+                        </div>
+                      );
+                    })}
+                    <div className={`attribute-card action-card ${myCharacter.actionUsed ? 'used' : ''}`}>
+                      <div className="attr-content">
+                        {myCharacter.actionCard.image && <img src={myCharacter.actionCard.image} alt={myCharacter.actionCard.title} className="attr-card-image" />}
+                        <div className="attr-text">
+                          <span className="attr-label">Особое условие</span>
+                          <span className="attr-value">{myCharacter.actionCard.title}</span>
+                          <span className="attr-detail">{myCharacter.actionCard.description}</span>
+                        </div>
+                      </div>
+                      {myCharacter.actionUsed && <span className="attr-status">Использовано</span>}
+                    </div>
+                  </>
+                ) : (
+                  revealedAttrs.length === 0 ? (
+                    <p className="no-attrs">Пока ничего не раскрыто</p>
+                  ) : (
+                    revealedAttrs.map((attr, i) => (
+                      <div key={i} className="attribute-card revealed" data-attr-type={attr.type}>
+                        <div className="attr-content">
+                          {attr.image && <img src={attr.image} alt={attr.value} className="attr-card-image" />}
+                          <div className="attr-text">
+                            <span className="attr-label">{attr.label}</span>
+                            <span className="attr-value">{attr.value}</span>
+                            {attr.detail && <span className="attr-detail">{attr.detail}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )
+                )}
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-secondary" onClick={() => setExpandedPlayerId(null)}>
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Action Result Toast */}
       {actionResult && <div className="action-toast">{actionResult}</div>}
