@@ -96,7 +96,7 @@ export function GameScreen() {
         {gameState.phase === 'ROUND_REVEAL' && (
           <div className="turn-info">
             {isMyTurn
-              ? 'Ваш ход! Выберите характеристику для раскрытия'
+              ? (gameState.roundNumber === 1 ? 'Ваш ход! Раскройте профессию' : 'Ваш ход! Выберите характеристику для раскрытия')
               : `Ход: ${gameState.players.find(p => p.id === gameState.currentTurnPlayerId)?.name || '...'}`}
           </div>
         )}
@@ -157,7 +157,14 @@ export function GameScreen() {
 
         <div className="character-actions">
           {canReveal && (
-            <button className="btn btn-primary btn-reveal" onClick={() => setShowAttrPicker(true)}>
+            <button className="btn btn-primary btn-reveal" onClick={() => {
+              if (gameState.roundNumber === 1) {
+                // Round 1: always reveal profession (index 0), no picker needed
+                revealAttribute(0);
+              } else {
+                setShowAttrPicker(true);
+              }
+            }}>
               Раскрыть характеристику
             </button>
           )}
