@@ -18,6 +18,7 @@ interface GameContextType {
   revealAttribute: (attributeIndex?: number) => void;
   castVote: (targetId: string) => void;
   useAction: (targetId?: string) => void;
+  endGame: () => void;
   playAgain: () => void;
   leaveRoom: () => void;
   clearError: () => void;
@@ -127,6 +128,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit('game:useAction', { targetPlayerId: targetId });
   }, []);
 
+  const endGame = useCallback(() => {
+    socket.emit('game:endGame');
+  }, []);
+
   const playAgainFn = useCallback(() => {
     socket.emit('game:playAgain');
     setMyCharacter(null);
@@ -170,6 +175,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         revealAttribute: revealAttributeFn,
         castVote: castVoteFn,
         useAction: useActionFn,
+        endGame,
         playAgain: playAgainFn,
         leaveRoom,
         clearError,

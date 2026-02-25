@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { ClientEvents, ServerEvents } from '../../shared/types.js';
 import { createRoom, joinRoom, getRoom, removePlayer, addBotToRoom, removeBotFromRoom, Room, Player } from './roomManager.js';
-import { startGame, revealAttribute, castVote, useAction, resetGame, broadcastState } from './gameEngine.js';
+import { startGame, revealAttribute, castVote, useAction, forceEndGame, resetGame, broadcastState } from './gameEngine.js';
 import { CONFIG } from './config.js';
 
 type IOServer = Server<ClientEvents, ServerEvents>;
@@ -152,6 +152,20 @@ export function registerHandlers(io: IOServer): void {
       if (!result.success) {
         socket.emit('room:error', { message: result.result });
       }
+    });
+
+    socket.on('game:endGame', () => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+
+      if (info.playerId !== room.hostId) {
+        socket.emit('room:error', { message: 'Только хост может завершить игру' });
+        return;
+      }
+
+      forceEndGame(room, io);
     });
 
     socket.on('game:playAgain', () => {

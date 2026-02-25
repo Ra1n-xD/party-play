@@ -3,7 +3,7 @@ import { useGame } from '../context/GameContext';
 import { Timer } from '../components/Timer';
 
 export function GameScreen() {
-  const { gameState, playerId, myCharacter, revealAttribute, useAction, actionResult, error } = useGame();
+  const { gameState, playerId, myCharacter, revealAttribute, useAction, endGame, actionResult, error } = useGame();
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [showAttrPicker, setShowAttrPicker] = useState(false);
@@ -282,6 +282,13 @@ export function GameScreen() {
       {/* Action Result Toast */}
       {actionResult && <div className="action-toast">{actionResult}</div>}
       {error && <div className="error-toast">{error}</div>}
+
+      {/* Host: End Game */}
+      {me?.isHost && (
+        <button className="btn btn-danger btn-end-game" onClick={endGame}>
+          Закончить игру
+        </button>
+      )}
     </div>
   );
 }
