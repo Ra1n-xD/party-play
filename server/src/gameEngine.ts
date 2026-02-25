@@ -673,6 +673,14 @@ export function useAction(room: Room, playerId: string, targetPlayerId: string |
   return { success: true, result };
 }
 
+export function forceEndGame(room: Room, io: IOServer): void {
+  if (!room.gameState) return;
+  if (room.gameState.phaseTimer) clearTimeout(room.gameState.phaseTimer);
+  room.gameState.phase = 'GAME_OVER';
+  room.gameState.phaseEndTime = null;
+  broadcastState(room, io);
+}
+
 export function resetGame(room: Room, io: IOServer): void {
   if (room.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
   room.gameState = null;
