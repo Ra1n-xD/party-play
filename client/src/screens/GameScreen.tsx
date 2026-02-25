@@ -141,30 +141,28 @@ export function GameScreen() {
             const isRevealed = revealedIndices.has(i);
             return (
               <div key={i} className={`attribute-card ${isRevealed ? 'revealed' : 'hidden'}`}>
-                {attr.image ? (
-                  <img src={attr.image} alt={attr.value} className="card-image attr-card-image" />
-                ) : (
-                  <>
+                <div className="attr-content">
+                  {attr.image && <img src={attr.image} alt={attr.value} className="attr-card-image" />}
+                  <div className="attr-text">
                     <span className="attr-label">{attr.label}</span>
                     <span className="attr-value">{attr.value}</span>
                     {attr.detail && <span className="attr-detail">{attr.detail}</span>}
-                  </>
-                )}
+                  </div>
+                </div>
                 {!isRevealed && <span className="attr-status">Скрыто</span>}
               </div>
             );
           })}
           {/* Special Condition card (separate from attributes) */}
           <div className={`attribute-card action-card ${myCharacter.actionUsed ? 'used' : ''}`}>
-            {myCharacter.actionCard.image ? (
-              <img src={myCharacter.actionCard.image} alt={myCharacter.actionCard.title} className="card-image attr-card-image" />
-            ) : (
-              <>
+            <div className="attr-content">
+              {myCharacter.actionCard.image && <img src={myCharacter.actionCard.image} alt={myCharacter.actionCard.title} className="attr-card-image" />}
+              <div className="attr-text">
                 <span className="attr-label">Особое условие</span>
                 <span className="attr-value">{myCharacter.actionCard.title}</span>
                 <span className="attr-detail">{myCharacter.actionCard.description}</span>
-              </>
-            )}
+              </div>
+            </div>
             {myCharacter.actionUsed && <span className="attr-status">Использовано</span>}
           </div>
         </div>
@@ -213,14 +211,9 @@ export function GameScreen() {
                 ) : (
                   player.revealedAttributes.map((attr, i) => (
                     <div key={i} className="mini-attr">
-                      {attr.image ? (
-                        <img src={attr.image} alt={attr.value} className="card-image mini-card-image" />
-                      ) : (
-                        <>
-                          <span className="mini-label">{attr.label}:</span>
-                          <span className="mini-value">{attr.value}</span>
-                        </>
-                      )}
+                      {attr.image && <img src={attr.image} alt={attr.value} className="mini-card-image" />}
+                      <span className="mini-label">{attr.label}:</span>
+                      <span className="mini-value">{attr.value}</span>
                     </div>
                   ))
                 )}
