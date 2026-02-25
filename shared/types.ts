@@ -5,6 +5,7 @@ export interface Attribute {
   label: string;
   value: string;
   detail?: string;
+  image?: string;
 }
 
 export type AttributeType =
@@ -21,6 +22,7 @@ export interface ActionCard {
   title: string;
   description: string;
   targetRequired: boolean;
+  image?: string;
 }
 
 export interface Character {
@@ -34,6 +36,13 @@ export interface Character {
 export interface BunkerCard {
   title: string;
   description: string;
+  image?: string;
+}
+
+export interface ThreatCard {
+  title: string;
+  description: string;
+  image?: string;
 }
 
 // ============ Game State ============
@@ -52,6 +61,7 @@ export type GamePhase =
 export interface Catastrophe {
   title: string;
   description: string;
+  image?: string;
 }
 
 export interface PlayerInfo {
@@ -71,6 +81,7 @@ export interface PublicGameState {
   totalRounds: number;
   catastrophe: Catastrophe | null;
   revealedBunkerCards: BunkerCard[];
+  threatCard: ThreatCard | null;
   bunkerCapacity: number;
   players: PlayerInfo[];
   currentTurnPlayerId: string | null;

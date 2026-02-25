@@ -1,0 +1,2 @@
+// ============ Character System ============
+export {};

@@ -1,4 +1,4 @@
-import { GamePhase, Catastrophe, Character, BunkerCard } from '../../shared/types.js';
+import { GamePhase, Catastrophe, Character, BunkerCard, ThreatCard } from '../../shared/types.js';
 import { generateRoomCode, generatePlayerId } from './utils.js';
 import { CONFIG } from './config.js';
 
@@ -25,6 +25,7 @@ export interface GameState {
   catastrophe: Catastrophe;
   bunkerCards: BunkerCard[];         // All 5 bunker cards for this game
   revealedBunkerCount: number;       // How many bunker cards have been revealed
+  threatCard: ThreatCard | null;     // Threat card revealed with the last bunker card
   bunkerCapacity: number;
   turnOrder: string[];
   currentTurnIndex: number;
