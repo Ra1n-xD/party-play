@@ -1301,8 +1301,9 @@ body {
     font-size: 2.2rem;
   }
 
-  .attributes-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .attributes-grid,
+  .expanded-player-modal .attributes-grid {
+    grid-template-columns: 1fr;
   }
 
   .players-list {
@@ -1339,11 +1340,6 @@ body {
   }
 }
 
-@media (max-width: 360px) {
-  .attributes-grid {
-    grid-template-columns: 1fr;
-  }
-}
 
 /* ============ BOT SYSTEM ============ */
 .bot-badge {
