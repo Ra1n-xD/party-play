@@ -171,7 +171,8 @@ body {
   background: #a855f7;
   color: #fff;
   border: none;
-  margin-top: 16px;
+  font-size: 1.1rem;
+  padding: 16px 32px;
 }
 
 .btn-reveal-action:hover:not(:disabled) {
@@ -724,9 +725,9 @@ body {
 }
 
 .attr-card-image {
-  width: 70px;
-  height: auto;
-  border-radius: 4px;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
   flex-shrink: 0;
 }
 
