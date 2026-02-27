@@ -966,7 +966,7 @@ body {
   align-items: center;
   background: var(--bg-card);
   border-radius: var(--radius-sm);
-  padding: 14px;
+  padding: 14px 14px 14px 20px;
   border: 1px solid var(--border);
   gap: 12px;
 }
