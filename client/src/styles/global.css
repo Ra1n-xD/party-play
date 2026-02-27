@@ -662,7 +662,8 @@ body {
 }
 
 .mini-attr.attr-hidden {
-  opacity: 0.5;
+  opacity: 0.35;
+  filter: brightness(0.6);
 }
 
 .mini-attr.attr-used {
@@ -711,8 +712,9 @@ body {
 }
 
 .attribute-card.hidden {
-  opacity: 0.5;
-  background: rgba(0, 0, 0, 0.3);
+  opacity: 0.35;
+  background: rgba(0, 0, 0, 0.5);
+  filter: brightness(0.6);
 }
 
 .attr-content {
@@ -1093,9 +1095,10 @@ body {
 }
 
 .result-tag.tag-hidden {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  opacity: 0.5;
 }
 
 .result-tag-label {
