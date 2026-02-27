@@ -481,9 +481,10 @@ export function GameScreen() {
           return (
             <div className="modal-overlay" onClick={() => setExpandedPlayerId(null)}>
               <div className="modal expanded-player-modal" onClick={(e) => e.stopPropagation()}>
+                <button className="modal-close-btn" onClick={() => setExpandedPlayerId(null)} aria-label="Закрыть">&times;</button>
                 <div className="expanded-player-header">
+                  <span className="player-number">{playerNumber}</span>
                   <h3>
-                    <span className="player-number">{playerNumber}</span>
                     {player.isBot && <span className="bot-badge">BOT</span>}
                     {player.name}
                     {isMe && <span className="me-badge">ВЫ</span>}
@@ -553,11 +554,6 @@ export function GameScreen() {
                       </div>
                     );
                   })()}
-                <div className="modal-actions">
-                  <button className="btn btn-secondary" onClick={() => setExpandedPlayerId(null)}>
-                    Закрыть
-                  </button>
-                </div>
               </div>
             </div>
           );
