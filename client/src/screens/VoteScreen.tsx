@@ -183,10 +183,15 @@ export function VoteScreen() {
                   </span>
                   <div className="candidate-attrs">
                     {player.revealedAttributes.map((attr, i) => (
-                      <span key={i} className="mini-tag">
-                        {attr.label}: {attr.value}
+                      <span key={i} className="mini-tag" data-attr-type={attr.type}>
+                        <span className="mini-tag-label">{attr.label}:</span> {attr.value}
                       </span>
                     ))}
+                    {player.actionCard && (
+                      <span className="mini-tag" data-attr-type="action">
+                        <span className="mini-tag-label">Особое условие:</span> {player.actionCard.title}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button className="btn btn-vote" onClick={() => handleVote(player.id)}>
