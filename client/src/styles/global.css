@@ -1676,3 +1676,44 @@ body {
 .btn-bot:hover:not(:disabled) {
   background: #0891b2;
 }
+
+/* ===== Background Particles ===== */
+
+.particles-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.8), rgba(245, 158, 11, 0));
+  box-shadow: 0 0 6px 2px rgba(245, 158, 11, 0.3);
+  animation: float-particle linear infinite;
+}
+
+@keyframes float-particle {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-120vh) translateX(30px);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .particle:nth-child(n+15) {
+    display: none;
+  }
+}
