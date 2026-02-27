@@ -359,9 +359,13 @@ export function GameScreen() {
                         );
                       })}
                       {myCharacter.actionCard && (
-                        <div className="mini-attr" data-attr-type="action">
+                        <div
+                          className={`mini-attr ${player.actionCard ? "" : "attr-hidden"}`}
+                          data-attr-type="action"
+                        >
                           <span className="mini-label">Особое условие:</span>
                           <span className="mini-value">{myCharacter.actionCard.title}</span>
+                          {!player.actionCard && <span className="mini-hidden-tag">скрыто</span>}
                         </div>
                       )}
                     </>
