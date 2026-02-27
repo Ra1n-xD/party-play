@@ -1,8 +1,30 @@
-import { Server, Socket } from 'socket.io';
-import { ClientEvents, ServerEvents } from '../../shared/types.js';
-import { createRoom, joinRoom, getRoom, removePlayer, addBotToRoom, removeBotFromRoom, Room, Player } from './roomManager.js';
-import { startGame, revealAttribute, revealActionCard, castVote, forceEndGame, resetGame, broadcastState, adminShuffleAll, adminSwapAttribute, adminReplaceAttribute, pauseGame, unpauseGame } from './gameEngine.js';
-import { CONFIG } from './config.js';
+import { Server, Socket } from "socket.io";
+import { ClientEvents, ServerEvents } from "../../shared/types.js";
+import {
+  createRoom,
+  joinRoom,
+  getRoom,
+  removePlayer,
+  addBotToRoom,
+  removeBotFromRoom,
+  Room,
+  Player,
+} from "./roomManager.js";
+import {
+  startGame,
+  revealAttribute,
+  revealActionCard,
+  castVote,
+  forceEndGame,
+  resetGame,
+  broadcastState,
+  adminShuffleAll,
+  adminSwapAttribute,
+  adminReplaceAttribute,
+  pauseGame,
+  unpauseGame,
+} from "./gameEngine.js";
+import { CONFIG } from "./config.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 type IOSocket = Socket<ClientEvents, ServerEvents>;
@@ -11,12 +33,12 @@ type IOSocket = Socket<ClientEvents, ServerEvents>;
 const socketRoomMap = new Map<string, { roomCode: string; playerId: string }>();
 
 export function registerHandlers(io: IOServer): void {
-  io.on('connection', (socket: IOSocket) => {
+  io.on("connection", (socket: IOSocket) => {
     console.log(`Connected: ${socket.id}`);
 
-    socket.on('room:create', ({ playerName }) => {
+    socket.on("room:create", ({ playerName }) => {
       if (!playerName?.trim()) {
-        socket.emit('room:error', { message: 'Введите имя' });
+        socket.emit("room:error", { message: "Введите имя" });
         return;
       }
 
@@ -24,23 +46,23 @@ export function registerHandlers(io: IOServer): void {
       socket.join(room.code);
       socketRoomMap.set(socket.id, { roomCode: room.code, playerId: player.id });
 
-      socket.emit('room:created', { roomCode: room.code, playerId: player.id });
+      socket.emit("room:created", { roomCode: room.code, playerId: player.id });
       broadcastState(room, io);
     });
 
-    socket.on('room:join', ({ roomCode, playerName }) => {
+    socket.on("room:join", ({ roomCode, playerName }) => {
       if (!playerName?.trim()) {
-        socket.emit('room:error', { message: 'Введите имя' });
+        socket.emit("room:error", { message: "Введите имя" });
         return;
       }
       if (!roomCode?.trim()) {
-        socket.emit('room:error', { message: 'Введите код комнаты' });
+        socket.emit("room:error", { message: "Введите код комнаты" });
         return;
       }
 
       const result = joinRoom(roomCode.trim().toUpperCase(), socket.id, playerName.trim());
-      if ('error' in result) {
-        socket.emit('room:error', { message: result.error });
+      if ("error" in result) {
+        socket.emit("room:error", { message: result.error });
         return;
       }
 
@@ -48,20 +70,20 @@ export function registerHandlers(io: IOServer): void {
       socket.join(room.code);
       socketRoomMap.set(socket.id, { roomCode: room.code, playerId: player.id });
 
-      socket.emit('room:joined', { roomCode: room.code, playerId: player.id });
+      socket.emit("room:joined", { roomCode: room.code, playerId: player.id });
       broadcastState(room, io);
     });
 
-    socket.on('room:rejoin', ({ roomCode, playerId }) => {
+    socket.on("room:rejoin", ({ roomCode, playerId }) => {
       const room = getRoom(roomCode);
       if (!room) {
-        socket.emit('room:error', { message: 'Комната не найдена' });
+        socket.emit("room:error", { message: "Комната не найдена" });
         return;
       }
 
       const player = room.players.get(playerId);
       if (!player) {
-        socket.emit('room:error', { message: 'Игрок не найден в комнате' });
+        socket.emit("room:error", { message: "Игрок не найден в комнате" });
         return;
       }
 
@@ -71,17 +93,17 @@ export function registerHandlers(io: IOServer): void {
       socket.join(room.code);
       socketRoomMap.set(socket.id, { roomCode: room.code, playerId: player.id });
 
-      socket.emit('room:joined', { roomCode: room.code, playerId: player.id });
+      socket.emit("room:joined", { roomCode: room.code, playerId: player.id });
 
       // Re-send character if game is in progress
       if (player.character) {
-        socket.emit('game:character', player.character);
+        socket.emit("game:character", player.character);
       }
 
       broadcastState(room, io);
     });
 
-    socket.on('player:ready', ({ ready }) => {
+    socket.on("player:ready", ({ ready }) => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
@@ -93,32 +115,34 @@ export function registerHandlers(io: IOServer): void {
       broadcastState(room, io);
     });
 
-    socket.on('game:start', () => {
+    socket.on("game:start", () => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
 
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может начать игру' });
+        socket.emit("room:error", { message: "Только хост может начать игру" });
         return;
       }
 
       if (room.players.size < CONFIG.MIN_PLAYERS) {
-        socket.emit('room:error', { message: `Нужно минимум ${CONFIG.MIN_PLAYERS} игрока` });
+        socket.emit("room:error", { message: `Нужно минимум ${CONFIG.MIN_PLAYERS} игрока` });
         return;
       }
 
-      const allReady = Array.from(room.players.values()).every(p => p.ready || p.id === room.hostId);
+      const allReady = Array.from(room.players.values()).every(
+        (p) => p.ready || p.id === room.hostId,
+      );
       if (!allReady) {
-        socket.emit('room:error', { message: 'Не все игроки готовы' });
+        socket.emit("room:error", { message: "Не все игроки готовы" });
         return;
       }
 
       startGame(room, io);
     });
 
-    socket.on('game:revealAttribute', ({ attributeIndex }) => {
+    socket.on("game:revealAttribute", ({ attributeIndex }) => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
@@ -126,11 +150,11 @@ export function registerHandlers(io: IOServer): void {
 
       const success = revealAttribute(room, info.playerId, attributeIndex, io);
       if (!success) {
-        socket.emit('room:error', { message: 'Сейчас не ваш ход' });
+        socket.emit("room:error", { message: "Сейчас не ваш ход" });
       }
     });
 
-    socket.on('game:revealActionCard', () => {
+    socket.on("game:revealActionCard", () => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
@@ -138,11 +162,11 @@ export function registerHandlers(io: IOServer): void {
 
       const success = revealActionCard(room, info.playerId, io);
       if (!success) {
-        socket.emit('room:error', { message: 'Невозможно раскрыть особое условие сейчас' });
+        socket.emit("room:error", { message: "Невозможно раскрыть особое условие сейчас" });
       }
     });
 
-    socket.on('vote:cast', ({ targetPlayerId }) => {
+    socket.on("vote:cast", ({ targetPlayerId }) => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
@@ -150,158 +174,158 @@ export function registerHandlers(io: IOServer): void {
 
       const success = castVote(room, info.playerId, targetPlayerId, io);
       if (!success) {
-        socket.emit('room:error', { message: 'Невозможно проголосовать' });
+        socket.emit("room:error", { message: "Невозможно проголосовать" });
       }
     });
 
-    socket.on('game:endGame', () => {
+    socket.on("game:endGame", () => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
 
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может завершить игру' });
+        socket.emit("room:error", { message: "Только хост может завершить игру" });
         return;
       }
 
       forceEndGame(room, io);
     });
 
-    socket.on('game:playAgain', () => {
+    socket.on("game:playAgain", () => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
 
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может начать новую игру' });
+        socket.emit("room:error", { message: "Только хост может начать новую игру" });
         return;
       }
 
       resetGame(room, io);
     });
 
-    socket.on('room:addBot', () => {
+    socket.on("room:addBot", () => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
 
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может добавлять ботов' });
+        socket.emit("room:error", { message: "Только хост может добавлять ботов" });
         return;
       }
 
       const bot = addBotToRoom(room);
       if (!bot) {
-        socket.emit('room:error', { message: 'Невозможно добавить бота' });
+        socket.emit("room:error", { message: "Невозможно добавить бота" });
         return;
       }
 
       broadcastState(room, io);
     });
 
-    socket.on('room:removeBot', ({ playerId: botId }) => {
+    socket.on("room:removeBot", ({ playerId: botId }) => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
 
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может удалять ботов' });
+        socket.emit("room:error", { message: "Только хост может удалять ботов" });
         return;
       }
 
       const removed = removeBotFromRoom(room, botId);
       if (!removed) {
-        socket.emit('room:error', { message: 'Невозможно удалить этого игрока' });
+        socket.emit("room:error", { message: "Невозможно удалить этого игрока" });
         return;
       }
 
       broadcastState(room, io);
     });
 
-    socket.on('admin:shuffleAll', ({ attributeType }) => {
+    socket.on("admin:shuffleAll", ({ attributeType }) => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может использовать админ-панель' });
+        socket.emit("room:error", { message: "Только хост может использовать админ-панель" });
         return;
       }
       const result = adminShuffleAll(room, attributeType, io);
       if (!result.success) {
-        socket.emit('room:error', { message: result.error });
+        socket.emit("room:error", { message: result.error });
       }
     });
 
-    socket.on('admin:swapAttribute', ({ player1Id, player2Id, attributeType }) => {
+    socket.on("admin:swapAttribute", ({ player1Id, player2Id, attributeType }) => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может использовать админ-панель' });
+        socket.emit("room:error", { message: "Только хост может использовать админ-панель" });
         return;
       }
       const result = adminSwapAttribute(room, player1Id, player2Id, attributeType, io);
       if (!result.success) {
-        socket.emit('room:error', { message: result.error });
+        socket.emit("room:error", { message: result.error });
       }
     });
 
-    socket.on('admin:replaceAttribute', ({ targetPlayerId, attributeType }) => {
+    socket.on("admin:replaceAttribute", ({ targetPlayerId, attributeType }) => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может использовать админ-панель' });
+        socket.emit("room:error", { message: "Только хост может использовать админ-панель" });
         return;
       }
       const result = adminReplaceAttribute(room, targetPlayerId, attributeType, io);
       if (!result.success) {
-        socket.emit('room:error', { message: result.error });
+        socket.emit("room:error", { message: result.error });
       }
     });
 
-    socket.on('admin:pause', () => {
+    socket.on("admin:pause", () => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может ставить игру на паузу' });
+        socket.emit("room:error", { message: "Только хост может ставить игру на паузу" });
         return;
       }
       const result = pauseGame(room, io);
       if (!result.success) {
-        socket.emit('room:error', { message: result.error });
+        socket.emit("room:error", { message: result.error });
       }
     });
 
-    socket.on('admin:unpause', () => {
+    socket.on("admin:unpause", () => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
       if (info.playerId !== room.hostId) {
-        socket.emit('room:error', { message: 'Только хост может снимать паузу' });
+        socket.emit("room:error", { message: "Только хост может снимать паузу" });
         return;
       }
       const result = unpauseGame(room, io);
       if (!result.success) {
-        socket.emit('room:error', { message: result.error });
+        socket.emit("room:error", { message: result.error });
       }
     });
 
-    socket.on('room:leave', () => {
+    socket.on("room:leave", () => {
       handleDisconnect(socket, io);
     });
 
-    socket.on('disconnect', () => {
+    socket.on("disconnect", () => {
       console.log(`Disconnected: ${socket.id}`);
       const info = socketRoomMap.get(socket.id);
       if (!info) return;
@@ -332,7 +356,7 @@ function handleDisconnect(socket: IOSocket, io: IOServer): void {
     const player = room.players.get(info.playerId);
 
     // If game is in progress and it's this player's turn, skip them
-    if (room.gameState?.phase === 'ROUND_REVEAL' && player) {
+    if (room.gameState?.phase === "ROUND_REVEAL" && player) {
       const currentTurnPlayerId = room.gameState.turnOrder[room.gameState.currentTurnIndex];
       if (currentTurnPlayerId === info.playerId) {
         // Auto-reveal for disconnected player

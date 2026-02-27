@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 interface TimerProps {
   endTime: number | null;
@@ -32,7 +32,7 @@ export function Timer({ endTime }: TimerProps) {
     <div className="timer">
       <span className="timer-icon">⏱</span>
       <span className="timer-value">
-        {minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, '0')}` : `${seconds}с`}
+        {minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, "0")}` : `${seconds}с`}
       </span>
     </div>
   );

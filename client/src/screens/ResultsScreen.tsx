@@ -1,37 +1,40 @@
-import { useGame } from '../context/GameContext';
+import { useGame } from "../context/GameContext";
 
 export function ResultsScreen() {
   const { gameState, playerId, playAgain } = useGame();
 
   if (!gameState) return null;
 
-  const me = gameState.players.find(p => p.id === playerId);
+  const me = gameState.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
-  const survivors = gameState.players.filter(p => p.alive);
-  const eliminated = gameState.players.filter(p => !p.alive);
+  const survivors = gameState.players.filter((p) => p.alive);
+  const eliminated = gameState.players.filter((p) => !p.alive);
   const iSurvived = me?.alive ?? false;
 
-  const renderPlayerCard = (player: typeof gameState.players[0]) => {
-    const attrs = player.allAttributes || player.revealedAttributes.map(a => ({ ...a, wasRevealed: true }));
-    const playerNumber = gameState.players.findIndex(p => p.id === player.id) + 1;
+  const renderPlayerCard = (player: (typeof gameState.players)[0]) => {
+    const attrs =
+      player.allAttributes || player.revealedAttributes.map((a) => ({ ...a, wasRevealed: true }));
+    const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;
 
     return (
-      <div key={player.id} className={`result-player ${player.id === playerId ? 'is-me' : ''}`}>
+      <div key={player.id} className={`result-player ${player.id === playerId ? "is-me" : ""}`}>
         <div className="result-player-name">
           <span className="player-number">{playerNumber}</span>
           {player.isBot && <span className="bot-badge">BOT</span>}
-          {player.name} {player.id === playerId && '(вы)'}
+          {player.name} {player.id === playerId && "(вы)"}
         </div>
         {/* Desktop: card grid */}
         <div className="result-desktop attributes-grid">
           {attrs.map((attr, i) => (
             <div
               key={i}
-              className={`attribute-card ${attr.wasRevealed ? 'revealed' : 'hidden'}`}
+              className={`attribute-card ${attr.wasRevealed ? "revealed" : "hidden"}`}
               data-attr-type={attr.type}
             >
               <div className="attr-content">
-                {attr.image && <img src={attr.image} alt={attr.value} className="attr-card-image" />}
+                {attr.image && (
+                  <img src={attr.image} alt={attr.value} className="attr-card-image" />
+                )}
                 <div className="attr-text">
                   <span className="attr-label">{attr.label}</span>
                   <span className="attr-value">{attr.value}</span>
@@ -47,7 +50,13 @@ export function ResultsScreen() {
           <div className="result-desktop action-card-display">
             <div className="attribute-card revealed" data-attr-type="action">
               <div className="attr-content">
-                {player.actionCard.image && <img src={player.actionCard.image} alt={player.actionCard.title} className="attr-card-image" />}
+                {player.actionCard.image && (
+                  <img
+                    src={player.actionCard.image}
+                    alt={player.actionCard.title}
+                    className="attr-card-image"
+                  />
+                )}
                 <div className="attr-text">
                   <span className="attr-label">Особое условие</span>
                   <span className="attr-value">{player.actionCard.title}</span>
@@ -62,7 +71,7 @@ export function ResultsScreen() {
           {attrs.map((attr, i) => (
             <span
               key={i}
-              className={`result-tag ${attr.wasRevealed ? 'tag-revealed' : 'tag-hidden'}`}
+              className={`result-tag ${attr.wasRevealed ? "tag-revealed" : "tag-hidden"}`}
               data-attr-type={attr.type}
             >
               <span className="result-tag-label">{attr.label}:</span> {attr.value}
@@ -81,7 +90,7 @@ export function ResultsScreen() {
   return (
     <div className="screen results-screen">
       <div className="results-container">
-        <h2>{iSurvived ? 'Вы попали в бункер!' : 'Вы были изгнаны...'}</h2>
+        <h2>{iSurvived ? "Вы попали в бункер!" : "Вы были изгнаны..."}</h2>
 
         {gameState.catastrophe && (
           <div className="results-scenario">
@@ -135,12 +144,15 @@ export function ResultsScreen() {
               {Object.entries(gameState.voteResults)
                 .sort(([, a], [, b]) => b - a)
                 .map(([pid, count]) => {
-                  const player = gameState.players.find(p => p.id === pid);
+                  const player = gameState.players.find((p) => p.id === pid);
                   return (
                     <div key={pid} className="vote-bar-row">
-                      <span className="vote-bar-name">{player?.name || '???'}</span>
+                      <span className="vote-bar-name">{player?.name || "???"}</span>
                       <div className="vote-bar">
-                        <div className="vote-bar-fill" style={{ width: `${(count / gameState.totalVotesExpected) * 100}%` }} />
+                        <div
+                          className="vote-bar-fill"
+                          style={{ width: `${(count / gameState.totalVotesExpected) * 100}%` }}
+                        />
                       </div>
                       <span className="vote-bar-count">{count}</span>
                     </div>

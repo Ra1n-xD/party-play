@@ -1,8 +1,8 @@
-import { Server } from 'socket.io';
-import { ServerEvents, ClientEvents } from '../../shared/types.js';
-import { Room, Player, getAlivePlayers } from './roomManager.js';
-import { revealAttribute, castVote } from './gameEngine.js';
-import { CONFIG } from './config.js';
+import { Server } from "socket.io";
+import { ServerEvents, ClientEvents } from "../../shared/types.js";
+import { Room, Player, getAlivePlayers } from "./roomManager.js";
+import { revealAttribute, castVote } from "./gameEngine.js";
+import { CONFIG } from "./config.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 
@@ -25,8 +25,10 @@ function addBotTimer(roomCode: string, timer: ReturnType<typeof setTimeout>): vo
 }
 
 function randomDelay(): number {
-  return CONFIG.BOT_ACTION_DELAY_MIN +
-    Math.random() * (CONFIG.BOT_ACTION_DELAY_MAX - CONFIG.BOT_ACTION_DELAY_MIN);
+  return (
+    CONFIG.BOT_ACTION_DELAY_MIN +
+    Math.random() * (CONFIG.BOT_ACTION_DELAY_MAX - CONFIG.BOT_ACTION_DELAY_MIN)
+  );
 }
 
 export function scheduleBotActions(room: Room, io: IOServer): void {
@@ -38,11 +40,11 @@ export function scheduleBotActions(room: Room, io: IOServer): void {
   const phase = room.gameState.phase;
 
   switch (phase) {
-    case 'ROUND_REVEAL':
+    case "ROUND_REVEAL":
       scheduleBotReveal(room, io);
       break;
-    case 'ROUND_VOTE':
-    case 'ROUND_VOTE_TIEBREAK':
+    case "ROUND_VOTE":
+    case "ROUND_VOTE_TIEBREAK":
       scheduleBotVotes(room, io);
       break;
   }
@@ -58,7 +60,7 @@ function scheduleBotReveal(room: Room, io: IOServer): void {
   if (!player || !player.isBot || !player.alive) return;
 
   const timer = setTimeout(() => {
-    if (!room.gameState || room.gameState.phase !== 'ROUND_REVEAL') return;
+    if (!room.gameState || room.gameState.phase !== "ROUND_REVEAL") return;
 
     // Pick a random unrevealed attribute (not the last one)
     const totalAttrs = player.character?.attributes.length || 0;
@@ -83,7 +85,7 @@ function scheduleBotReveal(room: Room, io: IOServer): void {
 function scheduleBotVotes(room: Room, io: IOServer): void {
   if (!room.gameState) return;
 
-  const isTiebreak = room.gameState.phase === 'ROUND_VOTE_TIEBREAK';
+  const isTiebreak = room.gameState.phase === "ROUND_VOTE_TIEBREAK";
 
   // Collect bot voters: alive bots + last eliminated bot
   const botVoters: Player[] = [];
@@ -105,17 +107,18 @@ function scheduleBotVotes(room: Room, io: IOServer): void {
 
     const timer = setTimeout(() => {
       if (!room.gameState) return;
-      if (room.gameState.phase !== 'ROUND_VOTE' && room.gameState.phase !== 'ROUND_VOTE_TIEBREAK') return;
+      if (room.gameState.phase !== "ROUND_VOTE" && room.gameState.phase !== "ROUND_VOTE_TIEBREAK")
+        return;
       if (bot.hasVoted) return;
 
       // Pick target
       let candidates: Player[];
       if (isTiebreak && room.gameState.tiebreakCandidateIds.length > 0) {
         candidates = room.gameState.tiebreakCandidateIds
-          .map(id => room.players.get(id))
+          .map((id) => room.players.get(id))
           .filter((p): p is Player => !!p && p.alive && p.id !== bot.id);
       } else {
-        candidates = getAlivePlayers(room).filter(p => p.id !== bot.id);
+        candidates = getAlivePlayers(room).filter((p) => p.id !== bot.id);
       }
 
       if (candidates.length === 0) return;
@@ -127,4 +130,3 @@ function scheduleBotVotes(room: Room, io: IOServer): void {
     addBotTimer(room.code, timer);
   }
 }
-
