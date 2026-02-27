@@ -40,52 +40,75 @@ npm -v    # 10.x
 
 ```bash
 useradd -m -s /bin/bash partyplay
-su - partyplay
 ```
 
 ---
 
-## 5. Загрузить проект
+## 5. Настроить SSH-ключ для GitHub (нужно для git clone и автодеплоя)
 
 ```bash
-git clone <твой-репозиторий> ~/party-play
+# Создать ключ от имени partyplay
+su - partyplay
+ssh-keygen -t ed25519 -C "partyplay@vps" -f ~/.ssh/id_ed25519 -N ""
+
+# Показать публичный ключ — скопируй его
+cat ~/.ssh/id_ed25519.pub
+exit
+```
+
+Добавь этот публичный ключ в GitHub:
+- **Вариант A** (только чтение одного репо): GitHub → Репозиторий → Settings → Deploy keys → Add deploy key
+- **Вариант B** (все репо аккаунта): GitHub → Settings → SSH and GPG keys → New SSH key
+
+---
+
+## 6. Загрузить проект
+
+```bash
+su - partyplay
+git clone git@github.com:ТВОЙ_ЮЗЕРНЕЙМ/party-play.git ~/party-play
 cd ~/party-play
 npm install
+exit
 ```
 
 ---
 
-## 6. Собрать проект
+## 7. Собрать проект
 
 ```bash
-npm -w server run build
-npm -w client run build
+su - partyplay -c "cd ~/party-play && npm run build"
 ```
+
+Эта команда последовательно соберёт server и client.
 
 ---
 
-## 7. Создать .env
+## 8. Создать .env
 
 ```bash
-cat > ~/party-play/.env << 'EOF'
+cat > /home/partyplay/party-play/.env << 'EOF'
 PORT=3001
 NODE_ENV=production
 CORS_ORIGINS=http://185.100.50.25
 EOF
+
+chown partyplay:partyplay /home/partyplay/party-play/.env
 ```
 
 Замени `185.100.50.25` на свой реальный IP.
 
 ---
 
-## 8. Проверить что запускается
+## 9. Проверить что запускается
 
 ```bash
+su - partyplay
 cd ~/party-play
 node --env-file=.env server/dist/index.js
 ```
 
-Должно вывести `PartyPlay server running on http://0.0.0.0:3001`. Останови через `Ctrl+C`, выйди обратно в root:
+Должно вывести `PartyPlay server running on http://0.0.0.0:3001`. Останови через `Ctrl+C`:
 
 ```bash
 exit
@@ -93,7 +116,7 @@ exit
 
 ---
 
-## 9. Создать systemd-сервис (автозапуск)
+## 10. Создать systemd-сервис (автозапуск)
 
 ```bash
 cat > /etc/systemd/system/partyplay.service << 'EOF'
@@ -123,7 +146,17 @@ systemctl status partyplay   # должен быть active (running)
 
 ---
 
-## 10. Настроить nginx
+## 11. Разрешить partyplay перезапускать сервис (нужно для автодеплоя)
+
+```bash
+cat > /etc/sudoers.d/partyplay << 'EOF'
+partyplay ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart partyplay
+EOF
+```
+
+---
+
+## 12. Настроить nginx
 
 ```bash
 cat > /etc/nginx/sites-available/partyplay << 'EOF'
@@ -164,13 +197,81 @@ systemctl restart nginx
 
 ---
 
-## 11. Открыть в браузере
+## 13. Открыть в браузере
 
 Заходи на `http://185.100.50.25` — должен открыться PartyPlay.
 
 ---
 
-## 12. Когда купишь домен
+## 14. Настроить автодеплой (GitHub Actions)
+
+При каждом пуше в `master` сервер автоматически обновляется и пересобирается.
+
+### Шаг 1: Создать SSH-ключ для GitHub Actions
+
+```bash
+# На VPS от root
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f /tmp/deploy_key -N ""
+
+# Добавить публичный ключ в authorized_keys пользователя partyplay
+mkdir -p /home/partyplay/.ssh
+cat /tmp/deploy_key.pub >> /home/partyplay/.ssh/authorized_keys
+chown -R partyplay:partyplay /home/partyplay/.ssh
+chmod 700 /home/partyplay/.ssh
+chmod 600 /home/partyplay/.ssh/authorized_keys
+
+# Скопировать приватный ключ — понадобится для GitHub
+cat /tmp/deploy_key
+
+# Удалить ключ с сервера после копирования
+rm /tmp/deploy_key /tmp/deploy_key.pub
+```
+
+### Шаг 2: Добавить секреты в GitHub
+
+GitHub → Репозиторий → Settings → Secrets and variables → Actions → New repository secret:
+
+| Секрет | Значение |
+|--------|----------|
+| `VPS_HOST` | IP-адрес сервера (например `185.100.50.25`) |
+| `VPS_USER` | `partyplay` |
+| `VPS_SSH_KEY` | Содержимое приватного ключа (весь текст из `cat /tmp/deploy_key`) |
+
+### Шаг 3: Готово
+
+Workflow-файл `.github/workflows/deploy.yml` уже есть в репозитории. После пуша в `master` GitHub автоматически:
+
+1. Подключится к VPS по SSH
+2. Стянет последние изменения (`git pull`)
+3. Установит зависимости (`npm install`)
+4. Соберёт проект (`npm run build`)
+5. Перезапустит сервис (`systemctl restart partyplay`)
+
+Статус деплоя смотри в GitHub → вкладка Actions.
+
+---
+
+## 15. Ручной деплой (если нужно)
+
+В репозитории есть скрипт `deploy.sh`. При первом запуске:
+
+```bash
+su - partyplay
+chmod +x ~/party-play/deploy.sh
+~/party-play/deploy.sh
+```
+
+В дальнейшем:
+
+```bash
+su - partyplay -c "~/party-play/deploy.sh"
+```
+
+Скрипт стянет изменения, пересоберёт проект, проверит сборку и перезапустит сервис.
+
+---
+
+## 16. Когда купишь домен
 
 ```bash
 # 1. Направить DNS A-запись домена на IP сервера
@@ -194,31 +295,6 @@ systemctl restart nginx
 
 ---
 
-## 13. Скрипт обновления (деплой новой версии)
-
-```bash
-cat > /home/partyplay/deploy.sh << 'EOF'
-#!/bin/bash
-cd ~/party-play
-git pull origin master
-npm install
-npm -w server run build
-npm -w client run build
-EOF
-
-chown partyplay:partyplay /home/partyplay/deploy.sh
-chmod +x /home/partyplay/deploy.sh
-```
-
-При обновлении:
-
-```bash
-su - partyplay -c "./deploy.sh"
-systemctl restart partyplay
-```
-
----
-
 ## Если что-то не работает
 
 ```bash
@@ -230,4 +306,10 @@ tail -f /var/log/nginx/error.log
 
 # Проверить что порт слушается
 ss -tlnp | grep 3001
+
+# Статус автодеплоя
+# GitHub → Репозиторий → вкладка Actions
+
+# Ручной деплой если Actions не сработал
+su - partyplay -c "~/party-play/deploy.sh"
 ```
