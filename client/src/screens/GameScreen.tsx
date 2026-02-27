@@ -32,6 +32,7 @@ export function GameScreen() {
     adminForceRevealType,
     adminPause,
     adminUnpause,
+    adminSkipDiscussion,
     pendingAdminOpen,
     consumePendingAdminOpen,
   } = useGame();
@@ -187,7 +188,16 @@ export function GameScreen() {
               : `Ход: ${gameState.players.find((p) => p.id === gameState.currentTurnPlayerId)?.name || "..."}`}
           </div>
         )}
-        {gameState.phase === "ROUND_DISCUSSION" && <div className="turn-info">{votingInfo}</div>}
+        {gameState.phase === "ROUND_DISCUSSION" && (
+          <div className="turn-info">
+            {votingInfo}
+            {me?.isHost && (
+              <button className="btn btn-secondary btn-skip-discussion" onClick={adminSkipDiscussion}>
+                Начать голосование
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Catastrophe Info */}

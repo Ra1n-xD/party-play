@@ -35,6 +35,7 @@ interface GameContextType {
   adminForceRevealType: (attributeType: AttributeType) => void;
   adminPause: () => void;
   adminUnpause: () => void;
+  adminSkipDiscussion: () => void;
   revealedActionCard: { playerName: string; actionCard: ActionCard } | null;
   pendingAdminOpen: boolean;
   consumePendingAdminOpen: () => void;
@@ -233,6 +234,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit("admin:unpause");
   }, []);
 
+  const adminSkipDiscussionFn = useCallback(() => {
+    socket.emit("admin:skipDiscussion");
+  }, []);
+
   return (
     <GameContext.Provider
       value={{
@@ -265,6 +270,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         adminForceRevealType: adminForceRevealTypeFn,
         adminPause: adminPauseFn,
         adminUnpause: adminUnpauseFn,
+        adminSkipDiscussion: adminSkipDiscussionFn,
         revealedActionCard,
         pendingAdminOpen,
         consumePendingAdminOpen: consumePendingAdminOpenFn,

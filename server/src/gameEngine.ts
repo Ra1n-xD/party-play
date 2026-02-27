@@ -287,6 +287,20 @@ function startDiscussionPhase(room: Room, io: IOServer): void {
   });
 }
 
+export function skipDiscussion(room: Room, io: IOServer): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (room.gameState.phase !== "ROUND_DISCUSSION")
+    return { success: false, error: "Сейчас не фаза обсуждения" };
+
+  if (room.gameState.phaseTimer) clearTimeout(room.gameState.phaseTimer);
+  room.gameState.phaseTimer = null;
+  room.gameState.phaseEndTime = null;
+  room.gameState.pausedCallback = null;
+
+  startVotePhase(room, io);
+  return { success: true, error: "" };
+}
+
 function startVotePhase(room: Room, io: IOServer): void {
   if (!room.gameState) return;
   room.gameState.phase = "ROUND_VOTE";
