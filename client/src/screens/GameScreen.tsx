@@ -49,7 +49,6 @@ export function GameScreen() {
   const me = gameState.players.find((p) => p.id === playerId);
   const isMyTurn = gameState.currentTurnPlayerId === playerId;
   const allPlayers = gameState.players;
-  const otherPlayers = gameState.players.filter((p) => p.id !== playerId);
 
   // Find which indices are revealed by matching
   const revealedIndices = new Set<number>();
@@ -302,16 +301,20 @@ export function GameScreen() {
           Игроки ({gameState.players.filter((p) => p.alive).length} в игре)
         </h3>
         <div className="players-list">
-          {otherPlayers.map((player) => (
+          {allPlayers.map((player, idx) => {
+            const isMe = player.id === playerId;
+            return (
             <div
               key={player.id}
-              className={`player-card ${!player.alive ? "eliminated" : ""} ${!player.connected ? "disconnected" : ""} ${gameState.currentTurnPlayerId === player.id ? "is-current-turn" : ""}`}
+              className={`player-card ${isMe ? "is-me" : ""} ${!player.alive ? "eliminated" : ""} ${!player.connected ? "disconnected" : ""} ${gameState.currentTurnPlayerId === player.id ? "is-current-turn" : ""}`}
               onClick={() => setExpandedPlayerId(player.id)}
             >
               <div className="player-header">
                 <span className="player-name">
+                  <span className="player-number">{idx + 1}</span>
                   {player.isBot && <span className="bot-badge">BOT</span>}
                   {player.name}
+                  {isMe && <span className="me-badge">ВЫ</span>}
                   {gameState.currentTurnPlayerId === player.id && (
                     <span className="turn-badge">ХОД ИГРОКА</span>
                   )}
@@ -361,7 +364,8 @@ export function GameScreen() {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -371,7 +375,7 @@ export function GameScreen() {
           Игроки ({gameState.players.filter((p) => p.alive).length} в игре)
         </h3>
         <div className="players-list">
-          {allPlayers.map((player) => {
+          {allPlayers.map((player, idx) => {
             const isMe = player.id === playerId;
             return (
               <div
@@ -381,6 +385,7 @@ export function GameScreen() {
               >
                 <div className="player-header">
                   <span className="player-name">
+                    <span className="player-number">{idx + 1}</span>
                     {player.isBot && <span className="bot-badge">BOT</span>}
                     {player.name}
                     {isMe && <span className="me-badge">ВЫ</span>}
@@ -523,6 +528,7 @@ export function GameScreen() {
           const isMe = player.id === playerId;
           const attrs = isMe ? myCharacter.attributes : [];
           const revealedAttrs = player.revealedAttributes;
+          const playerNumber = gameState.players.findIndex(p => p.id === player.id) + 1;
 
           return (
             <div
@@ -535,6 +541,7 @@ export function GameScreen() {
               >
                 <div className="expanded-player-header">
                   <h3>
+                    <span className="player-number">{playerNumber}</span>
                     {player.isBot && <span className="bot-badge">BOT</span>}
                     {player.name}
                     {isMe && <span className="me-badge">ВЫ</span>}

@@ -40,9 +40,10 @@ export function LobbyScreen() {
         </div>
 
         <div className="player-list">
-          {gameState.players.map(player => (
+          {gameState.players.map((player, idx) => (
             <div key={player.id} className={`player-item ${player.id === playerId ? 'is-me' : ''} ${player.isBot ? 'is-bot' : ''}`}>
               <span className="player-name">
+                <span className="player-number">{idx + 1}</span>
                 {player.isHost && <span className="host-badge">H</span>}
                 {player.isBot && <span className="bot-badge">BOT</span>}
                 {player.name}
