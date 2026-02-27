@@ -2,11 +2,14 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { socket } from "../socket";
 import { PublicGameState, Character, AttributeType, ActionCard } from "../../../shared/types";
 
+/** Client-side game state with local phaseEndTime computed from server's phaseRemainingMs */
+export type ClientGameState = PublicGameState & { phaseEndTime: number | null };
+
 interface GameContextType {
   connected: boolean;
   roomCode: string | null;
   playerId: string | null;
-  gameState: PublicGameState | null;
+  gameState: ClientGameState | null;
   myCharacter: Character | null;
   error: string | null;
   createRoom: (name: string) => void;
@@ -43,7 +46,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
-  const [gameState, setGameState] = useState<PublicGameState | null>(null);
+  const [gameState, setGameState] = useState<ClientGameState | null>(null);
   const [myCharacter, setMyCharacter] = useState<Character | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revealedActionCard, setRevealedActionCard] = useState<{
@@ -81,7 +84,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
 
     socket.on("game:state", (state) => {
-      setGameState(state);
+      // Convert server-relative remaining time to local absolute endTime
+      // This avoids clock desync between server and client
+      const phaseEndTime =
+        state.phaseRemainingMs != null ? Date.now() + state.phaseRemainingMs : null;
+      setGameState({ ...state, phaseEndTime });
     });
 
     socket.on("game:character", (character) => {
