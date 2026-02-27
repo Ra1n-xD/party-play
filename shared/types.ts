@@ -110,15 +110,15 @@ export interface ClientEvents {
   "game:start": () => void;
   "game:revealAttribute": (data: { attributeIndex?: number }) => void;
   "game:revealActionCard": () => void;
-  "admin:shuffleAll": (data: { attributeType: AttributeType }) => void;
+  "admin:shuffleAll": (data: { attributeType: AttributeType | "action" }) => void;
   "admin:swapAttribute": (data: {
     player1Id: string;
     player2Id: string;
-    attributeType: AttributeType;
+    attributeType: AttributeType | "action";
   }) => void;
   "admin:replaceAttribute": (data: {
     targetPlayerId: string;
-    attributeType: AttributeType;
+    attributeType: AttributeType | "action";
   }) => void;
   "admin:pause": () => void;
   "admin:unpause": () => void;
