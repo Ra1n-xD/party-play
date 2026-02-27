@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PartyGames — a real-time multiplayer party games platform built as a web app. Currently features "Бункер" (Bunker), a social deduction game where players argue over who deserves a spot in a fallout bunker during a catastrophe. Planned to expand into a collection of party mini-games with a shared lobby and room system. See `ARCHITECTURE.md` for the platform migration plan.
+PartyPlay — a real-time multiplayer party games platform built as a web app. Currently features "Бункер" (Bunker), a social deduction game where players argue over who deserves a spot in a fallout bunker during a catastrophe. Planned to expand into a collection of party mini-games with a shared lobby and room system. See `ARCHITECTURE.md` for the platform migration plan.
 
 ## Commands
 

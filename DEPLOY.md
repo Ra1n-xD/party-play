@@ -1,4 +1,4 @@
-# Деплой PartyGames на VPS
+# Деплой PartyPlay на VPS
 
 ## 1. Купить VPS
 
@@ -39,8 +39,8 @@ npm -v    # 10.x
 ## 4. Создать пользователя для приложения
 
 ```bash
-useradd -m -s /bin/bash partygames
-su - partygames
+useradd -m -s /bin/bash partyplay
+su - partyplay
 ```
 
 ---
@@ -48,8 +48,8 @@ su - partygames
 ## 5. Загрузить проект
 
 ```bash
-git clone <твой-репозиторий> ~/party-games
-cd ~/party-games
+git clone <твой-репозиторий> ~/party-play
+cd ~/party-play
 npm install
 ```
 
@@ -67,7 +67,7 @@ npm -w client run build
 ## 7. Создать .env
 
 ```bash
-cat > ~/party-games/.env << 'EOF'
+cat > ~/party-play/.env << 'EOF'
 PORT=3001
 NODE_ENV=production
 CORS_ORIGINS=http://185.100.50.25
@@ -81,11 +81,11 @@ EOF
 ## 8. Проверить что запускается
 
 ```bash
-cd ~/party-games
+cd ~/party-play
 node --env-file=.env server/dist/index.js
 ```
 
-Должно вывести `PartyGames server running on http://0.0.0.0:3001`. Останови через `Ctrl+C`, выйди обратно в root:
+Должно вывести `PartyPlay server running on http://0.0.0.0:3001`. Останови через `Ctrl+C`, выйди обратно в root:
 
 ```bash
 exit
@@ -96,15 +96,15 @@ exit
 ## 9. Создать systemd-сервис (автозапуск)
 
 ```bash
-cat > /etc/systemd/system/partygames.service << 'EOF'
+cat > /etc/systemd/system/partyplay.service << 'EOF'
 [Unit]
-Description=PartyGames Server
+Description=PartyPlay Server
 After=network.target
 
 [Service]
 Type=simple
-User=partygames
-WorkingDirectory=/home/partygames/party-games
+User=partyplay
+WorkingDirectory=/home/partyplay/party-play
 ExecStart=/usr/bin/node --env-file=.env server/dist/index.js
 Restart=always
 RestartSec=5
@@ -116,9 +116,9 @@ EOF
 
 ```bash
 systemctl daemon-reload
-systemctl enable partygames
-systemctl start partygames
-systemctl status partygames   # должен быть active (running)
+systemctl enable partyplay
+systemctl start partyplay
+systemctl status partyplay   # должен быть active (running)
 ```
 
 ---
@@ -126,13 +126,13 @@ systemctl status partygames   # должен быть active (running)
 ## 10. Настроить nginx
 
 ```bash
-cat > /etc/nginx/sites-available/partygames << 'EOF'
+cat > /etc/nginx/sites-available/partyplay << 'EOF'
 server {
     listen 80;
     server_name _;
 
     # Статика клиента
-    root /home/partygames/party-games/client/dist;
+    root /home/partyplay/party-play/client/dist;
     index index.html;
 
     # SPA — все маршруты -> index.html
@@ -156,7 +156,7 @@ EOF
 ```
 
 ```bash
-ln -s /etc/nginx/sites-available/partygames /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/partyplay /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t            # должен быть ok
 systemctl restart nginx
@@ -166,7 +166,7 @@ systemctl restart nginx
 
 ## 11. Открыть в браузере
 
-Заходи на `http://185.100.50.25` — должен открыться PartyGames.
+Заходи на `http://185.100.50.25` — должен открыться PartyPlay.
 
 ---
 
@@ -176,19 +176,19 @@ systemctl restart nginx
 # 1. Направить DNS A-запись домена на IP сервера
 
 # 2. Обновить nginx
-sed -i 's/server_name _;/server_name yourdomain.com;/' /etc/nginx/sites-available/partygames
+sed -i 's/server_name _;/server_name yourdomain.com;/' /etc/nginx/sites-available/partyplay
 
 # 3. Установить HTTPS
 apt install -y certbot python3-certbot-nginx
 certbot --nginx -d yourdomain.com
 
 # 4. Обновить CORS
-su - partygames
-sed -i 's|CORS_ORIGINS=.*|CORS_ORIGINS=https://yourdomain.com|' ~/party-games/.env
+su - partyplay
+sed -i 's|CORS_ORIGINS=.*|CORS_ORIGINS=https://yourdomain.com|' ~/party-play/.env
 exit
 
 # 5. Перезапустить
-systemctl restart partygames
+systemctl restart partyplay
 systemctl restart nginx
 ```
 
@@ -197,24 +197,24 @@ systemctl restart nginx
 ## 13. Скрипт обновления (деплой новой версии)
 
 ```bash
-cat > /home/partygames/deploy.sh << 'EOF'
+cat > /home/partyplay/deploy.sh << 'EOF'
 #!/bin/bash
-cd ~/party-games
+cd ~/party-play
 git pull origin master
 npm install
 npm -w server run build
 npm -w client run build
 EOF
 
-chown partygames:partygames /home/partygames/deploy.sh
-chmod +x /home/partygames/deploy.sh
+chown partyplay:partyplay /home/partyplay/deploy.sh
+chmod +x /home/partyplay/deploy.sh
 ```
 
 При обновлении:
 
 ```bash
-su - partygames -c "./deploy.sh"
-systemctl restart partygames
+su - partyplay -c "./deploy.sh"
+systemctl restart partyplay
 ```
 
 ---
@@ -223,7 +223,7 @@ systemctl restart partygames
 
 ```bash
 # Логи приложения
-journalctl -u partygames -f
+journalctl -u partyplay -f
 
 # Логи nginx
 tail -f /var/log/nginx/error.log
