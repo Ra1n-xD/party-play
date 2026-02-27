@@ -35,7 +35,3 @@ npm run dev
 ```bash
 npm run build
 ```
-
-## ☁️ Деплой
-
-Гайд по деплою на VPS с автодеплоем через GitHub Actions — [DEPLOY.md](DEPLOY.md).
