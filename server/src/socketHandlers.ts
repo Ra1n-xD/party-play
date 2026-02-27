@@ -29,6 +29,8 @@ import {
   pauseGame,
   unpauseGame,
   skipDiscussion,
+  adminRevivePlayer,
+  adminEliminatePlayer,
 } from "./gameEngine.js";
 import { CONFIG } from "./config.js";
 
@@ -545,6 +547,34 @@ export function registerHandlers(io: IOServer): void {
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
       const result = skipDiscussion(ctx.room, io);
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+      }
+    });
+
+    socket.on("admin:revivePlayer", ({ targetPlayerId }) => {
+      const ctx = getSocketRoom(socket);
+      if (!ctx) return;
+      if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
+      if (typeof targetPlayerId !== "string" || !ctx.room.players.has(targetPlayerId)) {
+        socket.emit("room:error", { message: "Игрок не найден" });
+        return;
+      }
+      const result = adminRevivePlayer(ctx.room, targetPlayerId, io);
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+      }
+    });
+
+    socket.on("admin:eliminatePlayer", ({ targetPlayerId }) => {
+      const ctx = getSocketRoom(socket);
+      if (!ctx) return;
+      if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
+      if (typeof targetPlayerId !== "string" || !ctx.room.players.has(targetPlayerId)) {
+        socket.emit("room:error", { message: "Игрок не найден" });
+        return;
+      }
+      const result = adminEliminatePlayer(ctx.room, targetPlayerId, io);
       if (!result.success) {
         socket.emit("room:error", { message: result.error });
       }

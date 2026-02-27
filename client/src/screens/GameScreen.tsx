@@ -33,6 +33,8 @@ export function GameScreen() {
     adminPause,
     adminUnpause,
     adminSkipDiscussion,
+    adminRevivePlayer,
+    adminEliminatePlayer,
     pendingAdminOpen,
     consumePendingAdminOpen,
   } = useGame();
@@ -43,7 +45,7 @@ export function GameScreen() {
   // Admin panel state
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminAction, setAdminAction] = useState<
-    "shuffle" | "swap" | "replace" | "deleteAttr" | "forceReveal" | "removeBunker" | "replaceBunker" | null
+    "shuffle" | "swap" | "replace" | "deleteAttr" | "forceReveal" | "removeBunker" | "replaceBunker" | "revive" | "eliminate" | null
   >(null);
   const [adminAttrType, setAdminAttrType] = useState<AttributeType | "action">("profession");
   const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType | "action">>(new Set());
@@ -156,6 +158,10 @@ export function GameScreen() {
       if (adminBunkerCardIndex !== null) {
         adminReplaceBunkerCard(adminBunkerCardIndex);
       }
+    } else if (adminAction === "revive") {
+      if (adminPlayer1) adminRevivePlayer(adminPlayer1);
+    } else if (adminAction === "eliminate") {
+      if (adminPlayer1) adminEliminatePlayer(adminPlayer1);
     }
     setAdminAction(null);
     setAdminPlayer1("");
@@ -615,6 +621,13 @@ export function GameScreen() {
                   <button className="btn btn-admin" onClick={() => setAdminAction("replaceBunker")}>
                     Заменить карту
                   </button>
+                  <label className="admin-group-label">Игроки</label>
+                  <button className="btn btn-admin" onClick={() => setAdminAction("revive")}>
+                    Вернуть в игру
+                  </button>
+                  <button className="btn btn-admin" onClick={() => setAdminAction("eliminate")}>
+                    Изгнать
+                  </button>
                 </div>
               )}
 
@@ -628,9 +641,28 @@ export function GameScreen() {
                     {adminAction === "forceReveal" && "Раскрыть у всех"}
                     {adminAction === "removeBunker" && "Убрать карту бункера"}
                     {adminAction === "replaceBunker" && "Заменить карту бункера"}
+                    {adminAction === "revive" && "Вернуть в игру"}
+                    {adminAction === "eliminate" && "Изгнать игрока"}
                   </h4>
 
-                  {adminAction === "removeBunker" || adminAction === "replaceBunker" ? (
+                  {adminAction === "revive" || adminAction === "eliminate" ? (
+                    <>
+                      <label>Игрок:</label>
+                      <div className="admin-chips">
+                        {gameState.players
+                          .filter((p) => (adminAction === "revive" ? !p.alive : p.alive))
+                          .map((p) => (
+                            <button
+                              key={p.id}
+                              className={`admin-chip ${adminPlayer1 === p.id ? "active" : ""}`}
+                              onClick={() => setAdminPlayer1(p.id)}
+                            >
+                              {p.name}
+                            </button>
+                          ))}
+                      </div>
+                    </>
+                  ) : adminAction === "removeBunker" || adminAction === "replaceBunker" ? (
                     <>
                       <label>Карта бункера:</label>
                       <div className="admin-chips">
@@ -776,7 +808,8 @@ export function GameScreen() {
                         (adminAction === "deleteAttr" &&
                           (adminPlayers.size === 0 || adminAttrTypes.size === 0)) ||
                         ((adminAction === "removeBunker" || adminAction === "replaceBunker") &&
-                          adminBunkerCardIndex === null)
+                          adminBunkerCardIndex === null) ||
+                        ((adminAction === "revive" || adminAction === "eliminate") && !adminPlayer1)
                       }
                     >
                       Применить

@@ -125,6 +125,8 @@ export interface ClientEvents {
   "admin:pause": () => void;
   "admin:unpause": () => void;
   "admin:skipDiscussion": () => void;
+  "admin:revivePlayer": (data: { targetPlayerId: string }) => void;
+  "admin:eliminatePlayer": (data: { targetPlayerId: string }) => void;
   "vote:cast": (data: { targetPlayerId: string }) => void;
   "game:endGame": () => void;
   "game:playAgain": () => void;

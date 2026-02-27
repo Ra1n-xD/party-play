@@ -785,6 +785,55 @@ export function adminForceRevealType(
   return { success: true, error: "" };
 }
 
+// ============ Revive / Eliminate Player ============
+
+export function adminRevivePlayer(
+  room: Room,
+  targetPlayerId: string,
+  io: IOServer,
+): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
+
+  const player = room.players.get(targetPlayerId);
+  if (!player) return { success: false, error: "Игрок не найден" };
+  if (player.alive) return { success: false, error: "Игрок уже в игре" };
+
+  player.alive = true;
+
+  // Remove from elimination order
+  room.gameState.eliminationOrder = room.gameState.eliminationOrder.filter(
+    (id) => id !== targetPlayerId,
+  );
+
+  // Clear lastEliminatedId if it was this player
+  if (room.gameState.lastEliminatedId === targetPlayerId) {
+    const order = room.gameState.eliminationOrder;
+    room.gameState.lastEliminatedId = order.length > 0 ? order[order.length - 1] : null;
+  }
+
+  broadcastState(room, io);
+  return { success: true, error: "" };
+}
+
+export function adminEliminatePlayer(
+  room: Room,
+  targetPlayerId: string,
+  io: IOServer,
+): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
+
+  const player = room.players.get(targetPlayerId);
+  if (!player) return { success: false, error: "Игрок не найден" };
+  if (!player.alive) return { success: false, error: "Игрок уже изгнан" };
+
+  player.alive = false;
+  room.gameState.eliminationOrder.push(targetPlayerId);
+  room.gameState.lastEliminatedId = targetPlayerId;
+
+  broadcastState(room, io);
+  return { success: true, error: "" };
+}
+
 // ============ Pause / Unpause ============
 
 export function pauseGame(room: Room, io: IOServer): { success: boolean; error: string } {
