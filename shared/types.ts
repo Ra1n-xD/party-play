@@ -92,7 +92,7 @@ export interface PublicGameState {
   votingsInCurrentRound: number;
   lastEliminatedPlayerId: string | null;
   tiebreakCandidateIds: string[] | null;
-  phaseEndTime: number | null;
+  phaseRemainingMs: number | null;
   paused: boolean;
 }
 

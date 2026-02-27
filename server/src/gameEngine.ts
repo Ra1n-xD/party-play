@@ -913,7 +913,7 @@ export function buildPublicState(room: Room): PublicGameState {
     votingsInCurrentRound: gs?.votingSchedule[roundIdx] || 0,
     lastEliminatedPlayerId: gs?.lastEliminatedId || null,
     tiebreakCandidateIds: gs?.tiebreakCandidateIds?.length ? gs.tiebreakCandidateIds : null,
-    phaseEndTime: gs?.phaseEndTime || null,
+    phaseRemainingMs: gs?.phaseEndTime ? Math.max(0, gs.phaseEndTime - Date.now()) : null,
     paused: gs?.paused || false,
   };
 }
