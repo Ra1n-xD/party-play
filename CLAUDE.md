@@ -26,9 +26,19 @@ npm -w client run build
 
 # Build server
 npm -w server run build
+
+# Format all files with Prettier
+npm run format
+
+# Check formatting without writing
+npm run format:check
 ```
 
 No test framework is configured.
+
+## Workflow Rules
+
+- **After every completed task**, provide a commit message in English using [Conventional Commits](https://www.conventionalcommits.org/) format (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `style:`, `docs:`).
 
 ## Architecture
 
