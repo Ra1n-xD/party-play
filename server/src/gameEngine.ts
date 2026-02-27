@@ -190,25 +190,9 @@ function startRevealPhase(room: Room, io: IOServer): void {
   if (!room.gameState) return;
   room.gameState.phase = "ROUND_REVEAL";
 
-  // Build turn order: alive players starting from the round starter
+  // Build turn order: alive players in original join order (1 to N)
   const alivePlayers = getAlivePlayers(room);
-  const aliveIds = alivePlayers.map((p) => p.id);
-
-  // Find the starter for this round: rotate through allPlayerIds
-  const starterIdx = room.gameState.roundStarterIndex;
-  // Find the next alive player from the rotation point
-  let startFrom = 0;
-  for (let i = 0; i < room.allPlayerIds.length; i++) {
-    const idx = (starterIdx + i) % room.allPlayerIds.length;
-    const pid = room.allPlayerIds[idx];
-    const pos = aliveIds.indexOf(pid);
-    if (pos !== -1) {
-      startFrom = pos;
-      break;
-    }
-  }
-
-  room.gameState.turnOrder = [...aliveIds.slice(startFrom), ...aliveIds.slice(0, startFrom)];
+  room.gameState.turnOrder = alivePlayers.map((p) => p.id);
   room.gameState.currentTurnIndex = 0;
 
   broadcastState(room, io);
@@ -516,10 +500,6 @@ function afterVoting(room: Room, io: IOServer): void {
 
 function advanceRoundOrEnd(room: Room, io: IOServer): void {
   if (!room.gameState) return;
-
-  // Advance round starter: next player after current starter
-  room.gameState.roundStarterIndex =
-    (room.gameState.roundStarterIndex + 1) % room.allPlayerIds.length;
 
   if (room.gameState.roundNumber >= CONFIG.TOTAL_ROUNDS) {
     // Game over after 5 rounds
