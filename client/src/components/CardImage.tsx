@@ -7,10 +7,7 @@ interface CardImageProps {
   className?: string;
 }
 
-const CARD_CONFIG: Record<
-  CardType,
-  { color: string; label: string; icon: JSX.Element }
-> = {
+const CARD_CONFIG: Record<CardType, { color: string; label: string; icon: JSX.Element }> = {
   profession: {
     color: "#f59e0b",
     label: "ПРОФЕССИЯ",
@@ -20,7 +17,12 @@ const CARD_CONFIG: Record<
         <circle cx="50" cy="30" r="10" fill="#1a1a1a" />
         <path d="M38 44c0-6.6 5.4-12 12-12s12 5.4 12 12v4H38v-4z" fill="#1a1a1a" />
         <rect x="30" y="52" width="40" height="22" rx="3" fill="#1a1a1a" />
-        <path d="M42 52v-4a4 4 0 014-4h8a4 4 0 014 4v4" stroke="#daa520" strokeWidth="2.5" fill="none" />
+        <path
+          d="M42 52v-4a4 4 0 014-4h8a4 4 0 014 4v4"
+          stroke="#daa520"
+          strokeWidth="2.5"
+          fill="none"
+        />
         <line x1="50" y1="58" x2="50" y2="68" stroke="#daa520" strokeWidth="2.5" />
         <line x1="44" y1="63" x2="56" y2="63" stroke="#daa520" strokeWidth="2.5" />
       </>
@@ -35,11 +37,42 @@ const CARD_CONFIG: Record<
         {/* Circle body */}
         <circle cx="50" cy="48" r="16" stroke="#1a1a1a" strokeWidth="5" fill="none" />
         {/* Male arrow (top-right) */}
-        <line x1="61" y1="37" x2="72" y2="26" stroke="#1a1a1a" strokeWidth="5" strokeLinecap="round" />
-        <polyline points="64,26 72,26 72,34" stroke="#1a1a1a" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <line
+          x1="61"
+          y1="37"
+          x2="72"
+          y2="26"
+          stroke="#1a1a1a"
+          strokeWidth="5"
+          strokeLinecap="round"
+        />
+        <polyline
+          points="64,26 72,26 72,34"
+          stroke="#1a1a1a"
+          strokeWidth="5"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
         {/* Female cross (bottom) */}
-        <line x1="50" y1="64" x2="50" y2="78" stroke="#1a1a1a" strokeWidth="5" strokeLinecap="round" />
-        <line x1="43" y1="72" x2="57" y2="72" stroke="#1a1a1a" strokeWidth="5" strokeLinecap="round" />
+        <line
+          x1="50"
+          y1="64"
+          x2="50"
+          y2="78"
+          stroke="#1a1a1a"
+          strokeWidth="5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="43"
+          y1="72"
+          x2="57"
+          y2="72"
+          stroke="#1a1a1a"
+          strokeWidth="5"
+          strokeLinecap="round"
+        />
       </>
     ),
   },
@@ -82,8 +115,14 @@ const CARD_CONFIG: Record<
         <circle cx="66" cy="50" r="3" fill="#daa520" />
         <circle cx="72" cy="56" r="3" fill="#daa520" />
         {/* Stars above */}
-        <path d="M40 30l2 4 4.5.7-3.2 3.2.8 4.5L40 40l-4.1 2.4.8-4.5-3.2-3.2L38 34z" fill="#1a1a1a" />
-        <path d="M60 26l2 4 4.5.7-3.2 3.2.8 4.5L60 36l-4.1 2.4.8-4.5-3.2-3.2L58 30z" fill="#1a1a1a" />
+        <path
+          d="M40 30l2 4 4.5.7-3.2 3.2.8 4.5L40 40l-4.1 2.4.8-4.5-3.2-3.2L38 34z"
+          fill="#1a1a1a"
+        />
+        <path
+          d="M60 26l2 4 4.5.7-3.2 3.2.8 4.5L60 36l-4.1 2.4.8-4.5-3.2-3.2L58 30z"
+          fill="#1a1a1a"
+        />
       </>
     ),
   },
@@ -94,10 +133,40 @@ const CARD_CONFIG: Record<
       // Backpack
       <>
         <rect x="32" y="36" width="36" height="38" rx="5" fill="#1a1a1a" />
-        <path d="M40 36v-6a6 6 0 016-6h8a6 6 0 016 6v6" stroke="#1a1a1a" strokeWidth="4" fill="none" />
-        <rect x="38" y="50" width="24" height="14" rx="3" stroke="#daa520" strokeWidth="2.5" fill="none" />
-        <line x1="50" y1="52" x2="50" y2="62" stroke="#daa520" strokeWidth="2.5" strokeLinecap="round" />
-        <line x1="44" y1="57" x2="56" y2="57" stroke="#daa520" strokeWidth="2.5" strokeLinecap="round" />
+        <path
+          d="M40 36v-6a6 6 0 016-6h8a6 6 0 016 6v6"
+          stroke="#1a1a1a"
+          strokeWidth="4"
+          fill="none"
+        />
+        <rect
+          x="38"
+          y="50"
+          width="24"
+          height="14"
+          rx="3"
+          stroke="#daa520"
+          strokeWidth="2.5"
+          fill="none"
+        />
+        <line
+          x1="50"
+          y1="52"
+          x2="50"
+          y2="62"
+          stroke="#daa520"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="44"
+          y1="57"
+          x2="56"
+          y2="57"
+          stroke="#daa520"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
         <path d="M32 44c-4 0-6 2-6 6v14c0 2 1 4 3 4" stroke="#1a1a1a" strokeWidth="3" fill="none" />
         <path d="M68 44c4 0 6 2 6 6v14c0 2-1 4-3 4" stroke="#1a1a1a" strokeWidth="3" fill="none" />
       </>
@@ -116,7 +185,15 @@ const CARD_CONFIG: Record<
           strokeWidth="2"
           strokeLinejoin="round"
         />
-        <line x1="50" y1="42" x2="50" y2="60" stroke="#daa520" strokeWidth="5" strokeLinecap="round" />
+        <line
+          x1="50"
+          y1="42"
+          x2="50"
+          y2="60"
+          stroke="#daa520"
+          strokeWidth="5"
+          strokeLinecap="round"
+        />
         <circle cx="50" cy="68" r="3" fill="#daa520" />
       </>
     ),
@@ -134,10 +211,7 @@ const CARD_CONFIG: Record<
           strokeWidth="1"
           strokeLinejoin="round"
         />
-        <path
-          d="M52 24L32 52h14L40 78 66 50H52L52 24z"
-          fill="#daa520"
-        />
+        <path d="M52 24L32 52h14L40 78 66 50H52L52 24z" fill="#daa520" />
       </>
     ),
   },
@@ -173,7 +247,7 @@ export function CardImage({ type, className }: CardImageProps) {
         {config.label}
       </text>
       {/* Icon area */}
-      <g transform="translate(0, 10)">{config.icon}</g>
+      <g transform="translate(0, 14)">{config.icon}</g>
     </svg>
   );
 }
