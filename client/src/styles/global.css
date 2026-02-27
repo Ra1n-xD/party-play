@@ -696,7 +696,7 @@ body {
 
 .attributes-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin-bottom: 16px;
 }
@@ -1287,7 +1287,7 @@ body {
 }
 
 .expanded-player-modal .attributes-grid {
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
 }
 
 /* ============ ADMIN PANEL ============ */
