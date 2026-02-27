@@ -84,8 +84,7 @@ export function startGame(room: Room, io: IOServer): void {
     player.immuneThisRound = false;
   }
 
-  const playerIds = Array.from(room.players.keys());
-  room.allPlayerIds = shuffle(playerIds);
+  room.allPlayerIds = Array.from(room.players.keys());
 
   room.gameState = {
     phase: "CATASTROPHE_REVEAL",
