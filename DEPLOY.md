@@ -205,7 +205,7 @@ systemctl restart nginx
 
 ## 14. Настроить автодеплой (GitHub Actions)
 
-При каждом пуше в `master` сервер автоматически обновляется и пересобирается.
+При каждом пуше в `main` сервер автоматически обновляется и пересобирается.
 
 ### Шаг 1: Создать SSH-ключ для GitHub Actions
 
@@ -239,7 +239,7 @@ GitHub → Репозиторий → Settings → Secrets and variables → Act
 
 ### Шаг 3: Готово
 
-Workflow-файл `.github/workflows/deploy.yml` уже есть в репозитории. После пуша в `master` GitHub автоматически:
+Workflow-файл `.github/workflows/deploy.yml` уже есть в репозитории. После пуша в `main` GitHub автоматически:
 
 1. Подключится к VPS по SSH
 2. Стянет последние изменения (`git pull`)
