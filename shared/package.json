@@ -1,5 +1,5 @@
 {
-  "name": "shared",
+  "name": "@party-games/shared",
   "version": "1.0.0",
   "private": true,
   "main": "types.ts"

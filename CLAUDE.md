@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-"Бункер" (Bunker) is a real-time multiplayer social deduction game built as a web app. Players argue over who deserves a spot in a fallout bunker during a catastrophe, eliminating each other through voting rounds. Digital adaptation of the Russian tabletop game by Economicus.
+PartyGames — a real-time multiplayer party games platform built as a web app. Currently features "Бункер" (Bunker), a social deduction game where players argue over who deserves a spot in a fallout bunker during a catastrophe. Planned to expand into a collection of party mini-games with a shared lobby and room system. See `ARCHITECTURE.md` for the platform migration plan.
 
 ## Commands
 
