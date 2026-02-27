@@ -5,6 +5,12 @@ import { PublicGameState, Character, AttributeType, ActionCard, Attribute, GameP
 /** Client-side game state with local phaseEndTime computed from server's phaseRemainingMs */
 export type ClientGameState = PublicGameState & { phaseEndTime: number | null };
 
+/** Overlay queue item types */
+export type OverlayItem =
+  | { kind: "announcement"; title: string; subtitle?: string; description?: string; duration: number }
+  | { kind: "attribute"; playerName: string; attribute: Attribute; duration: number }
+  | { kind: "actionCard"; playerName: string; actionCard: ActionCard; duration: number };
+
 interface GameContextType {
   connected: boolean;
   roomCode: string | null;
@@ -38,10 +44,7 @@ interface GameContextType {
   adminSkipDiscussion: () => void;
   adminRevivePlayer: (targetPlayerId: string) => void;
   adminEliminatePlayer: (targetPlayerId: string) => void;
-  revealedActionCard: { playerName: string; actionCard: ActionCard } | null;
-  revealedAttribute: { playerName: string; attribute: Attribute } | null;
-  announcement: { title: string; subtitle?: string; description?: string } | null;
-  dismissAnnouncement: () => void;
+  currentOverlay: OverlayItem | null;
   pendingAdminOpen: boolean;
   consumePendingAdminOpen: () => void;
 }
@@ -55,25 +58,43 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [gameState, setGameState] = useState<ClientGameState | null>(null);
   const [myCharacter, setMyCharacter] = useState<Character | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [revealedActionCard, setRevealedActionCard] = useState<{
-    playerName: string;
-    actionCard: ActionCard;
-  } | null>(null);
-  const [revealedAttribute, setRevealedAttribute] = useState<{
-    playerName: string;
-    attribute: Attribute;
-  } | null>(null);
   const [pendingAdminOpen, setPendingAdminOpen] = useState(false);
-  const [announcement, setAnnouncement] = useState<{
-    title: string;
-    subtitle?: string;
-    description?: string;
-  } | null>(null);
+  // Overlay queue: items shown one at a time, sequentially
+  const [currentOverlay, setCurrentOverlay] = useState<OverlayItem | null>(null);
+  const overlayQueueRef = useRef<OverlayItem[]>([]);
+  const overlayTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const prevPhaseRef = useRef<GamePhase | null>(null);
-  const announcementTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const actionCardTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const attributeRevealTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const overlayActiveRef = useRef(false);
+
+  // Show an overlay item and schedule its auto-dismiss
+  function showOverlayItem(item: OverlayItem) {
+    overlayActiveRef.current = true;
+    setCurrentOverlay(item);
+    if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current);
+    overlayTimerRef.current = setTimeout(() => {
+      if (item.kind === "actionCard") {
+        setPendingAdminOpen(true);
+      }
+      // Advance to next in queue
+      const next = overlayQueueRef.current.shift();
+      if (next) {
+        showOverlayItem(next);
+      } else {
+        overlayActiveRef.current = false;
+        setCurrentOverlay(null);
+      }
+    }, item.duration);
+  }
+
+  // Enqueue an overlay item. If nothing is showing, show immediately.
+  function enqueueOverlay(item: OverlayItem) {
+    if (!overlayActiveRef.current) {
+      showOverlayItem(item);
+    } else {
+      overlayQueueRef.current.push(item);
+    }
+  }
 
   useEffect(() => {
     socket.connect();
@@ -107,58 +128,58 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const phaseEndTime =
         state.phaseRemainingMs != null ? Date.now() + state.phaseRemainingMs : null;
 
-      // Detect phase change and show announcement
+      // Detect phase change and enqueue announcement overlay
       const prevPhase = prevPhaseRef.current;
       const newPhase = state.phase;
       if (prevPhase !== newPhase) {
         prevPhaseRef.current = newPhase;
-        let ann: { title: string; subtitle?: string; description?: string } | null = null;
 
         if (newPhase === "CATASTROPHE_REVEAL" && state.catastrophe) {
-          ann = {
+          enqueueOverlay({
+            kind: "announcement", duration: 3000,
             title: "Катастрофа!",
             subtitle: state.catastrophe.title,
             description: state.catastrophe.description,
-          };
+          });
         } else if (newPhase === "BUNKER_EXPLORE" && state.revealedBunkerCards.length > 0) {
           const lastCard = state.revealedBunkerCards[state.revealedBunkerCards.length - 1];
-          ann = {
+          enqueueOverlay({
+            kind: "announcement", duration: 3000,
             title: "Новая карта бункера",
             subtitle: lastCard.title,
             description: lastCard.description,
-          };
+          });
         } else if (newPhase === "ROUND_REVEAL") {
-          ann = {
+          enqueueOverlay({
+            kind: "announcement", duration: 3000,
             title: `Раунд ${state.roundNumber}`,
             subtitle: "Раскрытие карт",
-          };
+          });
         } else if (newPhase === "ROUND_DISCUSSION") {
-          ann = {
+          enqueueOverlay({
+            kind: "announcement", duration: 3000,
             title: "Обсуждение",
             subtitle: `Раунд ${state.roundNumber}`,
-          };
+          });
         } else if (newPhase === "ROUND_VOTE") {
-          ann = {
+          enqueueOverlay({
+            kind: "announcement", duration: 3000,
             title: "Голосование",
             subtitle: `Раунд ${state.roundNumber}`,
-          };
+          });
         } else if (newPhase === "ROUND_VOTE_TIEBREAK") {
-          ann = {
+          enqueueOverlay({
+            kind: "announcement", duration: 3000,
             title: "Перевоевание",
             subtitle: "Ничья! Повторное голосование",
-          };
+          });
         } else if (newPhase === "ROUND_RESULT" && state.eliminatedPlayerId) {
           const eliminated = state.players.find((p: any) => p.id === state.eliminatedPlayerId);
-          ann = {
+          enqueueOverlay({
+            kind: "announcement", duration: 3000,
             title: "Изгнан!",
             subtitle: eliminated?.name || "Игрок",
-          };
-        }
-
-        if (ann) {
-          setAnnouncement(ann);
-          if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
-          announcementTimerRef.current = setTimeout(() => setAnnouncement(null), 3000);
+          });
         }
       }
 
@@ -170,18 +191,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
 
     socket.on("game:attributeRevealed", ({ playerName, attribute }) => {
-      setRevealedAttribute({ playerName, attribute });
-      if (attributeRevealTimerRef.current) clearTimeout(attributeRevealTimerRef.current);
-      attributeRevealTimerRef.current = setTimeout(() => setRevealedAttribute(null), 4000);
+      enqueueOverlay({ kind: "attribute", playerName, attribute, duration: 4000 });
     });
 
-    socket.on("game:actionCardRevealed", (data) => {
-      setRevealedActionCard(data);
-      if (actionCardTimerRef.current) clearTimeout(actionCardTimerRef.current);
-      actionCardTimerRef.current = setTimeout(() => {
-        setRevealedActionCard(null);
-        setPendingAdminOpen(true);
-      }, 10000);
+    socket.on("game:actionCardRevealed", ({ playerName, actionCard }) => {
+      enqueueOverlay({ kind: "actionCard", playerName, actionCard, duration: 10000 });
     });
 
     // Try to rejoin on page reload
@@ -302,11 +316,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit("admin:forceRevealType", { attributeType });
   }, []);
 
-  const dismissAnnouncementFn = useCallback(() => {
-    setAnnouncement(null);
-    if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
-  }, []);
-
   const consumePendingAdminOpenFn = useCallback(() => {
     setPendingAdminOpen(false);
   }, []);
@@ -366,10 +375,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         adminSkipDiscussion: adminSkipDiscussionFn,
         adminRevivePlayer: adminRevivePlayerFn,
         adminEliminatePlayer: adminEliminatePlayerFn,
-        revealedActionCard,
-        revealedAttribute,
-        announcement,
-        dismissAnnouncement: dismissAnnouncementFn,
+        currentOverlay,
         pendingAdminOpen,
         consumePendingAdminOpen: consumePendingAdminOpenFn,
       }}
