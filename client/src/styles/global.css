@@ -167,6 +167,17 @@ body {
   background: var(--bg-card-hover);
 }
 
+.btn-reveal-action {
+  background: #a855f7;
+  color: #fff;
+  border: none;
+  margin-top: 16px;
+}
+
+.btn-reveal-action:hover:not(:disabled) {
+  background: #9333ea;
+}
+
 .btn-danger {
   background: var(--danger);
   color: white;

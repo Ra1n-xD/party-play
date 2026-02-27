@@ -61,11 +61,7 @@ export function GameScreen() {
     .filter((i) => !revealedIndices.has(i));
 
   const canReveal = gameState.phase === "ROUND_REVEAL" && isMyTurn && unrevealedIndices.length > 1;
-  const canRevealAction =
-    myCharacter.actionCard &&
-    !me?.actionCardRevealed &&
-    gameState.phase !== "ROUND_VOTE" &&
-    gameState.phase !== "ROUND_VOTE_TIEBREAK";
+  const canRevealAction = myCharacter.actionCard && !me?.actionCardRevealed;
 
   const phaseLabels: Record<string, string> = {
     CATASTROPHE_REVEAL: "Катастрофа!",
