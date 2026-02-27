@@ -4,6 +4,7 @@ import { LobbyScreen } from "./screens/LobbyScreen";
 import { GameScreen } from "./screens/GameScreen";
 import { VoteScreen } from "./screens/VoteScreen";
 import { ResultsScreen } from "./screens/ResultsScreen";
+import BackgroundParticles from "./components/BackgroundParticles";
 
 function AppContent() {
   const { roomCode, gameState } = useGame();
@@ -55,6 +56,7 @@ function PauseOverlay() {
 export default function App() {
   return (
     <>
+      <BackgroundParticles />
       <AppContent />
       <PauseOverlay />
     </>
