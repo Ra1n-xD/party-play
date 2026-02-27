@@ -120,6 +120,10 @@ export interface ClientEvents {
     targetPlayerId: string;
     attributeType: AttributeType | "action";
   }) => void;
+  "admin:removeBunkerCard": (data: { cardIndex: number }) => void;
+  "admin:replaceBunkerCard": (data: { cardIndex: number }) => void;
+  "admin:deleteAttribute": (data: { targetPlayerId: string; attributeType: AttributeType }) => void;
+  "admin:forceRevealType": (data: { attributeType: AttributeType }) => void;
   "admin:pause": () => void;
   "admin:unpause": () => void;
   "vote:cast": (data: { targetPlayerId: string }) => void;

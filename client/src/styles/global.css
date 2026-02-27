@@ -1281,6 +1281,15 @@ body {
   flex-wrap: wrap;
 }
 
+.admin-group-label {
+  width: 100%;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+}
+
 .btn-admin {
   flex: 1;
   min-width: 120px;

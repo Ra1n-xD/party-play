@@ -21,6 +21,10 @@ import {
   adminShuffleAll,
   adminSwapAttribute,
   adminReplaceAttribute,
+  adminRemoveBunkerCard,
+  adminReplaceBunkerCard,
+  adminDeleteAttribute,
+  adminForceRevealType,
   pauseGame,
   unpauseGame,
 } from "./gameEngine.js";
@@ -286,6 +290,66 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
       const result = adminReplaceAttribute(room, targetPlayerId, attributeType, io);
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+      }
+    });
+
+    socket.on("admin:removeBunkerCard", ({ cardIndex }) => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+      if (info.playerId !== room.hostId) {
+        socket.emit("room:error", { message: "Только хост может использовать админ-панель" });
+        return;
+      }
+      const result = adminRemoveBunkerCard(room, cardIndex, io);
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+      }
+    });
+
+    socket.on("admin:replaceBunkerCard", ({ cardIndex }) => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+      if (info.playerId !== room.hostId) {
+        socket.emit("room:error", { message: "Только хост может использовать админ-панель" });
+        return;
+      }
+      const result = adminReplaceBunkerCard(room, cardIndex, io);
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+      }
+    });
+
+    socket.on("admin:deleteAttribute", ({ targetPlayerId, attributeType }) => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+      if (info.playerId !== room.hostId) {
+        socket.emit("room:error", { message: "Только хост может использовать админ-панель" });
+        return;
+      }
+      const result = adminDeleteAttribute(room, targetPlayerId, attributeType, io);
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+      }
+    });
+
+    socket.on("admin:forceRevealType", ({ attributeType }) => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      if (!room) return;
+      if (info.playerId !== room.hostId) {
+        socket.emit("room:error", { message: "Только хост может использовать админ-панель" });
+        return;
+      }
+      const result = adminForceRevealType(room, attributeType, io);
       if (!result.success) {
         socket.emit("room:error", { message: result.error });
       }

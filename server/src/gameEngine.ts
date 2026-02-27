@@ -666,6 +666,97 @@ export function adminReplaceAttribute(
   return { success: true, error: "" };
 }
 
+// ============ Bunker Card Admin ============
+
+export function adminRemoveBunkerCard(
+  room: Room,
+  cardIndex: number,
+  io: IOServer,
+): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (cardIndex < 0 || cardIndex >= room.gameState.revealedBunkerCount) {
+    return { success: false, error: "Неверный индекс карты бункера" };
+  }
+
+  room.gameState.bunkerCards.splice(cardIndex, 1);
+  room.gameState.revealedBunkerCount--;
+
+  broadcastState(room, io);
+  return { success: true, error: "" };
+}
+
+export function adminReplaceBunkerCard(
+  room: Room,
+  cardIndex: number,
+  io: IOServer,
+): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (cardIndex < 0 || cardIndex >= room.gameState.revealedBunkerCount) {
+    return { success: false, error: "Неверный индекс карты бункера" };
+  }
+
+  const currentTitles = new Set(room.gameState.bunkerCards.map((c) => c.title));
+  const available = allBunkerCardsData.filter((c) => !currentTitles.has(c.title));
+  if (available.length === 0) {
+    return { success: false, error: "Нет доступных карт бункера для замены" };
+  }
+
+  const newCard = available[Math.floor(Math.random() * available.length)];
+  room.gameState.bunkerCards[cardIndex] = { title: newCard.title, description: newCard.description };
+
+  broadcastState(room, io);
+  return { success: true, error: "" };
+}
+
+// ============ Attribute Admin (extended) ============
+
+export function adminDeleteAttribute(
+  room: Room,
+  targetPlayerId: string,
+  attributeType: string,
+  io: IOServer,
+): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
+
+  const player = room.players.get(targetPlayerId);
+  if (!player?.character) return { success: false, error: "Игрок не найден" };
+
+  const removedIdx = player.character.attributes.findIndex((a) => a.type === attributeType);
+  if (removedIdx === -1) return { success: false, error: "Атрибут не найден" };
+
+  player.character.attributes.splice(removedIdx, 1);
+  player.revealedIndices = player.revealedIndices
+    .filter((i) => i !== removedIdx)
+    .map((i) => (i > removedIdx ? i - 1 : i));
+
+  const sock = io.sockets.sockets.get(player.socketId);
+  if (sock && player.character) {
+    sock.emit("game:character", player.character);
+  }
+
+  broadcastState(room, io);
+  return { success: true, error: "" };
+}
+
+export function adminForceRevealType(
+  room: Room,
+  attributeType: string,
+  io: IOServer,
+): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
+
+  for (const player of room.players.values()) {
+    if (!player.alive || !player.character) continue;
+    const idx = player.character.attributes.findIndex((a) => a.type === attributeType);
+    if (idx !== -1 && !player.revealedIndices.includes(idx)) {
+      player.revealedIndices.push(idx);
+    }
+  }
+
+  broadcastState(room, io);
+  return { success: true, error: "" };
+}
+
 // ============ Pause / Unpause ============
 
 export function pauseGame(room: Room, io: IOServer): { success: boolean; error: string } {
