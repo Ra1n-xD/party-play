@@ -35,6 +35,7 @@ export function VoteScreen() {
   } = useGame();
   const [voted, setVoted] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
+  const [confirmRevealAction, setConfirmRevealAction] = useState(false);
 
   // Admin panel state
   const [adminOpen, setAdminOpen] = useState(false);
@@ -273,7 +274,7 @@ export function VoteScreen() {
         </div>
 
         {canRevealAction && (
-          <button className="btn btn-reveal-action" onClick={revealActionCard}>
+          <button className="btn btn-reveal-action" onClick={() => setConfirmRevealAction(true)}>
             Раскрыть особое условие
           </button>
         )}
@@ -508,6 +509,29 @@ export function VoteScreen() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {confirmRevealAction && (
+        <div className="modal-overlay" onClick={() => setConfirmRevealAction(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Раскрыть особое условие?</h3>
+            <p>Это действие нельзя отменить. Все игроки увидят вашу карту.</p>
+            <div className="modal-actions">
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  revealActionCard();
+                  setConfirmRevealAction(false);
+                }}
+              >
+                Раскрыть
+              </button>
+              <button className="btn btn-secondary" onClick={() => setConfirmRevealAction(false)}>
+                Отмена
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
