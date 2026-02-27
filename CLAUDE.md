@@ -39,18 +39,18 @@ Single file `types.ts` — all TypeScript interfaces and Socket.IO event type ma
 
 ### server/ (Express + Socket.IO)
 - **`src/index.ts`** — Express app + Socket.IO server on port 3001, calls `registerHandlers(io)`
-- **`src/config.ts`** — All tunable constants (timers, player limits, round counts)
+- **`src/config.ts`** — All tunable constants (timers, player limits, round counts). Has switchable `TEST_TIMERS` / `PROD_TIMERS` sets
 - **`src/socketHandlers.ts`** — Socket event registration; maintains `socketRoomMap` for O(1) socket→room/player lookup. Routes events to roomManager and gameEngine
 - **`src/roomManager.ts`** — In-memory `Map<string, Room>` holding all rooms/players/game state. No database
-- **`src/gameEngine.ts`** — Core game logic: phase transitions via `setTimeout` chains, voting/tiebreak, attribute reveals, action card effects, bot action scheduling. `broadcastState()` pushes full `PublicGameState` to all clients after every change
+- **`src/gameEngine.ts`** — Core game logic: phase transitions via `setTimeout` chains, voting/tiebreak, attribute reveals, admin panel functions (shuffle/swap/replace), pause/unpause, bot action scheduling. `broadcastState()` pushes full `PublicGameState` to all clients after every change
 - **`src/characterGenerator.ts`** — Random character generation (6 attributes + 1 action card)
-- **`src/botManager.ts`** — AI bot scheduling (random reveals, staggered votes, 30% chance to use action cards)
+- **`src/botManager.ts`** — AI bot scheduling (random reveals, staggered votes)
 - **`src/data/`** — Static game content arrays (professions, health, hobbies, baggage, facts, catastrophes, bunkers, actions) all in Russian
 
 ### client/ (React 18 + Vite + TypeScript)
 - **`src/socket.ts`** — Typed Socket.IO client singleton, `autoConnect: false`. In dev connects to `http://<hostname>:3001` (LAN-friendly)
 - **`src/context/GameContext.tsx`** — Single React context provider managing all state. Listens to server events, stores `gameState`, `myCharacter` (private), handles reconnection via `sessionStorage`
-- **`src/App.tsx`** — Phase-based screen router (switch on `gameState.phase`)
+- **`src/App.tsx`** — Phase-based screen router (switch on `gameState.phase`) + global `PauseOverlay` component
 - **`src/screens/`** — One screen per game phase group: HomeScreen, LobbyScreen, GameScreen (covers reveal/discussion/result phases), VoteScreen, ResultsScreen
 
 ### Key Patterns
@@ -60,6 +60,8 @@ Single file `types.ts` — all TypeScript interfaces and Socket.IO event type ma
 - **Phase timers** are server-side `setTimeout`s. `phaseEndTime` (epoch ms) is included in public state so clients render countdowns via `endTime - Date.now()`.
 - **Reconnection**: client auto-emits `room:rejoin` on socket reconnect using `sessionStorage` credentials. Server restores socket mapping and resends character + state.
 - **All game content is in Russian** — UI text, data arrays, action card descriptions.
+- **Action cards** ("Особые условия") are display-only: each player gets a random card visible only to them. Players can reveal it publicly via a button (any phase except voting). The host applies card effects manually via the admin panel.
+- **Admin panel** (host only): shuffle attributes, swap between players, replace with random. Opening the panel pauses the game (server clears phase timer, saves remaining time). Closing resumes. All non-host players see a fullscreen "Пауза" overlay while paused.
 
 ### Game Flow
 
