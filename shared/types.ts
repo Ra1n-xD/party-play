@@ -124,6 +124,7 @@ export interface ClientEvents {
   "admin:forceRevealType": (data: { attributeType: AttributeType }) => void;
   "admin:pause": () => void;
   "admin:unpause": () => void;
+  "admin:skipDiscussion": () => void;
   "vote:cast": (data: { targetPlayerId: string }) => void;
   "game:endGame": () => void;
   "game:playAgain": () => void;

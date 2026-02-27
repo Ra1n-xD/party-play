@@ -28,6 +28,7 @@ import {
   adminForceRevealType,
   pauseGame,
   unpauseGame,
+  skipDiscussion,
 } from "./gameEngine.js";
 import { CONFIG } from "./config.js";
 
@@ -534,6 +535,16 @@ export function registerHandlers(io: IOServer): void {
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
       const result = unpauseGame(ctx.room, io);
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+      }
+    });
+
+    socket.on("admin:skipDiscussion", () => {
+      const ctx = getSocketRoom(socket);
+      if (!ctx) return;
+      if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
+      const result = skipDiscussion(ctx.room, io);
       if (!result.success) {
         socket.emit("room:error", { message: result.error });
       }
