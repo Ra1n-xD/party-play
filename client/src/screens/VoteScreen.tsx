@@ -40,7 +40,14 @@ export function VoteScreen() {
   // Admin panel state
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminAction, setAdminAction] = useState<
-    "shuffle" | "swap" | "replace" | "deleteAttr" | "forceReveal" | "removeBunker" | "replaceBunker" | null
+    | "shuffle"
+    | "swap"
+    | "replace"
+    | "deleteAttr"
+    | "forceReveal"
+    | "removeBunker"
+    | "replaceBunker"
+    | null
   >(null);
   const [adminAttrType, setAdminAttrType] = useState<AttributeType | "action">("profession");
   const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType | "action">>(new Set());
@@ -85,8 +92,7 @@ export function VoteScreen() {
   const canVote = me?.alive || isLastEliminated;
 
   // Action card reveal
-  const canRevealAction =
-    myCharacter?.actionCard && !me?.actionCardRevealed;
+  const canRevealAction = myCharacter?.actionCard && !me?.actionCardRevealed;
 
   // Admin helpers
   const alivePlayers = gameState.players.filter((p) => p.alive);
@@ -197,7 +203,7 @@ export function VoteScreen() {
   return (
     <div className="screen vote-screen">
       <div className="vote-container">
-        <h2>{isTiebreak ? "Перевоевание — ничья!" : "Голосование"}</h2>
+        <h2>{isTiebreak ? "Переголосование — ничья!" : "Голосование"}</h2>
         {isTiebreak ? (
           <p>Кандидаты получили равное число голосов. Выберите одного из них:</p>
         ) : (
@@ -235,7 +241,8 @@ export function VoteScreen() {
                     ))}
                     {player.actionCard && (
                       <span className="mini-tag" data-attr-type="action">
-                        <span className="mini-tag-label">Особое условие:</span> {player.actionCard.title}
+                        <span className="mini-tag-label">Особое условие:</span>{" "}
+                        {player.actionCard.title}
                       </span>
                     )}
                   </div>
