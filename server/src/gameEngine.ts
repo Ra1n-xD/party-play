@@ -9,7 +9,7 @@ import {
   BunkerCard,
   ThreatCard,
 } from "../../shared/types.js";
-import { Room, GameState, Player, getAlivePlayers } from "./roomManager.js";
+import { Room, GameState, Player, getAlivePlayers, touchRoom } from "./roomManager.js";
 import { generateCharacter } from "./characterGenerator.js";
 import { catastrophes } from "./data/catastrophes.js";
 import { bunkerCards as allBunkerCardsData } from "./data/bunkers.js";
@@ -942,6 +942,9 @@ function getVoters_fromState(room: Room): Player[] {
 export function broadcastState(room: Room, io: IOServer): void {
   const state = buildPublicState(room);
   io.to(room.code).emit("game:state", state);
+
+  // Refresh room activity TTL
+  touchRoom(room.code);
 
   // Schedule bot actions after state broadcast
   scheduleBotActions(room, io);

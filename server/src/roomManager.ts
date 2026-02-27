@@ -51,6 +51,24 @@ export interface Room {
 }
 
 const rooms = new Map<string, Room>();
+const roomLastActivity = new Map<string, number>();
+
+// Auto-cleanup inactive rooms every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, lastActivity] of roomLastActivity.entries()) {
+    if (now - lastActivity > CONFIG.ROOM_INACTIVE_TTL) {
+      const room = rooms.get(code);
+      if (room?.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
+      rooms.delete(code);
+      roomLastActivity.delete(code);
+    }
+  }
+}, 5 * 60 * 1000);
+
+export function touchRoom(code: string): void {
+  roomLastActivity.set(code, Date.now());
+}
 
 export function createRoom(socketId: string, playerName: string): { room: Room; player: Player } {
   let code: string;
@@ -84,6 +102,7 @@ export function createRoom(socketId: string, playerName: string): { room: Room; 
   };
 
   rooms.set(code, room);
+  touchRoom(code);
   return { room, player };
 }
 
@@ -116,6 +135,7 @@ export function joinRoom(
 
   room.players.set(playerId, player);
   room.allPlayerIds.push(playerId);
+  touchRoom(roomCode);
   return { room, player };
 }
 
@@ -136,6 +156,7 @@ export function removePlayer(room: Room, playerId: string): void {
   if (room.players.size === 0) {
     if (room.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
     rooms.delete(room.code);
+    roomLastActivity.delete(room.code);
   } else if (room.hostId === playerId) {
     const firstPlayer = room.players.values().next().value;
     if (firstPlayer) room.hostId = firstPlayer.id;
