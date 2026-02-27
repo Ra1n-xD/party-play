@@ -26,6 +26,10 @@ interface GameContextType {
   adminShuffleAll: (attributeType: AttributeType | "action") => void;
   adminSwapAttribute: (player1Id: string, player2Id: string, attributeType: AttributeType | "action") => void;
   adminReplaceAttribute: (targetPlayerId: string, attributeType: AttributeType | "action") => void;
+  adminRemoveBunkerCard: (cardIndex: number) => void;
+  adminReplaceBunkerCard: (cardIndex: number) => void;
+  adminDeleteAttribute: (targetPlayerId: string, attributeType: AttributeType) => void;
+  adminForceRevealType: (attributeType: AttributeType) => void;
   adminPause: () => void;
   adminUnpause: () => void;
 }
@@ -172,6 +176,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const adminRemoveBunkerCardFn = useCallback((cardIndex: number) => {
+    socket.emit("admin:removeBunkerCard", { cardIndex });
+  }, []);
+
+  const adminReplaceBunkerCardFn = useCallback((cardIndex: number) => {
+    socket.emit("admin:replaceBunkerCard", { cardIndex });
+  }, []);
+
+  const adminDeleteAttributeFn = useCallback(
+    (targetPlayerId: string, attributeType: AttributeType) => {
+      socket.emit("admin:deleteAttribute", { targetPlayerId, attributeType });
+    },
+    [],
+  );
+
+  const adminForceRevealTypeFn = useCallback((attributeType: AttributeType) => {
+    socket.emit("admin:forceRevealType", { attributeType });
+  }, []);
+
   const adminPauseFn = useCallback(() => {
     socket.emit("admin:pause");
   }, []);
@@ -206,6 +229,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         adminShuffleAll: adminShuffleAllFn,
         adminSwapAttribute: adminSwapAttributeFn,
         adminReplaceAttribute: adminReplaceAttributeFn,
+        adminRemoveBunkerCard: adminRemoveBunkerCardFn,
+        adminReplaceBunkerCard: adminReplaceBunkerCardFn,
+        adminDeleteAttribute: adminDeleteAttributeFn,
+        adminForceRevealType: adminForceRevealTypeFn,
         adminPause: adminPauseFn,
         adminUnpause: adminUnpauseFn,
       }}

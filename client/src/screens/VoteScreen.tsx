@@ -24,6 +24,10 @@ export function VoteScreen() {
     adminShuffleAll,
     adminSwapAttribute,
     adminReplaceAttribute,
+    adminRemoveBunkerCard,
+    adminReplaceBunkerCard,
+    adminDeleteAttribute,
+    adminForceRevealType,
     adminPause,
     adminUnpause,
   } = useGame();
@@ -32,12 +36,15 @@ export function VoteScreen() {
 
   // Admin panel state
   const [adminOpen, setAdminOpen] = useState(false);
-  const [adminAction, setAdminAction] = useState<"shuffle" | "swap" | "replace" | null>(null);
+  const [adminAction, setAdminAction] = useState<
+    "shuffle" | "swap" | "replace" | "deleteAttr" | "forceReveal" | "removeBunker" | "replaceBunker" | null
+  >(null);
   const [adminAttrType, setAdminAttrType] = useState<AttributeType | "action">("profession");
   const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType | "action">>(new Set());
   const [adminPlayer1, setAdminPlayer1] = useState<string>("");
   const [adminPlayer2, setAdminPlayer2] = useState<string>("");
   const [adminPlayers, setAdminPlayers] = useState<Set<string>>(new Set());
+  const [adminBunkerCardIndex, setAdminBunkerCardIndex] = useState<number | null>(null);
 
   // Reset voted state when phase changes (e.g. tiebreak)
   useEffect(() => {
@@ -94,12 +101,35 @@ export function VoteScreen() {
           }
         }
       }
+    } else if (adminAction === "deleteAttr") {
+      const players = Array.from(adminPlayers);
+      const types = Array.from(adminAttrTypes);
+      if (players.length > 0 && types.length > 0) {
+        for (const pid of players) {
+          for (const t of types) {
+            if (t !== "action") adminDeleteAttribute(pid, t);
+          }
+        }
+      }
+    } else if (adminAction === "forceReveal") {
+      if (adminAttrType !== "action") {
+        adminForceRevealType(adminAttrType as AttributeType);
+      }
+    } else if (adminAction === "removeBunker") {
+      if (adminBunkerCardIndex !== null) {
+        adminRemoveBunkerCard(adminBunkerCardIndex);
+      }
+    } else if (adminAction === "replaceBunker") {
+      if (adminBunkerCardIndex !== null) {
+        adminReplaceBunkerCard(adminBunkerCardIndex);
+      }
     }
     setAdminAction(null);
     setAdminPlayer1("");
     setAdminPlayer2("");
     setAdminPlayers(new Set());
     setAdminAttrTypes(new Set());
+    setAdminBunkerCardIndex(null);
   };
 
   const handleVote = (targetId: string) => {
@@ -259,13 +289,27 @@ export function VoteScreen() {
             <div className="admin-panel-body">
               {!adminAction && (
                 <div className="admin-actions-list">
+                  <label className="admin-group-label">Карты игроков</label>
                   <button className="btn btn-admin" onClick={() => setAdminAction("shuffle")}>
-                    Перемешать карты
+                    Перемешать
                   </button>
                   <button className="btn btn-admin" onClick={() => setAdminAction("swap")}>
                     Поменять местами
                   </button>
                   <button className="btn btn-admin" onClick={() => setAdminAction("replace")}>
+                    Заменить
+                  </button>
+                  <button className="btn btn-admin" onClick={() => setAdminAction("deleteAttr")}>
+                    Удалить
+                  </button>
+                  <button className="btn btn-admin" onClick={() => setAdminAction("forceReveal")}>
+                    Раскрыть у всех
+                  </button>
+                  <label className="admin-group-label">Карты бункера</label>
+                  <button className="btn btn-admin" onClick={() => setAdminAction("removeBunker")}>
+                    Убрать карту
+                  </button>
+                  <button className="btn btn-admin" onClick={() => setAdminAction("replaceBunker")}>
                     Заменить карту
                   </button>
                 </div>
@@ -277,9 +321,71 @@ export function VoteScreen() {
                     {adminAction === "shuffle" && "Перемешать карты"}
                     {adminAction === "swap" && "Поменять местами"}
                     {adminAction === "replace" && "Заменить карту"}
+                    {adminAction === "deleteAttr" && "Удалить карту"}
+                    {adminAction === "forceReveal" && "Раскрыть у всех"}
+                    {adminAction === "removeBunker" && "Убрать карту бункера"}
+                    {adminAction === "replaceBunker" && "Заменить карту бункера"}
                   </h4>
 
-                  {adminAction === "replace" ? (
+                  {adminAction === "removeBunker" || adminAction === "replaceBunker" ? (
+                    <>
+                      <label>Карта бункера:</label>
+                      <div className="admin-chips">
+                        {gameState.revealedBunkerCards.map((card, i) => (
+                          <button
+                            key={i}
+                            className={`admin-chip ${adminBunkerCardIndex === i ? "active" : ""}`}
+                            onClick={() => setAdminBunkerCardIndex(i)}
+                          >
+                            {card.title}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : adminAction === "forceReveal" ? (
+                    <>
+                      <label>Тип карты:</label>
+                      <div className="admin-chips">
+                        {ATTR_TYPES.filter((t) => t.type !== "action").map((t) => (
+                          <button
+                            key={t.type}
+                            className={`admin-chip ${adminAttrType === t.type ? "active" : ""}`}
+                            onClick={() => setAdminAttrType(t.type)}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : adminAction === "deleteAttr" ? (
+                    <>
+                      <label>Тип карты (можно несколько):</label>
+                      <div className="admin-chips">
+                        {ATTR_TYPES.filter((t) => t.type !== "action").map((t) => (
+                          <button
+                            key={t.type}
+                            className={`admin-chip ${adminAttrTypes.has(t.type) ? "active" : ""}`}
+                            onClick={() => setAdminAttrTypes(toggleInSet(adminAttrTypes, t.type))}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <label>Игроки (можно несколько):</label>
+                      <div className="admin-chips">
+                        {alivePlayers.map((p) => (
+                          <button
+                            key={p.id}
+                            className={`admin-chip ${adminPlayers.has(p.id) ? "active" : ""}`}
+                            onClick={() => setAdminPlayers(toggleInSet(adminPlayers, p.id))}
+                          >
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : adminAction === "replace" ? (
                     <>
                       <label>Тип карты (можно несколько):</label>
                       <div className="admin-chips">
@@ -363,7 +469,11 @@ export function VoteScreen() {
                       disabled={
                         (adminAction === "swap" && (!adminPlayer1 || !adminPlayer2)) ||
                         (adminAction === "replace" &&
-                          (adminPlayers.size === 0 || adminAttrTypes.size === 0))
+                          (adminPlayers.size === 0 || adminAttrTypes.size === 0)) ||
+                        (adminAction === "deleteAttr" &&
+                          (adminPlayers.size === 0 || adminAttrTypes.size === 0)) ||
+                        ((adminAction === "removeBunker" || adminAction === "replaceBunker") &&
+                          adminBunkerCardIndex === null)
                       }
                     >
                       Применить
@@ -374,6 +484,7 @@ export function VoteScreen() {
                         setAdminAction(null);
                         setAdminPlayer1("");
                         setAdminPlayer2("");
+                        setAdminBunkerCardIndex(null);
                       }}
                     >
                       Отмена
