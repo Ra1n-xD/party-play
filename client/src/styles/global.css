@@ -899,6 +899,11 @@ body {
   color: #06b6d4;
 }
 
+[data-attr-type="action"] .mini-label,
+[data-attr-type="action"] .attr-label {
+  color: #a855f7;
+}
+
 .mini-value {
   color: var(--text-primary);
   font-weight: 500;
