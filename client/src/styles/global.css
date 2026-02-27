@@ -988,6 +988,14 @@ body {
   color: var(--text-secondary);
 }
 
+.mini-tag[data-attr-type="profession"] .mini-tag-label { color: #eab308; }
+.mini-tag[data-attr-type="bio"] .mini-tag-label { color: #f97316; }
+.mini-tag[data-attr-type="health"] .mini-tag-label { color: #ef4444; }
+.mini-tag[data-attr-type="hobby"] .mini-tag-label { color: #22c55e; }
+.mini-tag[data-attr-type="baggage"] .mini-tag-label { color: #3b82f6; }
+.mini-tag[data-attr-type="fact"] .mini-tag-label { color: #06b6d4; }
+.mini-tag[data-attr-type="action"] .mini-tag-label { color: #a855f7; }
+
 .vote-progress {
   color: var(--text-muted);
   font-size: 0.9rem;
