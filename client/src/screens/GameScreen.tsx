@@ -37,6 +37,7 @@ export function GameScreen() {
   } = useGame();
   const [showAttrPicker, setShowAttrPicker] = useState(false);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  const [confirmRevealAction, setConfirmRevealAction] = useState(false);
 
   // Admin panel state
   const [adminOpen, setAdminOpen] = useState(false);
@@ -286,7 +287,7 @@ export function GameScreen() {
             </button>
           )}
           {canRevealAction && (
-            <button className="btn btn-secondary btn-reveal-action" onClick={revealActionCard}>
+            <button className="btn btn-secondary btn-reveal-action" onClick={() => setConfirmRevealAction(true)}>
               Раскрыть особое условие
             </button>
           )}
@@ -443,7 +444,7 @@ export function GameScreen() {
             </button>
           )}
           {canRevealAction && (
-            <button className="btn btn-secondary btn-reveal-action" onClick={revealActionCard}>
+            <button className="btn btn-secondary btn-reveal-action" onClick={() => setConfirmRevealAction(true)}>
               Раскрыть особое условие
             </button>
           )}
@@ -796,6 +797,29 @@ export function GameScreen() {
         <button className="btn btn-danger btn-end-game" onClick={endGame}>
           Закончить игру
         </button>
+      )}
+
+      {confirmRevealAction && (
+        <div className="modal-overlay" onClick={() => setConfirmRevealAction(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Раскрыть особое условие?</h3>
+            <p>Это действие нельзя отменить. Все игроки увидят вашу карту.</p>
+            <div className="modal-actions">
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  revealActionCard();
+                  setConfirmRevealAction(false);
+                }}
+              >
+                Раскрыть
+              </button>
+              <button className="btn btn-secondary" onClick={() => setConfirmRevealAction(false)}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
