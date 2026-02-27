@@ -118,12 +118,12 @@ export function startGame(room: Room, io: IOServer): void {
     }
   }
 
-  broadcastState(room, io);
-
-  // Auto-advance after catastrophe reveal
+  // Schedule before broadcast so phaseEndTime is included in the state
   schedulePhaseTransition(room, io, CONFIG.CATASTROPHE_REVEAL_TIME, () => {
     startNewRound(room, io);
   });
+
+  broadcastState(room, io);
 }
 
 function schedulePhaseTransition(
@@ -178,12 +178,12 @@ function startBunkerExplore(room: Room, io: IOServer): void {
   room.gameState.phase = "BUNKER_EXPLORE";
   room.gameState.revealedBunkerCount++;
 
-  broadcastState(room, io);
-
-  // Auto-advance to card reveal
+  // Schedule before broadcast so phaseEndTime is included in the state
   schedulePhaseTransition(room, io, CONFIG.BUNKER_EXPLORE_TIME, () => {
     startRevealPhase(room, io);
   });
+
+  broadcastState(room, io);
 }
 
 function startRevealPhase(room: Room, io: IOServer): void {
@@ -287,11 +287,13 @@ function afterRevealPhase(room: Room, io: IOServer): void {
 function startDiscussionPhase(room: Room, io: IOServer): void {
   if (!room.gameState) return;
   room.gameState.phase = "ROUND_DISCUSSION";
-  broadcastState(room, io);
 
+  // Schedule before broadcast so phaseEndTime is included in the state
   schedulePhaseTransition(room, io, CONFIG.DISCUSSION_TIME, () => {
     startVotePhase(room, io);
   });
+
+  broadcastState(room, io);
 }
 
 export function skipDiscussion(room: Room, io: IOServer): { success: boolean; error: string } {
@@ -320,11 +322,12 @@ function startVotePhase(room: Room, io: IOServer): void {
     player.votedFor = null;
   }
 
-  broadcastState(room, io);
-
+  // Schedule before broadcast so phaseEndTime is included in the state
   schedulePhaseTransition(room, io, CONFIG.VOTE_TIME, () => {
     tallyVotes(room, io);
   });
+
+  broadcastState(room, io);
 }
 
 function getVoters(room: Room): Player[] {
@@ -454,16 +457,17 @@ function startTiebreak(room: Room, io: IOServer): void {
     player.votedFor = null;
   }
 
-  broadcastState(room, io);
-
   // Give defense time, then start tiebreak vote
+  // Schedule before broadcast so phaseEndTime is included in the state
   schedulePhaseTransition(room, io, CONFIG.TIEBREAK_DEFENSE_TIME, () => {
     // Now actually collect votes (re-use ROUND_VOTE_TIEBREAK phase)
-    broadcastState(room, io);
     schedulePhaseTransition(room, io, CONFIG.VOTE_TIME, () => {
       tallyVotes(room, io);
     });
+    broadcastState(room, io);
   });
+
+  broadcastState(room, io);
 }
 
 function eliminatePlayer(room: Room, playerId: string, io: IOServer): void {
@@ -475,10 +479,10 @@ function eliminatePlayer(room: Room, playerId: string, io: IOServer): void {
   // Check immunity
   if (player.immuneThisRound) {
     room.gameState.phase = "ROUND_RESULT";
-    broadcastState(room, io);
     schedulePhaseTransition(room, io, CONFIG.RESULT_DISPLAY_TIME, () => {
       afterVoting(room, io);
     });
+    broadcastState(room, io);
     return;
   }
 
@@ -492,16 +496,17 @@ function eliminatePlayer(room: Room, playerId: string, io: IOServer): void {
     playerName: player.name,
   });
 
-  broadcastState(room, io);
-
   // Reset round-specific flags
   for (const p of room.players.values()) {
     p.immuneThisRound = false;
   }
 
+  // Schedule before broadcast so phaseEndTime is included in the state
   schedulePhaseTransition(room, io, CONFIG.RESULT_DISPLAY_TIME, () => {
     afterVoting(room, io);
   });
+
+  broadcastState(room, io);
 }
 
 function afterVoting(room: Room, io: IOServer): void {
