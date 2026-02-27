@@ -7,6 +7,16 @@ import { ResultsScreen } from "./screens/ResultsScreen";
 import BackgroundParticles from "./components/BackgroundParticles";
 import { CardImage } from "./components/CardImage";
 import { PhaseAnnouncement } from "./components/PhaseAnnouncement";
+import { AttributeType } from "../../shared/types";
+
+const ATTR_LABELS: Record<AttributeType, string> = {
+  profession: "раскрывает профессию",
+  bio: "раскрывает биологию",
+  health: "раскрывает здоровье",
+  hobby: "раскрывает хобби",
+  baggage: "раскрывает багаж",
+  fact: "раскрывает доп. факт",
+};
 
 function AppContent() {
   const { roomCode, gameState } = useGame();
@@ -69,16 +79,40 @@ function PauseOverlay() {
   );
 }
 
+function AttributeRevealOverlay() {
+  const { revealedAttribute } = useGame();
+  if (!revealedAttribute) return null;
+
+  const { playerName, attribute } = revealedAttribute;
+  const cardType = attribute.type as AttributeType;
+
+  return (
+    <div className="action-card-reveal-overlay" data-card-type={cardType}>
+      <div className="action-card-reveal-content">
+        <div className="action-card-reveal-player">{playerName}</div>
+        <div className="action-card-reveal-label">{ATTR_LABELS[cardType] || "раскрывает карту"}</div>
+        <div className="action-card-reveal-card" data-card-type={cardType}>
+          <CardImage type={cardType} className="action-card-reveal-image" />
+          <div className="action-card-reveal-title">{attribute.value}</div>
+          {attribute.detail && (
+            <div className="action-card-reveal-description">{attribute.detail}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ActionCardRevealOverlay() {
   const { revealedActionCard } = useGame();
   if (!revealedActionCard) return null;
 
   return (
-    <div className="action-card-reveal-overlay">
+    <div className="action-card-reveal-overlay" data-card-type="action">
       <div className="action-card-reveal-content">
         <div className="action-card-reveal-player">{revealedActionCard.playerName}</div>
         <div className="action-card-reveal-label">раскрывает особое условие</div>
-        <div className="action-card-reveal-card">
+        <div className="action-card-reveal-card" data-card-type="action">
           <CardImage type="action" className="action-card-reveal-image" />
           <div className="action-card-reveal-title">{revealedActionCard.actionCard.title}</div>
           <div className="action-card-reveal-description">
@@ -97,6 +131,7 @@ export default function App() {
       <AppContent />
       <PhaseAnnouncementOverlay />
       <PauseOverlay />
+      <AttributeRevealOverlay />
       <ActionCardRevealOverlay />
     </>
   );

@@ -1556,7 +1556,7 @@ body {
 .action-card-reveal-player {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #a855f7;
+  color: var(--card-accent, #a855f7);
   margin-bottom: 4px;
 }
 
@@ -1576,6 +1576,23 @@ body {
   max-width: 360px;
   margin: 0 auto;
 }
+
+/* Per-type card colors */
+.action-card-reveal-overlay[data-card-type="profession"] { --card-accent: #f59e0b; }
+.action-card-reveal-overlay[data-card-type="bio"] { --card-accent: #f97316; }
+.action-card-reveal-overlay[data-card-type="health"] { --card-accent: #ef4444; }
+.action-card-reveal-overlay[data-card-type="hobby"] { --card-accent: #22c55e; }
+.action-card-reveal-overlay[data-card-type="baggage"] { --card-accent: #3b82f6; }
+.action-card-reveal-overlay[data-card-type="fact"] { --card-accent: #06b6d4; }
+.action-card-reveal-overlay[data-card-type="action"] { --card-accent: #a855f7; }
+
+.action-card-reveal-card[data-card-type="profession"] { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.4); }
+.action-card-reveal-card[data-card-type="bio"] { background: rgba(249, 115, 22, 0.1); border-color: rgba(249, 115, 22, 0.4); }
+.action-card-reveal-card[data-card-type="health"] { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.4); }
+.action-card-reveal-card[data-card-type="hobby"] { background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.4); }
+.action-card-reveal-card[data-card-type="baggage"] { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.4); }
+.action-card-reveal-card[data-card-type="fact"] { background: rgba(6, 182, 212, 0.1); border-color: rgba(6, 182, 212, 0.4); }
+.action-card-reveal-card[data-card-type="action"] { background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.4); }
 
 .action-card-reveal-image {
   width: 80px;
