@@ -105,7 +105,7 @@ chown partyplay:partyplay /home/partyplay/party-play/.env
 ```bash
 su - partyplay
 cd ~/party-play
-node --env-file=.env server/dist/index.js
+node --env-file=.env server/dist/server/src/index.js
 ```
 
 Должно вывести `PartyPlay server running on http://0.0.0.0:3001`. Останови через `Ctrl+C`:
@@ -128,7 +128,7 @@ After=network.target
 Type=simple
 User=partyplay
 WorkingDirectory=/home/partyplay/party-play
-ExecStart=/usr/bin/node --env-file=.env server/dist/index.js
+ExecStart=/usr/bin/node --env-file=.env server/dist/server/src/index.js
 Restart=always
 RestartSec=5
 
