@@ -541,27 +541,37 @@ export function adminShuffleAll(
   const alivePlayers = getAlivePlayers(room).filter((p) => p.character);
   if (alivePlayers.length < 2) return { success: false, error: "Недостаточно игроков" };
 
-  // Collect all attributes of this type
-  const attrs: { playerIdx: number; attrIdx: number; attr: any }[] = [];
-  for (const player of alivePlayers) {
-    const idx = player.character!.attributes.findIndex((a) => a.type === attributeType);
-    if (idx !== -1) {
-      attrs.push({ playerIdx: 0, attrIdx: idx, attr: player.character!.attributes[idx] });
+  if (attributeType === "action") {
+    // Shuffle action cards among alive players
+    const actionCards = alivePlayers.map((p) => p.character!.actionCard);
+    const shuffled = shuffle([...actionCards]);
+    for (let i = 0; i < alivePlayers.length; i++) {
+      alivePlayers[i].character!.actionCard = shuffled[i];
+      alivePlayers[i].actionCardRevealed = false;
     }
-  }
+  } else {
+    // Collect all attributes of this type
+    const attrs: { playerIdx: number; attrIdx: number; attr: any }[] = [];
+    for (const player of alivePlayers) {
+      const idx = player.character!.attributes.findIndex((a) => a.type === attributeType);
+      if (idx !== -1) {
+        attrs.push({ playerIdx: 0, attrIdx: idx, attr: player.character!.attributes[idx] });
+      }
+    }
 
-  if (attrs.length < 2) return { success: false, error: "Недостаточно карт для перемешивания" };
+    if (attrs.length < 2) return { success: false, error: "Недостаточно карт для перемешивания" };
 
-  // Shuffle attributes
-  const shuffled = shuffle(attrs.map((a) => a.attr));
+    // Shuffle attributes
+    const shuffled = shuffle(attrs.map((a) => a.attr));
 
-  // Redistribute
-  let i = 0;
-  for (const player of alivePlayers) {
-    const idx = player.character!.attributes.findIndex((a) => a.type === attributeType);
-    if (idx !== -1 && i < shuffled.length) {
-      player.character!.attributes[idx] = shuffled[i];
-      i++;
+    // Redistribute
+    let i = 0;
+    for (const player of alivePlayers) {
+      const idx = player.character!.attributes.findIndex((a) => a.type === attributeType);
+      if (idx !== -1 && i < shuffled.length) {
+        player.character!.attributes[idx] = shuffled[i];
+        i++;
+      }
     }
   }
 
@@ -590,14 +600,22 @@ export function adminSwapAttribute(
   const p2 = room.players.get(p2Id);
   if (!p1?.character || !p2?.character) return { success: false, error: "Игрок не найден" };
 
-  const idx1 = p1.character.attributes.findIndex((a) => a.type === attributeType);
-  const idx2 = p2.character.attributes.findIndex((a) => a.type === attributeType);
-  if (idx1 === -1 || idx2 === -1) return { success: false, error: "Атрибут не найден" };
+  if (attributeType === "action") {
+    const temp = p1.character.actionCard;
+    p1.character.actionCard = p2.character.actionCard;
+    p2.character.actionCard = temp;
+    p1.actionCardRevealed = false;
+    p2.actionCardRevealed = false;
+  } else {
+    const idx1 = p1.character.attributes.findIndex((a) => a.type === attributeType);
+    const idx2 = p2.character.attributes.findIndex((a) => a.type === attributeType);
+    if (idx1 === -1 || idx2 === -1) return { success: false, error: "Атрибут не найден" };
 
-  // Swap
-  const temp = p1.character.attributes[idx1];
-  p1.character.attributes[idx1] = p2.character.attributes[idx2];
-  p2.character.attributes[idx2] = temp;
+    // Swap
+    const temp = p1.character.attributes[idx1];
+    p1.character.attributes[idx1] = p2.character.attributes[idx2];
+    p2.character.attributes[idx2] = temp;
+  }
 
   // Resend characters
   for (const p of [p1, p2]) {
@@ -622,16 +640,21 @@ export function adminReplaceAttribute(
   const player = room.players.get(targetPlayerId);
   if (!player?.character) return { success: false, error: "Игрок не найден" };
 
-  const idx = player.character.attributes.findIndex((a) => a.type === attributeType);
-  if (idx === -1) return { success: false, error: "Атрибут не найден" };
-
-  // Generate a new character to get a fresh attribute of the right type
   const usedProf = new Set<string>();
   const newChar = generateCharacter(usedProf);
-  const newIdx = newChar.attributes.findIndex((a) => a.type === attributeType);
-  if (newIdx === -1) return { success: false, error: "Не удалось сгенерировать новую карту" };
 
-  player.character.attributes[idx] = newChar.attributes[newIdx];
+  if (attributeType === "action") {
+    player.character.actionCard = newChar.actionCard;
+    player.actionCardRevealed = false;
+  } else {
+    const idx = player.character.attributes.findIndex((a) => a.type === attributeType);
+    if (idx === -1) return { success: false, error: "Атрибут не найден" };
+
+    const newIdx = newChar.attributes.findIndex((a) => a.type === attributeType);
+    if (newIdx === -1) return { success: false, error: "Не удалось сгенерировать новую карту" };
+
+    player.character.attributes[idx] = newChar.attributes[newIdx];
+  }
 
   // Resend character
   const sock = io.sockets.sockets.get(player.socketId);

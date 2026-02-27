@@ -3,13 +3,14 @@ import { useGame } from "../context/GameContext";
 import { Timer } from "../components/Timer";
 import { AttributeType } from "../../../shared/types";
 
-const ATTR_TYPES: { type: AttributeType; label: string }[] = [
+const ATTR_TYPES: { type: AttributeType | "action"; label: string }[] = [
   { type: "profession", label: "Профессия" },
   { type: "bio", label: "Биология" },
   { type: "health", label: "Здоровье" },
   { type: "hobby", label: "Хобби" },
   { type: "baggage", label: "Багаж" },
   { type: "fact", label: "Доп. факт" },
+  { type: "action", label: "Особое условие" },
 ];
 
 export function VoteScreen() {
@@ -32,8 +33,8 @@ export function VoteScreen() {
   // Admin panel state
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminAction, setAdminAction] = useState<"shuffle" | "swap" | "replace" | null>(null);
-  const [adminAttrType, setAdminAttrType] = useState<AttributeType>("profession");
-  const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType>>(new Set());
+  const [adminAttrType, setAdminAttrType] = useState<AttributeType | "action">("profession");
+  const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType | "action">>(new Set());
   const [adminPlayer1, setAdminPlayer1] = useState<string>("");
   const [adminPlayer2, setAdminPlayer2] = useState<string>("");
   const [adminPlayers, setAdminPlayers] = useState<Set<string>>(new Set());

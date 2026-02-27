@@ -23,9 +23,9 @@ interface GameContextType {
   clearError: () => void;
   addBot: () => void;
   removeBot: (playerId: string) => void;
-  adminShuffleAll: (attributeType: AttributeType) => void;
-  adminSwapAttribute: (player1Id: string, player2Id: string, attributeType: AttributeType) => void;
-  adminReplaceAttribute: (targetPlayerId: string, attributeType: AttributeType) => void;
+  adminShuffleAll: (attributeType: AttributeType | "action") => void;
+  adminSwapAttribute: (player1Id: string, player2Id: string, attributeType: AttributeType | "action") => void;
+  adminReplaceAttribute: (targetPlayerId: string, attributeType: AttributeType | "action") => void;
   adminPause: () => void;
   adminUnpause: () => void;
 }
@@ -154,19 +154,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit("room:removeBot", { playerId: botPlayerId });
   }, []);
 
-  const adminShuffleAllFn = useCallback((attributeType: AttributeType) => {
+  const adminShuffleAllFn = useCallback((attributeType: AttributeType | "action") => {
     socket.emit("admin:shuffleAll", { attributeType });
   }, []);
 
   const adminSwapAttributeFn = useCallback(
-    (player1Id: string, player2Id: string, attributeType: AttributeType) => {
+    (player1Id: string, player2Id: string, attributeType: AttributeType | "action") => {
       socket.emit("admin:swapAttribute", { player1Id, player2Id, attributeType });
     },
     [],
   );
 
   const adminReplaceAttributeFn = useCallback(
-    (targetPlayerId: string, attributeType: AttributeType) => {
+    (targetPlayerId: string, attributeType: AttributeType | "action") => {
       socket.emit("admin:replaceAttribute", { targetPlayerId, attributeType });
     },
     [],
