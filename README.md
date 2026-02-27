@@ -1,41 +1,41 @@
-# PartyPlay
+# 🎉 PartyPlay
 
-Real-time multiplayer party games platform. Play with friends from any device — just share the room code.
+Мультиплеерная платформа для вечеринок в реальном времени. Играй с друзьями с любого устройства — просто поделись кодом комнаты.
 
-## Current Games
+## 🎮 Доступные игры
 
-### Bunker (Бункер)
+### 🏠 Бункер
 
-Social deduction game for 4-16 players. A catastrophe strikes, and there's a bunker with limited capacity. Each player gets a random character with unique traits — profession, health, hobby, baggage, phobia, and a special action card. Over 5 rounds, players reveal their attributes, argue their case, and vote to eliminate those who don't deserve a spot. Survive the vote and make it into the bunker to win.
+Социальная игра на выживание для 4–16 игроков. Происходит катастрофа, и есть бункер с ограниченным количеством мест. Каждый игрок получает случайного персонажа с уникальными характеристиками — профессия, здоровье, хобби, багаж, фобия и особая карта действия. За 5 раундов игроки раскрывают свои атрибуты, спорят за место и голосуют за исключение тех, кто не заслуживает спасения. Выживи и попади в бункер!
 
-## Roadmap
+## 🗺️ Планы
 
-The platform is designed as a plugin-based system — each game is an isolated package with its own engine, types, screens, and data. The shared core provides rooms, lobbies, sockets, and UI components. New games can be added without modifying the core. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+Платформа построена как плагинная система — каждая игра является изолированным пакетом со своим движком, типами, экранами и данными. Общее ядро предоставляет систему комнат, лобби, сокетов и UI-компонентов. Новые игры добавляются без изменения ядра. Подробнее в [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Tech Stack
+## 🛠️ Стек технологий
 
-- **Server:** Node.js, Express, Socket.IO
-- **Client:** React 18, Vite, TypeScript
-- **Structure:** npm workspaces monorepo (`shared`, `server`, `client`)
+- **Сервер:** Node.js, Express, Socket.IO
+- **Клиент:** React 18, Vite, TypeScript
+- **Структура:** монорепо на npm workspaces (`shared`, `server`, `client`)
 
-## Getting Started
+## 🚀 Быстрый старт
 
 ```bash
-# Install dependencies
+# Установить зависимости
 npm install
 
-# Run in dev mode (server + client)
+# Запустить в dev-режиме (сервер + клиент)
 npm run dev
 ```
 
-Server runs on `http://localhost:3001`, client on `http://localhost:5173`.
+Сервер запускается на `http://localhost:3001`, клиент на `http://localhost:5173`.
 
-## Build
+## 📦 Сборка
 
 ```bash
 npm run build
 ```
 
-## Deploy
+## ☁️ Деплой
 
-See [DEPLOY.md](DEPLOY.md) for VPS deployment guide with auto-deploy via GitHub Actions.
+Гайд по деплою на VPS с автодеплоем через GitHub Actions — [DEPLOY.md](DEPLOY.md).
