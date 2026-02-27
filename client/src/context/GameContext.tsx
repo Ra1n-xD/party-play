@@ -39,6 +39,7 @@ interface GameContextType {
   adminRevivePlayer: (targetPlayerId: string) => void;
   adminEliminatePlayer: (targetPlayerId: string) => void;
   revealedActionCard: { playerName: string; actionCard: ActionCard } | null;
+  revealedAttribute: { playerName: string; attribute: Attribute } | null;
   announcement: { title: string; subtitle?: string; description?: string } | null;
   dismissAnnouncement: () => void;
   pendingAdminOpen: boolean;
@@ -58,6 +59,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     playerName: string;
     actionCard: ActionCard;
   } | null>(null);
+  const [revealedAttribute, setRevealedAttribute] = useState<{
+    playerName: string;
+    attribute: Attribute;
+  } | null>(null);
   const [pendingAdminOpen, setPendingAdminOpen] = useState(false);
   const [announcement, setAnnouncement] = useState<{
     title: string;
@@ -68,6 +73,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const announcementTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const actionCardTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const attributeRevealTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     socket.connect();
@@ -164,13 +170,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
 
     socket.on("game:attributeRevealed", ({ playerName, attribute }) => {
-      setAnnouncement({
-        title: playerName,
-        subtitle: attribute.label,
-        description: attribute.value,
-      });
-      if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
-      announcementTimerRef.current = setTimeout(() => setAnnouncement(null), 3000);
+      setRevealedAttribute({ playerName, attribute });
+      if (attributeRevealTimerRef.current) clearTimeout(attributeRevealTimerRef.current);
+      attributeRevealTimerRef.current = setTimeout(() => setRevealedAttribute(null), 4000);
     });
 
     socket.on("game:actionCardRevealed", (data) => {
@@ -365,6 +367,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         adminRevivePlayer: adminRevivePlayerFn,
         adminEliminatePlayer: adminEliminatePlayerFn,
         revealedActionCard,
+        revealedAttribute,
         announcement,
         dismissAnnouncement: dismissAnnouncementFn,
         pendingAdminOpen,
