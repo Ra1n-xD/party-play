@@ -1,11 +1,42 @@
 import { useState, useEffect } from "react";
 import { useGame } from "../context/GameContext";
 import { Timer } from "../components/Timer";
+import { AttributeType } from "../../../shared/types";
+
+const ATTR_TYPES: { type: AttributeType; label: string }[] = [
+  { type: "profession", label: "Профессия" },
+  { type: "bio", label: "Биология" },
+  { type: "health", label: "Здоровье" },
+  { type: "hobby", label: "Хобби" },
+  { type: "baggage", label: "Багаж" },
+  { type: "fact", label: "Доп. факт" },
+];
 
 export function VoteScreen() {
-  const { gameState, playerId, castVote, error } = useGame();
+  const {
+    gameState,
+    playerId,
+    myCharacter,
+    castVote,
+    revealActionCard,
+    error,
+    adminShuffleAll,
+    adminSwapAttribute,
+    adminReplaceAttribute,
+    adminPause,
+    adminUnpause,
+  } = useGame();
   const [voted, setVoted] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
+
+  // Admin panel state
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminAction, setAdminAction] = useState<"shuffle" | "swap" | "replace" | null>(null);
+  const [adminAttrType, setAdminAttrType] = useState<AttributeType>("profession");
+  const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType>>(new Set());
+  const [adminPlayer1, setAdminPlayer1] = useState<string>("");
+  const [adminPlayer2, setAdminPlayer2] = useState<string>("");
+  const [adminPlayers, setAdminPlayers] = useState<Set<string>>(new Set());
 
   // Reset voted state when phase changes (e.g. tiebreak)
   useEffect(() => {
@@ -29,6 +60,46 @@ export function VoteScreen() {
   // Can vote: alive OR last eliminated
   const isLastEliminated = playerId === gameState.lastEliminatedPlayerId;
   const canVote = me?.alive || isLastEliminated;
+
+  // Action card reveal
+  const canRevealAction =
+    myCharacter?.actionCard && !me?.actionCardRevealed;
+
+  // Admin helpers
+  const alivePlayers = gameState.players.filter((p) => p.alive);
+
+  const toggleInSet = <T,>(set: Set<T>, item: T): Set<T> => {
+    const next = new Set(set);
+    if (next.has(item)) next.delete(item);
+    else next.add(item);
+    return next;
+  };
+
+  const handleAdminExecute = () => {
+    if (!adminAction) return;
+    if (adminAction === "shuffle") {
+      adminShuffleAll(adminAttrType);
+    } else if (adminAction === "swap") {
+      if (adminPlayer1 && adminPlayer2 && adminPlayer1 !== adminPlayer2) {
+        adminSwapAttribute(adminPlayer1, adminPlayer2, adminAttrType);
+      }
+    } else if (adminAction === "replace") {
+      const players = Array.from(adminPlayers);
+      const types = Array.from(adminAttrTypes);
+      if (players.length > 0 && types.length > 0) {
+        for (const pid of players) {
+          for (const t of types) {
+            adminReplaceAttribute(pid, t);
+          }
+        }
+      }
+    }
+    setAdminAction(null);
+    setAdminPlayer1("");
+    setAdminPlayer2("");
+    setAdminPlayers(new Set());
+    setAdminAttrTypes(new Set());
+  };
 
   const handleVote = (targetId: string) => {
     setConfirmTarget(targetId);
@@ -151,8 +222,163 @@ export function VoteScreen() {
           Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
         </div>
 
+        {canRevealAction && (
+          <button className="btn btn-reveal-action" onClick={revealActionCard}>
+            Раскрыть особое условие
+          </button>
+        )}
+
         {error && <div className="error-toast">{error}</div>}
       </div>
+
+      {/* Host Admin Panel */}
+      {me?.isHost && (
+        <div className="admin-panel">
+          <button
+            className="btn btn-admin-toggle"
+            onClick={() => {
+              const next = !adminOpen;
+              setAdminOpen(next);
+              if (next) {
+                adminPause();
+              } else {
+                adminUnpause();
+              }
+            }}
+          >
+            {adminOpen ? "Скрыть админ-панель ▲" : "Админ-панель ▼"}
+          </button>
+
+          {adminOpen && (
+            <div className="admin-panel-body">
+              {!adminAction && (
+                <div className="admin-actions-list">
+                  <button className="btn btn-admin" onClick={() => setAdminAction("shuffle")}>
+                    Перемешать карты
+                  </button>
+                  <button className="btn btn-admin" onClick={() => setAdminAction("swap")}>
+                    Поменять местами
+                  </button>
+                  <button className="btn btn-admin" onClick={() => setAdminAction("replace")}>
+                    Заменить карту
+                  </button>
+                </div>
+              )}
+
+              {adminAction && (
+                <div className="admin-form">
+                  <h4>
+                    {adminAction === "shuffle" && "Перемешать карты"}
+                    {adminAction === "swap" && "Поменять местами"}
+                    {adminAction === "replace" && "Заменить карту"}
+                  </h4>
+
+                  {adminAction === "replace" ? (
+                    <>
+                      <label>Тип карты (можно несколько):</label>
+                      <div className="admin-chips">
+                        {ATTR_TYPES.map((t) => (
+                          <button
+                            key={t.type}
+                            className={`admin-chip ${adminAttrTypes.has(t.type) ? "active" : ""}`}
+                            onClick={() => setAdminAttrTypes(toggleInSet(adminAttrTypes, t.type))}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <label>Игроки (можно несколько):</label>
+                      <div className="admin-chips">
+                        {alivePlayers.map((p) => (
+                          <button
+                            key={p.id}
+                            className={`admin-chip ${adminPlayers.has(p.id) ? "active" : ""}`}
+                            onClick={() => setAdminPlayers(toggleInSet(adminPlayers, p.id))}
+                          >
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <label>Тип карты:</label>
+                      <div className="admin-chips">
+                        {ATTR_TYPES.map((t) => (
+                          <button
+                            key={t.type}
+                            className={`admin-chip ${adminAttrType === t.type ? "active" : ""}`}
+                            onClick={() => setAdminAttrType(t.type)}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {adminAction === "swap" && (
+                        <>
+                          <label>Игрок 1:</label>
+                          <div className="admin-chips">
+                            {alivePlayers.map((p) => (
+                              <button
+                                key={p.id}
+                                className={`admin-chip ${adminPlayer1 === p.id ? "active" : ""}`}
+                                onClick={() => setAdminPlayer1(p.id)}
+                              >
+                                {p.name}
+                              </button>
+                            ))}
+                          </div>
+
+                          <label>Игрок 2:</label>
+                          <div className="admin-chips">
+                            {alivePlayers
+                              .filter((p) => p.id !== adminPlayer1)
+                              .map((p) => (
+                                <button
+                                  key={p.id}
+                                  className={`admin-chip ${adminPlayer2 === p.id ? "active" : ""}`}
+                                  onClick={() => setAdminPlayer2(p.id)}
+                                >
+                                  {p.name}
+                                </button>
+                              ))}
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  <div className="admin-form-actions">
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleAdminExecute}
+                      disabled={
+                        (adminAction === "swap" && (!adminPlayer1 || !adminPlayer2)) ||
+                        (adminAction === "replace" &&
+                          (adminPlayers.size === 0 || adminAttrTypes.size === 0))
+                      }
+                    >
+                      Применить
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setAdminAction(null);
+                        setAdminPlayer1("");
+                        setAdminPlayer2("");
+                      }}
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

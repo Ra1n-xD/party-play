@@ -542,10 +542,6 @@ function advanceRoundOrEnd(room: Room, io: IOServer): void {
 
 export function revealActionCard(room: Room, playerId: string, io: IOServer): boolean {
   if (!room.gameState) return false;
-  // Can reveal in any phase except voting
-  const phase = room.gameState.phase;
-  if (phase === "ROUND_VOTE" || phase === "ROUND_VOTE_TIEBREAK") return false;
-
   const player = room.players.get(playerId);
   if (!player || !player.character || player.actionCardRevealed) return false;
 
