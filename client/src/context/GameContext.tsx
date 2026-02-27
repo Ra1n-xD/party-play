@@ -36,6 +36,8 @@ interface GameContextType {
   adminPause: () => void;
   adminUnpause: () => void;
   adminSkipDiscussion: () => void;
+  adminRevivePlayer: (targetPlayerId: string) => void;
+  adminEliminatePlayer: (targetPlayerId: string) => void;
   revealedActionCard: { playerName: string; actionCard: ActionCard } | null;
   announcement: { title: string; subtitle?: string; description?: string } | null;
   dismissAnnouncement: () => void;
@@ -304,6 +306,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit("admin:skipDiscussion");
   }, []);
 
+  const adminRevivePlayerFn = useCallback((targetPlayerId: string) => {
+    socket.emit("admin:revivePlayer", { targetPlayerId });
+  }, []);
+
+  const adminEliminatePlayerFn = useCallback((targetPlayerId: string) => {
+    socket.emit("admin:eliminatePlayer", { targetPlayerId });
+  }, []);
+
   return (
     <GameContext.Provider
       value={{
@@ -337,6 +347,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         adminPause: adminPauseFn,
         adminUnpause: adminUnpauseFn,
         adminSkipDiscussion: adminSkipDiscussionFn,
+        adminRevivePlayer: adminRevivePlayerFn,
+        adminEliminatePlayer: adminEliminatePlayerFn,
         revealedActionCard,
         announcement,
         dismissAnnouncement: dismissAnnouncementFn,
