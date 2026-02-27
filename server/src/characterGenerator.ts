@@ -38,37 +38,31 @@ export function generateCharacter(usedProfessions: Set<string>): Character {
       type: "profession",
       label: "Профессия",
       value: profession.title,
-      image: profession.image,
     },
     {
       type: "bio",
       label: "Биология",
       value: bioValue,
-      image: bio.image,
     },
     {
       type: "health",
       label: "Здоровье",
       value: health.title,
-      image: health.image,
     },
     {
       type: "hobby",
       label: "Хобби",
       value: hobby.title,
-      image: hobby.image,
     },
     {
       type: "baggage",
       label: "Багаж",
       value: bag.title,
-      image: bag.image,
     },
     {
       type: "fact",
       label: "Доп. факт",
       value: fact.title,
-      image: fact.image,
     },
   ];
 

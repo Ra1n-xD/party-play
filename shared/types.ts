@@ -5,7 +5,6 @@ export interface Attribute {
   label: string;
   value: string;
   detail?: string;
-  image?: string;
 }
 
 export type AttributeType = "profession" | "bio" | "health" | "hobby" | "baggage" | "fact";
@@ -15,7 +14,6 @@ export interface ActionCard {
   title: string;
   description: string;
   targetRequired: boolean;
-  image?: string;
 }
 
 export interface Character {

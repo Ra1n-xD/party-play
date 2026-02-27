@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGame } from "../context/GameContext";
 import { Timer } from "../components/Timer";
+import { CardImage } from "../components/CardImage";
 import { AttributeType } from "../../../shared/types";
 
 const ATTR_TYPES: { type: AttributeType | "action"; label: string }[] = [
@@ -227,9 +228,7 @@ export function GameScreen() {
                 data-attr-type={attr.type}
               >
                 <div className="attr-content">
-                  {attr.image && (
-                    <img src={attr.image} alt={attr.value} className="attr-card-image" />
-                  )}
+                  <CardImage type={attr.type} className="attr-card-image" />
                   <div className="attr-text">
                     <span className="attr-label">{attr.label}</span>
                     <span className="attr-value">{attr.value}</span>
@@ -246,13 +245,7 @@ export function GameScreen() {
           <div className="action-card-display">
             <div className="attribute-card revealed" data-attr-type="action">
               <div className="attr-content">
-                {myCharacter.actionCard.image && (
-                  <img
-                    src={myCharacter.actionCard.image}
-                    alt={myCharacter.actionCard.title}
-                    className="attr-card-image"
-                  />
-                )}
+                <CardImage type="action" className="attr-card-image" />
                 <div className="attr-text">
                   <span className="attr-label">Особое условие</span>
                   <span className="attr-value">{myCharacter.actionCard.title}</span>
@@ -321,15 +314,14 @@ export function GameScreen() {
                     <>
                       {player.revealedAttributes.map((attr, i) => (
                         <div key={i} className="mini-attr" data-attr-type={attr.type}>
-                          {attr.image && (
-                            <img src={attr.image} alt={attr.value} className="mini-card-image" />
-                          )}
+                          <CardImage type={attr.type} className="mini-card-image" />
                           <span className="mini-label">{attr.label}:</span>
                           <span className="mini-value">{attr.value}</span>
                         </div>
                       ))}
                       {player.actionCard && (
                         <div className="mini-attr" data-attr-type="action">
+                          <CardImage type="action" className="mini-card-image" />
                           <span className="mini-label">Особое условие:</span>
                           <span className="mini-value">{player.actionCard.title}</span>
                         </div>
@@ -502,9 +494,7 @@ export function GameScreen() {
                           data-attr-type={attr.type}
                         >
                           <div className="attr-content">
-                            {attr.image && (
-                              <img src={attr.image} alt={attr.value} className="attr-card-image" />
-                            )}
+                            <CardImage type={attr.type} className="attr-card-image" />
                             <div className="attr-text">
                               <span className="attr-label">{attr.label}</span>
                               <span className="attr-value">{attr.value}</span>
@@ -521,9 +511,7 @@ export function GameScreen() {
                     revealedAttrs.map((attr, i) => (
                       <div key={i} className="attribute-card revealed" data-attr-type={attr.type}>
                         <div className="attr-content">
-                          {attr.image && (
-                            <img src={attr.image} alt={attr.value} className="attr-card-image" />
-                          )}
+                          <CardImage type={attr.type} className="attr-card-image" />
                           <div className="attr-text">
                             <span className="attr-label">{attr.label}</span>
                             <span className="attr-value">{attr.value}</span>
@@ -541,9 +529,7 @@ export function GameScreen() {
                       <div className="action-card-display">
                         <div className="attribute-card revealed" data-attr-type="action">
                           <div className="attr-content">
-                            {ac.image && (
-                              <img src={ac.image} alt={ac.title} className="attr-card-image" />
-                            )}
+                            <CardImage type="action" className="attr-card-image" />
                             <div className="attr-text">
                               <span className="attr-label">Особое условие</span>
                               <span className="attr-value">{ac.title}</span>

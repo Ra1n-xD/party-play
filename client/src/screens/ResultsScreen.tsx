@@ -1,4 +1,5 @@
 import { useGame } from "../context/GameContext";
+import { CardImage } from "../components/CardImage";
 
 export function ResultsScreen() {
   const { gameState, playerId, playAgain } = useGame();
@@ -32,9 +33,7 @@ export function ResultsScreen() {
               data-attr-type={attr.type}
             >
               <div className="attr-content">
-                {attr.image && (
-                  <img src={attr.image} alt={attr.value} className="attr-card-image" />
-                )}
+                <CardImage type={attr.type} className="attr-card-image" />
                 <div className="attr-text">
                   <span className="attr-label">{attr.label}</span>
                   <span className="attr-value">{attr.value}</span>
@@ -50,13 +49,7 @@ export function ResultsScreen() {
           <div className="result-desktop action-card-display">
             <div className="attribute-card revealed" data-attr-type="action">
               <div className="attr-content">
-                {player.actionCard.image && (
-                  <img
-                    src={player.actionCard.image}
-                    alt={player.actionCard.title}
-                    className="attr-card-image"
-                  />
-                )}
+                <CardImage type="action" className="attr-card-image" />
                 <div className="attr-text">
                   <span className="attr-label">Особое условие</span>
                   <span className="attr-value">{player.actionCard.title}</span>
