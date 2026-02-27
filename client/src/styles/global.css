@@ -107,6 +107,57 @@ body {
   background: var(--border);
 }
 
+/* ============ HOME FOOTER ============ */
+.home-footer {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-footer-socials {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.home-footer-socials a,
+.home-footer-donate {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 1.05rem;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-footer-donate {
+  justify-content: center;
+}
+
+.home-footer-socials a:hover,
+.home-footer-donate:hover {
+  color: var(--accent);
+}
+
+.home-footer-socials a:nth-child(1) svg,
+.home-footer-socials a:nth-child(2) svg {
+  color: #26a5e4;
+}
+
+.home-footer-socials a:nth-child(3) svg {
+  color: #9146ff;
+}
+
+.home-footer-donate svg {
+  color: #f57b22;
+}
+
 /* ============ INPUTS ============ */
 .input {
   width: 100%;

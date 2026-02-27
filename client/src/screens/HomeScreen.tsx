@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
+import { BiDonateHeart } from "react-icons/bi";
 import { useGame } from "../context/GameContext";
 
 export function HomeScreen() {
@@ -81,6 +83,23 @@ export function HomeScreen() {
 
         {error && <div className="error-toast">{error}</div>}
       </div>
+
+      <footer className="home-footer">
+        <div className="home-footer-socials">
+          <a href="https://t.me/Ra1n_xD" target="_blank" rel="noopener noreferrer">
+            <FaTelegramPlane /> Telegram
+          </a>
+          <a href="https://t.me/fronted_engineer" target="_blank" rel="noopener noreferrer">
+            <FaTelegramPlane /> Канал
+          </a>
+          <a href="https://www.twitch.tv/fronted_ra1n" target="_blank" rel="noopener noreferrer">
+            <FaTwitch /> Twitch
+          </a>
+        </div>
+        <a className="home-footer-donate" href="https://www.donationalerts.com/r/fronted_ra1n" target="_blank" rel="noopener noreferrer">
+          <BiDonateHeart /> Поддержать проект
+        </a>
+      </footer>
     </div>
   );
 }
