@@ -1,5 +1,3 @@
-import { useEffect } from "react";
-
 interface PhaseAnnouncementProps {
   title: string;
   subtitle?: string;
@@ -7,12 +5,7 @@ interface PhaseAnnouncementProps {
   onDismiss: () => void;
 }
 
-export function PhaseAnnouncement({ title, subtitle, description, onDismiss }: PhaseAnnouncementProps) {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 6000);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-
+export function PhaseAnnouncement({ title, subtitle, description }: PhaseAnnouncementProps) {
   return (
     <div className="phase-announcement-overlay">
       <div className="phase-announcement-content">

@@ -121,10 +121,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             subtitle: lastCard.title,
             description: lastCard.description,
           };
+        } else if (newPhase === "ROUND_REVEAL") {
+          ann = {
+            title: `Раунд ${state.roundNumber}`,
+            subtitle: "Раскрытие карт",
+          };
         } else if (newPhase === "ROUND_DISCUSSION") {
           ann = {
             title: "Обсуждение",
             subtitle: `Раунд ${state.roundNumber}`,
+          };
+        } else if (newPhase === "ROUND_VOTE") {
+          ann = {
+            title: "Голосование",
+            subtitle: `Раунд ${state.roundNumber}`,
+          };
+        } else if (newPhase === "ROUND_VOTE_TIEBREAK") {
+          ann = {
+            title: "Перевоевание",
+            subtitle: "Ничья! Повторное голосование",
           };
         } else if (newPhase === "ROUND_RESULT" && state.eliminatedPlayerId) {
           const eliminated = state.players.find((p: any) => p.id === state.eliminatedPlayerId);
@@ -137,7 +152,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         if (ann) {
           setAnnouncement(ann);
           if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
-          announcementTimerRef.current = setTimeout(() => setAnnouncement(null), 6000);
+          announcementTimerRef.current = setTimeout(() => setAnnouncement(null), 3000);
         }
       }
 
@@ -155,7 +170,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         description: attribute.value,
       });
       if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
-      announcementTimerRef.current = setTimeout(() => setAnnouncement(null), 6000);
+      announcementTimerRef.current = setTimeout(() => setAnnouncement(null), 3000);
     });
 
     socket.on("game:actionCardRevealed", (data) => {
