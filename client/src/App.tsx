@@ -5,6 +5,7 @@ import { GameScreen } from "./screens/GameScreen";
 import { VoteScreen } from "./screens/VoteScreen";
 import { ResultsScreen } from "./screens/ResultsScreen";
 import BackgroundParticles from "./components/BackgroundParticles";
+import { CardImage } from "./components/CardImage";
 
 function AppContent() {
   const { roomCode, gameState } = useGame();
@@ -53,12 +54,34 @@ function PauseOverlay() {
   );
 }
 
+function ActionCardRevealOverlay() {
+  const { revealedActionCard } = useGame();
+  if (!revealedActionCard) return null;
+
+  return (
+    <div className="action-card-reveal-overlay">
+      <div className="action-card-reveal-content">
+        <div className="action-card-reveal-player">{revealedActionCard.playerName}</div>
+        <div className="action-card-reveal-label">раскрывает особое условие</div>
+        <div className="action-card-reveal-card">
+          <CardImage type="action" className="action-card-reveal-image" />
+          <div className="action-card-reveal-title">{revealedActionCard.actionCard.title}</div>
+          <div className="action-card-reveal-description">
+            {revealedActionCard.actionCard.description}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <>
       <BackgroundParticles />
       <AppContent />
       <PauseOverlay />
+      <ActionCardRevealOverlay />
     </>
   );
 }

@@ -139,4 +139,5 @@ export interface ServerEvents {
   "game:state": (data: PublicGameState) => void;
   "game:character": (data: Character) => void;
   "game:eliminated": (data: { playerId: string; playerName: string }) => void;
+  "game:actionCardRevealed": (data: { playerName: string; actionCard: ActionCard }) => void;
 }

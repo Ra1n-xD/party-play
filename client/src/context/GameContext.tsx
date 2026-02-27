@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { socket } from "../socket";
-import { PublicGameState, Character, AttributeType } from "../../../shared/types";
+import { PublicGameState, Character, AttributeType, ActionCard } from "../../../shared/types";
 
 interface GameContextType {
   connected: boolean;
@@ -32,6 +32,9 @@ interface GameContextType {
   adminForceRevealType: (attributeType: AttributeType) => void;
   adminPause: () => void;
   adminUnpause: () => void;
+  revealedActionCard: { playerName: string; actionCard: ActionCard } | null;
+  pendingAdminOpen: boolean;
+  consumePendingAdminOpen: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -43,7 +46,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [gameState, setGameState] = useState<PublicGameState | null>(null);
   const [myCharacter, setMyCharacter] = useState<Character | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [revealedActionCard, setRevealedActionCard] = useState<{
+    playerName: string;
+    actionCard: ActionCard;
+  } | null>(null);
+  const [pendingAdminOpen, setPendingAdminOpen] = useState(false);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const actionCardTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     socket.connect();
@@ -79,6 +88,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setMyCharacter(character);
     });
 
+    socket.on("game:actionCardRevealed", (data) => {
+      setRevealedActionCard(data);
+      if (actionCardTimerRef.current) clearTimeout(actionCardTimerRef.current);
+      actionCardTimerRef.current = setTimeout(() => {
+        setRevealedActionCard(null);
+        setPendingAdminOpen(true);
+      }, 10000);
+    });
+
     // Try to rejoin on page reload
     const savedRoom = sessionStorage.getItem("bunker_room");
     const savedPlayer = sessionStorage.getItem("bunker_player");
@@ -94,6 +112,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socket.off("room:error");
       socket.off("game:state");
       socket.off("game:character");
+      socket.off("game:actionCardRevealed");
     };
   }, []);
 
@@ -195,6 +214,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit("admin:forceRevealType", { attributeType });
   }, []);
 
+  const consumePendingAdminOpenFn = useCallback(() => {
+    setPendingAdminOpen(false);
+  }, []);
+
   const adminPauseFn = useCallback(() => {
     socket.emit("admin:pause");
   }, []);
@@ -235,6 +258,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         adminForceRevealType: adminForceRevealTypeFn,
         adminPause: adminPauseFn,
         adminUnpause: adminUnpauseFn,
+        revealedActionCard,
+        pendingAdminOpen,
+        consumePendingAdminOpen: consumePendingAdminOpenFn,
       }}
     >
       {children}

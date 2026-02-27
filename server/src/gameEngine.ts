@@ -525,6 +525,13 @@ export function revealActionCard(room: Room, playerId: string, io: IOServer): bo
   if (!player || !player.character || player.actionCardRevealed) return false;
 
   player.actionCardRevealed = true;
+
+  // Notify all clients about the action card reveal for the fullscreen modal
+  io.to(room.code).emit("game:actionCardRevealed", {
+    playerName: player.name,
+    actionCard: player.character.actionCard,
+  });
+
   broadcastState(room, io);
   return true;
 }

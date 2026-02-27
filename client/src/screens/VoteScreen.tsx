@@ -30,6 +30,8 @@ export function VoteScreen() {
     adminForceRevealType,
     adminPause,
     adminUnpause,
+    pendingAdminOpen,
+    consumePendingAdminOpen,
   } = useGame();
   const [voted, setVoted] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
@@ -51,6 +53,18 @@ export function VoteScreen() {
     setVoted(false);
     setConfirmTarget(null);
   }, [gameState?.phase]);
+
+  // Auto-open admin panel after action card reveal overlay
+  useEffect(() => {
+    if (pendingAdminOpen) {
+      consumePendingAdminOpen();
+      const me = gameState?.players.find((p) => p.id === playerId);
+      if (me?.isHost && !adminOpen) {
+        setAdminOpen(true);
+        adminPause();
+      }
+    }
+  }, [pendingAdminOpen]);
 
   if (!gameState) return null;
 
