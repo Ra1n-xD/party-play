@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGame } from "../context/GameContext";
 import { Timer } from "../components/Timer";
 import { CardImage } from "../components/CardImage";
@@ -32,6 +32,8 @@ export function GameScreen() {
     adminForceRevealType,
     adminPause,
     adminUnpause,
+    pendingAdminOpen,
+    consumePendingAdminOpen,
   } = useGame();
   const [showAttrPicker, setShowAttrPicker] = useState(false);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
@@ -47,6 +49,18 @@ export function GameScreen() {
   const [adminPlayer2, setAdminPlayer2] = useState<string>("");
   const [adminPlayers, setAdminPlayers] = useState<Set<string>>(new Set());
   const [adminBunkerCardIndex, setAdminBunkerCardIndex] = useState<number | null>(null);
+
+  // Auto-open admin panel after action card reveal overlay
+  useEffect(() => {
+    if (pendingAdminOpen) {
+      consumePendingAdminOpen();
+      const me = gameState?.players.find((p) => p.id === playerId);
+      if (me?.isHost && !adminOpen) {
+        setAdminOpen(true);
+        adminPause();
+      }
+    }
+  }, [pendingAdminOpen]);
 
   if (!gameState || !myCharacter) return null;
 
