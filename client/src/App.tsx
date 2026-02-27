@@ -1,4 +1,5 @@
 import { useGame } from "./context/GameContext";
+import { OverlayItem } from "./context/GameContext";
 import { HomeScreen } from "./screens/HomeScreen";
 import { LobbyScreen } from "./screens/LobbyScreen";
 import { GameScreen } from "./screens/GameScreen";
@@ -6,7 +7,6 @@ import { VoteScreen } from "./screens/VoteScreen";
 import { ResultsScreen } from "./screens/ResultsScreen";
 import BackgroundParticles from "./components/BackgroundParticles";
 import { CardImage } from "./components/CardImage";
-import { PhaseAnnouncement } from "./components/PhaseAnnouncement";
 import { AttributeType } from "../../shared/types";
 
 const ATTR_LABELS: Record<AttributeType, string> = {
@@ -48,20 +48,6 @@ function AppContent() {
   }
 }
 
-function PhaseAnnouncementOverlay() {
-  const { announcement, dismissAnnouncement } = useGame();
-  if (!announcement) return null;
-
-  return (
-    <PhaseAnnouncement
-      title={announcement.title}
-      subtitle={announcement.subtitle}
-      description={announcement.description}
-      onDismiss={dismissAnnouncement}
-    />
-  );
-}
-
 function PauseOverlay() {
   const { gameState, playerId } = useGame();
   if (!gameState?.paused) return null;
@@ -79,49 +65,65 @@ function PauseOverlay() {
   );
 }
 
-function AttributeRevealOverlay() {
-  const { revealedAttribute } = useGame();
-  if (!revealedAttribute) return null;
-
-  const { playerName, attribute } = revealedAttribute;
-  const cardType = attribute.type as AttributeType;
-
-  return (
-    <div className="action-card-reveal-overlay" data-card-type={cardType}>
-      <div className="action-card-reveal-content">
-        <div className="action-card-reveal-player">{playerName}</div>
-        <div className="action-card-reveal-label">{ATTR_LABELS[cardType] || "раскрывает карту"}</div>
-        <div className="action-card-reveal-card" data-card-type={cardType}>
-          <CardImage type={cardType} className="action-card-reveal-image" />
-          <div className="action-card-reveal-title">{attribute.value}</div>
-          {attribute.detail && (
-            <div className="action-card-reveal-description">{attribute.detail}</div>
+function OverlayRenderer({ item }: { item: OverlayItem }) {
+  if (item.kind === "announcement") {
+    return (
+      <div className="phase-announcement-overlay">
+        <div className="phase-announcement-content">
+          <div className="phase-announcement-title">{item.title}</div>
+          {item.subtitle && <div className="phase-announcement-subtitle">{item.subtitle}</div>}
+          {item.description && (
+            <div className="phase-announcement-description">{item.description}</div>
           )}
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-function ActionCardRevealOverlay() {
-  const { revealedActionCard } = useGame();
-  if (!revealedActionCard) return null;
-
-  return (
-    <div className="action-card-reveal-overlay" data-card-type="action">
-      <div className="action-card-reveal-content">
-        <div className="action-card-reveal-player">{revealedActionCard.playerName}</div>
-        <div className="action-card-reveal-label">раскрывает особое условие</div>
-        <div className="action-card-reveal-card" data-card-type="action">
-          <CardImage type="action" className="action-card-reveal-image" />
-          <div className="action-card-reveal-title">{revealedActionCard.actionCard.title}</div>
-          <div className="action-card-reveal-description">
-            {revealedActionCard.actionCard.description}
+  if (item.kind === "attribute") {
+    const cardType = item.attribute.type as AttributeType;
+    return (
+      <div className="action-card-reveal-overlay" data-card-type={cardType}>
+        <div className="action-card-reveal-content">
+          <div className="action-card-reveal-player">{item.playerName}</div>
+          <div className="action-card-reveal-label">
+            {ATTR_LABELS[cardType] || "раскрывает карту"}
+          </div>
+          <div className="action-card-reveal-card" data-card-type={cardType}>
+            <CardImage type={cardType} className="action-card-reveal-image" />
+            <div className="action-card-reveal-title">{item.attribute.value}</div>
+            {item.attribute.detail && (
+              <div className="action-card-reveal-description">{item.attribute.detail}</div>
+            )}
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (item.kind === "actionCard") {
+    return (
+      <div className="action-card-reveal-overlay" data-card-type="action">
+        <div className="action-card-reveal-content">
+          <div className="action-card-reveal-player">{item.playerName}</div>
+          <div className="action-card-reveal-label">раскрывает особое условие</div>
+          <div className="action-card-reveal-card" data-card-type="action">
+            <CardImage type="action" className="action-card-reveal-image" />
+            <div className="action-card-reveal-title">{item.actionCard.title}</div>
+            <div className="action-card-reveal-description">{item.actionCard.description}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function CurrentOverlay() {
+  const { currentOverlay } = useGame();
+  if (!currentOverlay) return null;
+  return <OverlayRenderer item={currentOverlay} />;
 }
 
 export default function App() {
@@ -129,10 +131,8 @@ export default function App() {
     <>
       <BackgroundParticles />
       <AppContent />
-      <PhaseAnnouncementOverlay />
       <PauseOverlay />
-      <AttributeRevealOverlay />
-      <ActionCardRevealOverlay />
+      <CurrentOverlay />
     </>
   );
 }
