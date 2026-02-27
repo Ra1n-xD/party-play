@@ -33,11 +33,11 @@ const io = new Server(httpServer, {
 });
 
 app.get("/", (_req, res) => {
-  res.json({ status: "ok", message: "PartyGames Server" });
+  res.json({ status: "ok", message: "PartyPlay Server" });
 });
 
 registerHandlers(io);
 
 httpServer.listen(CONFIG.PORT, "0.0.0.0", () => {
-  console.log(`PartyGames server running on http://0.0.0.0:${CONFIG.PORT}`);
+  console.log(`PartyPlay server running on http://0.0.0.0:${CONFIG.PORT}`);
 });
