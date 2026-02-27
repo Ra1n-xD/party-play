@@ -1,13 +1,22 @@
-import { Server } from 'socket.io';
-import { PublicGameState, PlayerInfo, Attribute, FullAttribute, ServerEvents, ClientEvents, BunkerCard, ThreatCard } from '../../shared/types.js';
-import { Room, GameState, Player, getAlivePlayers } from './roomManager.js';
-import { generateCharacter } from './characterGenerator.js';
-import { catastrophes } from './data/catastrophes.js';
-import { bunkerCards as allBunkerCardsData } from './data/bunkers.js';
-import { threatCards as allThreatCardsData } from './data/threats.js';
-import { randomPick, shuffle } from './utils.js';
-import { CONFIG } from './config.js';
-import { scheduleBotActions } from './botManager.js';
+import { Server } from "socket.io";
+import {
+  PublicGameState,
+  PlayerInfo,
+  Attribute,
+  FullAttribute,
+  ServerEvents,
+  ClientEvents,
+  BunkerCard,
+  ThreatCard,
+} from "../../shared/types.js";
+import { Room, GameState, Player, getAlivePlayers } from "./roomManager.js";
+import { generateCharacter } from "./characterGenerator.js";
+import { catastrophes } from "./data/catastrophes.js";
+import { bunkerCards as allBunkerCardsData } from "./data/bunkers.js";
+import { threatCards as allThreatCardsData } from "./data/threats.js";
+import { randomPick, shuffle } from "./utils.js";
+import { CONFIG } from "./config.js";
+import { scheduleBotActions } from "./botManager.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 
@@ -79,7 +88,7 @@ export function startGame(room: Room, io: IOServer): void {
   room.allPlayerIds = shuffle(playerIds);
 
   room.gameState = {
-    phase: 'CATASTROPHE_REVEAL',
+    phase: "CATASTROPHE_REVEAL",
     roundNumber: 0,
     catastrophe,
     bunkerCards: gameBunkerCards,
@@ -106,7 +115,7 @@ export function startGame(room: Room, io: IOServer): void {
   for (const player of room.players.values()) {
     const socket = io.sockets.sockets.get(player.socketId);
     if (socket && player.character) {
-      socket.emit('game:character', player.character);
+      socket.emit("game:character", player.character);
     }
   }
 
@@ -118,7 +127,12 @@ export function startGame(room: Room, io: IOServer): void {
   });
 }
 
-function schedulePhaseTransition(room: Room, io: IOServer, delay: number, callback: () => void): void {
+function schedulePhaseTransition(
+  room: Room,
+  io: IOServer,
+  delay: number,
+  callback: () => void,
+): void {
   if (room.gameState?.phaseTimer) {
     clearTimeout(room.gameState.phaseTimer);
   }
@@ -162,7 +176,7 @@ function startBunkerExplore(room: Room, io: IOServer): void {
     return;
   }
 
-  room.gameState.phase = 'BUNKER_EXPLORE';
+  room.gameState.phase = "BUNKER_EXPLORE";
   room.gameState.revealedBunkerCount++;
 
   broadcastState(room, io);
@@ -175,11 +189,11 @@ function startBunkerExplore(room: Room, io: IOServer): void {
 
 function startRevealPhase(room: Room, io: IOServer): void {
   if (!room.gameState) return;
-  room.gameState.phase = 'ROUND_REVEAL';
+  room.gameState.phase = "ROUND_REVEAL";
 
   // Build turn order: alive players starting from the round starter
   const alivePlayers = getAlivePlayers(room);
-  const aliveIds = alivePlayers.map(p => p.id);
+  const aliveIds = alivePlayers.map((p) => p.id);
 
   // Find the starter for this round: rotate through allPlayerIds
   const starterIdx = room.gameState.roundStarterIndex;
@@ -201,8 +215,13 @@ function startRevealPhase(room: Room, io: IOServer): void {
   broadcastState(room, io);
 }
 
-export function revealAttribute(room: Room, playerId: string, attributeIndex: number | undefined, io: IOServer): boolean {
-  if (!room.gameState || room.gameState.phase !== 'ROUND_REVEAL') return false;
+export function revealAttribute(
+  room: Room,
+  playerId: string,
+  attributeIndex: number | undefined,
+  io: IOServer,
+): boolean {
+  if (!room.gameState || room.gameState.phase !== "ROUND_REVEAL") return false;
 
   const player = room.players.get(playerId);
   if (!player || !player.alive || !player.character) return false;
@@ -277,7 +296,7 @@ function afterRevealPhase(room: Room, io: IOServer): void {
 
 function startDiscussionPhase(room: Room, io: IOServer): void {
   if (!room.gameState) return;
-  room.gameState.phase = 'ROUND_DISCUSSION';
+  room.gameState.phase = "ROUND_DISCUSSION";
   broadcastState(room, io);
 
   schedulePhaseTransition(room, io, CONFIG.DISCUSSION_TIME, () => {
@@ -287,7 +306,7 @@ function startDiscussionPhase(room: Room, io: IOServer): void {
 
 function startVotePhase(room: Room, io: IOServer): void {
   if (!room.gameState) return;
-  room.gameState.phase = 'ROUND_VOTE';
+  room.gameState.phase = "ROUND_VOTE";
   room.gameState.votes.clear();
   room.gameState.tiebreakCandidateIds = [];
 
@@ -327,7 +346,8 @@ function getVoters(room: Room): Player[] {
 
 export function castVote(room: Room, voterId: string, targetId: string, io: IOServer): boolean {
   if (!room.gameState) return false;
-  if (room.gameState.phase !== 'ROUND_VOTE' && room.gameState.phase !== 'ROUND_VOTE_TIEBREAK') return false;
+  if (room.gameState.phase !== "ROUND_VOTE" && room.gameState.phase !== "ROUND_VOTE_TIEBREAK")
+    return false;
 
   const voter = room.players.get(voterId);
   const target = room.players.get(targetId);
@@ -341,7 +361,7 @@ export function castVote(room: Room, voterId: string, targetId: string, io: IOSe
   if (!isAlive && !isLastEliminated) return false;
 
   // In tiebreak, can only vote for tiebreak candidates
-  if (room.gameState.phase === 'ROUND_VOTE_TIEBREAK') {
+  if (room.gameState.phase === "ROUND_VOTE_TIEBREAK") {
     if (!room.gameState.tiebreakCandidateIds.includes(targetId)) return false;
   }
 
@@ -353,7 +373,7 @@ export function castVote(room: Room, voterId: string, targetId: string, io: IOSe
 
   // Check if all voters have voted
   const voters = getVoters(room);
-  const allVoted = voters.every(p => p.hasVoted);
+  const allVoted = voters.every((p) => p.hasVoted);
   if (allVoted) {
     if (room.gameState.phaseTimer) clearTimeout(room.gameState.phaseTimer);
     room.gameState.phaseTimer = null;
@@ -367,7 +387,7 @@ export function castVote(room: Room, voterId: string, targetId: string, io: IOSe
 function tallyVotes(room: Room, io: IOServer): void {
   if (!room.gameState) return;
 
-  const isTiebreak = room.gameState.phase === 'ROUND_VOTE_TIEBREAK';
+  const isTiebreak = room.gameState.phase === "ROUND_VOTE_TIEBREAK";
   const voteCounts = new Map<string, number>();
   const alivePlayers = getAlivePlayers(room);
 
@@ -421,7 +441,7 @@ function tallyVotes(room: Room, io: IOServer): void {
 function startTiebreak(room: Room, io: IOServer): void {
   if (!room.gameState) return;
 
-  room.gameState.phase = 'ROUND_VOTE_TIEBREAK';
+  room.gameState.phase = "ROUND_VOTE_TIEBREAK";
   room.gameState.votes.clear();
 
   // Reset votes
@@ -450,7 +470,7 @@ function eliminatePlayer(room: Room, playerId: string, io: IOServer): void {
 
   // Check immunity
   if (player.immuneThisRound) {
-    room.gameState.phase = 'ROUND_RESULT';
+    room.gameState.phase = "ROUND_RESULT";
     broadcastState(room, io);
     schedulePhaseTransition(room, io, CONFIG.RESULT_DISPLAY_TIME, () => {
       afterVoting(room, io);
@@ -461,9 +481,9 @@ function eliminatePlayer(room: Room, playerId: string, io: IOServer): void {
   player.alive = false;
   room.gameState.eliminationOrder.push(playerId);
   room.gameState.lastEliminatedId = playerId;
-  room.gameState.phase = 'ROUND_RESULT';
+  room.gameState.phase = "ROUND_RESULT";
 
-  io.to(room.code).emit('game:eliminated', {
+  io.to(room.code).emit("game:eliminated", {
     playerId,
     playerName: player.name,
   });
@@ -499,17 +519,18 @@ function advanceRoundOrEnd(room: Room, io: IOServer): void {
   if (!room.gameState) return;
 
   // Advance round starter: next player after current starter
-  room.gameState.roundStarterIndex = (room.gameState.roundStarterIndex + 1) % room.allPlayerIds.length;
+  room.gameState.roundStarterIndex =
+    (room.gameState.roundStarterIndex + 1) % room.allPlayerIds.length;
 
   if (room.gameState.roundNumber >= CONFIG.TOTAL_ROUNDS) {
     // Game over after 5 rounds
-    room.gameState.phase = 'GAME_OVER';
+    room.gameState.phase = "GAME_OVER";
     broadcastState(room, io);
   } else {
     // Check if we still have enough players for elimination
     const alive = getAlivePlayers(room);
     if (alive.length <= room.gameState.bunkerCapacity) {
-      room.gameState.phase = 'GAME_OVER';
+      room.gameState.phase = "GAME_OVER";
       broadcastState(room, io);
     } else {
       startNewRound(room, io);
@@ -523,7 +544,7 @@ export function revealActionCard(room: Room, playerId: string, io: IOServer): bo
   if (!room.gameState) return false;
   // Can reveal in any phase except voting
   const phase = room.gameState.phase;
-  if (phase === 'ROUND_VOTE' || phase === 'ROUND_VOTE_TIEBREAK') return false;
+  if (phase === "ROUND_VOTE" || phase === "ROUND_VOTE_TIEBREAK") return false;
 
   const player = room.players.get(playerId);
   if (!player || !player.character || player.actionCardRevealed) return false;
@@ -535,30 +556,34 @@ export function revealActionCard(room: Room, playerId: string, io: IOServer): bo
 
 // ============ Admin Panel Functions ============
 
-export function adminShuffleAll(room: Room, attributeType: string, io: IOServer): { success: boolean; error: string } {
-  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
+export function adminShuffleAll(
+  room: Room,
+  attributeType: string,
+  io: IOServer,
+): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
 
-  const alivePlayers = getAlivePlayers(room).filter(p => p.character);
-  if (alivePlayers.length < 2) return { success: false, error: 'Недостаточно игроков' };
+  const alivePlayers = getAlivePlayers(room).filter((p) => p.character);
+  if (alivePlayers.length < 2) return { success: false, error: "Недостаточно игроков" };
 
   // Collect all attributes of this type
   const attrs: { playerIdx: number; attrIdx: number; attr: any }[] = [];
   for (const player of alivePlayers) {
-    const idx = player.character!.attributes.findIndex(a => a.type === attributeType);
+    const idx = player.character!.attributes.findIndex((a) => a.type === attributeType);
     if (idx !== -1) {
       attrs.push({ playerIdx: 0, attrIdx: idx, attr: player.character!.attributes[idx] });
     }
   }
 
-  if (attrs.length < 2) return { success: false, error: 'Недостаточно карт для перемешивания' };
+  if (attrs.length < 2) return { success: false, error: "Недостаточно карт для перемешивания" };
 
   // Shuffle attributes
-  const shuffled = shuffle(attrs.map(a => a.attr));
+  const shuffled = shuffle(attrs.map((a) => a.attr));
 
   // Redistribute
   let i = 0;
   for (const player of alivePlayers) {
-    const idx = player.character!.attributes.findIndex(a => a.type === attributeType);
+    const idx = player.character!.attributes.findIndex((a) => a.type === attributeType);
     if (idx !== -1 && i < shuffled.length) {
       player.character!.attributes[idx] = shuffled[i];
       i++;
@@ -569,24 +594,30 @@ export function adminShuffleAll(room: Room, attributeType: string, io: IOServer)
   for (const player of alivePlayers) {
     const sock = io.sockets.sockets.get(player.socketId);
     if (sock && player.character) {
-      sock.emit('game:character', player.character);
+      sock.emit("game:character", player.character);
     }
   }
 
   broadcastState(room, io);
-  return { success: true, error: '' };
+  return { success: true, error: "" };
 }
 
-export function adminSwapAttribute(room: Room, p1Id: string, p2Id: string, attributeType: string, io: IOServer): { success: boolean; error: string } {
-  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
+export function adminSwapAttribute(
+  room: Room,
+  p1Id: string,
+  p2Id: string,
+  attributeType: string,
+  io: IOServer,
+): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
 
   const p1 = room.players.get(p1Id);
   const p2 = room.players.get(p2Id);
-  if (!p1?.character || !p2?.character) return { success: false, error: 'Игрок не найден' };
+  if (!p1?.character || !p2?.character) return { success: false, error: "Игрок не найден" };
 
-  const idx1 = p1.character.attributes.findIndex(a => a.type === attributeType);
-  const idx2 = p2.character.attributes.findIndex(a => a.type === attributeType);
-  if (idx1 === -1 || idx2 === -1) return { success: false, error: 'Атрибут не найден' };
+  const idx1 = p1.character.attributes.findIndex((a) => a.type === attributeType);
+  const idx2 = p2.character.attributes.findIndex((a) => a.type === attributeType);
+  if (idx1 === -1 || idx2 === -1) return { success: false, error: "Атрибут не найден" };
 
   // Swap
   const temp = p1.character.attributes[idx1];
@@ -597,46 +628,51 @@ export function adminSwapAttribute(room: Room, p1Id: string, p2Id: string, attri
   for (const p of [p1, p2]) {
     const sock = io.sockets.sockets.get(p.socketId);
     if (sock && p.character) {
-      sock.emit('game:character', p.character);
+      sock.emit("game:character", p.character);
     }
   }
 
   broadcastState(room, io);
-  return { success: true, error: '' };
+  return { success: true, error: "" };
 }
 
-export function adminReplaceAttribute(room: Room, targetPlayerId: string, attributeType: string, io: IOServer): { success: boolean; error: string } {
-  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
+export function adminReplaceAttribute(
+  room: Room,
+  targetPlayerId: string,
+  attributeType: string,
+  io: IOServer,
+): { success: boolean; error: string } {
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
 
   const player = room.players.get(targetPlayerId);
-  if (!player?.character) return { success: false, error: 'Игрок не найден' };
+  if (!player?.character) return { success: false, error: "Игрок не найден" };
 
-  const idx = player.character.attributes.findIndex(a => a.type === attributeType);
-  if (idx === -1) return { success: false, error: 'Атрибут не найден' };
+  const idx = player.character.attributes.findIndex((a) => a.type === attributeType);
+  if (idx === -1) return { success: false, error: "Атрибут не найден" };
 
   // Generate a new character to get a fresh attribute of the right type
   const usedProf = new Set<string>();
   const newChar = generateCharacter(usedProf);
-  const newIdx = newChar.attributes.findIndex(a => a.type === attributeType);
-  if (newIdx === -1) return { success: false, error: 'Не удалось сгенерировать новую карту' };
+  const newIdx = newChar.attributes.findIndex((a) => a.type === attributeType);
+  if (newIdx === -1) return { success: false, error: "Не удалось сгенерировать новую карту" };
 
   player.character.attributes[idx] = newChar.attributes[newIdx];
 
   // Resend character
   const sock = io.sockets.sockets.get(player.socketId);
   if (sock && player.character) {
-    sock.emit('game:character', player.character);
+    sock.emit("game:character", player.character);
   }
 
   broadcastState(room, io);
-  return { success: true, error: '' };
+  return { success: true, error: "" };
 }
 
 // ============ Pause / Unpause ============
 
 export function pauseGame(room: Room, io: IOServer): { success: boolean; error: string } {
-  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
-  if (room.gameState.paused) return { success: false, error: 'Игра уже на паузе' };
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (room.gameState.paused) return { success: false, error: "Игра уже на паузе" };
 
   room.gameState.paused = true;
 
@@ -650,12 +686,12 @@ export function pauseGame(room: Room, io: IOServer): { success: boolean; error: 
   }
 
   broadcastState(room, io);
-  return { success: true, error: '' };
+  return { success: true, error: "" };
 }
 
 export function unpauseGame(room: Room, io: IOServer): { success: boolean; error: string } {
-  if (!room.gameState) return { success: false, error: 'Игра не запущена' };
-  if (!room.gameState.paused) return { success: false, error: 'Игра не на паузе' };
+  if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (!room.gameState.paused) return { success: false, error: "Игра не на паузе" };
 
   room.gameState.paused = false;
 
@@ -669,13 +705,13 @@ export function unpauseGame(room: Room, io: IOServer): { success: boolean; error
   }
 
   broadcastState(room, io);
-  return { success: true, error: '' };
+  return { success: true, error: "" };
 }
 
 export function forceEndGame(room: Room, io: IOServer): void {
   if (!room.gameState) return;
   if (room.gameState.phaseTimer) clearTimeout(room.gameState.phaseTimer);
-  room.gameState.phase = 'GAME_OVER';
+  room.gameState.phase = "GAME_OVER";
   room.gameState.phaseEndTime = null;
   broadcastState(room, io);
 }
@@ -700,8 +736,8 @@ export function resetGame(room: Room, io: IOServer): void {
 
 export function buildPublicState(room: Room): PublicGameState {
   const gs = room.gameState;
-  const isGameOver = gs?.phase === 'GAME_OVER';
-  const players: PlayerInfo[] = Array.from(room.players.values()).map(p => {
+  const isGameOver = gs?.phase === "GAME_OVER";
+  const players: PlayerInfo[] = Array.from(room.players.values()).map((p) => {
     const revealedSet = new Set(p.revealedIndices);
     const info: PlayerInfo = {
       id: p.id,
@@ -709,7 +745,9 @@ export function buildPublicState(room: Room): PublicGameState {
       ready: p.ready,
       connected: p.connected,
       alive: p.alive,
-      revealedAttributes: p.revealedIndices.map(i => p.character?.attributes[i]).filter(Boolean) as Attribute[],
+      revealedAttributes: p.revealedIndices
+        .map((i) => p.character?.attributes[i])
+        .filter(Boolean) as Attribute[],
       actionCardRevealed: p.actionCardRevealed,
       isHost: p.id === room.hostId,
       isBot: p.isBot,
@@ -730,11 +768,11 @@ export function buildPublicState(room: Room): PublicGameState {
 
   // Count voters (alive + last eliminated)
   const voters = gs ? getVoters_fromState(room) : [];
-  const votedCount = voters.filter(p => p.hasVoted).length;
+  const votedCount = voters.filter((p) => p.hasVoted).length;
 
   // Build vote results for ROUND_RESULT phase
   let voteResults: Record<string, number> | null = null;
-  if (gs?.phase === 'ROUND_RESULT' || gs?.phase === 'GAME_OVER') {
+  if (gs?.phase === "ROUND_RESULT" || gs?.phase === "GAME_OVER") {
     voteResults = {};
     for (const player of room.players.values()) {
       if (player.votedFor) {
@@ -744,7 +782,7 @@ export function buildPublicState(room: Room): PublicGameState {
   }
 
   let eliminatedPlayerId: string | null = null;
-  if (gs?.phase === 'ROUND_RESULT' && gs.eliminationOrder.length > 0) {
+  if (gs?.phase === "ROUND_RESULT" && gs.eliminationOrder.length > 0) {
     eliminatedPlayerId = gs.eliminationOrder[gs.eliminationOrder.length - 1];
   }
 
@@ -759,16 +797,17 @@ export function buildPublicState(room: Room): PublicGameState {
   const roundIdx = (gs?.roundNumber || 1) - 1;
 
   return {
-    phase: gs?.phase || 'LOBBY',
+    phase: gs?.phase || "LOBBY",
     roundNumber: gs?.roundNumber || 0,
     totalRounds: CONFIG.TOTAL_ROUNDS,
     catastrophe: gs?.catastrophe || null,
     revealedBunkerCards,
     totalBunkerCards: gs?.bunkerCards.length || 0,
-    threatCard: (gs && gs.revealedBunkerCount >= gs.bunkerCards.length) ? gs.threatCard : null,
+    threatCard: gs && gs.revealedBunkerCount >= gs.bunkerCards.length ? gs.threatCard : null,
     bunkerCapacity: gs?.bunkerCapacity || 0,
     players,
-    currentTurnPlayerId: gs?.phase === 'ROUND_REVEAL' ? gs.turnOrder[gs.currentTurnIndex] || null : null,
+    currentTurnPlayerId:
+      gs?.phase === "ROUND_REVEAL" ? gs.turnOrder[gs.currentTurnIndex] || null : null,
     votesCount: votedCount,
     totalVotesExpected: voters.length,
     voteResults,
@@ -806,7 +845,7 @@ function getVoters_fromState(room: Room): Player[] {
 
 export function broadcastState(room: Room, io: IOServer): void {
   const state = buildPublicState(room);
-  io.to(room.code).emit('game:state', state);
+  io.to(room.code).emit("game:state", state);
 
   // Schedule bot actions after state broadcast
   scheduleBotActions(room, io);

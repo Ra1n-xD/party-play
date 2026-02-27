@@ -1,12 +1,12 @@
-import { Character, Attribute } from '../../shared/types.js';
-import { professions } from './data/professions.js';
-import { healthConditions } from './data/health.js';
-import { hobbies } from './data/hobbies.js';
-import { baggage } from './data/baggage.js';
-import { facts } from './data/facts.js';
-import { biologyCards } from './data/biology.js';
-import { actionCards } from './data/actions.js';
-import { randomPick } from './utils.js';
+import { Character, Attribute } from "../../shared/types.js";
+import { professions } from "./data/professions.js";
+import { healthConditions } from "./data/health.js";
+import { hobbies } from "./data/hobbies.js";
+import { baggage } from "./data/baggage.js";
+import { facts } from "./data/facts.js";
+import { biologyCards } from "./data/biology.js";
+import { actionCards } from "./data/actions.js";
+import { randomPick } from "./utils.js";
 
 export function generateCharacter(usedProfessions: Set<string>): Character {
   let profession;
@@ -27,7 +27,7 @@ export function generateCharacter(usedProfessions: Set<string>): Character {
   let bioValue = bio.title;
   if (bio.gender && bio.age !== null) {
     bioValue = `${bio.gender}, ${bio.age} лет`;
-    if (bio.orientation && bio.orientation !== 'Гетеро') {
+    if (bio.orientation && bio.orientation !== "Гетеро") {
       bioValue += `, ${bio.orientation}`;
     }
   }
@@ -35,38 +35,38 @@ export function generateCharacter(usedProfessions: Set<string>): Character {
   // 6 attributes per original rules: Profession, Biology, Health, Hobby, Baggage, Fact
   const attributes: Attribute[] = [
     {
-      type: 'profession',
-      label: 'Профессия',
+      type: "profession",
+      label: "Профессия",
       value: profession.title,
       image: profession.image,
     },
     {
-      type: 'bio',
-      label: 'Биология',
+      type: "bio",
+      label: "Биология",
       value: bioValue,
       image: bio.image,
     },
     {
-      type: 'health',
-      label: 'Здоровье',
+      type: "health",
+      label: "Здоровье",
       value: health.title,
       image: health.image,
     },
     {
-      type: 'hobby',
-      label: 'Хобби',
+      type: "hobby",
+      label: "Хобби",
       value: hobby.title,
       image: hobby.image,
     },
     {
-      type: 'baggage',
-      label: 'Багаж',
+      type: "baggage",
+      label: "Багаж",
       value: bag.title,
       image: bag.image,
     },
     {
-      type: 'fact',
-      label: 'Доп. факт',
+      type: "fact",
+      label: "Доп. факт",
       value: fact.title,
       image: fact.image,
     },

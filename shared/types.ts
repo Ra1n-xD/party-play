@@ -8,13 +8,7 @@ export interface Attribute {
   image?: string;
 }
 
-export type AttributeType =
-  | 'profession'
-  | 'bio'
-  | 'health'
-  | 'hobby'
-  | 'baggage'
-  | 'fact';
+export type AttributeType = "profession" | "bio" | "health" | "hobby" | "baggage" | "fact";
 
 export interface ActionCard {
   id: string;
@@ -46,15 +40,15 @@ export interface ThreatCard {
 // ============ Game State ============
 
 export type GamePhase =
-  | 'LOBBY'
-  | 'CATASTROPHE_REVEAL'
-  | 'BUNKER_EXPLORE'
-  | 'ROUND_REVEAL'
-  | 'ROUND_DISCUSSION'
-  | 'ROUND_VOTE'
-  | 'ROUND_VOTE_TIEBREAK'
-  | 'ROUND_RESULT'
-  | 'GAME_OVER';
+  | "LOBBY"
+  | "CATASTROPHE_REVEAL"
+  | "BUNKER_EXPLORE"
+  | "ROUND_REVEAL"
+  | "ROUND_DISCUSSION"
+  | "ROUND_VOTE"
+  | "ROUND_VOTE_TIEBREAK"
+  | "ROUND_RESULT"
+  | "GAME_OVER";
 
 export interface Catastrophe {
   title: string;
@@ -108,32 +102,39 @@ export interface PublicGameState {
 
 // Client -> Server
 export interface ClientEvents {
-  'room:create': (data: { playerName: string }) => void;
-  'room:join': (data: { roomCode: string; playerName: string }) => void;
-  'room:leave': () => void;
-  'room:rejoin': (data: { roomCode: string; playerId: string }) => void;
-  'player:ready': (data: { ready: boolean }) => void;
-  'game:start': () => void;
-  'game:revealAttribute': (data: { attributeIndex?: number }) => void;
-  'game:revealActionCard': () => void;
-  'admin:shuffleAll': (data: { attributeType: AttributeType }) => void;
-  'admin:swapAttribute': (data: { player1Id: string; player2Id: string; attributeType: AttributeType }) => void;
-  'admin:replaceAttribute': (data: { targetPlayerId: string; attributeType: AttributeType }) => void;
-  'admin:pause': () => void;
-  'admin:unpause': () => void;
-  'vote:cast': (data: { targetPlayerId: string }) => void;
-  'game:endGame': () => void;
-  'game:playAgain': () => void;
-  'room:addBot': () => void;
-  'room:removeBot': (data: { playerId: string }) => void;
+  "room:create": (data: { playerName: string }) => void;
+  "room:join": (data: { roomCode: string; playerName: string }) => void;
+  "room:leave": () => void;
+  "room:rejoin": (data: { roomCode: string; playerId: string }) => void;
+  "player:ready": (data: { ready: boolean }) => void;
+  "game:start": () => void;
+  "game:revealAttribute": (data: { attributeIndex?: number }) => void;
+  "game:revealActionCard": () => void;
+  "admin:shuffleAll": (data: { attributeType: AttributeType }) => void;
+  "admin:swapAttribute": (data: {
+    player1Id: string;
+    player2Id: string;
+    attributeType: AttributeType;
+  }) => void;
+  "admin:replaceAttribute": (data: {
+    targetPlayerId: string;
+    attributeType: AttributeType;
+  }) => void;
+  "admin:pause": () => void;
+  "admin:unpause": () => void;
+  "vote:cast": (data: { targetPlayerId: string }) => void;
+  "game:endGame": () => void;
+  "game:playAgain": () => void;
+  "room:addBot": () => void;
+  "room:removeBot": (data: { playerId: string }) => void;
 }
 
 // Server -> Client
 export interface ServerEvents {
-  'room:created': (data: { roomCode: string; playerId: string }) => void;
-  'room:joined': (data: { roomCode: string; playerId: string }) => void;
-  'room:error': (data: { message: string }) => void;
-  'game:state': (data: PublicGameState) => void;
-  'game:character': (data: Character) => void;
-  'game:eliminated': (data: { playerId: string; playerName: string }) => void;
+  "room:created": (data: { roomCode: string; playerId: string }) => void;
+  "room:joined": (data: { roomCode: string; playerId: string }) => void;
+  "room:error": (data: { message: string }) => void;
+  "game:state": (data: PublicGameState) => void;
+  "game:character": (data: Character) => void;
+  "game:eliminated": (data: { playerId: string; playerName: string }) => void;
 }

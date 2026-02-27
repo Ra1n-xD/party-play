@@ -1,9 +1,9 @@
-import { useGame } from './context/GameContext';
-import { HomeScreen } from './screens/HomeScreen';
-import { LobbyScreen } from './screens/LobbyScreen';
-import { GameScreen } from './screens/GameScreen';
-import { VoteScreen } from './screens/VoteScreen';
-import { ResultsScreen } from './screens/ResultsScreen';
+import { useGame } from "./context/GameContext";
+import { HomeScreen } from "./screens/HomeScreen";
+import { LobbyScreen } from "./screens/LobbyScreen";
+import { GameScreen } from "./screens/GameScreen";
+import { VoteScreen } from "./screens/VoteScreen";
+import { ResultsScreen } from "./screens/ResultsScreen";
 
 function AppContent() {
   const { roomCode, gameState } = useGame();
@@ -16,19 +16,19 @@ function AppContent() {
   const phase = gameState.phase;
 
   switch (phase) {
-    case 'LOBBY':
+    case "LOBBY":
       return <LobbyScreen />;
-    case 'CATASTROPHE_REVEAL':
-    case 'BUNKER_EXPLORE':
-    case 'ROUND_REVEAL':
-    case 'ROUND_DISCUSSION':
+    case "CATASTROPHE_REVEAL":
+    case "BUNKER_EXPLORE":
+    case "ROUND_REVEAL":
+    case "ROUND_DISCUSSION":
       return <GameScreen />;
-    case 'ROUND_VOTE':
-    case 'ROUND_VOTE_TIEBREAK':
+    case "ROUND_VOTE":
+    case "ROUND_VOTE_TIEBREAK":
       return <VoteScreen />;
-    case 'ROUND_RESULT':
+    case "ROUND_RESULT":
       return <GameScreen />;
-    case 'GAME_OVER':
+    case "GAME_OVER":
       return <ResultsScreen />;
     default:
       return <HomeScreen />;
@@ -38,7 +38,7 @@ function AppContent() {
 function PauseOverlay() {
   const { gameState, playerId } = useGame();
   if (!gameState?.paused) return null;
-  const me = gameState.players.find(p => p.id === playerId);
+  const me = gameState.players.find((p) => p.id === playerId);
   if (me?.isHost) return null;
 
   return (

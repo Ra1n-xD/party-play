@@ -1,8 +1,8 @@
-import { CONFIG } from './config.js';
+import { CONFIG } from "./config.js";
 
 export function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
   for (let i = 0; i < CONFIG.ROOM_CODE_LENGTH; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
@@ -10,7 +10,7 @@ export function generateRoomCode(): string {
 }
 
 export function generatePlayerId(): string {
-  return 'p_' + Math.random().toString(36).substring(2, 10);
+  return "p_" + Math.random().toString(36).substring(2, 10);
 }
 
 export function randomPick<T>(arr: T[]): T {

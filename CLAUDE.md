@@ -35,9 +35,11 @@ No test framework is configured.
 **Monorepo** using npm workspaces with three packages: `shared`, `server`, `client`.
 
 ### shared/
+
 Single file `types.ts` — all TypeScript interfaces and Socket.IO event type maps used by both server and client. Contains `GamePhase` (9 phases), `PublicGameState`, `Character`, `ClientEvents`/`ServerEvents`.
 
 ### server/ (Express + Socket.IO)
+
 - **`src/index.ts`** — Express app + Socket.IO server on port 3001, calls `registerHandlers(io)`
 - **`src/config.ts`** — All tunable constants (timers, player limits, round counts). Has switchable `TEST_TIMERS` / `PROD_TIMERS` sets
 - **`src/socketHandlers.ts`** — Socket event registration; maintains `socketRoomMap` for O(1) socket→room/player lookup. Routes events to roomManager and gameEngine
@@ -48,6 +50,7 @@ Single file `types.ts` — all TypeScript interfaces and Socket.IO event type ma
 - **`src/data/`** — Static game content arrays (professions, health, hobbies, baggage, facts, catastrophes, bunkers, actions) all in Russian
 
 ### client/ (React 18 + Vite + TypeScript)
+
 - **`src/socket.ts`** — Typed Socket.IO client singleton, `autoConnect: false`. In dev connects to `http://<hostname>:3001` (LAN-friendly)
 - **`src/context/GameContext.tsx`** — Single React context provider managing all state. Listens to server events, stores `gameState`, `myCharacter` (private), handles reconnection via `sessionStorage`
 - **`src/App.tsx`** — Phase-based screen router (switch on `gameState.phase`) + global `PauseOverlay` component

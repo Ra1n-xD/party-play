@@ -1,18 +1,28 @@
-import { useState } from 'react';
-import { useGame } from '../context/GameContext';
+import { useState } from "react";
+import { useGame } from "../context/GameContext";
 
 export function LobbyScreen() {
-  const { roomCode, playerId, gameState, setReady, startGame, leaveRoom, addBot, removeBot, error } = useGame();
+  const {
+    roomCode,
+    playerId,
+    gameState,
+    setReady,
+    startGame,
+    leaveRoom,
+    addBot,
+    removeBot,
+    error,
+  } = useGame();
   const [copied, setCopied] = useState(false);
 
   if (!gameState || !roomCode) return null;
 
-  const me = gameState.players.find(p => p.id === playerId);
+  const me = gameState.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
-  const allReady = gameState.players.every(p => p.ready || p.isHost);
+  const allReady = gameState.players.every((p) => p.ready || p.isHost);
   const enoughPlayers = gameState.players.length >= 4;
   const bunkerCapacity = Math.floor(gameState.players.length / 2);
-  const botCount = gameState.players.filter(p => p.isBot).length;
+  const botCount = gameState.players.filter((p) => p.isBot).length;
   const canAddBot = gameState.players.length < 16;
 
   const copyCode = () => {
@@ -29,7 +39,9 @@ export function LobbyScreen() {
           <div className="room-code-display" onClick={copyCode}>
             <span className="room-code-label">Код:</span>
             <span className="room-code-value">{roomCode}</span>
-            <span className="copy-hint">{copied ? 'Скопировано!' : 'Нажмите чтобы скопировать'}</span>
+            <span className="copy-hint">
+              {copied ? "Скопировано!" : "Нажмите чтобы скопировать"}
+            </span>
           </div>
         </div>
 
@@ -41,7 +53,10 @@ export function LobbyScreen() {
 
         <div className="player-list">
           {gameState.players.map((player, idx) => (
-            <div key={player.id} className={`player-item ${player.id === playerId ? 'is-me' : ''} ${player.isBot ? 'is-bot' : ''}`}>
+            <div
+              key={player.id}
+              className={`player-item ${player.id === playerId ? "is-me" : ""} ${player.isBot ? "is-bot" : ""}`}
+            >
               <span className="player-name">
                 <span className="player-number">{idx + 1}</span>
                 {player.isHost && <span className="host-badge">H</span>}
@@ -50,8 +65,8 @@ export function LobbyScreen() {
                 {player.id === playerId && <span className="me-badge">(вы)</span>}
               </span>
               <span className="player-item-right">
-                <span className={`ready-status ${player.ready || player.isHost ? 'ready' : ''}`}>
-                  {player.ready || player.isHost ? 'Готов' : 'Не готов'}
+                <span className={`ready-status ${player.ready || player.isHost ? "ready" : ""}`}>
+                  {player.ready || player.isHost ? "Готов" : "Не готов"}
                 </span>
                 {isHost && player.isBot && (
                   <button className="btn-remove-bot" onClick={() => removeBot(player.id)}>
@@ -71,10 +86,10 @@ export function LobbyScreen() {
           )}
           {!isHost && (
             <button
-              className={`btn ${me?.ready ? 'btn-secondary' : 'btn-primary'}`}
+              className={`btn ${me?.ready ? "btn-secondary" : "btn-primary"}`}
               onClick={() => setReady(!me?.ready)}
             >
-              {me?.ready ? 'Не готов' : 'Готов!'}
+              {me?.ready ? "Не готов" : "Готов!"}
             </button>
           )}
           {isHost && (
@@ -86,8 +101,8 @@ export function LobbyScreen() {
               {!enoughPlayers
                 ? `Нужно минимум 4 игрока`
                 : !allReady
-                  ? 'Ждём готовности всех'
-                  : 'Начать игру!'}
+                  ? "Ждём готовности всех"
+                  : "Начать игру!"}
             </button>
           )}
           <button className="btn btn-text" onClick={leaveRoom}>

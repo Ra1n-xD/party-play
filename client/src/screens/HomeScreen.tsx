@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { useGame } from '../context/GameContext';
+import { useState } from "react";
+import { useGame } from "../context/GameContext";
 
 export function HomeScreen() {
   const { createRoom, joinRoom, error } = useGame();
-  const [name, setName] = useState('');
-  const [joinCode, setJoinCode] = useState('');
-  const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
+  const [name, setName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [mode, setMode] = useState<"menu" | "create" | "join">("menu");
 
   const handleCreate = () => {
     if (name.trim()) createRoom(name.trim());
@@ -23,7 +23,7 @@ export function HomeScreen() {
           <p className="subtitle">Игра на выживание</p>
         </div>
 
-        {mode === 'menu' && (
+        {mode === "menu" && (
           <div className="home-actions">
             <input
               type="text"
@@ -33,19 +33,34 @@ export function HomeScreen() {
               maxLength={20}
               className="input"
             />
-            <button className="btn btn-primary" onClick={() => { if (name.trim()) setMode('create'); handleCreate(); }} disabled={!name.trim()}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                if (name.trim()) setMode("create");
+                handleCreate();
+              }}
+              disabled={!name.trim()}
+            >
               Создать комнату
             </button>
-            <div className="divider"><span>или</span></div>
-            <button className="btn btn-secondary" onClick={() => setMode('join')} disabled={!name.trim()}>
+            <div className="divider">
+              <span>или</span>
+            </div>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setMode("join")}
+              disabled={!name.trim()}
+            >
               Присоединиться
             </button>
           </div>
         )}
 
-        {mode === 'join' && (
+        {mode === "join" && (
           <div className="home-actions">
-            <p className="join-label">Имя: <strong>{name}</strong></p>
+            <p className="join-label">
+              Имя: <strong>{name}</strong>
+            </p>
             <input
               type="text"
               placeholder="Код комнаты"
@@ -58,7 +73,7 @@ export function HomeScreen() {
             <button className="btn btn-primary" onClick={handleJoin} disabled={joinCode.length < 4}>
               Войти
             </button>
-            <button className="btn btn-text" onClick={() => setMode('menu')}>
+            <button className="btn btn-text" onClick={() => setMode("menu")}>
               Назад
             </button>
           </div>

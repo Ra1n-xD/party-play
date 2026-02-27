@@ -32,14 +32,9 @@ export function GameScreen() {
 
   // Admin panel state
   const [adminOpen, setAdminOpen] = useState(false);
-  const [adminAction, setAdminAction] = useState<
-    "shuffle" | "swap" | "replace" | null
-  >(null);
-  const [adminAttrType, setAdminAttrType] =
-    useState<AttributeType>("profession");
-  const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType>>(
-    new Set(),
-  );
+  const [adminAction, setAdminAction] = useState<"shuffle" | "swap" | "replace" | null>(null);
+  const [adminAttrType, setAdminAttrType] = useState<AttributeType>("profession");
+  const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType>>(new Set());
   const [adminPlayer1, setAdminPlayer1] = useState<string>("");
   const [adminPlayer2, setAdminPlayer2] = useState<string>("");
   const [adminPlayers, setAdminPlayers] = useState<Set<string>>(new Set());
@@ -55,8 +50,7 @@ export function GameScreen() {
   if (me) {
     for (const ra of me.revealedAttributes) {
       const idx = myCharacter.attributes.findIndex(
-        (a, i) =>
-          !revealedIndices.has(i) && a.type === ra.type && a.value === ra.value,
+        (a, i) => !revealedIndices.has(i) && a.type === ra.type && a.value === ra.value,
       );
       if (idx !== -1) revealedIndices.add(idx);
     }
@@ -66,10 +60,7 @@ export function GameScreen() {
     .map((_, i) => i)
     .filter((i) => !revealedIndices.has(i));
 
-  const canReveal =
-    gameState.phase === "ROUND_REVEAL" &&
-    isMyTurn &&
-    unrevealedIndices.length > 1;
+  const canReveal = gameState.phase === "ROUND_REVEAL" && isMyTurn && unrevealedIndices.length > 1;
   const canRevealAction =
     myCharacter.actionCard &&
     !me?.actionCardRevealed &&
@@ -135,9 +126,7 @@ export function GameScreen() {
       {/* Phase Header */}
       <div className="phase-header">
         <div className="phase-info">
-          <span className="phase-label">
-            {phaseLabels[gameState.phase] || gameState.phase}
-          </span>
+          <span className="phase-label">{phaseLabels[gameState.phase] || gameState.phase}</span>
           <span className="round-counter">
             Раунд {gameState.roundNumber}/{gameState.totalRounds}
           </span>
@@ -155,9 +144,7 @@ export function GameScreen() {
               : `Ход: ${gameState.players.find((p) => p.id === gameState.currentTurnPlayerId)?.name || "..."}`}
           </div>
         )}
-        {gameState.phase === "ROUND_DISCUSSION" && (
-          <div className="turn-info">{votingInfo}</div>
-        )}
+        {gameState.phase === "ROUND_DISCUSSION" && <div className="turn-info">{votingInfo}</div>}
       </div>
 
       {/* Catastrophe Info */}
@@ -171,8 +158,7 @@ export function GameScreen() {
           {gameState.revealedBunkerCards.length > 0 && (
             <div className="bunker-cards-panel">
               <h3>
-                Бункер ({gameState.revealedBunkerCards.length}/
-                {gameState.totalBunkerCards} карт)
+                Бункер ({gameState.revealedBunkerCards.length}/{gameState.totalBunkerCards} карт)
               </h3>
               <div className="bunker-cards-list">
                 {gameState.revealedBunkerCards.map((card, i) => (
@@ -185,9 +171,7 @@ export function GameScreen() {
                   </div>
                 ))}
               </div>
-              <p className="bunker-capacity">
-                Мест в бункере: {gameState.bunkerCapacity}
-              </p>
+              <p className="bunker-capacity">Мест в бункере: {gameState.bunkerCapacity}</p>
             </div>
           )}
 
@@ -195,12 +179,8 @@ export function GameScreen() {
             <div className="threat-card-panel">
               <h3>Угроза</h3>
               <div className="threat-card-item">
-                <span className="threat-card-title">
-                  {gameState.threatCard.title}
-                </span>
-                <span className="threat-card-desc">
-                  {gameState.threatCard.description}
-                </span>
+                <span className="threat-card-title">{gameState.threatCard.title}</span>
+                <span className="threat-card-desc">{gameState.threatCard.description}</span>
               </div>
             </div>
           )}
@@ -209,10 +189,7 @@ export function GameScreen() {
 
       {/* Desktop: My Character (separate card grid) */}
       <div className="my-character desktop-only">
-        <h3>
-          Ваш персонаж{" "}
-          {!me?.alive && <span className="eliminated-badge">ИЗГНАН</span>}
-        </h3>
+        <h3>Ваш персонаж {!me?.alive && <span className="eliminated-badge">ИЗГНАН</span>}</h3>
         <div className="attributes-grid">
           {myCharacter.attributes.map((attr, i) => {
             const isRevealed = revealedIndices.has(i);
@@ -224,18 +201,12 @@ export function GameScreen() {
               >
                 <div className="attr-content">
                   {attr.image && (
-                    <img
-                      src={attr.image}
-                      alt={attr.value}
-                      className="attr-card-image"
-                    />
+                    <img src={attr.image} alt={attr.value} className="attr-card-image" />
                   )}
                   <div className="attr-text">
                     <span className="attr-label">{attr.label}</span>
                     <span className="attr-value">{attr.value}</span>
-                    {attr.detail && (
-                      <span className="attr-detail">{attr.detail}</span>
-                    )}
+                    {attr.detail && <span className="attr-detail">{attr.detail}</span>}
                   </div>
                 </div>
                 {!isRevealed && <span className="attr-status">Скрыто</span>}
@@ -257,12 +228,8 @@ export function GameScreen() {
                 )}
                 <div className="attr-text">
                   <span className="attr-label">Особое условие</span>
-                  <span className="attr-value">
-                    {myCharacter.actionCard.title}
-                  </span>
-                  <span className="attr-detail">
-                    {myCharacter.actionCard.description}
-                  </span>
+                  <span className="attr-value">{myCharacter.actionCard.title}</span>
+                  <span className="attr-detail">{myCharacter.actionCard.description}</span>
                 </div>
               </div>
             </div>
@@ -285,10 +252,7 @@ export function GameScreen() {
             </button>
           )}
           {canRevealAction && (
-            <button
-              className="btn btn-secondary btn-reveal-action"
-              onClick={revealActionCard}
-            >
+            <button className="btn btn-secondary btn-reveal-action" onClick={revealActionCard}>
               Раскрыть особое условие
             </button>
           )}
@@ -297,73 +261,56 @@ export function GameScreen() {
 
       {/* Desktop: Other Players */}
       <div className="players-grid desktop-only">
-        <h3>
-          Игроки ({gameState.players.filter((p) => p.alive).length} в игре)
-        </h3>
+        <h3>Игроки ({gameState.players.filter((p) => p.alive).length} в игре)</h3>
         <div className="players-list">
           {allPlayers.map((player, idx) => {
             const isMe = player.id === playerId;
             return (
-            <div
-              key={player.id}
-              className={`player-card ${isMe ? "is-me" : ""} ${!player.alive ? "eliminated" : ""} ${!player.connected ? "disconnected" : ""} ${gameState.currentTurnPlayerId === player.id ? "is-current-turn" : ""}`}
-              onClick={() => setExpandedPlayerId(player.id)}
-            >
-              <div className="player-header">
-                <span className="player-name">
-                  <span className="player-number">{idx + 1}</span>
-                  {player.isBot && <span className="bot-badge">BOT</span>}
-                  {player.name}
-                  {isMe && <span className="me-badge">ВЫ</span>}
-                  {gameState.currentTurnPlayerId === player.id && (
-                    <span className="turn-badge">ХОД ИГРОКА</span>
-                  )}
-                </span>
-                {!player.alive && (
-                  <span className="eliminated-badge">ИЗГНАН</span>
-                )}
-                {!player.connected && !player.isBot && (
-                  <span className="dc-badge">Отключён</span>
-                )}
-                {player.id === gameState.lastEliminatedPlayerId && (
-                  <span className="last-elim-badge">Голосует</span>
-                )}
-              </div>
-              <div className="player-attributes">
-                {player.revealedAttributes.length === 0 &&
-                !player.actionCard ? (
-                  <span className="no-attrs">Пока ничего не раскрыто</span>
-                ) : (
-                  <>
-                    {player.revealedAttributes.map((attr, i) => (
-                      <div
-                        key={i}
-                        className="mini-attr"
-                        data-attr-type={attr.type}
-                      >
-                        {attr.image && (
-                          <img
-                            src={attr.image}
-                            alt={attr.value}
-                            className="mini-card-image"
-                          />
-                        )}
-                        <span className="mini-label">{attr.label}:</span>
-                        <span className="mini-value">{attr.value}</span>
-                      </div>
-                    ))}
-                    {player.actionCard && (
-                      <div className="mini-attr" data-attr-type="action">
-                        <span className="mini-label">Особое условие:</span>
-                        <span className="mini-value">
-                          {player.actionCard.title}
-                        </span>
-                      </div>
+              <div
+                key={player.id}
+                className={`player-card ${isMe ? "is-me" : ""} ${!player.alive ? "eliminated" : ""} ${!player.connected ? "disconnected" : ""} ${gameState.currentTurnPlayerId === player.id ? "is-current-turn" : ""}`}
+                onClick={() => setExpandedPlayerId(player.id)}
+              >
+                <div className="player-header">
+                  <span className="player-name">
+                    <span className="player-number">{idx + 1}</span>
+                    {player.isBot && <span className="bot-badge">BOT</span>}
+                    {player.name}
+                    {isMe && <span className="me-badge">ВЫ</span>}
+                    {gameState.currentTurnPlayerId === player.id && (
+                      <span className="turn-badge">ХОД ИГРОКА</span>
                     )}
-                  </>
-                )}
+                  </span>
+                  {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
+                  {!player.connected && !player.isBot && <span className="dc-badge">Отключён</span>}
+                  {player.id === gameState.lastEliminatedPlayerId && (
+                    <span className="last-elim-badge">Голосует</span>
+                  )}
+                </div>
+                <div className="player-attributes">
+                  {player.revealedAttributes.length === 0 && !player.actionCard ? (
+                    <span className="no-attrs">Пока ничего не раскрыто</span>
+                  ) : (
+                    <>
+                      {player.revealedAttributes.map((attr, i) => (
+                        <div key={i} className="mini-attr" data-attr-type={attr.type}>
+                          {attr.image && (
+                            <img src={attr.image} alt={attr.value} className="mini-card-image" />
+                          )}
+                          <span className="mini-label">{attr.label}:</span>
+                          <span className="mini-value">{attr.value}</span>
+                        </div>
+                      ))}
+                      {player.actionCard && (
+                        <div className="mini-attr" data-attr-type="action">
+                          <span className="mini-label">Особое условие:</span>
+                          <span className="mini-value">{player.actionCard.title}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
             );
           })}
         </div>
@@ -371,9 +318,7 @@ export function GameScreen() {
 
       {/* Mobile: All Players in one grid */}
       <div className="players-grid mobile-only">
-        <h3>
-          Игроки ({gameState.players.filter((p) => p.alive).length} в игре)
-        </h3>
+        <h3>Игроки ({gameState.players.filter((p) => p.alive).length} в игре)</h3>
         <div className="players-list">
           {allPlayers.map((player, idx) => {
             const isMe = player.id === playerId;
@@ -393,12 +338,8 @@ export function GameScreen() {
                       <span className="turn-badge">ХОД</span>
                     )}
                   </span>
-                  {!player.alive && (
-                    <span className="eliminated-badge">ИЗГНАН</span>
-                  )}
-                  {!player.connected && !player.isBot && (
-                    <span className="dc-badge">Отключён</span>
-                  )}
+                  {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
+                  {!player.connected && !player.isBot && <span className="dc-badge">Отключён</span>}
                 </div>
                 <div className="player-attributes">
                   {isMe ? (
@@ -413,32 +354,23 @@ export function GameScreen() {
                           >
                             <span className="mini-label">{attr.label}:</span>
                             <span className="mini-value">{attr.value}</span>
-                            {!isRevealed && (
-                              <span className="mini-hidden-tag">скрыто</span>
-                            )}
+                            {!isRevealed && <span className="mini-hidden-tag">скрыто</span>}
                           </div>
                         );
                       })}
                       {myCharacter.actionCard && (
                         <div className="mini-attr" data-attr-type="action">
                           <span className="mini-label">Особое условие:</span>
-                          <span className="mini-value">
-                            {myCharacter.actionCard.title}
-                          </span>
+                          <span className="mini-value">{myCharacter.actionCard.title}</span>
                         </div>
                       )}
                     </>
-                  ) : player.revealedAttributes.length === 0 &&
-                    !player.actionCard ? (
+                  ) : player.revealedAttributes.length === 0 && !player.actionCard ? (
                     <span className="no-attrs">Пока ничего не раскрыто</span>
                   ) : (
                     <>
                       {player.revealedAttributes.map((attr, i) => (
-                        <div
-                          key={i}
-                          className="mini-attr"
-                          data-attr-type={attr.type}
-                        >
+                        <div key={i} className="mini-attr" data-attr-type={attr.type}>
                           <span className="mini-label">{attr.label}:</span>
                           <span className="mini-value">{attr.value}</span>
                         </div>
@@ -446,9 +378,7 @@ export function GameScreen() {
                       {player.actionCard && (
                         <div className="mini-attr" data-attr-type="action">
                           <span className="mini-label">Особое условие:</span>
-                          <span className="mini-value">
-                            {player.actionCard.title}
-                          </span>
+                          <span className="mini-value">{player.actionCard.title}</span>
                         </div>
                       )}
                     </>
@@ -476,10 +406,7 @@ export function GameScreen() {
             </button>
           )}
           {canRevealAction && (
-            <button
-              className="btn btn-secondary btn-reveal-action"
-              onClick={revealActionCard}
-            >
+            <button className="btn btn-secondary btn-reveal-action" onClick={revealActionCard}>
               Раскрыть особое условие
             </button>
           )}
@@ -496,21 +423,13 @@ export function GameScreen() {
               {unrevealedIndices
                 .filter(() => unrevealedIndices.length > 1)
                 .map((idx) => (
-                  <button
-                    key={idx}
-                    className="btn btn-target"
-                    onClick={() => handleReveal(idx)}
-                  >
-                    {myCharacter.attributes[idx].label}:{" "}
-                    {myCharacter.attributes[idx].value}
+                  <button key={idx} className="btn btn-target" onClick={() => handleReveal(idx)}>
+                    {myCharacter.attributes[idx].label}: {myCharacter.attributes[idx].value}
                   </button>
                 ))}
             </div>
             <div className="modal-actions">
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowAttrPicker(false)}
-              >
+              <button className="btn btn-secondary" onClick={() => setShowAttrPicker(false)}>
                 Отмена
               </button>
             </div>
@@ -521,24 +440,16 @@ export function GameScreen() {
       {/* Expanded Player Modal */}
       {expandedPlayerId &&
         (() => {
-          const player = gameState.players.find(
-            (p) => p.id === expandedPlayerId,
-          );
+          const player = gameState.players.find((p) => p.id === expandedPlayerId);
           if (!player) return null;
           const isMe = player.id === playerId;
           const attrs = isMe ? myCharacter.attributes : [];
           const revealedAttrs = player.revealedAttributes;
-          const playerNumber = gameState.players.findIndex(p => p.id === player.id) + 1;
+          const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;
 
           return (
-            <div
-              className="modal-overlay"
-              onClick={() => setExpandedPlayerId(null)}
-            >
-              <div
-                className="modal expanded-player-modal"
-                onClick={(e) => e.stopPropagation()}
-              >
+            <div className="modal-overlay" onClick={() => setExpandedPlayerId(null)}>
+              <div className="modal expanded-player-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="expanded-player-header">
                   <h3>
                     <span className="player-number">{playerNumber}</span>
@@ -546,9 +457,7 @@ export function GameScreen() {
                     {player.name}
                     {isMe && <span className="me-badge">ВЫ</span>}
                   </h3>
-                  {!player.alive && (
-                    <span className="eliminated-badge">ИЗГНАН</span>
-                  )}
+                  {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
                 </div>
                 <div className="attributes-grid">
                   {isMe ? (
@@ -562,25 +471,15 @@ export function GameScreen() {
                         >
                           <div className="attr-content">
                             {attr.image && (
-                              <img
-                                src={attr.image}
-                                alt={attr.value}
-                                className="attr-card-image"
-                              />
+                              <img src={attr.image} alt={attr.value} className="attr-card-image" />
                             )}
                             <div className="attr-text">
                               <span className="attr-label">{attr.label}</span>
                               <span className="attr-value">{attr.value}</span>
-                              {attr.detail && (
-                                <span className="attr-detail">
-                                  {attr.detail}
-                                </span>
-                              )}
+                              {attr.detail && <span className="attr-detail">{attr.detail}</span>}
                             </div>
                           </div>
-                          {!isRevealed && (
-                            <span className="attr-status">Скрыто</span>
-                          )}
+                          {!isRevealed && <span className="attr-status">Скрыто</span>}
                         </div>
                       );
                     })
@@ -588,57 +487,35 @@ export function GameScreen() {
                     <p className="no-attrs">Пока ничего не раскрыто</p>
                   ) : (
                     revealedAttrs.map((attr, i) => (
-                      <div
-                        key={i}
-                        className="attribute-card revealed"
-                        data-attr-type={attr.type}
-                      >
+                      <div key={i} className="attribute-card revealed" data-attr-type={attr.type}>
                         <div className="attr-content">
                           {attr.image && (
-                            <img
-                              src={attr.image}
-                              alt={attr.value}
-                              className="attr-card-image"
-                            />
+                            <img src={attr.image} alt={attr.value} className="attr-card-image" />
                           )}
                           <div className="attr-text">
                             <span className="attr-label">{attr.label}</span>
                             <span className="attr-value">{attr.value}</span>
-                            {attr.detail && (
-                              <span className="attr-detail">{attr.detail}</span>
-                            )}
+                            {attr.detail && <span className="attr-detail">{attr.detail}</span>}
                           </div>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
-                {((isMe && myCharacter.actionCard) ||
-                  (!isMe && player.actionCard)) &&
+                {((isMe && myCharacter.actionCard) || (!isMe && player.actionCard)) &&
                   (() => {
-                    const ac = isMe
-                      ? myCharacter.actionCard!
-                      : player.actionCard!;
+                    const ac = isMe ? myCharacter.actionCard! : player.actionCard!;
                     return (
                       <div className="action-card-display">
-                        <div
-                          className="attribute-card revealed"
-                          data-attr-type="action"
-                        >
+                        <div className="attribute-card revealed" data-attr-type="action">
                           <div className="attr-content">
                             {ac.image && (
-                              <img
-                                src={ac.image}
-                                alt={ac.title}
-                                className="attr-card-image"
-                              />
+                              <img src={ac.image} alt={ac.title} className="attr-card-image" />
                             )}
                             <div className="attr-text">
                               <span className="attr-label">Особое условие</span>
                               <span className="attr-value">{ac.title}</span>
-                              <span className="attr-detail">
-                                {ac.description}
-                              </span>
+                              <span className="attr-detail">{ac.description}</span>
                             </div>
                           </div>
                         </div>
@@ -646,10 +523,7 @@ export function GameScreen() {
                     );
                   })()}
                 <div className="modal-actions">
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setExpandedPlayerId(null)}
-                  >
+                  <button className="btn btn-secondary" onClick={() => setExpandedPlayerId(null)}>
                     Закрыть
                   </button>
                 </div>
@@ -680,22 +554,13 @@ export function GameScreen() {
             <div className="admin-panel-body">
               {!adminAction && (
                 <div className="admin-actions-list">
-                  <button
-                    className="btn btn-admin"
-                    onClick={() => setAdminAction("shuffle")}
-                  >
+                  <button className="btn btn-admin" onClick={() => setAdminAction("shuffle")}>
                     Перемешать карты
                   </button>
-                  <button
-                    className="btn btn-admin"
-                    onClick={() => setAdminAction("swap")}
-                  >
+                  <button className="btn btn-admin" onClick={() => setAdminAction("swap")}>
                     Поменять местами
                   </button>
-                  <button
-                    className="btn btn-admin"
-                    onClick={() => setAdminAction("replace")}
-                  >
+                  <button className="btn btn-admin" onClick={() => setAdminAction("replace")}>
                     Заменить карту
                   </button>
                 </div>
@@ -717,11 +582,7 @@ export function GameScreen() {
                           <button
                             key={t.type}
                             className={`admin-chip ${adminAttrTypes.has(t.type) ? "active" : ""}`}
-                            onClick={() =>
-                              setAdminAttrTypes(
-                                toggleInSet(adminAttrTypes, t.type),
-                              )
-                            }
+                            onClick={() => setAdminAttrTypes(toggleInSet(adminAttrTypes, t.type))}
                           >
                             {t.label}
                           </button>
@@ -734,9 +595,7 @@ export function GameScreen() {
                           <button
                             key={p.id}
                             className={`admin-chip ${adminPlayers.has(p.id) ? "active" : ""}`}
-                            onClick={() =>
-                              setAdminPlayers(toggleInSet(adminPlayers, p.id))
-                            }
+                            onClick={() => setAdminPlayers(toggleInSet(adminPlayers, p.id))}
                           >
                             {p.name}
                           </button>
@@ -797,11 +656,9 @@ export function GameScreen() {
                       className="btn btn-primary"
                       onClick={handleAdminExecute}
                       disabled={
-                        (adminAction === "swap" &&
-                          (!adminPlayer1 || !adminPlayer2)) ||
+                        (adminAction === "swap" && (!adminPlayer1 || !adminPlayer2)) ||
                         (adminAction === "replace" &&
-                          (adminPlayers.size === 0 ||
-                            adminAttrTypes.size === 0))
+                          (adminPlayers.size === 0 || adminAttrTypes.size === 0))
                       }
                     >
                       Применить

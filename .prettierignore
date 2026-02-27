@@ -1,4 +1,4 @@
 node_modules
 dist
-cards
-.claude
+build
+.git
