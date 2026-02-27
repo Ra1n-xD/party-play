@@ -303,7 +303,7 @@ export function GameScreen() {
                   </span>
                   {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
                   {!player.connected && !player.isBot && <span className="dc-badge">Отключён</span>}
-                  {player.id === gameState.lastEliminatedPlayerId && (
+                  {player.id === gameState.lastEliminatedPlayerId && player.alive && (
                     <span className="last-elim-badge">Голосует</span>
                   )}
                 </div>

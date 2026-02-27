@@ -156,13 +156,13 @@ export function CardImage({ type, className }: CardImageProps) {
       {/* Colored border */}
       <rect x="0" y="0" width="100" height="100" rx="8" fill={config.color} />
       {/* Black header */}
-      <rect x="4" y="4" width="92" height="20" rx="5" fill="#1a1a1a" />
+      <rect x="4" y="4" width="92" height="24" rx="5" fill="#1a1a1a" />
       {/* Yellow center area */}
-      <rect x="4" y="26" width="92" height="70" rx="5" fill="#daa520" />
+      <rect x="4" y="30" width="92" height="66" rx="5" fill="#daa520" />
       {/* Category label */}
       <text
         x="50"
-        y="18"
+        y="20"
         textAnchor="middle"
         fill="#daa520"
         fontSize="11"
@@ -173,7 +173,7 @@ export function CardImage({ type, className }: CardImageProps) {
         {config.label}
       </text>
       {/* Icon area */}
-      <g transform="translate(0, 8)">{config.icon}</g>
+      <g transform="translate(0, 10)">{config.icon}</g>
     </svg>
   );
 }
