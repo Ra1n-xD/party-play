@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { socket } from "../socket";
-import { PublicGameState, Character, AttributeType, ActionCard } from "../../../shared/types";
+import { PublicGameState, Character, AttributeType, ActionCard, Attribute, GamePhase } from "../../../shared/types";
 
 /** Client-side game state with local phaseEndTime computed from server's phaseRemainingMs */
 export type ClientGameState = PublicGameState & { phaseEndTime: number | null };
@@ -37,6 +37,8 @@ interface GameContextType {
   adminUnpause: () => void;
   adminSkipDiscussion: () => void;
   revealedActionCard: { playerName: string; actionCard: ActionCard } | null;
+  announcement: { title: string; subtitle?: string; description?: string } | null;
+  dismissAnnouncement: () => void;
   pendingAdminOpen: boolean;
   consumePendingAdminOpen: () => void;
 }
@@ -55,6 +57,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     actionCard: ActionCard;
   } | null>(null);
   const [pendingAdminOpen, setPendingAdminOpen] = useState(false);
+  const [announcement, setAnnouncement] = useState<{
+    title: string;
+    subtitle?: string;
+    description?: string;
+  } | null>(null);
+  const prevPhaseRef = useRef<GamePhase | null>(null);
+  const announcementTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const actionCardTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -89,11 +98,62 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       // This avoids clock desync between server and client
       const phaseEndTime =
         state.phaseRemainingMs != null ? Date.now() + state.phaseRemainingMs : null;
+
+      // Detect phase change and show announcement
+      const prevPhase = prevPhaseRef.current;
+      const newPhase = state.phase;
+      if (prevPhase !== newPhase) {
+        prevPhaseRef.current = newPhase;
+        let ann: { title: string; subtitle?: string; description?: string } | null = null;
+
+        if (newPhase === "CATASTROPHE_REVEAL" && state.catastrophe) {
+          ann = {
+            title: "Катастрофа!",
+            subtitle: state.catastrophe.title,
+            description: state.catastrophe.description,
+          };
+        } else if (newPhase === "BUNKER_EXPLORE" && state.revealedBunkerCards.length > 0) {
+          const lastCard = state.revealedBunkerCards[state.revealedBunkerCards.length - 1];
+          ann = {
+            title: "Новая карта бункера",
+            subtitle: lastCard.title,
+            description: lastCard.description,
+          };
+        } else if (newPhase === "ROUND_DISCUSSION") {
+          ann = {
+            title: "Обсуждение",
+            subtitle: `Раунд ${state.roundNumber}`,
+          };
+        } else if (newPhase === "ROUND_RESULT" && state.eliminatedPlayerId) {
+          const eliminated = state.players.find((p: any) => p.id === state.eliminatedPlayerId);
+          ann = {
+            title: "Изгнан!",
+            subtitle: eliminated?.name || "Игрок",
+          };
+        }
+
+        if (ann) {
+          setAnnouncement(ann);
+          if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
+          announcementTimerRef.current = setTimeout(() => setAnnouncement(null), 6000);
+        }
+      }
+
       setGameState({ ...state, phaseEndTime });
     });
 
     socket.on("game:character", (character) => {
       setMyCharacter(character);
+    });
+
+    socket.on("game:attributeRevealed", ({ playerName, attribute }) => {
+      setAnnouncement({
+        title: playerName,
+        subtitle: attribute.label,
+        description: attribute.value,
+      });
+      if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
+      announcementTimerRef.current = setTimeout(() => setAnnouncement(null), 6000);
     });
 
     socket.on("game:actionCardRevealed", (data) => {
@@ -121,6 +181,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socket.off("game:state");
       socket.off("game:character");
       socket.off("game:actionCardRevealed");
+      socket.off("game:attributeRevealed");
     };
   }, []);
 
@@ -222,6 +283,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit("admin:forceRevealType", { attributeType });
   }, []);
 
+  const dismissAnnouncementFn = useCallback(() => {
+    setAnnouncement(null);
+    if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
+  }, []);
+
   const consumePendingAdminOpenFn = useCallback(() => {
     setPendingAdminOpen(false);
   }, []);
@@ -272,6 +338,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         adminUnpause: adminUnpauseFn,
         adminSkipDiscussion: adminSkipDiscussionFn,
         revealedActionCard,
+        announcement,
+        dismissAnnouncement: dismissAnnouncementFn,
         pendingAdminOpen,
         consumePendingAdminOpen: consumePendingAdminOpenFn,
       }}

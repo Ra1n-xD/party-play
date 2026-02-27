@@ -250,6 +250,13 @@ export function revealAttribute(
 
   player.revealedIndices.push(idxToReveal);
 
+  // Notify all clients about the revealed attribute
+  const revealedAttr = player.character.attributes[idxToReveal];
+  io.to(room.code).emit("game:attributeRevealed", {
+    playerName: player.name,
+    attribute: revealedAttr,
+  });
+
   // Move to next player's turn
   room.gameState.currentTurnIndex++;
 

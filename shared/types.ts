@@ -141,4 +141,5 @@ export interface ServerEvents {
   "game:character": (data: Character) => void;
   "game:eliminated": (data: { playerId: string; playerName: string }) => void;
   "game:actionCardRevealed": (data: { playerName: string; actionCard: ActionCard }) => void;
+  "game:attributeRevealed": (data: { playerName: string; attribute: Attribute }) => void;
 }

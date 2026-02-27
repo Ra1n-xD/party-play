@@ -6,6 +6,7 @@ import { VoteScreen } from "./screens/VoteScreen";
 import { ResultsScreen } from "./screens/ResultsScreen";
 import BackgroundParticles from "./components/BackgroundParticles";
 import { CardImage } from "./components/CardImage";
+import { PhaseAnnouncement } from "./components/PhaseAnnouncement";
 
 function AppContent() {
   const { roomCode, gameState } = useGame();
@@ -35,6 +36,20 @@ function AppContent() {
     default:
       return <HomeScreen />;
   }
+}
+
+function PhaseAnnouncementOverlay() {
+  const { announcement, dismissAnnouncement } = useGame();
+  if (!announcement) return null;
+
+  return (
+    <PhaseAnnouncement
+      title={announcement.title}
+      subtitle={announcement.subtitle}
+      description={announcement.description}
+      onDismiss={dismissAnnouncement}
+    />
+  );
 }
 
 function PauseOverlay() {
@@ -80,6 +95,7 @@ export default function App() {
     <>
       <BackgroundParticles />
       <AppContent />
+      <PhaseAnnouncementOverlay />
       <PauseOverlay />
       <ActionCardRevealOverlay />
     </>

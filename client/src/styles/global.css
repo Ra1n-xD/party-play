@@ -1607,6 +1607,61 @@ body {
   }
 }
 
+/* ============ PHASE ANNOUNCEMENTS ============ */
+.phase-announcement-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 550;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease;
+  pointer-events: none;
+}
+
+.phase-announcement-content {
+  text-align: center;
+  color: var(--text-main);
+  animation: phaseAnnouncementIn 0.5s ease;
+  padding: 32px;
+  max-width: 420px;
+  width: 100%;
+}
+
+.phase-announcement-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.phase-announcement-subtitle {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.phase-announcement-description {
+  font-size: 1rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+@keyframes phaseAnnouncementIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* ============ TOASTS ============ */
 .error-toast,
 .action-toast {
