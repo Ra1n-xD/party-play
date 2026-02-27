@@ -345,6 +345,7 @@ body {
   font-size: 0.7rem;
   font-weight: 700;
   flex-shrink: 0;
+  margin-right: 6px;
 }
 
 .host-badge {
