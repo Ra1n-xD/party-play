@@ -98,10 +98,13 @@ export function VoteScreen() {
         )}
 
         <div className="vote-candidates">
-          {candidates.map(player => (
+          {candidates.map(player => {
+            const playerNumber = gameState.players.findIndex(p => p.id === player.id) + 1;
+            return (
             <div key={player.id} className="vote-candidate">
               <div className="candidate-info">
                 <span className="candidate-name">
+                  <span className="player-number">{playerNumber}</span>
                   {player.isBot && <span className="bot-badge">BOT</span>}
                   {player.name}
                 </span>
@@ -115,7 +118,8 @@ export function VoteScreen() {
                 Изгнать
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Confirm Modal */}

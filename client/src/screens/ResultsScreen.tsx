@@ -13,10 +13,12 @@ export function ResultsScreen() {
 
   const renderPlayerCard = (player: typeof gameState.players[0]) => {
     const attrs = player.allAttributes || player.revealedAttributes.map(a => ({ ...a, wasRevealed: true }));
+    const playerNumber = gameState.players.findIndex(p => p.id === player.id) + 1;
 
     return (
       <div key={player.id} className={`result-player ${player.id === playerId ? 'is-me' : ''}`}>
         <div className="result-player-name">
+          <span className="player-number">{playerNumber}</span>
           {player.isBot && <span className="bot-badge">BOT</span>}
           {player.name} {player.id === playerId && '(вы)'}
         </div>
