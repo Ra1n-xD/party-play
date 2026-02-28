@@ -5,10 +5,32 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
+  version-and-deploy:
     runs-on: ubuntu-latest
+    # Skip if commit message contains [skip ci] (prevents infinite loop from version bump)
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Bump patch version
+        run: |
+          npm version patch --no-git-tag-version
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${NEW_VERSION} [skip ci]"
+          git push
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:

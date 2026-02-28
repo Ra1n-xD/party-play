@@ -133,6 +133,7 @@ export default function App() {
       <AppContent />
       <PauseOverlay />
       <CurrentOverlay />
+      <div className="app-version">v{__APP_VERSION__}</div>
     </>
   );
 }
