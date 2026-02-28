@@ -2013,4 +2013,7 @@ body {
   opacity: 0.7;
   pointer-events: none;
   z-index: 1;
+  background: rgba(10, 14, 23, 0.6);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
