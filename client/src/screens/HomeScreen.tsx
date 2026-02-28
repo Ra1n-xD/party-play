@@ -26,7 +26,7 @@ export function HomeScreen() {
       <div className="home-container">
         <div className="logo">
           <h1>БУНКЕР</h1>
-          <p className="subtitle">Игра на выживание</p>
+          <p className="subtitle">💀 Игра на выживание 💀</p>
         </div>
 
         {mode === "menu" && (
