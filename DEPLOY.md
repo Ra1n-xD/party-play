@@ -57,6 +57,7 @@ exit
 ```
 
 Добавь этот публичный ключ в GitHub:
+
 - **Вариант A** (только чтение одного репо): GitHub → Репозиторий → Settings → Deploy keys → Add deploy key
 - **Вариант B** (все репо аккаунта): GitHub → Settings → SSH and GPG keys → New SSH key
 
@@ -231,10 +232,10 @@ rm /tmp/deploy_key /tmp/deploy_key.pub
 
 GitHub → Репозиторий → Settings → Secrets and variables → Actions → New repository secret:
 
-| Секрет | Значение |
-|--------|----------|
-| `VPS_HOST` | IP-адрес сервера (например `185.100.50.25`) |
-| `VPS_USER` | `partyplay` |
+| Секрет        | Значение                                                          |
+| ------------- | ----------------------------------------------------------------- |
+| `VPS_HOST`    | IP-адрес сервера (например `185.100.50.25`)                       |
+| `VPS_USER`    | `partyplay`                                                       |
 | `VPS_SSH_KEY` | Содержимое приватного ключа (весь текст из `cat /tmp/deploy_key`) |
 
 ### Шаг 3: Готово

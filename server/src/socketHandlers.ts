@@ -3,8 +3,10 @@ import { ClientEvents, ServerEvents } from "../../shared/types.js";
 import {
   createRoom,
   joinRoom,
+  joinRoomAsSpectator,
   getRoom,
   removePlayer,
+  removeSpectator,
   addBotToRoom,
   removeBotFromRoom,
   getAllRooms,
@@ -37,8 +39,11 @@ import { CONFIG } from "./config.js";
 type IOServer = Server<ClientEvents, ServerEvents>;
 type IOSocket = Socket<ClientEvents, ServerEvents>;
 
-// Map socketId -> { roomCode, playerId }
-const socketRoomMap = new Map<string, { roomCode: string; playerId: string }>();
+// Map socketId -> { roomCode, playerId, role }
+const socketRoomMap = new Map<
+  string,
+  { roomCode: string; playerId: string; role: "player" | "spectator" }
+>();
 
 // --- Rate limiting ---
 const RATE_LIMIT_WINDOW = 10_000; // 10 seconds
@@ -64,15 +69,7 @@ function cleanupRateLimitEntry(socketId: string): void {
 }
 
 // --- Input validation helpers ---
-const VALID_ATTRIBUTE_TYPES = [
-  "profession",
-  "bio",
-  "health",
-  "hobby",
-  "baggage",
-  "fact",
-  "action",
-];
+const VALID_ATTRIBUTE_TYPES = ["profession", "bio", "health", "hobby", "baggage", "fact", "action"];
 
 function isValidAttributeType(type: unknown): type is string {
   return typeof type === "string" && VALID_ATTRIBUTE_TYPES.includes(type);
@@ -93,7 +90,7 @@ function isValidPlayerName(name: unknown): name is string {
 // --- Helper: get room info with rate limit check ---
 function getSocketInfo(
   socket: IOSocket,
-): { roomCode: string; playerId: string } | null {
+): { roomCode: string; playerId: string; role: "player" | "spectator" } | null {
   if (isRateLimited(socket.id)) {
     socket.emit("room:error", { message: "Слишком много запросов, подождите" });
     return null;
@@ -101,21 +98,20 @@ function getSocketInfo(
   return socketRoomMap.get(socket.id) || null;
 }
 
-function getSocketRoom(
-  socket: IOSocket,
-): { room: Room; info: { roomCode: string; playerId: string } } | null {
+function getSocketRoom(socket: IOSocket): {
+  room: Room;
+  info: { roomCode: string; playerId: string; role: "player" | "spectator" };
+} | null {
   const info = getSocketInfo(socket);
   if (!info) return null;
+  // Spectators should not use player-action handlers
+  if (info.role === "spectator") return null;
   const room = getRoom(info.roomCode);
   if (!room) return null;
   return { room, info };
 }
 
-function requireHost(
-  socket: IOSocket,
-  room: Room,
-  playerId: string,
-): boolean {
+function requireHost(socket: IOSocket, room: Room, playerId: string): boolean {
   if (playerId !== room.hostId) {
     socket.emit("room:error", {
       message: "Только хост может выполнить это действие",
@@ -159,6 +155,7 @@ export function registerHandlers(io: IOServer): void {
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
         playerId: player.id,
+        role: "player",
       });
 
       socket.emit("room:created", { roomCode: room.code, playerId: player.id });
@@ -184,11 +181,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
-      const result = joinRoom(
-        roomCode.trim().toUpperCase(),
-        socket.id,
-        playerName.trim(),
-      );
+      const result = joinRoom(roomCode.trim().toUpperCase(), socket.id, playerName.trim());
       if ("error" in result) {
         socket.emit("room:error", { message: result.error });
         return;
@@ -199,6 +192,7 @@ export function registerHandlers(io: IOServer): void {
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
         playerId: player.id,
+        role: "player",
       });
 
       socket.emit("room:joined", { roomCode: room.code, playerId: player.id });
@@ -227,6 +221,7 @@ export function registerHandlers(io: IOServer): void {
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
         playerId: player.id,
+        role: "player",
       });
 
       socket.emit("room:joined", { roomCode: room.code, playerId: player.id });
@@ -236,6 +231,81 @@ export function registerHandlers(io: IOServer): void {
         socket.emit("game:character", player.character);
       }
 
+      broadcastState(room, io);
+    });
+
+    socket.on("room:joinSpectator", ({ roomCode, spectatorName }) => {
+      if (isRateLimited(socket.id)) {
+        socket.emit("room:error", {
+          message: "Слишком много запросов, подождите",
+        });
+        return;
+      }
+
+      if (!isValidPlayerName(spectatorName)) {
+        socket.emit("room:error", {
+          message: `Имя должно быть от 1 до ${CONFIG.MAX_PLAYER_NAME_LENGTH} символов`,
+        });
+        return;
+      }
+      if (!roomCode?.trim()) {
+        socket.emit("room:error", { message: "Введите код комнаты" });
+        return;
+      }
+
+      const result = joinRoomAsSpectator(
+        roomCode.trim().toUpperCase(),
+        socket.id,
+        spectatorName.trim(),
+      );
+      if ("error" in result) {
+        socket.emit("room:error", { message: result.error });
+        return;
+      }
+
+      const { room, spectator } = result;
+      socket.join(room.code);
+      socketRoomMap.set(socket.id, {
+        roomCode: room.code,
+        playerId: spectator.id,
+        role: "spectator",
+      });
+
+      socket.emit("room:spectatorJoined", {
+        roomCode: room.code,
+        spectatorId: spectator.id,
+      });
+      broadcastState(room, io);
+    });
+
+    socket.on("room:rejoinSpectator", ({ roomCode, spectatorId }) => {
+      if (isRateLimited(socket.id)) return;
+
+      const room = getRoom(roomCode);
+      if (!room) {
+        socket.emit("room:error", { message: "Комната не найдена" });
+        return;
+      }
+
+      const spectator = room.spectators.get(spectatorId);
+      if (!spectator) {
+        socket.emit("room:error", { message: "Зритель не найден в комнате" });
+        return;
+      }
+
+      spectator.socketId = socket.id;
+      spectator.connected = true;
+      socket.join(room.code);
+      socketRoomMap.set(socket.id, {
+        roomCode: room.code,
+        playerId: spectator.id,
+        role: "spectator",
+      });
+
+      socket.emit("room:spectatorJoined", {
+        roomCode: room.code,
+        spectatorId: spectator.id,
+      });
       broadcastState(room, io);
     });
 
@@ -288,12 +358,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
-      const success = revealAttribute(
-        ctx.room,
-        ctx.info.playerId,
-        attributeIndex,
-        io,
-      );
+      const success = revealAttribute(ctx.room, ctx.info.playerId, attributeIndex, io);
       if (!success) {
         socket.emit("room:error", { message: "Сейчас не ваш ход" });
       }
@@ -326,12 +391,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
-      const success = castVote(
-        ctx.room,
-        ctx.info.playerId,
-        targetPlayerId,
-        io,
-      );
+      const success = castVote(ctx.room, ctx.info.playerId, targetPlayerId, io);
       if (!success) {
         socket.emit("room:error", { message: "Невозможно проголосовать" });
       }
@@ -416,13 +476,7 @@ export function registerHandlers(io: IOServer): void {
         socket.emit("room:error", { message: "Игрок не найден" });
         return;
       }
-      const result = adminSwapAttribute(
-        ctx.room,
-        player1Id,
-        player2Id,
-        attributeType,
-        io,
-      );
+      const result = adminSwapAttribute(ctx.room, player1Id, player2Id, attributeType, io);
       if (!result.success) {
         socket.emit("room:error", { message: result.error });
       }
@@ -436,19 +490,11 @@ export function registerHandlers(io: IOServer): void {
         socket.emit("room:error", { message: "Некорректный тип атрибута" });
         return;
       }
-      if (
-        typeof targetPlayerId !== "string" ||
-        !ctx.room.players.has(targetPlayerId)
-      ) {
+      if (typeof targetPlayerId !== "string" || !ctx.room.players.has(targetPlayerId)) {
         socket.emit("room:error", { message: "Игрок не найден" });
         return;
       }
-      const result = adminReplaceAttribute(
-        ctx.room,
-        targetPlayerId,
-        attributeType,
-        io,
-      );
+      const result = adminReplaceAttribute(ctx.room, targetPlayerId, attributeType, io);
       if (!result.success) {
         socket.emit("room:error", { message: result.error });
       }
@@ -490,19 +536,11 @@ export function registerHandlers(io: IOServer): void {
         socket.emit("room:error", { message: "Некорректный тип атрибута" });
         return;
       }
-      if (
-        typeof targetPlayerId !== "string" ||
-        !ctx.room.players.has(targetPlayerId)
-      ) {
+      if (typeof targetPlayerId !== "string" || !ctx.room.players.has(targetPlayerId)) {
         socket.emit("room:error", { message: "Игрок не найден" });
         return;
       }
-      const result = adminDeleteAttribute(
-        ctx.room,
-        targetPlayerId,
-        attributeType,
-        io,
-      );
+      const result = adminDeleteAttribute(ctx.room, targetPlayerId, attributeType, io);
       if (!result.success) {
         socket.emit("room:error", { message: result.error });
       }
@@ -581,6 +619,20 @@ export function registerHandlers(io: IOServer): void {
     });
 
     socket.on("room:leave", () => {
+      const info = socketRoomMap.get(socket.id);
+      if (info?.role === "spectator") {
+        const room = getRoom(info.roomCode);
+        if (room) {
+          removeSpectator(room, info.playerId);
+          if (room.players.size > 0) {
+            broadcastState(room, io);
+          }
+        }
+        socketRoomMap.delete(socket.id);
+        cleanupRateLimitEntry(socket.id);
+        socket.leave(info.roomCode);
+        return;
+      }
       handleDisconnect(socket, io);
     });
 
@@ -592,6 +644,26 @@ export function registerHandlers(io: IOServer): void {
       if (!info) return;
       const room = getRoom(info.roomCode);
       if (!room) return;
+
+      if (info.role === "spectator") {
+        const spectator = room.spectators.get(info.playerId);
+        if (spectator) {
+          spectator.connected = false;
+          setTimeout(() => {
+            if (!spectator.connected) {
+              removeSpectator(room, info.playerId);
+              socketRoomMap.delete(socket.id);
+              socket.leave(info.roomCode);
+              if (room.players.size > 0) {
+                broadcastState(room, io);
+              }
+            }
+          }, CONFIG.RECONNECT_GRACE_PERIOD);
+        }
+        cleanupRateLimitEntry(socket.id);
+        return;
+      }
+
       const player = room.players.get(info.playerId);
       if (!player) return;
 
@@ -621,8 +693,7 @@ function handleDisconnect(socket: IOSocket, io: IOServer): void {
 
     // If game is in progress and it's this player's turn, skip them
     if (room.gameState?.phase === "ROUND_REVEAL" && player) {
-      const currentTurnPlayerId =
-        room.gameState.turnOrder[room.gameState.currentTurnIndex];
+      const currentTurnPlayerId = room.gameState.turnOrder[room.gameState.currentTurnIndex];
       if (currentTurnPlayerId === info.playerId) {
         // Auto-reveal for disconnected player
         revealAttribute(room, info.playerId, undefined, io);

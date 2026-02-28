@@ -735,7 +735,10 @@ export function adminReplaceBunkerCard(
   }
 
   const newCard = available[Math.floor(Math.random() * available.length)];
-  room.gameState.bunkerCards[cardIndex] = { title: newCard.title, description: newCard.description };
+  room.gameState.bunkerCards[cardIndex] = {
+    title: newCard.title,
+    description: newCard.description,
+  };
 
   broadcastState(room, io);
   return { success: true, error: "" };
@@ -990,6 +993,7 @@ export function buildPublicState(room: Room): PublicGameState {
     tiebreakCandidateIds: gs?.tiebreakCandidateIds?.length ? gs.tiebreakCandidateIds : null,
     phaseRemainingMs: gs?.phaseEndTime ? Math.max(0, gs.phaseEndTime - Date.now()) : null,
     paused: gs?.paused || false,
+    spectatorCount: room.spectators.size,
   };
 }
 

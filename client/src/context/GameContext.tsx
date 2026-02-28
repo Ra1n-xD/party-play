@@ -1,13 +1,26 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { socket } from "../socket";
-import { PublicGameState, Character, AttributeType, ActionCard, Attribute, GamePhase } from "../../../shared/types";
+import {
+  PublicGameState,
+  Character,
+  AttributeType,
+  ActionCard,
+  Attribute,
+  GamePhase,
+} from "../../../shared/types";
 
 /** Client-side game state with local phaseEndTime computed from server's phaseRemainingMs */
 export type ClientGameState = PublicGameState & { phaseEndTime: number | null };
 
 /** Overlay queue item types */
 export type OverlayItem =
-  | { kind: "announcement"; title: string; subtitle?: string; description?: string; duration: number }
+  | {
+      kind: "announcement";
+      title: string;
+      subtitle?: string;
+      description?: string;
+      duration: number;
+    }
   | { kind: "attribute"; playerName: string; attribute: Attribute; duration: number }
   | { kind: "actionCard"; playerName: string; actionCard: ActionCard; duration: number };
 
@@ -15,11 +28,13 @@ interface GameContextType {
   connected: boolean;
   roomCode: string | null;
   playerId: string | null;
+  isSpectator: boolean;
   gameState: ClientGameState | null;
   myCharacter: Character | null;
   error: string | null;
   createRoom: (name: string) => void;
   joinRoom: (code: string, name: string) => void;
+  joinAsSpectator: (code: string, name: string) => void;
   rejoinRoom: (code: string, pid: string) => void;
   setReady: (ready: boolean) => void;
   startGame: () => void;
@@ -33,7 +48,11 @@ interface GameContextType {
   addBot: () => void;
   removeBot: (playerId: string) => void;
   adminShuffleAll: (attributeType: AttributeType | "action") => void;
-  adminSwapAttribute: (player1Id: string, player2Id: string, attributeType: AttributeType | "action") => void;
+  adminSwapAttribute: (
+    player1Id: string,
+    player2Id: string,
+    attributeType: AttributeType | "action",
+  ) => void;
   adminReplaceAttribute: (targetPlayerId: string, attributeType: AttributeType | "action") => void;
   adminRemoveBunkerCard: (cardIndex: number) => void;
   adminReplaceBunkerCard: (cardIndex: number) => void;
@@ -55,6 +74,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
+  const [isSpectator, setIsSpectator] = useState(false);
   const [gameState, setGameState] = useState<ClientGameState | null>(null);
   const [myCharacter, setMyCharacter] = useState<Character | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -112,8 +132,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.on("room:joined", ({ roomCode: code, playerId: pid }) => {
       setRoomCode(code);
       setPlayerId(pid);
+      setIsSpectator(false);
       sessionStorage.setItem("bunker_room", code);
       sessionStorage.setItem("bunker_player", pid);
+      sessionStorage.removeItem("bunker_spectator");
+    });
+
+    socket.on("room:spectatorJoined", ({ roomCode: code, spectatorId: sid }) => {
+      setRoomCode(code);
+      setPlayerId(sid);
+      setIsSpectator(true);
+      sessionStorage.setItem("bunker_room", code);
+      sessionStorage.setItem("bunker_player", sid);
+      sessionStorage.setItem("bunker_spectator", "true");
     });
 
     socket.on("room:error", ({ message }) => {
@@ -136,7 +167,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
         if (newPhase === "CATASTROPHE_REVEAL" && state.catastrophe) {
           enqueueOverlay({
-            kind: "announcement", duration: 3000,
+            kind: "announcement",
+            duration: 3000,
             title: "Катастрофа!",
             subtitle: state.catastrophe.title,
             description: state.catastrophe.description,
@@ -144,39 +176,45 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         } else if (newPhase === "BUNKER_EXPLORE" && state.revealedBunkerCards.length > 0) {
           const lastCard = state.revealedBunkerCards[state.revealedBunkerCards.length - 1];
           enqueueOverlay({
-            kind: "announcement", duration: 3000,
+            kind: "announcement",
+            duration: 3000,
             title: "Новая карта бункера",
             subtitle: lastCard.title,
             description: lastCard.description,
           });
         } else if (newPhase === "ROUND_REVEAL") {
           enqueueOverlay({
-            kind: "announcement", duration: 3000,
+            kind: "announcement",
+            duration: 3000,
             title: `Раунд ${state.roundNumber}`,
             subtitle: "Раскрытие карт",
           });
         } else if (newPhase === "ROUND_DISCUSSION") {
           enqueueOverlay({
-            kind: "announcement", duration: 3000,
+            kind: "announcement",
+            duration: 3000,
             title: "Обсуждение",
             subtitle: `Раунд ${state.roundNumber}`,
           });
         } else if (newPhase === "ROUND_VOTE") {
           enqueueOverlay({
-            kind: "announcement", duration: 3000,
+            kind: "announcement",
+            duration: 3000,
             title: "Голосование",
             subtitle: `Раунд ${state.roundNumber}`,
           });
         } else if (newPhase === "ROUND_VOTE_TIEBREAK") {
           enqueueOverlay({
-            kind: "announcement", duration: 3000,
+            kind: "announcement",
+            duration: 3000,
             title: "Перевоевание",
             subtitle: "Ничья! Повторное голосование",
           });
         } else if (newPhase === "ROUND_RESULT" && state.eliminatedPlayerId) {
           const eliminated = state.players.find((p: any) => p.id === state.eliminatedPlayerId);
           enqueueOverlay({
-            kind: "announcement", duration: 3000,
+            kind: "announcement",
+            duration: 3000,
             title: "Изгнан!",
             subtitle: eliminated?.name || "Игрок",
           });
@@ -201,8 +239,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     // Try to rejoin on page reload
     const savedRoom = sessionStorage.getItem("bunker_room");
     const savedPlayer = sessionStorage.getItem("bunker_player");
+    const savedSpectator = sessionStorage.getItem("bunker_spectator");
     if (savedRoom && savedPlayer) {
-      socket.emit("room:rejoin", { roomCode: savedRoom, playerId: savedPlayer });
+      if (savedSpectator === "true") {
+        socket.emit("room:rejoinSpectator", { roomCode: savedRoom, spectatorId: savedPlayer });
+      } else {
+        socket.emit("room:rejoin", { roomCode: savedRoom, playerId: savedPlayer });
+      }
     }
 
     return () => {
@@ -210,6 +253,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socket.off("disconnect");
       socket.off("room:created");
       socket.off("room:joined");
+      socket.off("room:spectatorJoined");
       socket.off("room:error");
       socket.off("game:state");
       socket.off("game:character");
@@ -224,6 +268,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const joinRoom = useCallback((code: string, name: string) => {
     socket.emit("room:join", { roomCode: code, playerName: name });
+  }, []);
+
+  const joinAsSpectator = useCallback((code: string, name: string) => {
+    socket.emit("room:joinSpectator", { roomCode: code, spectatorName: name });
   }, []);
 
   const rejoinRoom = useCallback((code: string, pid: string) => {
@@ -263,10 +311,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit("room:leave");
     setRoomCode(null);
     setPlayerId(null);
+    setIsSpectator(false);
     setGameState(null);
     setMyCharacter(null);
     sessionStorage.removeItem("bunker_room");
     sessionStorage.removeItem("bunker_player");
+    sessionStorage.removeItem("bunker_spectator");
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
@@ -346,11 +396,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         connected,
         roomCode,
         playerId,
+        isSpectator,
         gameState,
         myCharacter,
         error,
         createRoom,
         joinRoom,
+        joinAsSpectator,
         rejoinRoom,
         setReady,
         startGame: startGameFn,

@@ -18,6 +18,7 @@ export function GameScreen() {
   const {
     gameState,
     playerId,
+    isSpectator,
     myCharacter,
     revealAttribute,
     revealActionCard,
@@ -45,7 +46,16 @@ export function GameScreen() {
   // Admin panel state
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminAction, setAdminAction] = useState<
-    "shuffle" | "swap" | "replace" | "deleteAttr" | "forceReveal" | "removeBunker" | "replaceBunker" | "revive" | "eliminate" | null
+    | "shuffle"
+    | "swap"
+    | "replace"
+    | "deleteAttr"
+    | "forceReveal"
+    | "removeBunker"
+    | "replaceBunker"
+    | "revive"
+    | "eliminate"
+    | null
   >(null);
   const [adminAttrType, setAdminAttrType] = useState<AttributeType | "action">("profession");
   const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType | "action">>(new Set());
@@ -66,15 +76,16 @@ export function GameScreen() {
     }
   }, [pendingAdminOpen]);
 
-  if (!gameState || !myCharacter) return null;
+  if (!gameState) return null;
+  if (!isSpectator && !myCharacter) return null;
 
-  const me = gameState.players.find((p) => p.id === playerId);
-  const isMyTurn = gameState.currentTurnPlayerId === playerId;
+  const me = isSpectator ? undefined : gameState.players.find((p) => p.id === playerId);
+  const isMyTurn = !isSpectator && gameState.currentTurnPlayerId === playerId;
   const allPlayers = gameState.players;
 
   // Find which indices are revealed by matching
   const revealedIndices = new Set<number>();
-  if (me) {
+  if (me && myCharacter) {
     for (const ra of me.revealedAttributes) {
       const idx = myCharacter.attributes.findIndex(
         (a, i) => !revealedIndices.has(i) && a.type === ra.type && a.value === ra.value,
@@ -83,12 +94,13 @@ export function GameScreen() {
     }
   }
 
-  const unrevealedIndices = myCharacter.attributes
-    .map((_, i) => i)
-    .filter((i) => !revealedIndices.has(i));
+  const unrevealedIndices = myCharacter
+    ? myCharacter.attributes.map((_, i) => i).filter((i) => !revealedIndices.has(i))
+    : [];
 
-  const canReveal = gameState.phase === "ROUND_REVEAL" && isMyTurn && unrevealedIndices.length > 1;
-  const canRevealAction = myCharacter.actionCard && !me?.actionCardRevealed;
+  const canReveal =
+    !isSpectator && gameState.phase === "ROUND_REVEAL" && isMyTurn && unrevealedIndices.length > 1;
+  const canRevealAction = !isSpectator && myCharacter?.actionCard && !me?.actionCardRevealed;
 
   const phaseLabels: Record<string, string> = {
     CATASTROPHE_REVEAL: "Катастрофа!",
@@ -198,7 +210,10 @@ export function GameScreen() {
           <div className="turn-info">
             {votingInfo}
             {me?.isHost && (
-              <button className="btn btn-secondary btn-skip-discussion" onClick={adminSkipDiscussion}>
+              <button
+                className="btn btn-secondary btn-skip-discussion"
+                onClick={adminSkipDiscussion}
+              >
                 Начать голосование
               </button>
             )}
@@ -247,68 +262,73 @@ export function GameScreen() {
       )}
 
       {/* Desktop: My Character (separate card grid) */}
-      <div className="my-character desktop-only">
-        <h3>Ваш персонаж {!me?.alive && <span className="eliminated-badge">ИЗГНАН</span>}</h3>
-        <div className="attributes-grid">
-          {myCharacter.attributes.map((attr, i) => {
-            const isRevealed = revealedIndices.has(i);
-            return (
-              <div
-                key={i}
-                className={`attribute-card ${isRevealed ? "revealed" : "hidden"}`}
-                data-attr-type={attr.type}
-              >
-                <div className="attr-content">
-                  <CardImage type={attr.type} className="attr-card-image" />
-                  <div className="attr-text">
-                    <span className="attr-label">{attr.label}</span>
-                    <span className="attr-value">{attr.value}</span>
-                    {attr.detail && <span className="attr-detail">{attr.detail}</span>}
+      {!isSpectator && myCharacter && (
+        <div className="my-character desktop-only">
+          <h3>Ваш персонаж {!me?.alive && <span className="eliminated-badge">ИЗГНАН</span>}</h3>
+          <div className="attributes-grid">
+            {myCharacter.attributes.map((attr, i) => {
+              const isRevealed = revealedIndices.has(i);
+              return (
+                <div
+                  key={i}
+                  className={`attribute-card ${isRevealed ? "revealed" : "hidden"}`}
+                  data-attr-type={attr.type}
+                >
+                  <div className="attr-content">
+                    <CardImage type={attr.type} className="attr-card-image" />
+                    <div className="attr-text">
+                      <span className="attr-label">{attr.label}</span>
+                      <span className="attr-value">{attr.value}</span>
+                      {attr.detail && <span className="attr-detail">{attr.detail}</span>}
+                    </div>
                   </div>
+                  {!isRevealed && <span className="attr-status">Скрыто</span>}
                 </div>
-                {!isRevealed && <span className="attr-status">Скрыто</span>}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        {myCharacter.actionCard && (
-          <div className="action-card-display">
-            <div className="attribute-card revealed" data-attr-type="action">
-              <div className="attr-content">
-                <CardImage type="action" className="attr-card-image" />
-                <div className="attr-text">
-                  <span className="attr-label">Особое условие</span>
-                  <span className="attr-value">{myCharacter.actionCard.title}</span>
-                  <span className="attr-detail">{myCharacter.actionCard.description}</span>
+          {myCharacter.actionCard && (
+            <div className="action-card-display">
+              <div className="attribute-card revealed" data-attr-type="action">
+                <div className="attr-content">
+                  <CardImage type="action" className="attr-card-image" />
+                  <div className="attr-text">
+                    <span className="attr-label">Особое условие</span>
+                    <span className="attr-value">{myCharacter.actionCard.title}</span>
+                    <span className="attr-detail">{myCharacter.actionCard.description}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="character-actions">
-          {canReveal && (
-            <button
-              className="btn btn-primary btn-reveal"
-              onClick={() => {
-                if (gameState.roundNumber === 1) {
-                  revealAttribute(0);
-                } else {
-                  setShowAttrPicker(true);
-                }
-              }}
-            >
-              Раскрыть характеристику
-            </button>
-          )}
-          {canRevealAction && (
-            <button className="btn btn-secondary btn-reveal-action" onClick={() => setConfirmRevealAction(true)}>
-              Раскрыть особое условие
-            </button>
-          )}
+          <div className="character-actions">
+            {canReveal && (
+              <button
+                className="btn btn-primary btn-reveal"
+                onClick={() => {
+                  if (gameState.roundNumber === 1) {
+                    revealAttribute(0);
+                  } else {
+                    setShowAttrPicker(true);
+                  }
+                }}
+              >
+                Раскрыть характеристику
+              </button>
+            )}
+            {canRevealAction && (
+              <button
+                className="btn btn-secondary btn-reveal-action"
+                onClick={() => setConfirmRevealAction(true)}
+              >
+                Раскрыть особое условие
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Desktop: Other Players */}
       <div className="players-grid desktop-only">
@@ -392,7 +412,7 @@ export function GameScreen() {
                   {!player.connected && !player.isBot && <span className="dc-badge">Отключён</span>}
                 </div>
                 <div className="player-attributes">
-                  {isMe ? (
+                  {isMe && myCharacter ? (
                     <>
                       {myCharacter.attributes.map((attr, i) => {
                         const isRevealed = revealedIndices.has(i);
@@ -460,7 +480,10 @@ export function GameScreen() {
             </button>
           )}
           {canRevealAction && (
-            <button className="btn btn-secondary btn-reveal-action" onClick={() => setConfirmRevealAction(true)}>
+            <button
+              className="btn btn-secondary btn-reveal-action"
+              onClick={() => setConfirmRevealAction(true)}
+            >
               Раскрыть особое условие
             </button>
           )}
@@ -468,7 +491,7 @@ export function GameScreen() {
       </div>
 
       {/* Attribute Picker Modal */}
-      {showAttrPicker && (
+      {showAttrPicker && myCharacter && (
         <div className="modal-overlay" onClick={() => setShowAttrPicker(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Выберите характеристику для раскрытия</h3>
@@ -496,15 +519,21 @@ export function GameScreen() {
         (() => {
           const player = gameState.players.find((p) => p.id === expandedPlayerId);
           if (!player) return null;
-          const isMe = player.id === playerId;
-          const attrs = isMe ? myCharacter.attributes : [];
+          const isMe = !isSpectator && player.id === playerId;
+          const attrs = isMe && myCharacter ? myCharacter.attributes : [];
           const revealedAttrs = player.revealedAttributes;
           const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;
 
           return (
             <div className="modal-overlay" onClick={() => setExpandedPlayerId(null)}>
               <div className="modal expanded-player-modal" onClick={(e) => e.stopPropagation()}>
-                <button className="modal-close-btn" onClick={() => setExpandedPlayerId(null)} aria-label="Закрыть">&times;</button>
+                <button
+                  className="modal-close-btn"
+                  onClick={() => setExpandedPlayerId(null)}
+                  aria-label="Закрыть"
+                >
+                  &times;
+                </button>
                 <div className="expanded-player-header">
                   <span className="player-number">{playerNumber}</span>
                   <h3>
@@ -553,9 +582,9 @@ export function GameScreen() {
                     ))
                   )}
                 </div>
-                {((isMe && myCharacter.actionCard) || (!isMe && player.actionCard)) &&
+                {((isMe && myCharacter?.actionCard) || (!isMe && player.actionCard)) &&
                   (() => {
-                    const ac = isMe ? myCharacter.actionCard! : player.actionCard!;
+                    const ac = isMe && myCharacter ? myCharacter.actionCard! : player.actionCard!;
                     return (
                       <div className="action-card-display">
                         <div className="attribute-card revealed" data-attr-type="action">

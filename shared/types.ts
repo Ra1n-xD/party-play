@@ -94,6 +94,7 @@ export interface PublicGameState {
   tiebreakCandidateIds: string[] | null;
   phaseRemainingMs: number | null;
   paused: boolean;
+  spectatorCount: number;
 }
 
 // ============ Socket Events ============
@@ -102,8 +103,10 @@ export interface PublicGameState {
 export interface ClientEvents {
   "room:create": (data: { playerName: string }) => void;
   "room:join": (data: { roomCode: string; playerName: string }) => void;
+  "room:joinSpectator": (data: { roomCode: string; spectatorName: string }) => void;
   "room:leave": () => void;
   "room:rejoin": (data: { roomCode: string; playerId: string }) => void;
+  "room:rejoinSpectator": (data: { roomCode: string; spectatorId: string }) => void;
   "player:ready": (data: { ready: boolean }) => void;
   "game:start": () => void;
   "game:revealAttribute": (data: { attributeIndex?: number }) => void;
@@ -138,6 +141,7 @@ export interface ClientEvents {
 export interface ServerEvents {
   "room:created": (data: { roomCode: string; playerId: string }) => void;
   "room:joined": (data: { roomCode: string; playerId: string }) => void;
+  "room:spectatorJoined": (data: { roomCode: string; spectatorId: string }) => void;
   "room:error": (data: { message: string }) => void;
   "game:state": (data: PublicGameState) => void;
   "game:character": (data: Character) => void;

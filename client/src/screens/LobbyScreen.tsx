@@ -5,6 +5,7 @@ export function LobbyScreen() {
   const {
     roomCode,
     playerId,
+    isSpectator,
     gameState,
     setReady,
     startGame,
@@ -17,7 +18,7 @@ export function LobbyScreen() {
 
   if (!gameState || !roomCode) return null;
 
-  const me = gameState.players.find((p) => p.id === playerId);
+  const me = isSpectator ? undefined : gameState.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
   const allReady = gameState.players.every((p) => p.ready || p.isHost);
   const enoughPlayers = gameState.players.length >= 4;
@@ -49,7 +50,10 @@ export function LobbyScreen() {
           <span>Игроков: {gameState.players.length}/16</span>
           <span>В бункер попадут: {bunkerCapacity}</span>
           {botCount > 0 && <span>Ботов: {botCount}</span>}
+          {gameState.spectatorCount > 0 && <span>Зрителей: {gameState.spectatorCount}</span>}
         </div>
+
+        {isSpectator && <div className="spectator-badge">Вы наблюдаете</div>}
 
         <div className="player-list">
           {gameState.players.map((player, idx) => (
@@ -79,12 +83,12 @@ export function LobbyScreen() {
         </div>
 
         <div className="lobby-actions">
-          {isHost && canAddBot && (
+          {!isSpectator && isHost && canAddBot && (
             <button className="btn btn-bot" onClick={addBot}>
               + Добавить бота
             </button>
           )}
-          {!isHost && (
+          {!isSpectator && !isHost && (
             <button
               className={`btn ${me?.ready ? "btn-secondary" : "btn-primary"}`}
               onClick={() => setReady(!me?.ready)}
@@ -92,7 +96,7 @@ export function LobbyScreen() {
               {me?.ready ? "Не готов" : "Готов!"}
             </button>
           )}
-          {isHost && (
+          {!isSpectator && isHost && (
             <button
               className="btn btn-primary"
               onClick={startGame}
@@ -106,7 +110,7 @@ export function LobbyScreen() {
             </button>
           )}
           <button className="btn btn-text" onClick={leaveRoom}>
-            Покинуть комнату
+            {isSpectator ? "Перестать наблюдать" : "Покинуть комнату"}
           </button>
         </div>
 

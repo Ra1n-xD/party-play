@@ -2,15 +2,14 @@ import { useGame } from "../context/GameContext";
 import { CardImage } from "../components/CardImage";
 
 export function ResultsScreen() {
-  const { gameState, playerId, playAgain } = useGame();
+  const { gameState, playerId, isSpectator, playAgain } = useGame();
 
   if (!gameState) return null;
 
-  const me = gameState.players.find((p) => p.id === playerId);
+  const me = isSpectator ? undefined : gameState.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
   const survivors = gameState.players.filter((p) => p.alive);
   const eliminated = gameState.players.filter((p) => !p.alive);
-  const iSurvived = me?.alive ?? false;
 
   const renderPlayerCard = (player: (typeof gameState.players)[0]) => {
     const attrs =
@@ -18,11 +17,14 @@ export function ResultsScreen() {
     const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;
 
     return (
-      <div key={player.id} className={`result-player ${player.id === playerId ? "is-me" : ""}`}>
+      <div
+        key={player.id}
+        className={`result-player ${!isSpectator && player.id === playerId ? "is-me" : ""}`}
+      >
         <div className="result-player-name">
           <span className="player-number">{playerNumber}</span>
           {player.isBot && <span className="bot-badge">BOT</span>}
-          {player.name} {player.id === playerId && "(вы)"}
+          {player.name} {!isSpectator && player.id === playerId && "(вы)"}
         </div>
         {/* Desktop: card grid */}
         <div className="result-desktop attributes-grid">
@@ -83,7 +85,9 @@ export function ResultsScreen() {
   return (
     <div className="screen results-screen">
       <div className="results-container">
-        <h2>{iSurvived ? "Вы попали в бункер!" : "Вы были изгнаны..."}</h2>
+        <h2>
+          {isSpectator ? "Игра окончена" : me?.alive ? "Вы попали в бункер!" : "Вы были изгнаны..."}
+        </h2>
 
         {gameState.catastrophe && (
           <div className="results-scenario">

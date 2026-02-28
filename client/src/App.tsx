@@ -49,10 +49,12 @@ function AppContent() {
 }
 
 function PauseOverlay() {
-  const { gameState, playerId } = useGame();
+  const { gameState, playerId, isSpectator } = useGame();
   if (!gameState?.paused) return null;
-  const me = gameState.players.find((p) => p.id === playerId);
-  if (me?.isHost) return null;
+  if (!isSpectator) {
+    const me = gameState.players.find((p) => p.id === playerId);
+    if (me?.isHost) return null;
+  }
 
   return (
     <div className="pause-overlay">
