@@ -42,10 +42,18 @@ export interface GameState {
   pausedCallback: (() => void) | null;
 }
 
+export interface Spectator {
+  id: string;
+  socketId: string;
+  name: string;
+  connected: boolean;
+}
+
 export interface Room {
   code: string;
   hostId: string;
   players: Map<string, Player>;
+  spectators: Map<string, Spectator>;
   gameState: GameState | null;
   allPlayerIds: string[]; // Original player order (for round rotation)
 }
@@ -54,17 +62,20 @@ const rooms = new Map<string, Room>();
 const roomLastActivity = new Map<string, number>();
 
 // Auto-cleanup inactive rooms every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [code, lastActivity] of roomLastActivity.entries()) {
-    if (now - lastActivity > CONFIG.ROOM_INACTIVE_TTL) {
-      const room = rooms.get(code);
-      if (room?.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
-      rooms.delete(code);
-      roomLastActivity.delete(code);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [code, lastActivity] of roomLastActivity.entries()) {
+      if (now - lastActivity > CONFIG.ROOM_INACTIVE_TTL) {
+        const room = rooms.get(code);
+        if (room?.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
+        rooms.delete(code);
+        roomLastActivity.delete(code);
+      }
     }
-  }
-}, 5 * 60 * 1000);
+  },
+  5 * 60 * 1000,
+);
 
 export function touchRoom(code: string): void {
   roomLastActivity.set(code, Date.now());
@@ -97,6 +108,7 @@ export function createRoom(socketId: string, playerName: string): { room: Room; 
     code,
     hostId: playerId,
     players: new Map([[playerId, player]]),
+    spectators: new Map(),
     gameState: null,
     allPlayerIds: [playerId],
   };
@@ -244,4 +256,36 @@ export function removeBotFromRoom(room: Room, playerId: string): boolean {
   room.players.delete(playerId);
   room.allPlayerIds = room.allPlayerIds.filter((id) => id !== playerId);
   return true;
+}
+
+export function joinRoomAsSpectator(
+  roomCode: string,
+  socketId: string,
+  spectatorName: string,
+): { room: Room; spectator: Spectator } | { error: string } {
+  const room = rooms.get(roomCode);
+  if (!room) return { error: "Комната не найдена" };
+
+  const spectatorId = generatePlayerId();
+  const spectator: Spectator = {
+    id: spectatorId,
+    socketId,
+    name: spectatorName,
+    connected: true,
+  };
+
+  room.spectators.set(spectatorId, spectator);
+  touchRoom(roomCode);
+  return { room, spectator };
+}
+
+export function removeSpectator(room: Room, spectatorId: string): void {
+  room.spectators.delete(spectatorId);
+}
+
+export function getRoomBySpectatorId(spectatorId: string): Room | undefined {
+  for (const room of rooms.values()) {
+    if (room.spectators.has(spectatorId)) return room;
+  }
+  return undefined;
 }

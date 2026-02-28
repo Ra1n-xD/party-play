@@ -4,10 +4,10 @@ import { BiDonateHeart } from "react-icons/bi";
 import { useGame } from "../context/GameContext";
 
 export function HomeScreen() {
-  const { createRoom, joinRoom, error } = useGame();
+  const { createRoom, joinRoom, joinAsSpectator, error } = useGame();
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
-  const [mode, setMode] = useState<"menu" | "create" | "join">("menu");
+  const [mode, setMode] = useState<"menu" | "create" | "join" | "spectate">("menu");
 
   const handleCreate = () => {
     if (name.trim()) createRoom(name.trim());
@@ -15,6 +15,10 @@ export function HomeScreen() {
 
   const handleJoin = () => {
     if (name.trim() && joinCode.trim()) joinRoom(joinCode.trim().toUpperCase(), name.trim());
+  };
+
+  const handleSpectate = () => {
+    if (name.trim() && joinCode.trim()) joinAsSpectator(joinCode.trim().toUpperCase(), name.trim());
   };
 
   return (
@@ -55,6 +59,13 @@ export function HomeScreen() {
             >
               Присоединиться
             </button>
+            <button
+              className="btn btn-text"
+              onClick={() => setMode("spectate")}
+              disabled={!name.trim()}
+            >
+              Наблюдать
+            </button>
           </div>
         )}
 
@@ -81,6 +92,33 @@ export function HomeScreen() {
           </div>
         )}
 
+        {mode === "spectate" && (
+          <div className="home-actions">
+            <p className="join-label">
+              Имя: <strong>{name}</strong>
+            </p>
+            <input
+              type="text"
+              placeholder="Код комнаты"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              maxLength={6}
+              className="input input-code"
+              autoFocus
+            />
+            <button
+              className="btn btn-primary"
+              onClick={handleSpectate}
+              disabled={joinCode.length < 4}
+            >
+              Наблюдать
+            </button>
+            <button className="btn btn-text" onClick={() => setMode("menu")}>
+              Назад
+            </button>
+          </div>
+        )}
+
         {error && <div className="error-toast">{error}</div>}
       </div>
 
@@ -96,7 +134,12 @@ export function HomeScreen() {
             <FaTwitch /> Twitch
           </a>
         </div>
-        <a className="home-footer-donate" href="https://www.donationalerts.com/r/fronted_ra1n" target="_blank" rel="noopener noreferrer">
+        <a
+          className="home-footer-donate"
+          href="https://www.donationalerts.com/r/fronted_ra1n"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <BiDonateHeart /> Поддержать проект
         </a>
       </footer>

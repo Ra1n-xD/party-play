@@ -17,6 +17,7 @@ export function VoteScreen() {
   const {
     gameState,
     playerId,
+    isSpectator,
     myCharacter,
     castVote,
     revealActionCard,
@@ -75,6 +76,22 @@ export function VoteScreen() {
   }, [pendingAdminOpen]);
 
   if (!gameState) return null;
+
+  if (isSpectator) {
+    const isTiebreak = gameState.phase === "ROUND_VOTE_TIEBREAK";
+    return (
+      <div className="screen vote-screen">
+        <div className="vote-container">
+          <h2>{isTiebreak ? "Переголосование" : "Голосование"}</h2>
+          <p className="vote-status">Вы наблюдаете за голосованием</p>
+          <div className="vote-progress">
+            Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+          </div>
+          <Timer endTime={gameState.phaseEndTime} />
+        </div>
+      </div>
+    );
+  }
 
   const me = gameState.players.find((p) => p.id === playerId);
   const isTiebreak = gameState.phase === "ROUND_VOTE_TIEBREAK";

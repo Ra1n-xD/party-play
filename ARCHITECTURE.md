@@ -112,10 +112,10 @@ bunker/
 
 interface GamePlugin {
   /** Уникальный идентификатор игры */
-  id: string;                          // "bunker", "mafia", "spy"
+  id: string; // "bunker", "mafia", "spy"
 
   /** Отображаемое название */
-  name: string;                        // "Бункер", "Мафия", "Шпион"
+  name: string; // "Бункер", "Мафия", "Шпион"
 
   /** Краткое описание */
   description: string;
@@ -239,33 +239,33 @@ interface ClientGamePlugin {
 
 ```typescript
 // Управление комнатами — обрабатывает core
-"room:create"       // → создание комнаты
-"room:join"         // → вход по коду
-"room:leave"        // → выход
-"room:rejoin"       // → реконнект
-"room:selectGame"   // → выбор игры хостом
-"room:start"        // → запуск выбранной игры
+"room:create"; // → создание комнаты
+"room:join"; // → вход по коду
+"room:leave"; // → выход
+"room:rejoin"; // → реконнект
+"room:selectGame"; // → выбор игры хостом
+"room:start"; // → запуск выбранной игры
 
 // Игровые события — маршрутизируются к плагину
-"game:*"            // → plugin.onGameEvent(room, event, data, playerId)
+"game:*"; // → plugin.onGameEvent(room, event, data, playerId)
 
 // Broadcast — отправляет core
-"state:update"      // → публичное состояние (core + game merged)
-"game:private"      // → приватные данные конкретному игроку
+"state:update"; // → публичное состояние (core + game merged)
+"game:private"; // → приватные данные конкретному игроку
 ```
 
 ---
 
 ## Технологический стек
 
-| Слой | Технология | Без изменений |
-|------|-----------|:---:|
-| Сервер | Express + Socket.IO | ✅ |
-| Клиент | React 18 + Vite | ✅ |
-| Типы | TypeScript | ✅ |
-| Workspaces | npm workspaces | ✅ |
-| Dev-режим | concurrently + tsx watch | ✅ |
-| Формат | Prettier | ✅ |
+| Слой       | Технология               | Без изменений |
+| ---------- | ------------------------ | :-----------: |
+| Сервер     | Express + Socket.IO      |      ✅       |
+| Клиент     | React 18 + Vite          |      ✅       |
+| Типы       | TypeScript               |      ✅       |
+| Workspaces | npm workspaces           |      ✅       |
+| Dev-режим  | concurrently + tsx watch |      ✅       |
+| Формат     | Prettier                 |      ✅       |
 
 Стек не меняется — меняется только организация кода.
 
