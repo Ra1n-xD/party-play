@@ -40,6 +40,6 @@ jobs:
           script: |
             cd ~/party-play
             git pull origin main
-            npm install --omit=dev
+            npm install
             npm run build
             sudo systemctl restart partyplay
