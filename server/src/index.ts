@@ -8,6 +8,9 @@ import { registerHandlers } from "./socketHandlers.js";
 
 const app = express();
 
+// Trust reverse proxy (Caddy/Nginx) — correct client IP in req.ip
+app.set("trust proxy", 1);
+
 // Security headers
 app.use(helmet());
 
