@@ -77,24 +77,40 @@ export function VoteScreen() {
 
   if (!gameState) return null;
 
+  const me = isSpectator ? undefined : gameState.players.find((p) => p.id === playerId);
+  const isTiebreak = gameState.phase === "ROUND_VOTE_TIEBREAK";
+
+  // Spectator view
   if (isSpectator) {
-    const isTiebreak = gameState.phase === "ROUND_VOTE_TIEBREAK";
     return (
       <div className="screen vote-screen">
-        <div className="vote-container">
-          <h2>{isTiebreak ? "Переголосование" : "Голосование"}</h2>
-          <p className="vote-status">Вы наблюдаете за голосованием</p>
-          <div className="vote-progress">
-            Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+        <div className="sticky-top-bar">
+          <div className="top-bar-content">
+            <div className="top-bar-left">
+              <span className="top-bar-phase">{isTiebreak ? "Переголосование" : "Голосование"}</span>
+              <span className="top-bar-desc">Вы наблюдаете</span>
+            </div>
+            <div className="top-bar-right">
+              <Timer endTime={gameState.phaseEndTime} size="large" />
+            </div>
           </div>
-          <Timer endTime={gameState.phaseEndTime} />
+        </div>
+        <div className="vote-container">
+          <div className="vote-progress-bar">
+            <div className="vote-progress-label">
+              Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+            </div>
+            <div className="vote-progress-track">
+              <div
+                className="vote-progress-fill"
+                style={{ width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
   }
-
-  const me = gameState.players.find((p) => p.id === playerId);
-  const isTiebreak = gameState.phase === "ROUND_VOTE_TIEBREAK";
 
   // Determine voteable candidates
   let candidates = gameState.players.filter((p) => p.alive && p.id !== playerId);
@@ -182,36 +198,74 @@ export function VoteScreen() {
     }
   };
 
+  // Can't vote view
   if (!canVote) {
     return (
       <div className="screen vote-screen">
-        <div className="vote-container">
-          <h2>{isTiebreak ? "Перевоевание" : "Голосование"}</h2>
-          <p className="vote-status">Вы были изгнаны и не можете голосовать</p>
-          <div className="vote-progress">
-            Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+        <div className="sticky-top-bar">
+          <div className="top-bar-content">
+            <div className="top-bar-left">
+              <span className="top-bar-phase">{isTiebreak ? "Переголосование" : "Голосование"}</span>
+              <span className="top-bar-desc">Вы изгнаны</span>
+            </div>
+            <div className="top-bar-right">
+              <Timer endTime={gameState.phaseEndTime} size="large" />
+            </div>
           </div>
-          <Timer endTime={gameState.phaseEndTime} />
+        </div>
+        <div className="vote-container">
+          <div className="vote-waiting-card">
+            <p>Вы были изгнаны и не можете голосовать</p>
+          </div>
+          <div className="vote-progress-bar">
+            <div className="vote-progress-label">
+              Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+            </div>
+            <div className="vote-progress-track">
+              <div
+                className="vote-progress-fill"
+                style={{ width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
+  // Already voted view
   if (voted) {
     return (
       <div className="screen vote-screen">
-        <div className="vote-container">
-          <h2>{isTiebreak ? "Перевоевание" : "Голосование"}</h2>
-          <p className="vote-status">
-            Ваш голос принят! Ожидаем остальных...
-            {isLastEliminated && !me?.alive && (
-              <span className="last-elim-note"> (вы голосуете как последний изгнанный)</span>
-            )}
-          </p>
-          <div className="vote-progress">
-            Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+        <div className="sticky-top-bar">
+          <div className="top-bar-content">
+            <div className="top-bar-left">
+              <span className="top-bar-phase">{isTiebreak ? "Переголосование" : "Голосование"}</span>
+              <span className="top-bar-desc">Голос принят</span>
+            </div>
+            <div className="top-bar-right">
+              <Timer endTime={gameState.phaseEndTime} size="large" />
+            </div>
           </div>
-          <Timer endTime={gameState.phaseEndTime} />
+        </div>
+        <div className="vote-container">
+          <div className="vote-waiting-card vote-accepted">
+            <p>Ваш голос принят! Ожидаем остальных...</p>
+            {isLastEliminated && !me?.alive && (
+              <p className="last-elim-note">Вы голосуете как последний изгнанный</p>
+            )}
+          </div>
+          <div className="vote-progress-bar">
+            <div className="vote-progress-label">
+              Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+            </div>
+            <div className="vote-progress-track">
+              <div
+                className="vote-progress-fill"
+                style={{ width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -219,19 +273,31 @@ export function VoteScreen() {
 
   return (
     <div className="screen vote-screen">
+      {/* Sticky top bar */}
+      <div className="sticky-top-bar vote-top-bar">
+        <div className="top-bar-content">
+          <div className="top-bar-left">
+            <span className="top-bar-phase">
+              {isTiebreak ? "Переголосование" : "Кого изгнать?"}
+            </span>
+            <span className="top-bar-desc">
+              {isTiebreak
+                ? "Ничья! Выберите одного из кандидатов"
+                : "Выберите игрока для изгнания"}
+            </span>
+          </div>
+          <div className="top-bar-right">
+            <Timer endTime={gameState.phaseEndTime} size="large" />
+          </div>
+        </div>
+      </div>
+
       <div className="vote-container">
-        <h2>{isTiebreak ? "Переголосование — ничья!" : "Голосование"}</h2>
-        {isTiebreak ? (
-          <p>Кандидаты получили равное число голосов. Выберите одного из них:</p>
-        ) : (
-          <p>Кого изгнать из бункера?</p>
-        )}
         {isLastEliminated && !me?.alive && (
-          <p className="last-elim-note">
+          <div className="last-elim-banner">
             Вы голосуете как последний изгнанный — от лица всех изгнанных
-          </p>
+          </div>
         )}
-        <Timer endTime={gameState.phaseEndTime} />
 
         {gameState.votingsInCurrentRound > 1 && (
           <div className="voting-counter">
@@ -243,7 +309,7 @@ export function VoteScreen() {
           {candidates.map((player) => {
             const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;
             return (
-              <div key={player.id} className="vote-candidate">
+              <div key={player.id} className="vote-candidate" onClick={() => handleVote(player.id)}>
                 <div className="candidate-info">
                   <span className="candidate-name">
                     <span className="player-number">{playerNumber}</span>
@@ -264,9 +330,7 @@ export function VoteScreen() {
                     )}
                   </div>
                 </div>
-                <button className="btn btn-vote" onClick={() => handleVote(player.id)}>
-                  Изгнать
-                </button>
+                <button className="btn btn-vote">Изгнать</button>
               </div>
             );
           })}
@@ -293,8 +357,16 @@ export function VoteScreen() {
           </div>
         )}
 
-        <div className="vote-progress">
-          Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+        <div className="vote-progress-bar">
+          <div className="vote-progress-label">
+            Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+          </div>
+          <div className="vote-progress-track">
+            <div
+              className="vote-progress-fill"
+              style={{ width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%` }}
+            />
+          </div>
         </div>
 
         {canRevealAction && (
@@ -321,7 +393,7 @@ export function VoteScreen() {
               }
             }}
           >
-            {adminOpen ? "Скрыть админ-панель ▲" : "Админ-панель ▼"}
+            {adminOpen ? "Скрыть админ-панель" : "Админ-панель"}
           </button>
 
           {adminOpen && (

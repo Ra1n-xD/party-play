@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 
 interface TimerProps {
   endTime: number | null;
+  size?: "normal" | "large";
 }
 
-export function Timer({ endTime }: TimerProps) {
+export function Timer({ endTime, size = "normal" }: TimerProps) {
   const [secondsLeft, setSecondsLeft] = useState(0);
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export function Timer({ endTime }: TimerProps) {
     };
 
     update();
-    const interval = setInterval(update, 1000);
+    const interval = setInterval(update, 250);
     return () => clearInterval(interval);
   }, [endTime]);
 
@@ -27,10 +28,13 @@ export function Timer({ endTime }: TimerProps) {
 
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
+  const isUrgent = secondsLeft <= 10;
+  const isCritical = secondsLeft <= 5;
+
+  const urgencyClass = isCritical ? "timer-critical" : isUrgent ? "timer-urgent" : "";
 
   return (
-    <div className="timer">
-      <span className="timer-icon">⏱</span>
+    <div className={`timer timer-${size} ${urgencyClass}`}>
       <span className="timer-value">
         {minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, "0")}` : `${seconds}с`}
       </span>
