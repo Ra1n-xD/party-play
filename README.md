@@ -18,14 +18,3 @@
 - **Клиент:** React 18, Vite, TypeScript
 - **Структура:** монорепо на npm workspaces (`shared`, `server`, `client`)
 
-## 🚀 Быстрый старт
-
-```bash
-# Установить зависимости
-npm install
-
-# Запустить в dev-режиме (сервер + клиент)
-npm run dev
-```
-
-Сервер запускается на `http://localhost:3001`, клиент на `http://localhost:5173`.
