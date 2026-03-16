@@ -3,16 +3,8 @@ import { useGame } from "../context/GameContext";
 import { Timer } from "../components/Timer";
 import { CardImage } from "../components/CardImage";
 import { AttributeType } from "../../../shared/types";
-
-const ATTR_TYPES: { type: AttributeType | "action"; label: string }[] = [
-  { type: "profession", label: "Профессия" },
-  { type: "bio", label: "Биология" },
-  { type: "health", label: "Здоровье" },
-  { type: "hobby", label: "Хобби" },
-  { type: "baggage", label: "Багаж" },
-  { type: "fact", label: "Доп. факт" },
-  { type: "action", label: "Особое условие" },
-];
+import { ATTR_TYPES } from "../utils/constants";
+import { toggleInSet } from "../utils/setUtils";
 
 export function GameScreen() {
   const {
@@ -137,13 +129,6 @@ export function GameScreen() {
   const alivePlayers = gameState.players.filter((p) => p.alive);
   const hasBottomAction = canReveal || canRevealAction;
 
-  const toggleInSet = <T,>(set: Set<T>, item: T): Set<T> => {
-    const next = new Set(set);
-    if (next.has(item)) next.delete(item);
-    else next.add(item);
-    return next;
-  };
-
   const handleAdminExecute = () => {
     if (!adminAction) return;
     if (adminAction === "shuffle") {
@@ -235,10 +220,7 @@ export function GameScreen() {
 
         {/* Discussion host controls */}
         {gameState.phase === "ROUND_DISCUSSION" && me?.isHost && (
-          <button
-            className="btn btn-secondary btn-skip-discussion"
-            onClick={adminSkipDiscussion}
-          >
+          <button className="btn btn-secondary btn-skip-discussion" onClick={adminSkipDiscussion}>
             Пропустить обсуждение
           </button>
         )}
@@ -257,8 +239,8 @@ export function GameScreen() {
                 {gameState.catastrophe.title}
                 {gameState.revealedBunkerCards.length > 0 && (
                   <span className="scenario-toggle-meta">
-                    | Бункер: {gameState.revealedBunkerCards.length}/{gameState.totalBunkerCards} карт
-                    | Мест: {gameState.bunkerCapacity}
+                    | Бункер: {gameState.revealedBunkerCards.length}/{gameState.totalBunkerCards}{" "}
+                    карт | Мест: {gameState.bunkerCapacity}
                   </span>
                 )}
               </span>
@@ -274,7 +256,8 @@ export function GameScreen() {
                 {gameState.revealedBunkerCards.length > 0 && (
                   <div className="bunker-cards-panel">
                     <h3>
-                      Бункер ({gameState.revealedBunkerCards.length}/{gameState.totalBunkerCards} карт)
+                      Бункер ({gameState.revealedBunkerCards.length}/{gameState.totalBunkerCards}{" "}
+                      карт)
                     </h3>
                     <div className="bunker-cards-list">
                       {gameState.revealedBunkerCards.map((card, i) => (
@@ -372,7 +355,9 @@ export function GameScreen() {
                       )}
                     </span>
                     {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
-                    {!player.connected && !player.isBot && <span className="dc-badge">Отключён</span>}
+                    {!player.connected && !player.isBot && (
+                      <span className="dc-badge">Отключён</span>
+                    )}
                     {player.id === gameState.lastEliminatedPlayerId && player.alive && (
                       <span className="last-elim-badge">Голосует</span>
                     )}
@@ -428,7 +413,9 @@ export function GameScreen() {
                       )}
                     </span>
                     {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
-                    {!player.connected && !player.isBot && <span className="dc-badge">Отключён</span>}
+                    {!player.connected && !player.isBot && (
+                      <span className="dc-badge">Отключён</span>
+                    )}
                   </div>
                   <div className="player-attributes">
                     {isMe && myCharacter ? (
@@ -522,10 +509,16 @@ export function GameScreen() {
                       Раскрыть у всех
                     </button>
                     <label className="admin-group-label">Карты бункера</label>
-                    <button className="btn btn-admin" onClick={() => setAdminAction("removeBunker")}>
+                    <button
+                      className="btn btn-admin"
+                      onClick={() => setAdminAction("removeBunker")}
+                    >
                       Убрать карту
                     </button>
-                    <button className="btn btn-admin" onClick={() => setAdminAction("replaceBunker")}>
+                    <button
+                      className="btn btn-admin"
+                      onClick={() => setAdminAction("replaceBunker")}
+                    >
                       Заменить карту
                     </button>
                     <label className="admin-group-label">Игроки</label>
@@ -716,7 +709,8 @@ export function GameScreen() {
                             (adminPlayers.size === 0 || adminAttrTypes.size === 0)) ||
                           ((adminAction === "removeBunker" || adminAction === "replaceBunker") &&
                             adminBunkerCardIndex === null) ||
-                          ((adminAction === "revive" || adminAction === "eliminate") && !adminPlayer1)
+                          ((adminAction === "revive" || adminAction === "eliminate") &&
+                            !adminPlayer1)
                         }
                       >
                         Применить

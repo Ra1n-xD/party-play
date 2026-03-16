@@ -20,7 +20,7 @@ export function Timer({ endTime, size = "normal" }: TimerProps) {
     };
 
     update();
-    const interval = setInterval(update, 250);
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [endTime]);
 

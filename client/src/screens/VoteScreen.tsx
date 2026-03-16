@@ -1,17 +1,10 @@
 import { useState, useEffect } from "react";
 import { useGame } from "../context/GameContext";
 import { Timer } from "../components/Timer";
+import { VoteProgressBar } from "../components/VoteProgressBar";
 import { AttributeType } from "../../../shared/types";
-
-const ATTR_TYPES: { type: AttributeType | "action"; label: string }[] = [
-  { type: "profession", label: "Профессия" },
-  { type: "bio", label: "Биология" },
-  { type: "health", label: "Здоровье" },
-  { type: "hobby", label: "Хобби" },
-  { type: "baggage", label: "Багаж" },
-  { type: "fact", label: "Доп. факт" },
-  { type: "action", label: "Особое условие" },
-];
+import { ATTR_TYPES } from "../utils/constants";
+import { toggleInSet } from "../utils/setUtils";
 
 export function VoteScreen() {
   const {
@@ -87,7 +80,9 @@ export function VoteScreen() {
         <div className="sticky-top-bar">
           <div className="top-bar-content">
             <div className="top-bar-left">
-              <span className="top-bar-phase">{isTiebreak ? "Переголосование" : "Голосование"}</span>
+              <span className="top-bar-phase">
+                {isTiebreak ? "Переголосование" : "Голосование"}
+              </span>
               <span className="top-bar-desc">Вы наблюдаете</span>
             </div>
             <div className="top-bar-right">
@@ -96,17 +91,10 @@ export function VoteScreen() {
           </div>
         </div>
         <div className="vote-container">
-          <div className="vote-progress-bar">
-            <div className="vote-progress-label">
-              Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
-            </div>
-            <div className="vote-progress-track">
-              <div
-                className="vote-progress-fill"
-                style={{ width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%` }}
-              />
-            </div>
-          </div>
+          <VoteProgressBar
+            votesCount={gameState.votesCount}
+            totalVotesExpected={gameState.totalVotesExpected}
+          />
         </div>
       </div>
     );
@@ -129,13 +117,6 @@ export function VoteScreen() {
 
   // Admin helpers
   const alivePlayers = gameState.players.filter((p) => p.alive);
-
-  const toggleInSet = <T,>(set: Set<T>, item: T): Set<T> => {
-    const next = new Set(set);
-    if (next.has(item)) next.delete(item);
-    else next.add(item);
-    return next;
-  };
 
   const handleAdminExecute = () => {
     if (!adminAction) return;
@@ -205,7 +186,9 @@ export function VoteScreen() {
         <div className="sticky-top-bar">
           <div className="top-bar-content">
             <div className="top-bar-left">
-              <span className="top-bar-phase">{isTiebreak ? "Переголосование" : "Голосование"}</span>
+              <span className="top-bar-phase">
+                {isTiebreak ? "Переголосование" : "Голосование"}
+              </span>
               <span className="top-bar-desc">Вы изгнаны</span>
             </div>
             <div className="top-bar-right">
@@ -217,17 +200,10 @@ export function VoteScreen() {
           <div className="vote-waiting-card">
             <p>Вы были изгнаны и не можете голосовать</p>
           </div>
-          <div className="vote-progress-bar">
-            <div className="vote-progress-label">
-              Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
-            </div>
-            <div className="vote-progress-track">
-              <div
-                className="vote-progress-fill"
-                style={{ width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%` }}
-              />
-            </div>
-          </div>
+          <VoteProgressBar
+            votesCount={gameState.votesCount}
+            totalVotesExpected={gameState.totalVotesExpected}
+          />
         </div>
       </div>
     );
@@ -240,7 +216,9 @@ export function VoteScreen() {
         <div className="sticky-top-bar">
           <div className="top-bar-content">
             <div className="top-bar-left">
-              <span className="top-bar-phase">{isTiebreak ? "Переголосование" : "Голосование"}</span>
+              <span className="top-bar-phase">
+                {isTiebreak ? "Переголосование" : "Голосование"}
+              </span>
               <span className="top-bar-desc">Голос принят</span>
             </div>
             <div className="top-bar-right">
@@ -255,17 +233,10 @@ export function VoteScreen() {
               <p className="last-elim-note">Вы голосуете как последний изгнанный</p>
             )}
           </div>
-          <div className="vote-progress-bar">
-            <div className="vote-progress-label">
-              Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
-            </div>
-            <div className="vote-progress-track">
-              <div
-                className="vote-progress-fill"
-                style={{ width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%` }}
-              />
-            </div>
-          </div>
+          <VoteProgressBar
+            votesCount={gameState.votesCount}
+            totalVotesExpected={gameState.totalVotesExpected}
+          />
         </div>
       </div>
     );
@@ -281,9 +252,7 @@ export function VoteScreen() {
               {isTiebreak ? "Переголосование" : "Кого изгнать?"}
             </span>
             <span className="top-bar-desc">
-              {isTiebreak
-                ? "Ничья! Выберите одного из кандидатов"
-                : "Выберите игрока для изгнания"}
+              {isTiebreak ? "Ничья! Выберите одного из кандидатов" : "Выберите игрока для изгнания"}
             </span>
           </div>
           <div className="top-bar-right">

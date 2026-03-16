@@ -17,4 +17,3 @@
 - **Сервер:** Node.js, Express, Socket.IO
 - **Клиент:** React 18, Vite, TypeScript
 - **Структура:** монорепо на npm workspaces (`shared`, `server`, `client`)
-

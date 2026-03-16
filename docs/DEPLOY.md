@@ -296,7 +296,7 @@ systemctl restart nginx
 
 ---
 
-## 🚀 Следующие шаги: HTTPS без порта в URL приложения 
+## 🚀 Следующие шаги: HTTPS без порта в URL приложения
 
 Сейчас PartyPlay работает на `https://partyplay.duckdns.org:8444`, потому что порт 443 занят VPN (Xray/VLESS Reality). Чтобы убрать порт из URL и получить чистый `https://partyplay.duckdns.org`:
 
