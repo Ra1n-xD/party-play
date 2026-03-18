@@ -122,28 +122,31 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
 
-    socket.on("room:created", ({ roomCode: code, playerId: pid }) => {
+    socket.on("room:created", ({ roomCode: code, playerId: pid, sessionToken: token }) => {
       setRoomCode(code);
       setPlayerId(pid);
       sessionStorage.setItem("bunker_room", code);
       sessionStorage.setItem("bunker_player", pid);
+      sessionStorage.setItem("bunker_token", token);
     });
 
-    socket.on("room:joined", ({ roomCode: code, playerId: pid }) => {
+    socket.on("room:joined", ({ roomCode: code, playerId: pid, sessionToken: token }) => {
       setRoomCode(code);
       setPlayerId(pid);
       setIsSpectator(false);
       sessionStorage.setItem("bunker_room", code);
       sessionStorage.setItem("bunker_player", pid);
+      sessionStorage.setItem("bunker_token", token);
       sessionStorage.removeItem("bunker_spectator");
     });
 
-    socket.on("room:spectatorJoined", ({ roomCode: code, spectatorId: sid }) => {
+    socket.on("room:spectatorJoined", ({ roomCode: code, spectatorId: sid, sessionToken: token }) => {
       setRoomCode(code);
       setPlayerId(sid);
       setIsSpectator(true);
       sessionStorage.setItem("bunker_room", code);
       sessionStorage.setItem("bunker_player", sid);
+      sessionStorage.setItem("bunker_token", token);
       sessionStorage.setItem("bunker_spectator", "true");
     });
 
@@ -239,12 +242,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     // Try to rejoin on page reload
     const savedRoom = sessionStorage.getItem("bunker_room");
     const savedPlayer = sessionStorage.getItem("bunker_player");
+    const savedToken = sessionStorage.getItem("bunker_token");
     const savedSpectator = sessionStorage.getItem("bunker_spectator");
-    if (savedRoom && savedPlayer) {
+    if (savedRoom && savedPlayer && savedToken) {
       if (savedSpectator === "true") {
-        socket.emit("room:rejoinSpectator", { roomCode: savedRoom, spectatorId: savedPlayer });
+        socket.emit("room:rejoinSpectator", { roomCode: savedRoom, spectatorId: savedPlayer, sessionToken: savedToken });
       } else {
-        socket.emit("room:rejoin", { roomCode: savedRoom, playerId: savedPlayer });
+        socket.emit("room:rejoin", { roomCode: savedRoom, playerId: savedPlayer, sessionToken: savedToken });
       }
     }
 
@@ -275,7 +279,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const rejoinRoom = useCallback((code: string, pid: string) => {
-    socket.emit("room:rejoin", { roomCode: code, playerId: pid });
+    const token = sessionStorage.getItem("bunker_token");
+    if (token) {
+      socket.emit("room:rejoin", { roomCode: code, playerId: pid, sessionToken: token });
+    }
   }, []);
 
   const setReady = useCallback((ready: boolean) => {
@@ -316,6 +323,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setMyCharacter(null);
     sessionStorage.removeItem("bunker_room");
     sessionStorage.removeItem("bunker_player");
+    sessionStorage.removeItem("bunker_token");
     sessionStorage.removeItem("bunker_spectator");
   }, []);
 

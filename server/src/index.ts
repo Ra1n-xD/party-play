@@ -39,6 +39,29 @@ app.get("/", (_req, res) => {
   res.json({ status: "ok", message: "PartyPlay Server" });
 });
 
+// Per-IP connection limiting
+const ipConnectionCounts = new Map<string, number>();
+
+io.use((socket, next) => {
+  const forwarded = socket.handshake.headers["x-forwarded-for"];
+  const ip = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null)
+    || socket.handshake.address;
+
+  const count = ipConnectionCounts.get(ip) || 0;
+  if (count >= CONFIG.MAX_CONNECTIONS_PER_IP) {
+    return next(new Error("Too many connections from this IP"));
+  }
+
+  ipConnectionCounts.set(ip, count + 1);
+  socket.on("disconnect", () => {
+    const c = ipConnectionCounts.get(ip) || 1;
+    if (c <= 1) ipConnectionCounts.delete(ip);
+    else ipConnectionCounts.set(ip, c - 1);
+  });
+
+  next();
+});
+
 registerHandlers(io);
 
 httpServer.listen(CONFIG.PORT, "0.0.0.0", () => {

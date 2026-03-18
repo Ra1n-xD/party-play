@@ -45,27 +45,45 @@ const socketRoomMap = new Map<
   { roomCode: string; playerId: string; role: "player" | "spectator" }
 >();
 
-// --- Rate limiting ---
-const RATE_LIMIT_WINDOW = 10_000; // 10 seconds
-const RATE_LIMIT_MAX = 50; // max events per window
-const socketEventCounts = new Map<string, { count: number; resetAt: number }>();
+// --- Per-action rate limiting ---
+const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
+  "room:create": { max: 1, windowMs: 10000 },
+  "room:join": { max: 3, windowMs: 10000 },
+  "room:joinSpectator": { max: 3, windowMs: 10000 },
+  "room:rejoin": { max: 3, windowMs: 10000 },
+  "room:rejoinSpectator": { max: 3, windowMs: 10000 },
+  "vote:cast": { max: 2, windowMs: 5000 },
+  "game:revealAttribute": { max: 2, windowMs: 2000 },
+  "game:revealActionCard": { max: 2, windowMs: 2000 },
+  default: { max: 20, windowMs: 10000 },
+};
 
-function isRateLimited(socketId: string): boolean {
+// socketId -> (action -> { count, resetAt })
+const socketActionCounts = new Map<string, Map<string, { count: number; resetAt: number }>>();
+
+function isRateLimited(socketId: string, action: string = "default"): boolean {
   const now = Date.now();
-  let entry = socketEventCounts.get(socketId);
+  const limit = ACTION_LIMITS[action] || ACTION_LIMITS.default;
 
+  let actions = socketActionCounts.get(socketId);
+  if (!actions) {
+    actions = new Map();
+    socketActionCounts.set(socketId, actions);
+  }
+
+  let entry = actions.get(action);
   if (!entry || now >= entry.resetAt) {
-    entry = { count: 1, resetAt: now + RATE_LIMIT_WINDOW };
-    socketEventCounts.set(socketId, entry);
+    entry = { count: 1, resetAt: now + limit.windowMs };
+    actions.set(action, entry);
     return false;
   }
 
   entry.count++;
-  return entry.count > RATE_LIMIT_MAX;
+  return entry.count > limit.max;
 }
 
 function cleanupRateLimitEntry(socketId: string): void {
-  socketEventCounts.delete(socketId);
+  socketActionCounts.delete(socketId);
 }
 
 // --- Input validation helpers ---
@@ -90,19 +108,20 @@ function isValidPlayerName(name: unknown): name is string {
 // --- Helper: get room info with rate limit check ---
 function getSocketInfo(
   socket: IOSocket,
+  action: string = "default",
 ): { roomCode: string; playerId: string; role: "player" | "spectator" } | null {
-  if (isRateLimited(socket.id)) {
+  if (isRateLimited(socket.id, action)) {
     socket.emit("room:error", { message: "Слишком много запросов, подождите" });
     return null;
   }
   return socketRoomMap.get(socket.id) || null;
 }
 
-function getSocketRoom(socket: IOSocket): {
+function getSocketRoom(socket: IOSocket, action: string = "default"): {
   room: Room;
   info: { roomCode: string; playerId: string; role: "player" | "spectator" };
 } | null {
-  const info = getSocketInfo(socket);
+  const info = getSocketInfo(socket, action);
   if (!info) return null;
   // Spectators should not use player-action handlers
   if (info.role === "spectator") return null;
@@ -128,7 +147,7 @@ export function registerHandlers(io: IOServer): void {
     }
 
     socket.on("room:create", ({ playerName }) => {
-      if (isRateLimited(socket.id)) {
+      if (isRateLimited(socket.id, "room:create")) {
         socket.emit("room:error", {
           message: "Слишком много запросов, подождите",
         });
@@ -158,12 +177,12 @@ export function registerHandlers(io: IOServer): void {
         role: "player",
       });
 
-      socket.emit("room:created", { roomCode: room.code, playerId: player.id });
+      socket.emit("room:created", { roomCode: room.code, playerId: player.id, sessionToken: player.sessionToken });
       broadcastState(room, io);
     });
 
     socket.on("room:join", ({ roomCode, playerName }) => {
-      if (isRateLimited(socket.id)) {
+      if (isRateLimited(socket.id, "room:join")) {
         socket.emit("room:error", {
           message: "Слишком много запросов, подождите",
         });
@@ -195,12 +214,12 @@ export function registerHandlers(io: IOServer): void {
         role: "player",
       });
 
-      socket.emit("room:joined", { roomCode: room.code, playerId: player.id });
+      socket.emit("room:joined", { roomCode: room.code, playerId: player.id, sessionToken: player.sessionToken });
       broadcastState(room, io);
     });
 
-    socket.on("room:rejoin", ({ roomCode, playerId }) => {
-      if (isRateLimited(socket.id)) return;
+    socket.on("room:rejoin", ({ roomCode, playerId, sessionToken }) => {
+      if (isRateLimited(socket.id, "room:rejoin")) return;
 
       const room = getRoom(roomCode);
       if (!room) {
@@ -214,6 +233,12 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
+      // Validate session token
+      if (!sessionToken || player.sessionToken !== sessionToken) {
+        socket.emit("room:error", { message: "Недействительный токен сессии" });
+        return;
+      }
+
       // Reconnect
       player.socketId = socket.id;
       player.connected = true;
@@ -224,7 +249,7 @@ export function registerHandlers(io: IOServer): void {
         role: "player",
       });
 
-      socket.emit("room:joined", { roomCode: room.code, playerId: player.id });
+      socket.emit("room:joined", { roomCode: room.code, playerId: player.id, sessionToken: player.sessionToken });
 
       // Re-send character if game is in progress
       if (player.character) {
@@ -235,7 +260,7 @@ export function registerHandlers(io: IOServer): void {
     });
 
     socket.on("room:joinSpectator", ({ roomCode, spectatorName }) => {
-      if (isRateLimited(socket.id)) {
+      if (isRateLimited(socket.id, "room:joinSpectator")) {
         socket.emit("room:error", {
           message: "Слишком много запросов, подождите",
         });
@@ -274,12 +299,13 @@ export function registerHandlers(io: IOServer): void {
       socket.emit("room:spectatorJoined", {
         roomCode: room.code,
         spectatorId: spectator.id,
+        sessionToken: spectator.sessionToken,
       });
       broadcastState(room, io);
     });
 
-    socket.on("room:rejoinSpectator", ({ roomCode, spectatorId }) => {
-      if (isRateLimited(socket.id)) return;
+    socket.on("room:rejoinSpectator", ({ roomCode, spectatorId, sessionToken }) => {
+      if (isRateLimited(socket.id, "room:rejoinSpectator")) return;
 
       const room = getRoom(roomCode);
       if (!room) {
@@ -290,6 +316,12 @@ export function registerHandlers(io: IOServer): void {
       const spectator = room.spectators.get(spectatorId);
       if (!spectator) {
         socket.emit("room:error", { message: "Зритель не найден в комнате" });
+        return;
+      }
+
+      // Validate session token
+      if (!sessionToken || spectator.sessionToken !== sessionToken) {
+        socket.emit("room:error", { message: "Недействительный токен сессии" });
         return;
       }
 
@@ -305,6 +337,7 @@ export function registerHandlers(io: IOServer): void {
       socket.emit("room:spectatorJoined", {
         roomCode: room.code,
         spectatorId: spectator.id,
+        sessionToken: spectator.sessionToken,
       });
       broadcastState(room, io);
     });
@@ -343,7 +376,7 @@ export function registerHandlers(io: IOServer): void {
     });
 
     socket.on("game:revealAttribute", ({ attributeIndex }) => {
-      const ctx = getSocketRoom(socket);
+      const ctx = getSocketRoom(socket, "game:revealAttribute");
       if (!ctx) return;
 
       // Validate attributeIndex if provided
@@ -365,7 +398,7 @@ export function registerHandlers(io: IOServer): void {
     });
 
     socket.on("game:revealActionCard", () => {
-      const ctx = getSocketRoom(socket);
+      const ctx = getSocketRoom(socket, "game:revealActionCard");
       if (!ctx) return;
 
       const success = revealActionCard(ctx.room, ctx.info.playerId, io);
@@ -377,7 +410,7 @@ export function registerHandlers(io: IOServer): void {
     });
 
     socket.on("vote:cast", ({ targetPlayerId }) => {
-      const ctx = getSocketRoom(socket);
+      const ctx = getSocketRoom(socket, "vote:cast");
       if (!ctx) return;
 
       // Validate target exists in room and is alive

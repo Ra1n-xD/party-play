@@ -1,10 +1,11 @@
 import { GamePhase, Catastrophe, Character, BunkerCard, ThreatCard } from "../../shared/types.js";
-import { generateRoomCode, generatePlayerId } from "./utils.js";
+import { generateRoomCode, generatePlayerId, generateSessionToken, randomPick } from "./utils.js";
 import { CONFIG } from "./config.js";
 
 export interface Player {
   id: string;
   socketId: string;
+  sessionToken: string;
   name: string;
   ready: boolean;
   connected: boolean;
@@ -45,6 +46,7 @@ export interface GameState {
 export interface Spectator {
   id: string;
   socketId: string;
+  sessionToken: string;
   name: string;
   connected: boolean;
 }
@@ -91,6 +93,7 @@ export function createRoom(socketId: string, playerName: string): { room: Room; 
   const player: Player = {
     id: playerId,
     socketId,
+    sessionToken: generateSessionToken(),
     name: playerName,
     ready: false,
     connected: true,
@@ -132,6 +135,7 @@ export function joinRoom(
   const player: Player = {
     id: playerId,
     socketId,
+    sessionToken: generateSessionToken(),
     name: playerName,
     ready: false,
     connected: true,
@@ -223,13 +227,14 @@ export function addBotToRoom(room: Room): Player | null {
   const available = BOT_NAMES.filter((n) => !usedNames.has(n));
   const name =
     available.length > 0
-      ? available[Math.floor(Math.random() * available.length)]
+      ? randomPick(available)
       : `Бот ${room.players.size + 1}`;
 
   const playerId = generatePlayerId();
   const player: Player = {
     id: playerId,
     socketId: "",
+    sessionToken: "",
     name,
     ready: true,
     connected: true,
@@ -270,6 +275,7 @@ export function joinRoomAsSpectator(
   const spectator: Spectator = {
     id: spectatorId,
     socketId,
+    sessionToken: generateSessionToken(),
     name: spectatorName,
     connected: true,
   };

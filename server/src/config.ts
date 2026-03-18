@@ -25,7 +25,7 @@ export const CONFIG = {
   PORT: parseInt(process.env.PORT || "3001", 10),
   MIN_PLAYERS: 4,
   MAX_PLAYERS: 16,
-  ROOM_CODE_LENGTH: 6,
+  ROOM_CODE_LENGTH: 8,
   TOTAL_ROUNDS: 5,
   ATTRIBUTE_COUNT: 6,
   ...TIMERS,
@@ -35,4 +35,5 @@ export const CONFIG = {
   MAX_PLAYER_NAME_LENGTH: 30, // Макс длина имени
   MAX_ROOMS: 500, // Макс количество комнат
   ROOM_INACTIVE_TTL: 30 * 60 * 1000, // 30 минут TTL для неактивных комнат
+  MAX_CONNECTIONS_PER_IP: 10, // Макс подключений с одного IP
 };

@@ -79,7 +79,7 @@ export function HomeScreen() {
               placeholder="Код комнаты"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              maxLength={6}
+              maxLength={8}
               className="input input-code"
               autoFocus
             />
@@ -102,7 +102,7 @@ export function HomeScreen() {
               placeholder="Код комнаты"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              maxLength={6}
+              maxLength={8}
               className="input input-code"
               autoFocus
             />

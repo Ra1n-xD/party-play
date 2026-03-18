@@ -436,7 +436,7 @@ function tallyVotes(room: Room, io: IOServer): void {
     eliminatePlayer(room, candidates[0], io);
   } else if (isTiebreak) {
     // Already had a tiebreak — random elimination per rules
-    const randomElim = candidates[Math.floor(Math.random() * candidates.length)];
+    const randomElim = randomPick(candidates);
     eliminatePlayer(room, randomElim, io);
   } else {
     // Tie — start tiebreak: defense speeches then re-vote
@@ -734,7 +734,7 @@ export function adminReplaceBunkerCard(
     return { success: false, error: "Нет доступных карт бункера для замены" };
   }
 
-  const newCard = available[Math.floor(Math.random() * available.length)];
+  const newCard = randomPick(available);
   room.gameState.bunkerCards[cardIndex] = {
     title: newCard.title,
     description: newCard.description,

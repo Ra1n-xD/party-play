@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { Server } from "socket.io";
 import { ServerEvents, ClientEvents } from "../../shared/types.js";
 import { Room, Player, getAlivePlayers } from "./roomManager.js";
@@ -25,10 +26,7 @@ function addBotTimer(roomCode: string, timer: ReturnType<typeof setTimeout>): vo
 }
 
 function randomDelay(): number {
-  return (
-    CONFIG.BOT_ACTION_DELAY_MIN +
-    Math.random() * (CONFIG.BOT_ACTION_DELAY_MAX - CONFIG.BOT_ACTION_DELAY_MIN)
-  );
+  return randomInt(CONFIG.BOT_ACTION_DELAY_MIN, CONFIG.BOT_ACTION_DELAY_MAX + 1);
 }
 
 export function scheduleBotActions(room: Room, io: IOServer): void {
@@ -75,7 +73,7 @@ function scheduleBotReveal(room: Room, io: IOServer): void {
       return;
     }
 
-    const idx = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+    const idx = unrevealed[randomInt(unrevealed.length)];
     revealAttribute(room, player.id, idx, io);
   }, randomDelay());
 
@@ -123,7 +121,7 @@ function scheduleBotVotes(room: Room, io: IOServer): void {
 
       if (candidates.length === 0) return;
 
-      const target = candidates[Math.floor(Math.random() * candidates.length)];
+      const target = candidates[randomInt(candidates.length)];
       castVote(room, bot.id, target.id, io);
     }, delay);
 
