@@ -385,6 +385,7 @@ export function castVote(room: Room, voterId: string, targetId: string, io: IOSe
     if (room.gameState.phaseTimer) clearTimeout(room.gameState.phaseTimer);
     room.gameState.phaseTimer = null;
     room.gameState.phaseEndTime = null;
+    room.gameState.pausedCallback = null;
     tallyVotes(room, io);
   }
 
@@ -393,6 +394,8 @@ export function castVote(room: Room, voterId: string, targetId: string, io: IOSe
 
 function tallyVotes(room: Room, io: IOServer): void {
   if (!room.gameState) return;
+  // Guard against double tally (timer + last vote arriving simultaneously)
+  if (room.gameState.phase !== "ROUND_VOTE" && room.gameState.phase !== "ROUND_VOTE_TIEBREAK") return;
 
   const isTiebreak = room.gameState.phase === "ROUND_VOTE_TIEBREAK";
   const voteCounts = new Map<string, number>();
