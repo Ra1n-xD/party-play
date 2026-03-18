@@ -270,6 +270,7 @@ export function joinRoomAsSpectator(
 ): { room: Room; spectator: Spectator } | { error: string } {
   const room = rooms.get(roomCode);
   if (!room) return { error: "Комната не найдена" };
+  if (room.spectators.size >= CONFIG.MAX_SPECTATORS_PER_ROOM) return { error: "Слишком много зрителей" };
 
   const spectatorId = generatePlayerId();
   const spectator: Spectator = {

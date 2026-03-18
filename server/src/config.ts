@@ -36,4 +36,5 @@ export const CONFIG = {
   MAX_ROOMS: 500, // Макс количество комнат
   ROOM_INACTIVE_TTL: 30 * 60 * 1000, // 30 минут TTL для неактивных комнат
   MAX_CONNECTIONS_PER_IP: 10, // Макс подключений с одного IP
+  MAX_SPECTATORS_PER_ROOM: 20, // Макс зрителей в одной комнате
 };

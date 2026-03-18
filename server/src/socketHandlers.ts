@@ -144,6 +144,18 @@ function isValidPlayerName(name: unknown): name is string {
   return sanitized.length > 0 && sanitized.length <= CONFIG.MAX_PLAYER_NAME_LENGTH;
 }
 
+function isValidRoomCode(code: unknown): code is string {
+  return typeof code === "string" && /^[A-Z0-9]{4,16}$/.test(code.trim().toUpperCase());
+}
+
+function isValidId(id: unknown): id is string {
+  return typeof id === "string" && /^p_[a-f0-9]{24}$/.test(id);
+}
+
+function isValidSessionToken(token: unknown): token is string {
+  return typeof token === "string" && /^[a-f0-9]{64}$/.test(token);
+}
+
 // --- Helper: get room info with rate limit check ---
 function getSocketInfo(
   socket: IOSocket,
@@ -234,7 +246,7 @@ export function registerHandlers(io: IOServer): void {
         });
         return;
       }
-      if (!roomCode?.trim()) {
+      if (!isValidRoomCode(roomCode)) {
         socket.emit("room:error", { message: "Введите код комнаты" });
         return;
       }
@@ -261,6 +273,12 @@ export function registerHandlers(io: IOServer): void {
       if (isRateLimited(socket.id, "room:rejoin")) return;
       if (isRejoinBlocked(socket)) {
         socket.emit("room:error", { message: "Слишком много неудачных попыток, подождите" });
+        return;
+      }
+
+      if (!isValidRoomCode(roomCode) || !isValidId(playerId) || !isValidSessionToken(sessionToken)) {
+        recordRejoinFailure(socket);
+        socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
       }
 
@@ -322,7 +340,7 @@ export function registerHandlers(io: IOServer): void {
         });
         return;
       }
-      if (!roomCode?.trim()) {
+      if (!isValidRoomCode(roomCode)) {
         socket.emit("room:error", { message: "Введите код комнаты" });
         return;
       }
@@ -357,6 +375,12 @@ export function registerHandlers(io: IOServer): void {
       if (isRateLimited(socket.id, "room:rejoinSpectator")) return;
       if (isRejoinBlocked(socket)) {
         socket.emit("room:error", { message: "Слишком много неудачных попыток, подождите" });
+        return;
+      }
+
+      if (!isValidRoomCode(roomCode) || !isValidId(spectatorId) || !isValidSessionToken(sessionToken)) {
+        recordRejoinFailure(socket);
+        socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
       }
 
