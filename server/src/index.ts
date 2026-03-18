@@ -1,5 +1,7 @@
 import express from "express";
 import { createServer } from "http";
+import { createServer as createHttpsServer } from "https";
+import { readFileSync } from "fs";
 import { Server } from "socket.io";
 import cors from "cors";
 import helmet from "helmet";
@@ -11,8 +13,25 @@ const app = express();
 // Trust reverse proxy (Caddy/Nginx) — correct client IP in req.ip
 app.set("trust proxy", 1);
 
-// Security headers
-app.use(helmet());
+// Security headers with CSP
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: ["'self'", "ws:", "wss:"],
+        imgSrc: ["'self'", "data:"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    // Prevent clickjacking
+    frameguard: { action: "deny" },
+  }),
+);
 
 // CORS — restricted origins
 const allowedOrigins = process.env.CORS_ORIGINS
@@ -25,7 +44,18 @@ app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ limit: "10kb", extended: true }));
 
-const httpServer = createServer(app);
+// HTTPS support: set SSL_CERT and SSL_KEY env vars to enable
+const sslCert = process.env.SSL_CERT;
+const sslKey = process.env.SSL_KEY;
+const useHttps = sslCert && sslKey;
+
+const httpServer = useHttps
+  ? createHttpsServer(
+      { cert: readFileSync(sslCert), key: readFileSync(sslKey) },
+      app,
+    )
+  : createServer(app);
+
 const io = new Server(httpServer, {
   cors: {
     origin: allowedOrigins,
@@ -65,5 +95,9 @@ io.use((socket, next) => {
 registerHandlers(io);
 
 httpServer.listen(CONFIG.PORT, "0.0.0.0", () => {
-  console.log(`PartyPlay server running on http://0.0.0.0:${CONFIG.PORT}`);
+  const proto = useHttps ? "https" : "http";
+  console.log(`PartyPlay server running on ${proto}://0.0.0.0:${CONFIG.PORT}`);
+  if (!useHttps) {
+    console.log("WARNING: Running without HTTPS. Set SSL_CERT and SSL_KEY env vars for production.");
+  }
 });
