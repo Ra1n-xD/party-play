@@ -86,6 +86,40 @@ function cleanupRateLimitEntry(socketId: string): void {
   socketActionCounts.delete(socketId);
 }
 
+// --- Progressive backoff for failed rejoin attempts (per IP) ---
+const rejoinFailures = new Map<string, { count: number; blockedUntil: number }>();
+
+function getSocketIp(socket: IOSocket): string {
+  const forwarded = socket.handshake.headers["x-forwarded-for"];
+  return (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null)
+    || socket.handshake.address;
+}
+
+function isRejoinBlocked(socket: IOSocket): boolean {
+  const ip = getSocketIp(socket);
+  const entry = rejoinFailures.get(ip);
+  if (!entry) return false;
+  if (Date.now() < entry.blockedUntil) return true;
+  // Block expired — reset
+  rejoinFailures.delete(ip);
+  return false;
+}
+
+function recordRejoinFailure(socket: IOSocket): void {
+  const ip = getSocketIp(socket);
+  const entry = rejoinFailures.get(ip) || { count: 0, blockedUntil: 0 };
+  entry.count++;
+  // Exponential backoff: 2s, 4s, 8s, 16s, max 60s
+  const delaySec = Math.min(60, 2 ** entry.count);
+  entry.blockedUntil = Date.now() + delaySec * 1000;
+  rejoinFailures.set(ip, entry);
+}
+
+function clearRejoinFailures(socket: IOSocket): void {
+  const ip = getSocketIp(socket);
+  rejoinFailures.delete(ip);
+}
+
 // --- Input validation helpers ---
 const VALID_ATTRIBUTE_TYPES = ["profession", "bio", "health", "hobby", "baggage", "fact", "action"];
 
@@ -97,12 +131,17 @@ function isValidCardIndex(index: unknown): index is number {
   return typeof index === "number" && Number.isInteger(index) && index >= 0;
 }
 
+function sanitizePlayerName(name: string): string {
+  return name
+    .replace(/[<>&"'`/\\]/g, "") // Strip HTML/script-dangerous characters
+    .replace(/[\x00-\x1F\x7F]/g, "") // Strip control characters
+    .trim();
+}
+
 function isValidPlayerName(name: unknown): name is string {
-  return (
-    typeof name === "string" &&
-    name.trim().length > 0 &&
-    name.trim().length <= CONFIG.MAX_PLAYER_NAME_LENGTH
-  );
+  if (typeof name !== "string") return false;
+  const sanitized = sanitizePlayerName(name);
+  return sanitized.length > 0 && sanitized.length <= CONFIG.MAX_PLAYER_NAME_LENGTH;
 }
 
 // --- Helper: get room info with rate limit check ---
@@ -169,7 +208,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
-      const { room, player } = createRoom(socket.id, playerName.trim());
+      const { room, player } = createRoom(socket.id, sanitizePlayerName(playerName));
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -200,7 +239,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
-      const result = joinRoom(roomCode.trim().toUpperCase(), socket.id, playerName.trim());
+      const result = joinRoom(roomCode.trim().toUpperCase(), socket.id, sanitizePlayerName(playerName));
       if ("error" in result) {
         socket.emit("room:error", { message: result.error });
         return;
@@ -220,24 +259,34 @@ export function registerHandlers(io: IOServer): void {
 
     socket.on("room:rejoin", ({ roomCode, playerId, sessionToken }) => {
       if (isRateLimited(socket.id, "room:rejoin")) return;
+      if (isRejoinBlocked(socket)) {
+        socket.emit("room:error", { message: "Слишком много неудачных попыток, подождите" });
+        return;
+      }
 
       const room = getRoom(roomCode);
       if (!room) {
-        socket.emit("room:error", { message: "Комната не найдена" });
+        recordRejoinFailure(socket);
+        socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
       }
 
       const player = room.players.get(playerId);
       if (!player) {
-        socket.emit("room:error", { message: "Игрок не найден в комнате" });
+        recordRejoinFailure(socket);
+        socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
       }
 
       // Validate session token
       if (!sessionToken || player.sessionToken !== sessionToken) {
-        socket.emit("room:error", { message: "Недействительный токен сессии" });
+        recordRejoinFailure(socket);
+        socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
       }
+
+      // Success — clear failure counter
+      clearRejoinFailures(socket);
 
       // Reconnect
       player.socketId = socket.id;
@@ -281,7 +330,7 @@ export function registerHandlers(io: IOServer): void {
       const result = joinRoomAsSpectator(
         roomCode.trim().toUpperCase(),
         socket.id,
-        spectatorName.trim(),
+        sanitizePlayerName(spectatorName),
       );
       if ("error" in result) {
         socket.emit("room:error", { message: result.error });
@@ -306,24 +355,34 @@ export function registerHandlers(io: IOServer): void {
 
     socket.on("room:rejoinSpectator", ({ roomCode, spectatorId, sessionToken }) => {
       if (isRateLimited(socket.id, "room:rejoinSpectator")) return;
+      if (isRejoinBlocked(socket)) {
+        socket.emit("room:error", { message: "Слишком много неудачных попыток, подождите" });
+        return;
+      }
 
       const room = getRoom(roomCode);
       if (!room) {
-        socket.emit("room:error", { message: "Комната не найдена" });
+        recordRejoinFailure(socket);
+        socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
       }
 
       const spectator = room.spectators.get(spectatorId);
       if (!spectator) {
-        socket.emit("room:error", { message: "Зритель не найден в комнате" });
+        recordRejoinFailure(socket);
+        socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
       }
 
       // Validate session token
       if (!sessionToken || spectator.sessionToken !== sessionToken) {
-        socket.emit("room:error", { message: "Недействительный токен сессии" });
+        recordRejoinFailure(socket);
+        socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
       }
+
+      // Success — clear failure counter
+      clearRejoinFailures(socket);
 
       spectator.socketId = socket.id;
       spectator.connected = true;
