@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { Server, Socket } from "socket.io";
 import { ClientEvents, ServerEvents } from "../../shared/types.js";
 import {
@@ -156,6 +157,13 @@ function isValidSessionToken(token: unknown): token is string {
   return typeof token === "string" && /^[a-f0-9]{64}$/.test(token);
 }
 
+function tokensEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "hex");
+  const bufB = Buffer.from(b, "hex");
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
 // --- Helper: get room info with rate limit check ---
 function getSocketInfo(
   socket: IOSocket,
@@ -297,7 +305,7 @@ export function registerHandlers(io: IOServer): void {
       }
 
       // Validate session token
-      if (!sessionToken || player.sessionToken !== sessionToken) {
+      if (!sessionToken || !tokensEqual(player.sessionToken, sessionToken)) {
         recordRejoinFailure(socket);
         socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
@@ -399,7 +407,7 @@ export function registerHandlers(io: IOServer): void {
       }
 
       // Validate session token
-      if (!sessionToken || spectator.sessionToken !== sessionToken) {
+      if (!sessionToken || !tokensEqual(spectator.sessionToken, sessionToken)) {
         recordRejoinFailure(socket);
         socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
