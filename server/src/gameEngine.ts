@@ -810,6 +810,8 @@ export function adminRevivePlayer(
   if (player.alive) return { success: false, error: "Игрок уже в игре" };
 
   player.alive = true;
+  player.hasVoted = false;
+  player.votedFor = null;
 
   // Remove from elimination order
   room.gameState.eliminationOrder = room.gameState.eliminationOrder.filter(
