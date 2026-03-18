@@ -73,9 +73,9 @@ app.get("/", (_req, res) => {
 const ipConnectionCounts = new Map<string, number>();
 
 io.use((socket, next) => {
-  const forwarded = socket.handshake.headers["x-forwarded-for"];
-  const ip = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null)
-    || socket.handshake.address;
+  // Use socket.handshake.address which respects the proxy chain,
+  // not raw X-Forwarded-For header which can be spoofed
+  const ip = socket.handshake.address;
 
   const count = ipConnectionCounts.get(ip) || 0;
   if (count >= CONFIG.MAX_CONNECTIONS_PER_IP) {
@@ -94,7 +94,7 @@ io.use((socket, next) => {
 
 registerHandlers(io);
 
-httpServer.listen(CONFIG.PORT, "0.0.0.0", () => {
+httpServer.listen(CONFIG.PORT, "127.0.0.1", () => {
   const proto = useHttps ? "https" : "http";
   console.log(`PartyPlay server running on ${proto}://0.0.0.0:${CONFIG.PORT}`);
   if (!useHttps) {

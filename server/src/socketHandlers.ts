@@ -36,6 +36,7 @@ import {
   adminEliminatePlayer,
 } from "./gameEngine.js";
 import { CONFIG } from "./config.js";
+import { generateSessionToken } from "./utils.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 type IOSocket = Socket<ClientEvents, ServerEvents>;
@@ -91,9 +92,9 @@ function cleanupRateLimitEntry(socketId: string): void {
 const rejoinFailures = new Map<string, { count: number; blockedUntil: number }>();
 
 function getSocketIp(socket: IOSocket): string {
-  const forwarded = socket.handshake.headers["x-forwarded-for"];
-  return (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null)
-    || socket.handshake.address;
+  // Use socket.handshake.address — do not parse X-Forwarded-For manually,
+  // as it can be spoofed to bypass rate limiting
+  return socket.handshake.address;
 }
 
 function isRejoinBlocked(socket: IOSocket): boolean {
@@ -314,6 +315,10 @@ export function registerHandlers(io: IOServer): void {
       // Success — clear failure counter
       clearRejoinFailures(socket);
 
+      // Rotate session token on successful rejoin
+      const newToken = generateSessionToken();
+      player.sessionToken = newToken;
+
       // Reconnect
       player.socketId = socket.id;
       player.connected = true;
@@ -324,7 +329,7 @@ export function registerHandlers(io: IOServer): void {
         role: "player",
       });
 
-      socket.emit("room:joined", { roomCode: room.code, playerId: player.id, sessionToken: player.sessionToken });
+      socket.emit("room:joined", { roomCode: room.code, playerId: player.id, sessionToken: newToken });
 
       // Re-send character if game is in progress
       if (player.character) {
@@ -416,6 +421,10 @@ export function registerHandlers(io: IOServer): void {
       // Success — clear failure counter
       clearRejoinFailures(socket);
 
+      // Rotate session token on successful rejoin
+      const newToken = generateSessionToken();
+      spectator.sessionToken = newToken;
+
       spectator.socketId = socket.id;
       spectator.connected = true;
       socket.join(room.code);
@@ -428,7 +437,7 @@ export function registerHandlers(io: IOServer): void {
       socket.emit("room:spectatorJoined", {
         roomCode: room.code,
         spectatorId: spectator.id,
-        sessionToken: spectator.sessionToken,
+        sessionToken: newToken,
       });
       broadcastState(room, io);
     });

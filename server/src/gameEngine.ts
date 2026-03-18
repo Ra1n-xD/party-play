@@ -392,10 +392,15 @@ export function castVote(room: Room, voterId: string, targetId: string, io: IOSe
   return true;
 }
 
+let tallyInProgress = new Set<string>();
+
 function tallyVotes(room: Room, io: IOServer): void {
   if (!room.gameState) return;
   // Guard against double tally (timer + last vote arriving simultaneously)
   if (room.gameState.phase !== "ROUND_VOTE" && room.gameState.phase !== "ROUND_VOTE_TIEBREAK") return;
+  // Prevent concurrent tally for the same room
+  if (tallyInProgress.has(room.code)) return;
+  tallyInProgress.add(room.code);
 
   const isTiebreak = room.gameState.phase === "ROUND_VOTE_TIEBREAK";
   const voteCounts = new Map<string, number>();
@@ -422,6 +427,8 @@ function tallyVotes(room: Room, io: IOServer): void {
   for (const count of voteCounts.values()) {
     if (count > maxVotes) maxVotes = count;
   }
+
+  tallyInProgress.delete(room.code);
 
   if (maxVotes === 0) {
     // No votes cast — skip elimination
@@ -567,12 +574,22 @@ export function revealActionCard(room: Room, playerId: string, io: IOServer): bo
 
 // ============ Admin Panel Functions ============
 
+const ADMIN_BLOCKED_PHASES: Set<string> = new Set([
+  "ROUND_VOTE",
+  "ROUND_VOTE_TIEBREAK",
+]);
+
+function isAdminBlockedPhase(room: Room): boolean {
+  return !!room.gameState && ADMIN_BLOCKED_PHASES.has(room.gameState.phase);
+}
+
 export function adminShuffleAll(
   room: Room,
   attributeType: string,
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
 
   const alivePlayers = getAlivePlayers(room).filter((p) => p.character);
   if (alivePlayers.length < 2) return { success: false, error: "Недостаточно игроков" };
@@ -631,6 +648,7 @@ export function adminSwapAttribute(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
 
   const p1 = room.players.get(p1Id);
   const p2 = room.players.get(p2Id);
@@ -672,6 +690,7 @@ export function adminReplaceAttribute(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
 
   const player = room.players.get(targetPlayerId);
   if (!player?.character) return { success: false, error: "Игрок не найден" };
@@ -756,6 +775,7 @@ export function adminDeleteAttribute(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
 
   const player = room.players.get(targetPlayerId);
   if (!player?.character) return { success: false, error: "Игрок не найден" };
@@ -804,6 +824,7 @@ export function adminRevivePlayer(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
 
   const player = room.players.get(targetPlayerId);
   if (!player) return { success: false, error: "Игрок не найден" };
@@ -834,6 +855,7 @@ export function adminEliminatePlayer(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
 
   const player = room.players.get(targetPlayerId);
   if (!player) return { success: false, error: "Игрок не найден" };
