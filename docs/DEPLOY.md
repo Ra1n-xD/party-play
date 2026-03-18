@@ -1,6 +1,6 @@
 # Деплой PartyPlay на VPS
 
-## 1. Купить VPS
+## 1. Купить VPS 
 
 Любой провайдер (Timeweb, Aeza, Selectel, Hetzner). Минимум: **1 vCPU, 1 GB RAM, Ubuntu 22.04/24.04**.
 
