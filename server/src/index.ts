@@ -21,7 +21,7 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        connectSrc: ["'self'", "ws:", "wss:"],
+        connectSrc: ["'self'", "wss:"],
         imgSrc: ["'self'", "data:"],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
