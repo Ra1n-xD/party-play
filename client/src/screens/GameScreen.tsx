@@ -5,6 +5,7 @@ import "../styles/game-screen.css";
 import { AccessibleModal } from "./game/AccessibleModal";
 import { CharacterLoadingState } from "./game/CharacterLoadingState";
 import { CharacterDossier } from "./game/CharacterDossier";
+import { GameCommandBar } from "./game/GameCommandBar";
 import { GameStatusHeader } from "./game/GameStatusHeader";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { HostControlDialog } from "./game/HostControlDialog";
@@ -153,18 +154,8 @@ export function GameScreen() {
     ) : null;
 
   return (
-    <main
-      className={`screen command-game-screen ${view.hasBottomAction ? "has-game-actions" : ""}`}
-    >
-      <GameRoomHeader
-        roomCode={roomCode}
-        connected={connected}
-        canManageGame={Boolean(view.me?.isHost)}
-        canSkipDiscussion={gameState.phase === "ROUND_DISCUSSION"}
-        onOpenHostControls={openHostControls}
-        onSkipDiscussion={adminSkipDiscussion}
-        onLeaveRoom={leaveRoom}
-      />
+    <main className="screen command-game-screen has-game-command-bar">
+      <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
       <GameStatusHeader
         gameState={gameState}
         phaseLabel={view.phaseLabel}
@@ -204,34 +195,27 @@ export function GameScreen() {
         />
       </div>
 
-      {view.hasBottomAction && (
-        <div className="gs-action-bar" aria-label="Игровые действия">
-          {view.canRevealAction && (
-            <button
-              type="button"
-              className="btn btn-reveal-action btn-bottom-action"
-              onClick={openRevealActionConfirmation}
-            >
-              Раскрыть особое условие
-            </button>
-          )}
-          {view.canReveal && (
-            <button
-              type="button"
-              className="btn btn-primary btn-reveal btn-bottom-action"
-              onClick={() => {
-                if (gameState.roundNumber === 1) {
-                  revealAttribute(0);
-                } else {
-                  openAttributePicker();
-                }
-              }}
-            >
-              Раскрыть характеристику
-            </button>
-          )}
-        </div>
-      )}
+      <GameCommandBar
+        currentTurnPlayer={view.currentTurnPlayer}
+        isMyTurn={view.isMyTurn}
+        phaseLabel={view.phaseLabel}
+        phaseDescription={view.phaseDescription}
+        canReveal={view.canReveal}
+        canRevealAction={view.canRevealAction}
+        canManageGame={Boolean(view.me?.isHost)}
+        canSkipDiscussion={gameState.phase === "ROUND_DISCUSSION"}
+        hostControlsOpen={hostControlsOpen}
+        onReveal={() => {
+          if (gameState.roundNumber === 1) {
+            revealAttribute(0);
+          } else {
+            openAttributePicker();
+          }
+        }}
+        onRevealAction={openRevealActionConfirmation}
+        onOpenHostControls={openHostControls}
+        onSkipDiscussion={adminSkipDiscussion}
+      />
 
       {view.me?.isHost && (
         <HostControlDialog

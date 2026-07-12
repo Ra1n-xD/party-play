@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
 import { BiDonateHeart } from "react-icons/bi";
+import { ROOM_CODE_LENGTH, sanitizeRoomCodeInput } from "../../../shared/roomCode";
 import { useGame } from "../context/GameContext";
 
 export function HomeScreen() {
@@ -76,14 +77,18 @@ export function HomeScreen() {
             </p>
             <input
               type="text"
-              placeholder="Код комнаты"
+              placeholder="Код комнаты (4 буквы)"
               value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              maxLength={8}
+              onChange={(e) => setJoinCode(sanitizeRoomCodeInput(e.target.value))}
+              maxLength={ROOM_CODE_LENGTH}
               className="input input-code"
               autoFocus
             />
-            <button className="btn btn-primary" onClick={handleJoin} disabled={joinCode.length < 4}>
+            <button
+              className="btn btn-primary"
+              onClick={handleJoin}
+              disabled={joinCode.length !== ROOM_CODE_LENGTH}
+            >
               Войти
             </button>
             <button className="btn btn-text" onClick={() => setMode("menu")}>
@@ -99,17 +104,17 @@ export function HomeScreen() {
             </p>
             <input
               type="text"
-              placeholder="Код комнаты"
+              placeholder="Код комнаты (4 буквы)"
               value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              maxLength={8}
+              onChange={(e) => setJoinCode(sanitizeRoomCodeInput(e.target.value))}
+              maxLength={ROOM_CODE_LENGTH}
               className="input input-code"
               autoFocus
             />
             <button
               className="btn btn-primary"
               onClick={handleSpectate}
-              disabled={joinCode.length < 4}
+              disabled={joinCode.length !== ROOM_CODE_LENGTH}
             >
               Наблюдать
             </button>

@@ -1,3 +1,5 @@
+import { ROOM_CODE_LENGTH } from "../../shared/roomCode.js";
+
 // ---- Тест (быстрые таймеры) ----
 const TEST_TIMERS = {
   CATASTROPHE_REVEAL_TIME: 5000, // 5 сек
@@ -25,7 +27,7 @@ export const CONFIG = {
   PORT: parseInt(process.env.PORT || "3001", 10),
   MIN_PLAYERS: 4,
   MAX_PLAYERS: 16,
-  ROOM_CODE_LENGTH: 8,
+  ROOM_CODE_LENGTH,
   TOTAL_ROUNDS: 5,
   ATTRIBUTE_COUNT: 6,
   ...TIMERS,

@@ -1,11 +1,11 @@
 import { randomBytes, randomInt } from "crypto";
+import { ROOM_CODE_ALPHABET } from "../../shared/roomCode.js";
 import { CONFIG } from "./config.js";
 
 export function generateRoomCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   for (let i = 0; i < CONFIG.ROOM_CODE_LENGTH; i++) {
-    code += chars[randomInt(chars.length)];
+    code += ROOM_CODE_ALPHABET[randomInt(ROOM_CODE_ALPHABET.length)];
   }
   return code;
 }

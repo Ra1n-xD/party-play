@@ -25,12 +25,12 @@ export interface AdminSelection {
 export interface GameScreenViewModel {
   me?: PlayerInfo;
   alivePlayers: PlayerInfo[];
+  currentTurnPlayer?: PlayerInfo;
   isMyTurn: boolean;
   revealedIndices: Set<number>;
   unrevealedIndices: number[];
   canReveal: boolean;
   canRevealAction: boolean;
-  hasBottomAction: boolean;
   phaseLabel: string;
   phaseDescription: string;
 }
@@ -80,6 +80,9 @@ export function buildGameScreenViewModel({
   myCharacter,
 }: BuildViewModelArgs): GameScreenViewModel {
   const me = isSpectator ? undefined : gameState.players.find((player) => player.id === playerId);
+  const currentTurnPlayer = gameState.players.find(
+    (player) => player.id === gameState.currentTurnPlayerId,
+  );
   const isMyTurn = Boolean(me && gameState.currentTurnPlayerId === me.id);
   const revealedIndices = getRevealedIndices(myCharacter, me);
   const unrevealedIndices = myCharacter
@@ -104,22 +107,21 @@ export function buildGameScreenViewModel({
     } else if (isMyTurn) {
       phaseDescription = "Все доступные характеристики уже раскрыты";
     } else {
-      const current = gameState.players.find(
-        (player) => player.id === gameState.currentTurnPlayerId,
-      );
-      phaseDescription = current ? `Сейчас ходит ${current.name}` : "Ожидаем следующего игрока";
+      phaseDescription = currentTurnPlayer
+        ? `Сейчас ходит ${currentTurnPlayer.name}`
+        : "Ожидаем следующего игрока";
     }
   }
 
   return {
     me,
     alivePlayers: gameState.players.filter((player) => player.alive),
+    currentTurnPlayer,
     isMyTurn,
     revealedIndices,
     unrevealedIndices,
     canReveal,
     canRevealAction,
-    hasBottomAction: canReveal || canRevealAction,
     phaseLabel: PHASE_LABELS[gameState.phase] ?? gameState.phase,
     phaseDescription,
   };
