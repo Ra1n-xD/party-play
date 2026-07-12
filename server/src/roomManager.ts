@@ -210,6 +210,14 @@ export function getAllRooms(): Map<string, Room> {
   return rooms;
 }
 
+export function resetRoomManagerStateForTests(): void {
+  for (const room of rooms.values()) {
+    if (room.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
+  }
+  rooms.clear();
+  roomLastActivity.clear();
+}
+
 const BOT_NAMES = [
   "Алексей",
   "Мария",
