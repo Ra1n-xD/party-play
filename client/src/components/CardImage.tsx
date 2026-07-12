@@ -199,7 +199,7 @@ const CARD_CONFIG: Record<CardType, { color: string; label: string; icon: JSX.El
     ),
   },
   action: {
-    color: "#a855f7",
+    color: "#c084fc",
     label: "ОСОБОЕ",
     icon: (
       // Lightning bolt

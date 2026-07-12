@@ -1,4 +1,5 @@
 import React, { type ReactNode } from "react";
+import { FiAlertTriangle } from "react-icons/fi";
 import type { ClientGameState } from "../../context/GameContext";
 
 interface ScenarioSummaryProps {
@@ -7,6 +8,44 @@ interface ScenarioSummaryProps {
   expanded: boolean;
   onToggle: () => void;
   alwaysExpanded?: boolean;
+}
+
+interface ScenarioDetailsProps {
+  idPrefix: string;
+  gameState: ClientGameState;
+}
+
+export function ScenarioDetails({ idPrefix, gameState }: ScenarioDetailsProps) {
+  const revealedCount = gameState.revealedBunkerCards.length;
+
+  return (
+    <div id={`${idPrefix}-details`} className="gs-scenario-details">
+      <div className="gs-bunker-details">
+        <h3>Бункер</h3>
+        <div className="gs-bunker-cards">
+          {gameState.revealedBunkerCards.map((card, index) => {
+            const isNew = gameState.phase === "BUNKER_EXPLORE" && index === revealedCount - 1;
+
+            return (
+              <div
+                key={`${card.title}-${index}`}
+                className={`gs-bunker-card${isNew ? " is-new" : ""}`}
+              >
+                <span className="gs-bunker-card-title">{card.title}</span>
+                <span className="gs-bunker-card-description">{card.description}</span>
+              </div>
+            );
+          })}
+          {gameState.threatCard && (
+            <div className="gs-bunker-card gs-bunker-threat-card">
+              <span className="gs-bunker-card-title">Угроза · {gameState.threatCard.title}</span>
+              <span className="gs-bunker-card-description">{gameState.threatCard.description}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ScenarioSummary({
@@ -20,8 +59,16 @@ export function ScenarioSummary({
   const revealedCount = gameState.revealedBunkerCards.length;
   const summaryContent: ReactNode = (
     <>
-      <span id={`${idPrefix}-title`} className="gs-scenario-title">
-        {gameState.catastrophe?.title ?? "Катастрофа не раскрыта"}
+      <span className="gs-scenario-alert-icon" aria-hidden="true">
+        <FiAlertTriangle />
+      </span>
+      <span className="gs-scenario-copy">
+        <span id={`${idPrefix}-title`} className="gs-scenario-title">
+          {gameState.catastrophe?.title ?? "Катастрофа не раскрыта"}
+        </span>
+        <span className="gs-scenario-description">
+          {gameState.catastrophe?.description ?? "Описание сценария пока недоступно"}
+        </span>
       </span>
       <span className="gs-scenario-meta">
         Бункер: {revealedCount} из {gameState.totalBunkerCards}
@@ -49,43 +96,7 @@ export function ScenarioSummary({
         </button>
       )}
 
-      {isOpen && (
-        <div id={`${idPrefix}-details`} className="gs-scenario-details">
-          {gameState.catastrophe && (
-            <div className="gs-catastrophe-details">
-              <p>{gameState.catastrophe.description}</p>
-            </div>
-          )}
-
-          <div className="gs-bunker-details">
-            <h3>Бункер</h3>
-            <div className="gs-bunker-cards">
-              {gameState.revealedBunkerCards.map((card, index) => {
-                const isNew = gameState.phase === "BUNKER_EXPLORE" && index === revealedCount - 1;
-
-                return (
-                  <div
-                    key={`${card.title}-${index}`}
-                    className={`gs-bunker-card${isNew ? " is-new" : ""}`}
-                  >
-                    <span className="gs-bunker-card-title">{card.title}</span>
-                    <span className="gs-bunker-card-description">{card.description}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="gs-bunker-capacity">Мест в бункере: {gameState.bunkerCapacity}</p>
-          </div>
-
-          {gameState.threatCard && (
-            <div className="gs-threat-details">
-              <h3>Угроза</h3>
-              <span className="gs-threat-title">{gameState.threatCard.title}</span>
-              <span className="gs-threat-description">{gameState.threatCard.description}</span>
-            </div>
-          )}
-        </div>
-      )}
+      {isOpen && <ScenarioDetails idPrefix={idPrefix} gameState={gameState} />}
     </section>
   );
 }
