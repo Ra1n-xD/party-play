@@ -39,15 +39,24 @@ import {
 import { CONFIG } from "./config.js";
 import { generateSessionToken } from "./utils.js";
 import { resetBotManagerStateForTests } from "./botManager.js";
+import { resetGameLifecycleHooksForTests, setBeforeGameOverHook } from "./gameLifecycle.js";
 import {
   bindPlayerSocket,
   bindSpectatorSocket,
+  cancelAllSeatClaims,
+  cancelSeatClaim,
   cancelClaimsForPlayer,
+  createSeatClaim,
   ensureConnectedHost,
+  expireSeatClaims,
+  finalizeApprovedSeatClaim,
   isCurrentSocketOwner,
+  listReconnectableSeats,
   markPlayerDisconnected,
   removeLobbyPlayerWithHostFailover,
   removeClaimsForSocket,
+  resetSeatClaimStateForTests,
+  resolveSeatClaim,
   transferHost,
 } from "./reconnectManager.js";
 
@@ -71,14 +80,26 @@ const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
   "room:joinSpectator": { max: 3, windowMs: 10000 },
   "room:rejoin": { max: 3, windowMs: 10000 },
   "room:rejoinSpectator": { max: 3, windowMs: 10000 },
+  "room:listReconnectableSeats": { max: 5, windowMs: 10000 },
+  "room:requestSeatClaim": { max: 3, windowMs: 10000 },
+  "room:cancelSeatClaim": { max: 5, windowMs: 10000 },
+  "admin:resolveSeatClaim": { max: 5, windowMs: 10000 },
   "vote:cast": { max: 2, windowMs: 5000 },
   "game:revealAttribute": { max: 2, windowMs: 2000 },
   "game:revealActionCard": { max: 2, windowMs: 2000 },
   default: { max: 20, windowMs: 10000 },
 };
 
+const CLAIM_IP_ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
+  "room:listReconnectableSeats": { max: 12, windowMs: 10000 },
+  "room:requestSeatClaim": { max: 12, windowMs: 10000 },
+  "admin:resolveSeatClaim": { max: 12, windowMs: 10000 },
+};
+
 // socketId -> (action -> { count, resetAt })
 const socketActionCounts = new Map<string, Map<string, { count: number; resetAt: number }>>();
+const ipActionCounts = new Map<string, Map<string, { count: number; resetAt: number }>>();
+let nextIpActionPruneAt = 0;
 
 function isRateLimited(socketId: string, action: string = "default"): boolean {
   const now = Date.now();
@@ -99,6 +120,47 @@ function isRateLimited(socketId: string, action: string = "default"): boolean {
 
   entry.count++;
   return entry.count > limit.max;
+}
+
+function isIpRateLimited(socket: IOSocket, action: string): boolean {
+  const limit = CLAIM_IP_ACTION_LIMITS[action];
+  if (!limit) return false;
+
+  const now = Date.now();
+  if (now >= nextIpActionPruneAt) {
+    nextIpActionPruneAt = now + limit.windowMs;
+    for (const [storedIp, storedActions] of ipActionCounts) {
+      for (const [storedAction, entry] of storedActions) {
+        if (now >= entry.resetAt) storedActions.delete(storedAction);
+      }
+      if (storedActions.size === 0) ipActionCounts.delete(storedIp);
+    }
+  }
+
+  const ip = getSocketIp(socket);
+  let actions = ipActionCounts.get(ip);
+  if (!actions) {
+    actions = new Map();
+    ipActionCounts.set(ip, actions);
+  }
+
+  let entry = actions.get(action);
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 1, resetAt: now + limit.windowMs };
+    actions.set(action, entry);
+    return false;
+  }
+
+  entry.count++;
+  return entry.count > limit.max;
+}
+
+function rejectRateLimitedClaimAction(socket: IOSocket, action: string): boolean {
+  const socketLimited = isRateLimited(socket.id, action);
+  const ipLimited = isIpRateLimited(socket, action);
+  if (!socketLimited && !ipLimited) return false;
+  socket.emit("room:error", { message: "Слишком много запросов, подождите" });
+  return true;
 }
 
 function cleanupRateLimitEntry(socketId: string): void {
@@ -139,13 +201,24 @@ function clearRejoinFailures(socket: IOSocket): void {
   rejoinFailures.delete(ip);
 }
 
+function installGameLifecycleHooks(): void {
+  setBeforeGameOverHook((room, io) => {
+    cancelAllSeatClaims(room, io, "Игра завершена");
+  });
+}
+
 export function resetSocketHandlerStateForTests(): void {
   for (const timer of spectatorGraceTimers.values()) clearTimeout(timer);
   spectatorGraceTimers.clear();
   socketRoomMap.clear();
   socketActionCounts.clear();
+  ipActionCounts.clear();
+  nextIpActionPruneAt = 0;
   rejoinFailures.clear();
+  resetGameLifecycleHooksForTests();
+  installGameLifecycleHooks();
   resetBotManagerStateForTests();
+  resetSeatClaimStateForTests();
   resetRoomManagerStateForTests();
 }
 
@@ -185,6 +258,10 @@ function isValidSessionToken(token: unknown): token is string {
   return typeof token === "string" && /^[a-f0-9]{64}$/.test(token);
 }
 
+function isValidSeatClaimId(id: unknown): id is string {
+  return typeof id === "string" && /^[a-f0-9]{32}$/.test(id);
+}
+
 function tokensEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "hex");
   const bufB = Buffer.from(b, "hex");
@@ -216,10 +293,7 @@ function getCurrentSocketMembership(socket: IOSocket): SocketMembership | null {
   if (membership.role === "player") {
     const player = room?.players.get(membership.playerId);
     ownsMembership =
-      !!player &&
-      player.connected &&
-      !player.kicked &&
-      isCurrentSocketOwner(player, socket.id);
+      !!player && player.connected && !player.kicked && isCurrentSocketOwner(player, socket.id);
   } else {
     const spectator = room?.spectators.get(membership.playerId);
     ownsMembership = !!spectator && spectator.connected && spectator.socketId === socket.id;
@@ -250,10 +324,7 @@ function rejectExistingSocketMembership(
 }
 
 // --- Helper: get room info with rate limit check ---
-function getSocketInfo(
-  socket: IOSocket,
-  action: string = "default",
-): SocketMembership | null {
+function getSocketInfo(socket: IOSocket, action: string = "default"): SocketMembership | null {
   if (isRateLimited(socket.id, action)) {
     socket.emit("room:error", { message: "Слишком много запросов, подождите" });
     return null;
@@ -261,7 +332,10 @@ function getSocketInfo(
   return getCurrentSocketMembership(socket);
 }
 
-function getSocketRoom(socket: IOSocket, action: string = "default"): {
+function getSocketRoom(
+  socket: IOSocket,
+  action: string = "default",
+): {
   room: Room;
   info: { roomCode: string; playerId: string; role: "player" | "spectator" };
 } | null {
@@ -315,6 +389,7 @@ function requireHost(socket: IOSocket, room: Room, playerId: string): boolean {
 }
 
 export function registerHandlers(io: IOServer): void {
+  installGameLifecycleHooks();
   io.on("connection", (socket: IOSocket) => {
     if (process.env.NODE_ENV !== "production") {
       console.log(`Connected: ${socket.id}`);
@@ -344,6 +419,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
+      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       const { room, player } = createRoom(socket.id, sanitizePlayerName(playerName));
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
@@ -352,7 +428,11 @@ export function registerHandlers(io: IOServer): void {
         role: "player",
       });
 
-      socket.emit("room:created", { roomCode: room.code, playerId: player.id, sessionToken: player.sessionToken });
+      socket.emit("room:created", {
+        roomCode: room.code,
+        playerId: player.id,
+        sessionToken: player.sessionToken,
+      });
       broadcastState(room, io);
     });
 
@@ -376,13 +456,18 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
-      const result = joinRoom(roomCode.trim().toUpperCase(), socket.id, sanitizePlayerName(playerName));
+      const result = joinRoom(
+        roomCode.trim().toUpperCase(),
+        socket.id,
+        sanitizePlayerName(playerName),
+      );
       if ("error" in result) {
         socket.emit("room:error", { message: result.error });
         return;
       }
 
       const { room, player } = result;
+      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -390,7 +475,11 @@ export function registerHandlers(io: IOServer): void {
         role: "player",
       });
 
-      socket.emit("room:joined", { roomCode: room.code, playerId: player.id, sessionToken: player.sessionToken });
+      socket.emit("room:joined", {
+        roomCode: room.code,
+        playerId: player.id,
+        sessionToken: player.sessionToken,
+      });
       if (!ensureConnectedHost(room, io)) broadcastState(room, io);
     });
 
@@ -476,6 +565,7 @@ export function registerHandlers(io: IOServer): void {
       }
 
       clearRejoinFailures(socket);
+      removeClaimsForSocket(socket.id, io, "Владелец места вернулся", true);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -496,6 +586,92 @@ export function registerHandlers(io: IOServer): void {
 
       removeDisconnectPause(room, player.id, io, false);
       if (!ensureConnectedHost(room, io)) broadcastState(room, io);
+    });
+
+    socket.on("room:listReconnectableSeats", (data) => {
+      if (rejectExistingSocketMembership(socket)) return;
+      if (rejectRateLimitedClaimAction(socket, "room:listReconnectableSeats")) return;
+
+      const roomCode = data?.roomCode;
+      if (!isValidRoomCode(roomCode)) {
+        socket.emit("room:error", { message: "Введите код комнаты" });
+        return;
+      }
+      const normalizedRoomCode = roomCode.trim().toUpperCase();
+      const room = getRoom(normalizedRoomCode);
+      if (!room) {
+        socket.emit("room:error", { message: "Комната не найдена" });
+        return;
+      }
+      if (room.gameState?.phase === "GAME_OVER") {
+        socket.emit("room:error", { message: "Игра завершена" });
+        return;
+      }
+
+      expireSeatClaims(room, io);
+      socket.leave(room.code);
+      socket.emit("room:reconnectableSeats", {
+        roomCode: room.code,
+        seats: listReconnectableSeats(room),
+      });
+    });
+
+    socket.on("room:requestSeatClaim", (data) => {
+      if (rejectExistingSocketMembership(socket)) return;
+      if (rejectRateLimitedClaimAction(socket, "room:requestSeatClaim")) return;
+
+      const roomCode = data?.roomCode;
+      const playerId = data?.playerId;
+      const claimantName = data?.claimantName;
+      if (!isValidRoomCode(roomCode)) {
+        socket.emit("room:error", { message: "Введите код комнаты" });
+        return;
+      }
+      const normalizedRoomCode = roomCode.trim().toUpperCase();
+      const room = getRoom(normalizedRoomCode);
+      if (!room) {
+        socket.emit("room:error", { message: "Комната не найдена" });
+        return;
+      }
+      if (!isValidId(playerId)) {
+        socket.emit("room:error", { message: "Место недоступно для восстановления" });
+        return;
+      }
+      if (!isValidPlayerName(claimantName)) {
+        socket.emit("room:error", {
+          message: `Имя должно быть от 1 до ${CONFIG.MAX_PLAYER_NAME_LENGTH} символов`,
+        });
+        return;
+      }
+
+      expireSeatClaims(room, io);
+      socket.leave(room.code);
+      const result = createSeatClaim(
+        room,
+        socket.id,
+        playerId,
+        sanitizePlayerName(claimantName),
+        io,
+      );
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+        return;
+      }
+      socket.emit("room:seatClaimSubmitted", { requestId: result.claim.id });
+    });
+
+    socket.on("room:cancelSeatClaim", (data) => {
+      if (isRateLimited(socket.id, "room:cancelSeatClaim")) {
+        socket.emit("room:error", { message: "Слишком много запросов, подождите" });
+        return;
+      }
+      const requestId = data?.requestId;
+      if (!isValidSeatClaimId(requestId)) {
+        socket.emit("room:error", { message: "Заявка не найдена" });
+        return;
+      }
+      const result = cancelSeatClaim(socket.id, requestId, io);
+      if (!result.success) socket.emit("room:error", { message: result.error });
     });
 
     socket.on("room:joinSpectator", ({ roomCode, spectatorName }) => {
@@ -529,6 +705,7 @@ export function registerHandlers(io: IOServer): void {
       }
 
       const { room, spectator } = result;
+      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -551,7 +728,11 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
-      if (!isValidRoomCode(roomCode) || !isValidId(spectatorId) || !isValidSessionToken(sessionToken)) {
+      if (
+        !isValidRoomCode(roomCode) ||
+        !isValidId(spectatorId) ||
+        !isValidSessionToken(sessionToken)
+      ) {
         recordRejoinFailure(socket);
         socket.emit("room:error", { message: "Не удалось переподключиться" });
         return;
@@ -606,6 +787,7 @@ export function registerHandlers(io: IOServer): void {
 
       clearRejoinFailures(socket);
       clearSpectatorGraceTimer(spectator.id);
+      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       const newToken = generateSessionToken();
       spectator.sessionToken = newToken;
 
@@ -737,6 +919,7 @@ export function registerHandlers(io: IOServer): void {
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
 
+      cancelAllSeatClaims(ctx.room, io, "Игра сброшена");
       resetGame(ctx.room, io);
     });
 
@@ -771,6 +954,90 @@ export function registerHandlers(io: IOServer): void {
     });
 
     // --- Admin panel events ---
+
+    socket.on("admin:resolveSeatClaim", (data) => {
+      const ctx = getSocketRoom(socket);
+      if (!ctx) return;
+      if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
+      if (rejectRateLimitedClaimAction(socket, "admin:resolveSeatClaim")) return;
+
+      const requestId = data?.requestId;
+      const approved = data?.approved;
+      if (!isValidSeatClaimId(requestId)) {
+        socket.emit("room:error", { message: "Некорректный ID заявки" });
+        return;
+      }
+      if (typeof approved !== "boolean") {
+        socket.emit("room:error", { message: "Некорректное решение по заявке" });
+        return;
+      }
+
+      const resolutionNow = Date.now();
+      const resolution = resolveSeatClaim(
+        ctx.room,
+        ctx.info.playerId,
+        requestId,
+        approved,
+        io,
+        resolutionNow,
+      );
+      if (!resolution.success) {
+        socket.emit("room:error", { message: resolution.error });
+        return;
+      }
+      if (!resolution.approved) return;
+
+      const { claim, player } = resolution;
+      const claimantSocket = io.sockets.sockets.get(claim.socketId);
+      const claimantMembership = claimantSocket ? getCurrentSocketMembership(claimantSocket) : null;
+      if (
+        !claimantSocket?.connected ||
+        claimantMembership !== null ||
+        claimantSocket.rooms.size > 1
+      ) {
+        removeClaimsForSocket(claim.socketId, io, "Заявитель больше недоступен", true);
+        socket.emit("room:error", { message: "Заявитель больше недоступен" });
+        return;
+      }
+
+      const bindResult = bindPlayerSocket(player, claimantSocket.id, (previousSocketId) => {
+        const previousInfo = socketRoomMap.get(previousSocketId);
+        if (
+          previousInfo?.roomCode === ctx.room.code &&
+          previousInfo.playerId === player.id &&
+          previousInfo.role === "player"
+        ) {
+          socketRoomMap.delete(previousSocketId);
+        }
+        io.sockets.sockets.get(previousSocketId)?.leave(ctx.room.code);
+      });
+      if (!bindResult.ok) {
+        removeClaimsForSocket(claim.socketId, io, bindResult.error, true);
+        socket.emit("room:error", { message: bindResult.error });
+        return;
+      }
+
+      player.name = sanitizePlayerName(claim.claimantName);
+      player.sessionToken = generateSessionToken();
+      claimantSocket.join(ctx.room.code);
+      socketRoomMap.set(claimantSocket.id, {
+        roomCode: ctx.room.code,
+        playerId: player.id,
+        role: "player",
+      });
+
+      finalizeApprovedSeatClaim(ctx.room, requestId, io, resolutionNow);
+      removeClaimsForSocket(claimantSocket.id, io, "Вы уже восстановили другое место", true);
+      claimantSocket.emit("room:joined", {
+        roomCode: ctx.room.code,
+        playerId: player.id,
+        sessionToken: player.sessionToken,
+      });
+      if (player.character) claimantSocket.emit("game:character", player.character);
+
+      removeDisconnectPause(ctx.room, player.id, io, false);
+      if (!ensureConnectedHost(ctx.room, io)) broadcastState(ctx.room, io);
+    });
 
     socket.on("admin:transferHost", ({ targetPlayerId }) => {
       const ctx = getSocketRoom(socket);
@@ -958,7 +1225,7 @@ export function registerHandlers(io: IOServer): void {
     });
 
     socket.on("room:leave", () => {
-      removeClaimsForSocket(socket.id);
+      removeClaimsForSocket(socket.id, io, "Заявка отменена", true);
       const info = socketRoomMap.get(socket.id);
       if (info?.role === "spectator") {
         const room = getRoom(info.roomCode);
@@ -1005,7 +1272,7 @@ export function registerHandlers(io: IOServer): void {
       if (process.env.NODE_ENV !== "production") {
         console.log(`Disconnected: ${socket.id}`);
       }
-      removeClaimsForSocket(socket.id);
+      removeClaimsForSocket(socket.id, io);
       const info = socketRoomMap.get(socket.id);
       cleanupRateLimitEntry(socket.id);
       if (!info) return;

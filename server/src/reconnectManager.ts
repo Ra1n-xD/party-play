@@ -1,7 +1,9 @@
+import { randomBytes } from "crypto";
 import type { Server } from "socket.io";
 import type {
   ClientEvents,
   HostChangeReason,
+  ReconnectableSeat,
   ReconnectErrorCode,
   SeatClaimInfo,
   ServerEvents,
@@ -9,13 +11,20 @@ import type {
 import { addDisconnectPause, broadcastState, setAdminPause } from "./gameEngine.js";
 import {
   getAllRooms,
+  getRoom,
   removePlayer,
+  type PendingSeatClaim,
   type Player,
   type Room,
   type Spectator,
 } from "./roomManager.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
+
+export const SEAT_CLAIM_TTL_MS = 120_000;
+export const MAX_PENDING_SEAT_CLAIMS_PER_ROOM = 32;
+
+const seatClaimExpiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export type BindPlayerSocketResult =
   | { ok: true; previousSocketId: string }
@@ -76,6 +85,274 @@ export function bindSpectatorSocket(
   return { ok: true, previousSocketId };
 }
 
+function isReconnectablePlayer(player: Player | undefined): player is Player {
+  return !!player && !player.connected && !player.isBot && !player.kicked;
+}
+
+function generateSeatClaimId(): string {
+  let id: string;
+  do {
+    id = randomBytes(16).toString("hex");
+  } while (
+    seatClaimExpiryTimers.has(id) ||
+    Array.from(getAllRooms().values()).some((room) => room.pendingSeatClaims.has(id))
+  );
+  return id;
+}
+
+function clearSeatClaimExpiryTimer(requestId: string): void {
+  const timer = seatClaimExpiryTimers.get(requestId);
+  if (timer) clearTimeout(timer);
+  seatClaimExpiryTimers.delete(requestId);
+}
+
+function deleteSeatClaim(room: Room, requestId: string): PendingSeatClaim | null {
+  const claim = room.pendingSeatClaims.get(requestId);
+  if (!claim) return null;
+  room.pendingSeatClaims.delete(requestId);
+  clearSeatClaimExpiryTimer(requestId);
+  return claim;
+}
+
+function emitSeatClaimResolution(
+  claim: PendingSeatClaim,
+  approved: boolean,
+  message: string,
+  io: IOServer,
+): void {
+  io.to(claim.socketId).emit("room:seatClaimResolved", {
+    requestId: claim.id,
+    approved,
+    message,
+  });
+}
+
+function buildPendingClaimList(room: Room): SeatClaimInfo[] {
+  const claims: SeatClaimInfo[] = [];
+  for (const claim of room.pendingSeatClaims.values()) {
+    const player = room.players.get(claim.playerId);
+    if (!player) continue;
+    claims.push({
+      requestId: claim.id,
+      playerId: player.id,
+      playerName: player.name,
+      claimantName: claim.claimantName,
+    });
+  }
+  return claims;
+}
+
+export function emitClaimsToHost(room: Room, io: IOServer): void {
+  const host = room.players.get(room.hostId);
+  if (!host || !host.connected || host.isBot || host.kicked || !host.socketId) return;
+  io.to(host.socketId).emit("admin:seatClaimsUpdated", {
+    claims: buildPendingClaimList(room),
+  });
+}
+
+export function listReconnectableSeats(room: Room): ReconnectableSeat[] {
+  const seats: ReconnectableSeat[] = [];
+  for (const playerId of room.allPlayerIds) {
+    const player = room.players.get(playerId);
+    if (!isReconnectablePlayer(player)) continue;
+    seats.push({ playerId: player.id, playerName: player.name });
+  }
+  return seats;
+}
+
+export type CreateSeatClaimResult =
+  | { success: true; claim: PendingSeatClaim }
+  | { success: false; error: string };
+
+export interface CreateSeatClaimOptions {
+  now?: number;
+  ttlMs?: number;
+}
+
+export function createSeatClaim(
+  room: Room,
+  socketId: string,
+  playerId: string,
+  claimantName: string,
+  io: IOServer,
+  options: CreateSeatClaimOptions = {},
+): CreateSeatClaimResult {
+  if (room.gameState?.phase === "GAME_OVER") {
+    return { success: false, error: "Игра завершена" };
+  }
+  const player = room.players.get(playerId);
+  if (!isReconnectablePlayer(player)) {
+    return { success: false, error: "Место недоступно для восстановления" };
+  }
+  if (room.pendingSeatClaims.size >= MAX_PENDING_SEAT_CLAIMS_PER_ROOM) {
+    return {
+      success: false,
+      error: "Слишком много заявок на восстановление, попробуйте позже",
+    };
+  }
+
+  const now = options.now ?? Date.now();
+  const ttlMs = options.ttlMs ?? SEAT_CLAIM_TTL_MS;
+  const requestId = generateSeatClaimId();
+  const claim: PendingSeatClaim = {
+    id: requestId,
+    socketId,
+    playerId,
+    claimantName,
+    createdAt: now,
+    expiresAt: now + ttlMs,
+  };
+  room.pendingSeatClaims.set(requestId, claim);
+
+  const timer = setTimeout(() => {
+    if (seatClaimExpiryTimers.get(requestId) !== timer) return;
+    if (getRoom(room.code) !== room || room.pendingSeatClaims.get(requestId) !== claim) {
+      seatClaimExpiryTimers.delete(requestId);
+      return;
+    }
+    expireSeatClaims(room, io, claim.expiresAt);
+  }, ttlMs);
+  timer.unref();
+  seatClaimExpiryTimers.set(requestId, timer);
+  emitClaimsToHost(room, io);
+  return { success: true, claim };
+}
+
+export type ResolveSeatClaimResult =
+  | { success: true; approved: false }
+  | { success: true; approved: true; claim: PendingSeatClaim; player: Player }
+  | { success: false; error: string };
+
+export function resolveSeatClaim(
+  room: Room,
+  actorId: string,
+  requestId: string,
+  approved: boolean,
+  io: IOServer,
+  now = Date.now(),
+): ResolveSeatClaimResult {
+  const actor = room.players.get(actorId);
+  if (room.hostId !== actorId || !isEligibleHost(actor)) {
+    return { success: false, error: "Только хост может выполнить это действие" };
+  }
+
+  if (room.gameState?.phase === "GAME_OVER") {
+    cancelAllSeatClaims(room, io, "Игра завершена", now);
+    return { success: false, error: "Игра завершена" };
+  }
+
+  expireSeatClaims(room, io, now);
+  const claim = room.pendingSeatClaims.get(requestId);
+  if (!claim) {
+    return { success: false, error: "Заявка уже обработана или не найдена" };
+  }
+
+  if (!approved) {
+    deleteSeatClaim(room, requestId);
+    emitSeatClaimResolution(claim, false, "Хост отклонил заявку", io);
+    emitClaimsToHost(room, io);
+    return { success: true, approved: false };
+  }
+
+  const player = room.players.get(claim.playerId);
+  if (!isReconnectablePlayer(player)) {
+    deleteSeatClaim(room, requestId);
+    emitSeatClaimResolution(claim, false, "Место больше недоступно", io);
+    emitClaimsToHost(room, io);
+    return { success: false, error: "Место недоступно для восстановления" };
+  }
+
+  return { success: true, approved: true, claim, player };
+}
+
+export function finalizeApprovedSeatClaim(
+  room: Room,
+  requestId: string,
+  io: IOServer,
+  now = Date.now(),
+): boolean {
+  expireSeatClaims(room, io, now);
+  const winningClaim = deleteSeatClaim(room, requestId);
+  if (!winningClaim) return false;
+
+  emitSeatClaimResolution(winningClaim, true, "Заявка одобрена", io);
+  for (const [claimId, claim] of Array.from(room.pendingSeatClaims.entries())) {
+    let message: string | null = null;
+    if (claim.socketId === winningClaim.socketId) {
+      message = "Вы уже восстановили другое место";
+    } else if (claim.playerId === winningClaim.playerId) {
+      message = "Место уже занято другим игроком";
+    }
+    if (!message) continue;
+    deleteSeatClaim(room, claimId);
+    emitSeatClaimResolution(claim, false, message, io);
+  }
+  emitClaimsToHost(room, io);
+  return true;
+}
+
+export type CancelSeatClaimResult = { success: true } | { success: false; error: string };
+
+export function cancelSeatClaim(
+  socketId: string,
+  requestId: string,
+  io: IOServer,
+  now = Date.now(),
+): CancelSeatClaimResult {
+  for (const room of getAllRooms().values()) {
+    const claim = room.pendingSeatClaims.get(requestId);
+    const ownedExpiredClaim = !!claim && claim.socketId === socketId && claim.expiresAt <= now;
+    expireSeatClaims(room, io, now);
+    if (ownedExpiredClaim) return { success: true };
+    if (!claim) continue;
+    if (!room.pendingSeatClaims.has(requestId)) {
+      return { success: false, error: "Заявка не найдена" };
+    }
+    if (claim.socketId !== socketId) {
+      return { success: false, error: "Заявка не найдена" };
+    }
+    deleteSeatClaim(room, requestId);
+    emitSeatClaimResolution(claim, false, "Заявка отменена", io);
+    emitClaimsToHost(room, io);
+    return { success: true };
+  }
+  return { success: false, error: "Заявка не найдена" };
+}
+
+export function expireSeatClaims(room: Room, io: IOServer, now = Date.now()): number {
+  let removed = 0;
+  for (const [claimId, claim] of Array.from(room.pendingSeatClaims.entries())) {
+    if (claim.expiresAt > now) continue;
+    deleteSeatClaim(room, claimId);
+    emitSeatClaimResolution(claim, false, "Время ожидания истекло", io);
+    removed++;
+  }
+  if (removed > 0) emitClaimsToHost(room, io);
+  return removed;
+}
+
+export function cancelAllSeatClaims(
+  room: Room,
+  io?: IOServer,
+  message = "Заявка отменена",
+  now = Date.now(),
+): number {
+  let removed = io ? expireSeatClaims(room, io, now) : 0;
+  for (const [claimId, claim] of Array.from(room.pendingSeatClaims.entries())) {
+    deleteSeatClaim(room, claimId);
+    if (io) emitSeatClaimResolution(claim, false, message, io);
+    removed++;
+  }
+  if (io && removed > 0) emitClaimsToHost(room, io);
+  return removed;
+}
+
+export function resetSeatClaimStateForTests(): void {
+  for (const timer of seatClaimExpiryTimers.values()) clearTimeout(timer);
+  seatClaimExpiryTimers.clear();
+  for (const room of getAllRooms().values()) room.pendingSeatClaims.clear();
+}
+
 function isEligibleHost(player: Player | undefined): player is Player {
   return !!player && player.connected && !player.isBot && !player.kicked;
 }
@@ -95,21 +372,6 @@ function findNextEligibleHost(room: Room, formerHostId: string): Player | null {
   return null;
 }
 
-function buildPendingClaimList(room: Room): SeatClaimInfo[] {
-  const claims: SeatClaimInfo[] = [];
-  for (const claim of room.pendingSeatClaims.values()) {
-    const player = room.players.get(claim.playerId);
-    if (!player) continue;
-    claims.push({
-      requestId: claim.id,
-      playerId: player.id,
-      playerName: player.name,
-      claimantName: claim.claimantName,
-    });
-  }
-  return claims;
-}
-
 function commitHostTransfer(
   room: Room,
   successor: Player,
@@ -124,9 +386,7 @@ function commitHostTransfer(
     hostName: successor.name,
     reason,
   });
-  io.to(successor.socketId).emit("admin:seatClaimsUpdated", {
-    claims: buildPendingClaimList(room),
-  });
+  emitClaimsToHost(room, io);
 }
 
 export function ensureConnectedHost(room: Room, io: IOServer, formerHostId?: string): boolean {
@@ -231,29 +491,38 @@ export function cancelClaimsForPlayer(
   playerId: string,
   io?: IOServer,
   message = "Владелец места вернулся",
+  now = Date.now(),
 ): number {
-  let removed = 0;
-  for (const [claimId, claim] of room.pendingSeatClaims) {
+  let removed = io ? expireSeatClaims(room, io, now) : 0;
+  for (const [claimId, claim] of Array.from(room.pendingSeatClaims.entries())) {
     if (claim.playerId !== playerId) continue;
-    room.pendingSeatClaims.delete(claimId);
+    deleteSeatClaim(room, claimId);
     removed++;
-    io?.to(claim.socketId).emit("room:seatClaimResolved", {
-      requestId: claim.id,
-      approved: false,
-      message,
-    });
+    if (io) emitSeatClaimResolution(claim, false, message, io);
   }
+  if (io && removed > 0) emitClaimsToHost(room, io);
   return removed;
 }
 
-export function removeClaimsForSocket(socketId: string): number {
+export function removeClaimsForSocket(
+  socketId: string,
+  io?: IOServer,
+  message = "Заявка отменена",
+  notifyRequester = false,
+  now = Date.now(),
+): number {
   let removed = 0;
   for (const room of getAllRooms().values()) {
-    for (const [claimId, claim] of room.pendingSeatClaims) {
+    if (io) removed += expireSeatClaims(room, io, now);
+    let removedFromRoom = 0;
+    for (const [claimId, claim] of Array.from(room.pendingSeatClaims.entries())) {
       if (claim.socketId !== socketId) continue;
-      room.pendingSeatClaims.delete(claimId);
+      deleteSeatClaim(room, claimId);
+      if (io && notifyRequester) emitSeatClaimResolution(claim, false, message, io);
       removed++;
+      removedFromRoom++;
     }
+    if (io && removedFromRoom > 0) emitClaimsToHost(room, io);
   }
   return removed;
 }
