@@ -22,7 +22,11 @@ export interface ReconnectSession {
 
 function getBrowserStorage(): StorageLike | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeSession(session: ReconnectSession): ReconnectSession | null {
