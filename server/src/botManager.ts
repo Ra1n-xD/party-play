@@ -15,7 +15,14 @@ export function clearBotActions(roomCode: string): void {
   if (timers) {
     for (const t of timers) clearTimeout(t);
   }
-  pendingBotTimers.set(roomCode, []);
+  pendingBotTimers.delete(roomCode);
+}
+
+export function resetBotManagerStateForTests(): void {
+  for (const timers of pendingBotTimers.values()) {
+    for (const timer of timers) clearTimeout(timer);
+  }
+  pendingBotTimers.clear();
 }
 
 function addBotTimer(roomCode: string, timer: ReturnType<typeof setTimeout>): void {

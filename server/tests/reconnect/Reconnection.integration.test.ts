@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { Server } from "socket.io";
-import type { ClientEvents, GamePhase, ServerEvents } from "../../../shared/types.js";
+import type {
+  Character,
+  ClientEvents,
+  GamePhase,
+  ReconnectErrorCode,
+  ServerEvents,
+} from "../../../shared/types.js";
 import { clearBotActions, scheduleBotActions } from "../../src/botManager.js";
 import { CONFIG } from "../../src/config.js";
 import * as gameEngine from "../../src/gameEngine.js";
@@ -16,13 +22,19 @@ import {
 import {
   addBotToRoom,
   createRoom,
+  getAllRooms,
   getRoom,
   joinRoom,
   removePlayer,
   type Player,
   type Room,
 } from "../../src/roomManager.js";
-import { createSocketTestServer } from "../helpers/socketTestServer.js";
+import { resetSocketHandlerStateForTests } from "../../src/socketHandlers.js";
+import {
+  createSocketTestServer,
+  type SocketTestClient,
+  type SocketTestServer,
+} from "../helpers/socketTestServer.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 
@@ -31,6 +43,29 @@ interface StartedRoom {
   io: IOServer;
   humans: Player[];
   bots: Player[];
+}
+
+interface SocketPlayerCredential {
+  roomCode: string;
+  playerId: string;
+  sessionToken: string;
+}
+
+interface SocketStartedGame {
+  server: SocketTestServer;
+  host: SocketTestClient;
+  humans: SocketTestClient[];
+  credentials: SocketPlayerCredential[];
+  characters: Character[];
+  room: Room;
+}
+
+interface SocketLobby {
+  server: SocketTestServer;
+  host: SocketTestClient;
+  humans: SocketTestClient[];
+  credentials: SocketPlayerCredential[];
+  room: Room;
 }
 
 function createStartedRoom(
@@ -86,6 +121,134 @@ function useFastBotTimers(t: TestContext): void {
   });
 }
 
+function useShortReconnectGrace(t: TestContext, gracePeriodMs = 20): void {
+  const originalGracePeriod = CONFIG.RECONNECT_GRACE_PERIOD;
+  CONFIG.RECONNECT_GRACE_PERIOD = gracePeriodMs;
+  t.after(() => {
+    CONFIG.RECONNECT_GRACE_PERIOD = originalGracePeriod;
+  });
+}
+
+async function createFourHumanSocketLobby(t: TestContext): Promise<SocketLobby> {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const host = await server.connectClient();
+  host.emit("room:create", { playerName: "Host" });
+  const hostCredential = await host.waitFor("room:created");
+  await host.waitFor("game:state", (state) => state.players.length === 1);
+
+  const humans = [host];
+  const credentials: SocketPlayerCredential[] = [hostCredential];
+  for (let index = 1; index < 4; index++) {
+    const human = await server.connectClient();
+    human.emit("room:join", {
+      roomCode: hostCredential.roomCode,
+      playerName: `Human ${index}`,
+    });
+    credentials.push(await human.waitFor("room:joined"));
+    humans.push(human);
+    await host.waitFor("game:state", (state) => state.players.length === index + 1);
+  }
+
+  const room = getRoom(hostCredential.roomCode);
+  assert.ok(room);
+  return { server, host, humans, credentials, room };
+}
+
+async function createFourHumanSocketGame(t: TestContext): Promise<SocketStartedGame> {
+  const lobby = await createFourHumanSocketLobby(t);
+
+  for (const human of lobby.humans.slice(1)) {
+    human.emit("player:ready", { ready: true });
+  }
+  await lobby.host.waitFor("game:state", (state) =>
+    state.players.filter((player) => !player.isHost).every((player) => player.ready),
+  );
+
+  const characterPromises = lobby.humans.map((human) => human.waitFor("game:character"));
+  lobby.host.emit("game:start");
+  const characters = await Promise.all(characterPromises);
+  await lobby.host.waitFor("game:state", (state) => state.phase === "CATASTROPHE_REVEAL");
+
+  return { ...lobby, characters };
+}
+
+type RejoinOutcome =
+  | {
+      event: "joined";
+      payload: { roomCode: string; playerId: string; sessionToken: string };
+    }
+  | {
+      event: "reconnectError";
+      payload: { message: string; code: ReconnectErrorCode; terminal: boolean };
+    }
+  | { event: "roomError"; payload: { message: string } };
+
+function waitForRejoinOutcome(client: SocketTestClient): Promise<RejoinOutcome> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("Timed out waiting for reconnect outcome"));
+    }, 1_000);
+    const cleanup = () => {
+      clearTimeout(timer);
+      client.socket.off("room:joined", onJoined);
+      client.socket.off("room:reconnectError", onReconnectError);
+      client.socket.off("room:error", onRoomError);
+    };
+    const onJoined = (payload: { roomCode: string; playerId: string; sessionToken: string }) => {
+      cleanup();
+      resolve({ event: "joined", payload });
+    };
+    const onReconnectError = (payload: {
+      message: string;
+      code: ReconnectErrorCode;
+      terminal: boolean;
+    }) => {
+      cleanup();
+      resolve({ event: "reconnectError", payload });
+    };
+    const onRoomError = (payload: { message: string }) => {
+      cleanup();
+      resolve({ event: "roomError", payload });
+    };
+
+    client.socket.on("room:joined", onJoined);
+    client.socket.on("room:reconnectError", onReconnectError);
+    client.socket.on("room:error", onRoomError);
+  });
+}
+
+type MembershipOutcome =
+  | { event: "roomError"; message: string }
+  | { event: "spectatorJoined" };
+
+function waitForMembershipOutcome(client: SocketTestClient): Promise<MembershipOutcome> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("Timed out waiting for membership outcome"));
+    }, 1_000);
+    const cleanup = () => {
+      clearTimeout(timer);
+      client.socket.off("room:error", onRoomError);
+      client.socket.off("room:spectatorJoined", onSpectatorJoined);
+    };
+    const onRoomError = ({ message }: { message: string }) => {
+      cleanup();
+      resolve({ event: "roomError", message });
+    };
+    const onSpectatorJoined = () => {
+      cleanup();
+      resolve({ event: "spectatorJoined" });
+    };
+
+    client.socket.on("room:error", onRoomError);
+    client.socket.on("room:spectatorJoined", onSpectatorJoined);
+  });
+}
+
 test("socket harness creates a typed lobby room", async (t) => {
   const server = await createSocketTestServer();
   t.after(() => server.close());
@@ -118,16 +281,90 @@ test("consecutive socket harnesses isolate failed rejoin state", async (t) => {
   };
 
   const firstClient = await firstServer.connectClient();
+  const firstOutcomePromise = waitForRejoinOutcome(firstClient);
   firstClient.emit("room:rejoin", invalidSession);
-  assert.equal((await firstClient.waitFor("room:error")).message, "Не удалось переподключиться");
+  assert.deepEqual(await firstOutcomePromise, {
+    event: "reconnectError",
+    payload: {
+      message: "Комната не найдена",
+      code: "ROOM_NOT_FOUND",
+      terminal: true,
+    },
+  });
 
   await firstServer.close();
 
   secondServer = await createSocketTestServer();
   const secondClient = await secondServer.connectClient();
+  const secondOutcomePromise = waitForRejoinOutcome(secondClient);
   secondClient.emit("room:rejoin", invalidSession);
 
-  assert.equal((await secondClient.waitFor("room:error")).message, "Не удалось переподключиться");
+  assert.deepEqual(await secondOutcomePromise, {
+    event: "reconnectError",
+    payload: {
+      message: "Комната не найдена",
+      code: "ROOM_NOT_FOUND",
+      terminal: true,
+    },
+  });
+});
+
+test("invalid stored session returns a typed terminal reconnect error", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const host = await server.connectClient();
+  host.emit("room:create", { playerName: "Host" });
+  const credential = await host.waitFor("room:created");
+  await host.waitFor("game:state");
+
+  const attacker = await server.connectClient();
+  const outcomePromise = waitForRejoinOutcome(attacker);
+  attacker.emit("room:rejoin", {
+    ...credential,
+    sessionToken: credential.sessionToken === "a".repeat(64) ? "b".repeat(64) : "a".repeat(64),
+  });
+
+  assert.deepEqual(await outcomePromise, {
+    event: "reconnectError",
+    payload: {
+      message: "Не удалось переподключиться",
+      code: "INVALID_SESSION",
+      terminal: true,
+    },
+  });
+});
+
+test("closed seat returns a typed terminal reconnect error", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const host = await server.connectClient();
+  host.emit("room:create", { playerName: "Host" });
+  const credential = await host.waitFor("room:created");
+  await host.waitFor("game:state");
+  const room = getRoom(credential.roomCode);
+  const player = room?.players.get(credential.playerId);
+  assert.ok(player);
+  player.kicked = true;
+  player.connected = false;
+  player.sessionToken =
+    credential.sessionToken === "c".repeat(64) ? "d".repeat(64) : "c".repeat(64);
+
+  const reconnectingClient = await server.connectClient();
+  const outcomePromise = waitForRejoinOutcome(reconnectingClient);
+  reconnectingClient.emit("room:rejoin", credential);
+
+  assert.deepEqual(await outcomePromise, {
+    event: "reconnectError",
+    payload: {
+      message: "Место закрыто",
+      code: "SEAT_CLOSED",
+      terminal: true,
+    },
+  });
+  assert.equal(player.connected, false);
+  assert.equal(player.socketId, host.socket.id);
 });
 
 test("started player count is dynamic only while the room is in the lobby", async (t) => {
@@ -171,6 +408,698 @@ test("started player count is dynamic only while the room is in the lobby", asyn
   assert.equal(resetState.startedPlayerCount, 3);
 });
 
+test("a bound socket cannot overwrite its active seat with a spectator membership", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const boundIndex = 1;
+  const credential = game.credentials[boundIndex];
+  const boundClient = game.humans[boundIndex];
+  const outcomePromise = waitForMembershipOutcome(boundClient);
+
+  boundClient.emit("room:joinSpectator", {
+    roomCode: game.room.code,
+    spectatorName: "Duplicate membership",
+  });
+
+  assert.deepEqual(await outcomePromise, {
+    event: "roomError",
+    message: "Сокет уже привязан к комнате",
+  });
+  assert.equal(game.room.spectators.size, 0);
+
+  boundClient.disconnect();
+  const disconnectedState = await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === credential.playerId)?.connected === false,
+  );
+  assert.equal(disconnectedState.pauseKind, "reconnect");
+  assert.deepEqual(disconnectedState.disconnectedPlayerIds, [credential.playerId]);
+});
+
+test("terminal missing-room rejoin prunes stale membership so the socket can join again", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const staleClient = await server.connectClient();
+  staleClient.emit("room:create", { playerName: "Stale player" });
+  const staleCredential = await staleClient.waitFor("room:created");
+  await staleClient.waitFor("game:state");
+
+  const destinationHost = await server.connectClient();
+  destinationHost.emit("room:create", { playerName: "Destination host" });
+  const destination = await destinationHost.waitFor("room:created");
+  await destinationHost.waitFor("game:state");
+
+  const staleSocketId = staleClient.socket.id;
+  assert.ok(staleSocketId);
+  assert.equal(getAllRooms().delete(staleCredential.roomCode), true);
+
+  const terminalOutcomePromise = waitForRejoinOutcome(staleClient);
+  staleClient.emit("room:rejoin", staleCredential);
+  assert.deepEqual(await terminalOutcomePromise, {
+    event: "reconnectError",
+    payload: {
+      message: "Комната не найдена",
+      code: "ROOM_NOT_FOUND",
+      terminal: true,
+    },
+  });
+  assert.equal(
+    server.io.sockets.adapter.rooms.get(staleCredential.roomCode)?.has(staleSocketId) ?? false,
+    false,
+  );
+
+  const joinedOutcomePromise = waitForRejoinOutcome(staleClient);
+  staleClient.emit("room:join", {
+    roomCode: destination.roomCode,
+    playerName: "Recovered player",
+  });
+  const joinedOutcome = await joinedOutcomePromise;
+  assert.equal(joinedOutcome.event, "joined");
+  if (joinedOutcome.event !== "joined") return;
+  assert.equal(joinedOutcome.payload.roomCode, destination.roomCode);
+  assert.equal(getRoom(destination.roomCode)?.players.size, 2);
+});
+
+test("stale deleted-room membership cannot block direct rejoin to another valid seat", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const staleClient = await server.connectClient();
+  staleClient.emit("room:create", { playerName: "Stale player" });
+  const staleCredential = await staleClient.waitFor("room:created");
+  await staleClient.waitFor("game:state");
+
+  const destinationHost = await server.connectClient();
+  destinationHost.emit("room:create", { playerName: "Destination host" });
+  const destination = await destinationHost.waitFor("room:created");
+  await destinationHost.waitFor("game:state");
+
+  const seatOwner = await server.connectClient();
+  seatOwner.emit("room:join", {
+    roomCode: destination.roomCode,
+    playerName: "Reserved seat",
+  });
+  const seatCredential = await seatOwner.waitFor("room:joined");
+  await destinationHost.waitFor("game:state", (state) => state.players.length === 2);
+  seatOwner.disconnect();
+  await destinationHost.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === seatCredential.playerId)?.connected === false,
+  );
+
+  const staleSocketId = staleClient.socket.id;
+  assert.ok(staleSocketId);
+  assert.equal(getAllRooms().delete(staleCredential.roomCode), true);
+
+  const outcomePromise = waitForRejoinOutcome(staleClient);
+  staleClient.emit("room:rejoin", seatCredential);
+  const outcome = await outcomePromise;
+  assert.equal(outcome.event, "joined");
+  if (outcome.event !== "joined") return;
+  assert.deepEqual(outcome.payload, seatCredential);
+
+  const destinationRoom = getRoom(destination.roomCode);
+  assert.equal(destinationRoom?.players.get(seatCredential.playerId)?.socketId, staleSocketId);
+  assert.equal(
+    server.io.sockets.adapter.rooms.get(staleCredential.roomCode)?.has(staleSocketId) ?? false,
+    false,
+  );
+});
+
+test("connected spectator ownership is first-winner", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const host = await server.connectClient();
+  host.emit("room:create", { playerName: "Host" });
+  const created = await host.waitFor("room:created");
+  await host.waitFor("game:state");
+
+  const owner = await server.connectClient();
+  owner.emit("room:joinSpectator", {
+    roomCode: created.roomCode,
+    spectatorName: "Owner",
+  });
+  const credential = await owner.waitFor("room:spectatorJoined");
+  await host.waitFor("game:state", (state) => state.spectatorCount === 1);
+
+  const contender = await server.connectClient();
+  const outcomePromise = waitForMembershipOutcome(contender);
+  contender.emit("room:rejoinSpectator", credential);
+
+  assert.deepEqual(await outcomePromise, {
+    event: "roomError",
+    message: "Место уже подключено",
+  });
+  const spectator = getRoom(created.roomCode)?.spectators.get(credential.spectatorId);
+  assert.ok(spectator);
+  assert.equal(spectator.connected, true);
+  assert.equal(spectator.socketId, owner.socket.id);
+  assert.equal(spectator.sessionToken, credential.sessionToken);
+});
+
+test("spectator rebind releases the stale socket and stale explicit leave is ignored", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const host = await server.connectClient();
+  host.emit("room:create", { playerName: "Host" });
+  const created = await host.waitFor("room:created");
+  await host.waitFor("game:state");
+
+  const oldOwner = await server.connectClient();
+  oldOwner.emit("room:joinSpectator", {
+    roomCode: created.roomCode,
+    spectatorName: "Spectator",
+  });
+  const credential = await oldOwner.waitFor("room:spectatorJoined");
+  await host.waitFor("game:state", (state) => state.spectatorCount === 1);
+
+  const room = getRoom(created.roomCode);
+  const spectator = room?.spectators.get(credential.spectatorId);
+  assert.ok(room);
+  assert.ok(spectator);
+  spectator.connected = false;
+
+  const newOwner = await server.connectClient();
+  const reboundPromise = newOwner.waitFor("room:spectatorJoined");
+  newOwner.emit("room:rejoinSpectator", credential);
+  await reboundPromise;
+
+  const oldSocketId = oldOwner.socket.id;
+  const newSocketId = newOwner.socket.id;
+  assert.ok(oldSocketId);
+  assert.ok(newSocketId);
+  const oldServerSocket = server.io.sockets.sockets.get(oldSocketId);
+  assert.ok(oldServerSocket);
+  const leaveHandled = new Promise<void>((resolve) => {
+    oldServerSocket.once("room:leave", () => resolve());
+  });
+  oldOwner.emit("room:leave");
+  await leaveHandled;
+
+  assert.equal(room.spectators.get(credential.spectatorId), spectator);
+  assert.equal(spectator.connected, true);
+  assert.equal(spectator.socketId, newSocketId);
+  const roomMembers = server.io.sockets.adapter.rooms.get(room.code);
+  assert.equal(roomMembers?.has(oldSocketId), false);
+  assert.equal(roomMembers?.has(newSocketId), true);
+});
+
+const ACTIVE_DISCONNECT_PHASES: GamePhase[] = [
+  "CATASTROPHE_REVEAL",
+  "BUNKER_EXPLORE",
+  "ROUND_REVEAL",
+  "ROUND_DISCUSSION",
+  "ROUND_VOTE",
+  "ROUND_VOTE_TIEBREAK",
+  "ROUND_RESULT",
+];
+
+for (const phase of ACTIVE_DISCONNECT_PHASES) {
+  test(`network disconnect reserves the seat and pauses ${phase}`, async (t) => {
+    useShortReconnectGrace(t);
+    const game = await createFourHumanSocketGame(t);
+    const disconnectedIndex = 1;
+    const credential = game.credentials[disconnectedIndex];
+    const originalCharacter = game.characters[disconnectedIndex];
+    const disconnectedPlayer = game.room.players.get(credential.playerId);
+    const hostPlayer = game.room.players.get(game.credentials[0].playerId);
+    assert.ok(disconnectedPlayer);
+    assert.ok(hostPlayer);
+    assert.ok(game.room.gameState);
+
+    if (phase !== "CATASTROPHE_REVEAL") moveToPhase(game.room, phase);
+    game.room.gameState.turnOrder = game.credentials.map(({ playerId }) => playerId);
+    game.room.gameState.currentTurnIndex = disconnectedIndex;
+    disconnectedPlayer.revealedIndices = [0];
+    hostPlayer.hasVoted = true;
+    hostPlayer.votedFor = credential.playerId;
+    game.room.gameState.votes.set(hostPlayer.id, credential.playerId);
+
+    const originalReveals = [...disconnectedPlayer.revealedIndices];
+    const originalVotes = Array.from(game.room.gameState.votes.entries());
+    const originalCapacity = game.room.gameState.bunkerCapacity;
+    const originalSchedule = [...game.room.gameState.votingSchedule];
+
+    game.humans[disconnectedIndex].disconnect();
+
+    const pausedState = await game.host.waitFor(
+      "game:state",
+      (state) =>
+        state.players.find((candidate) => candidate.id === credential.playerId)?.connected ===
+        false,
+    );
+
+    assert.equal(pausedState.phase, phase);
+    assert.equal(pausedState.paused, true);
+    assert.equal(pausedState.pauseKind, "reconnect");
+    assert.deepEqual(pausedState.disconnectedPlayerIds, [credential.playerId]);
+    assert.equal(pausedState.players.length, 4);
+    assert.equal(pausedState.startedPlayerCount, 4);
+
+    await delay(50);
+
+    const retainedPlayer = game.room.players.get(credential.playerId);
+    assert.equal(retainedPlayer, disconnectedPlayer);
+    assert.deepEqual(retainedPlayer?.character, originalCharacter);
+    assert.equal(retainedPlayer?.connected, false);
+    assert.deepEqual(retainedPlayer?.revealedIndices, originalReveals);
+    assert.equal(game.room.players.size, 4);
+    assert.equal(game.room.startedPlayerCount, 4);
+    assert.equal(game.room.gameState.phase, phase);
+    assert.equal(game.room.gameState.currentTurnIndex, disconnectedIndex);
+    assert.deepEqual(Array.from(game.room.gameState.votes.entries()), originalVotes);
+    assert.equal(game.room.gameState.bunkerCapacity, originalCapacity);
+    assert.deepEqual(game.room.gameState.votingSchedule, originalSchedule);
+  });
+}
+
+test("transient lobby disconnect reserves the seat without a game pause and blocks start", async (t) => {
+  useShortReconnectGrace(t);
+  const lobby = await createFourHumanSocketLobby(t);
+  const disconnectedIndex = 1;
+  const credential = lobby.credentials[disconnectedIndex];
+
+  for (const human of lobby.humans.slice(1)) {
+    human.emit("player:ready", { ready: true });
+  }
+  await lobby.host.waitFor("game:state", (state) =>
+    state.players.filter((player) => !player.isHost).every((player) => player.ready),
+  );
+
+  lobby.humans[disconnectedIndex].disconnect();
+  const disconnectedState = await lobby.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === credential.playerId)?.connected === false,
+  );
+
+  assert.equal(disconnectedState.phase, "LOBBY");
+  assert.equal(disconnectedState.paused, false);
+  assert.equal(disconnectedState.pauseKind, "none");
+  assert.deepEqual(disconnectedState.disconnectedPlayerIds, []);
+  assert.equal(disconnectedState.players.length, 4);
+
+  await delay(50);
+  assert.ok(lobby.room.players.has(credential.playerId));
+  assert.equal(lobby.room.players.size, 4);
+  assert.equal(lobby.room.startedPlayerCount, null);
+
+  lobby.host.emit("game:start");
+  assert.equal((await lobby.host.waitFor("room:error")).message, "Не все игроки подключены");
+  assert.equal(lobby.room.gameState, null);
+});
+
+test("GAME_OVER disconnect retains the fixed seat without pausing", async (t) => {
+  useShortReconnectGrace(t);
+  const game = await createFourHumanSocketGame(t);
+  const credential = game.credentials[1];
+
+  game.host.emit("game:endGame");
+  await game.host.waitFor("game:state", (state) => state.phase === "GAME_OVER");
+  game.humans[1].disconnect();
+
+  const disconnectedState = await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.phase === "GAME_OVER" &&
+      state.players.find((player) => player.id === credential.playerId)?.connected === false,
+  );
+  assert.equal(disconnectedState.paused, false);
+  assert.equal(disconnectedState.pauseKind, "none");
+  assert.deepEqual(disconnectedState.disconnectedPlayerIds, []);
+
+  await delay(50);
+  assert.ok(game.room.players.has(credential.playerId));
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.startedPlayerCount, 4);
+  assert.equal(game.room.gameState?.phase, "GAME_OVER");
+});
+
+test("explicit active-game leave reserves the seat, pauses, and keeps its credential", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const leavingIndex = 1;
+  const credential = game.credentials[leavingIndex];
+  const character = game.characters[leavingIndex];
+
+  game.humans[leavingIndex].emit("room:leave");
+  const pausedState = await game.host.waitFor(
+    "game:state",
+    (state) =>
+      !state.players.some((player) => player.id === credential.playerId) ||
+      state.players.find((player) => player.id === credential.playerId)?.connected === false,
+  );
+
+  assert.equal(pausedState.players.length, 4);
+  assert.equal(pausedState.paused, true);
+  assert.equal(pausedState.pauseKind, "reconnect");
+  assert.ok(game.room.players.has(credential.playerId));
+  assert.equal(game.room.startedPlayerCount, 4);
+
+  const outcomePromise = waitForRejoinOutcome(game.humans[leavingIndex]);
+  const characterPromise = game.humans[leavingIndex].waitFor("game:character");
+  game.humans[leavingIndex].emit("room:rejoin", credential);
+  const outcome = await outcomePromise;
+
+  assert.equal(outcome.event, "joined");
+  if (outcome.event !== "joined") return;
+  assert.deepEqual(outcome.payload, credential);
+  assert.deepEqual(await characterPromise, character);
+  assert.equal(game.room.players.get(credential.playerId)?.sessionToken, credential.sessionToken);
+});
+
+test("explicit lobby leave removes the seat and original-order entry", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  const leavingCredential = lobby.credentials[1];
+
+  lobby.humans[1].emit("room:leave");
+  const state = await lobby.host.waitFor(
+    "game:state",
+    (candidate) => candidate.players.length === 3,
+  );
+
+  assert.equal(state.phase, "LOBBY");
+  assert.equal(
+    state.players.some((player) => player.id === leavingCredential.playerId),
+    false,
+  );
+  assert.equal(lobby.room.players.has(leavingCredential.playerId), false);
+  assert.equal(lobby.room.allPlayerIds.includes(leavingCredential.playerId), false);
+  assert.equal(lobby.room.startedPlayerCount, null);
+});
+
+test("ordinary reconnect restores the exact seat with a stable token and clears pending claims", async (t) => {
+  useShortReconnectGrace(t);
+  const game = await createFourHumanSocketGame(t);
+  const disconnectedIndex = 1;
+  const credential = game.credentials[disconnectedIndex];
+  const character = game.characters[disconnectedIndex];
+  const originalPlayer = game.room.players.get(credential.playerId);
+  const originalCapacity = game.room.gameState?.bunkerCapacity;
+  const originalSchedule = [...(game.room.gameState?.votingSchedule ?? [])];
+  assert.ok(originalPlayer);
+
+  game.room.pendingSeatClaims.set("claim-one", {
+    id: "claim-one",
+    socketId: "claimant-one",
+    playerId: credential.playerId,
+    claimantName: "Claimant One",
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 120_000,
+  });
+  game.room.pendingSeatClaims.set("claim-two", {
+    id: "claim-two",
+    socketId: "claimant-two",
+    playerId: credential.playerId,
+    claimantName: "Claimant Two",
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 120_000,
+  });
+
+  game.humans[disconnectedIndex].disconnect();
+  const disconnectedState = await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === credential.playerId)?.connected === false,
+  );
+  assert.equal(disconnectedState.pauseKind, "reconnect");
+
+  const reconnectingClient = await game.server.connectClient();
+  const outcomePromise = waitForRejoinOutcome(reconnectingClient);
+  const characterPromise = reconnectingClient.waitFor("game:character");
+  reconnectingClient.emit("room:rejoin", {
+    ...credential,
+    roomCode: ` ${credential.roomCode.toLowerCase()} `,
+  });
+
+  const outcome = await outcomePromise;
+  assert.equal(outcome.event, "joined");
+  if (outcome.event !== "joined") return;
+  assert.deepEqual(outcome.payload, credential);
+  assert.deepEqual(await characterPromise, character);
+
+  const resumedState = await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === credential.playerId)?.connected === true,
+  );
+  const reboundPlayer = game.room.players.get(credential.playerId);
+  assert.equal(reboundPlayer, originalPlayer);
+  assert.equal(reboundPlayer?.socketId, reconnectingClient.socket.id);
+  assert.equal(reboundPlayer?.sessionToken, credential.sessionToken);
+  assert.deepEqual(reboundPlayer?.character, character);
+  assert.equal(game.room.pendingSeatClaims.size, 0);
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.startedPlayerCount, 4);
+  assert.equal(game.room.gameState?.bunkerCapacity, originalCapacity);
+  assert.deepEqual(game.room.gameState?.votingSchedule, originalSchedule);
+  assert.equal(resumedState.players.length, 4);
+  assert.equal(resumedState.startedPlayerCount, 4);
+  assert.equal(resumedState.paused, false);
+  assert.equal(resumedState.pauseKind, "none");
+  assert.deepEqual(resumedState.disconnectedPlayerIds, []);
+});
+
+test("duplicate rejoin from the current socket is idempotent and does not rotate the token", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const client = game.humans[1];
+  const credential = game.credentials[1];
+  const character = game.characters[1];
+  const originalPlayer = game.room.players.get(credential.playerId);
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const outcomePromise = waitForRejoinOutcome(client);
+    const characterPromise = client.waitFor("game:character");
+    client.emit("room:rejoin", credential);
+    const outcome = await outcomePromise;
+
+    assert.equal(outcome.event, "joined");
+    if (outcome.event !== "joined") return;
+    assert.deepEqual(outcome.payload, credential);
+    assert.deepEqual(await characterPromise, character);
+  }
+
+  assert.equal(game.room.players.get(credential.playerId), originalPlayer);
+  assert.equal(originalPlayer?.socketId, client.socket.id);
+  assert.equal(originalPlayer?.sessionToken, credential.sessionToken);
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.startedPlayerCount, 4);
+});
+
+test("competing reconnect sockets have one winner and a nonterminal ownership error", async (t) => {
+  useShortReconnectGrace(t);
+  const game = await createFourHumanSocketGame(t);
+  const credential = game.credentials[1];
+  game.humans[1].disconnect();
+  const disconnectedState = await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === credential.playerId)?.connected === false,
+  );
+  assert.equal(disconnectedState.pauseKind, "reconnect");
+
+  const competitors = [await game.server.connectClient(), await game.server.connectClient()];
+  const outcomePromises = competitors.map((client) => waitForRejoinOutcome(client));
+  for (const competitor of competitors) competitor.emit("room:rejoin", credential);
+  const outcomes = await Promise.all(outcomePromises);
+
+  const winnerIndex = outcomes.findIndex((outcome) => outcome.event === "joined");
+  const loserIndex = outcomes.findIndex((outcome) => outcome.event === "reconnectError");
+  assert.notEqual(winnerIndex, -1);
+  assert.notEqual(loserIndex, -1);
+  assert.notEqual(winnerIndex, loserIndex);
+  const loserOutcome = outcomes[loserIndex];
+  assert.equal(loserOutcome.event, "reconnectError");
+  if (loserOutcome.event !== "reconnectError") return;
+  assert.deepEqual(loserOutcome.payload, {
+    message: "Место уже подключено",
+    code: "SEAT_ALREADY_CONNECTED",
+    terminal: false,
+  });
+
+  const winner = competitors[winnerIndex];
+  const winnerSocketId = winner.socket.id;
+  const loserSocketId = competitors[loserIndex].socket.id;
+  assert.ok(winnerSocketId);
+  assert.ok(loserSocketId);
+  assert.equal(game.room.players.get(credential.playerId)?.socketId, winnerSocketId);
+  assert.equal(game.room.players.get(credential.playerId)?.sessionToken, credential.sessionToken);
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.startedPlayerCount, 4);
+  const roomMembers = game.server.io.sockets.adapter.rooms.get(game.room.code);
+  assert.equal(roomMembers?.has(winnerSocketId), true);
+  assert.equal(roomMembers?.has(loserSocketId), false);
+});
+
+test("late disconnect from a stale socket cannot disconnect its rebound seat", async (t) => {
+  useShortReconnectGrace(t);
+  const game = await createFourHumanSocketGame(t);
+  const credential = game.credentials[1];
+  const oldClient = game.humans[1];
+  const player = game.room.players.get(credential.playerId);
+  assert.ok(player);
+
+  player.connected = false;
+  addDisconnectPause(game.room, player.id, game.server.io);
+  await game.host.waitFor("game:state", (state) =>
+    state.disconnectedPlayerIds.includes(credential.playerId),
+  );
+
+  const reboundClient = await game.server.connectClient();
+  const outcomePromise = waitForRejoinOutcome(reboundClient);
+  reboundClient.emit("room:rejoin", credential);
+  const outcome = await outcomePromise;
+  assert.equal(outcome.event, "joined");
+  await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((candidate) => candidate.id === credential.playerId)?.connected === true,
+  );
+
+  const oldSocketId = oldClient.socket.id;
+  assert.ok(oldSocketId);
+  const oldServerSocket = game.server.io.sockets.sockets.get(oldSocketId);
+  assert.ok(oldServerSocket);
+  const oldDisconnectProcessed = new Promise<void>((resolve) => {
+    oldServerSocket.once("disconnect", () => resolve());
+  });
+  oldClient.disconnect();
+  await oldDisconnectProcessed;
+
+  assert.equal(player.connected, true);
+  assert.equal(player.socketId, reboundClient.socket.id);
+  assert.equal(game.room.gameState?.pauseReasons.disconnectedPlayerIds.has(player.id), false);
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.startedPlayerCount, 4);
+});
+
+test("disconnect removes pending claims even for sockets that never joined a room", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  const claimant = await lobby.server.connectClient();
+  const claimantSocketId = claimant.socket.id;
+  assert.ok(claimantSocketId);
+  lobby.room.pendingSeatClaims.set("orphan-claim", {
+    id: "orphan-claim",
+    socketId: claimantSocketId,
+    playerId: lobby.credentials[1].playerId,
+    claimantName: "Claimant",
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 120_000,
+  });
+
+  const claimantServerSocket = lobby.server.io.sockets.sockets.get(claimantSocketId);
+  assert.ok(claimantServerSocket);
+  const disconnectProcessed = new Promise<void>((resolve) => {
+    claimantServerSocket.once("disconnect", () => resolve());
+  });
+  claimant.disconnect();
+  await disconnectProcessed;
+
+  assert.equal(lobby.room.pendingSeatClaims.has("orphan-claim"), false);
+});
+
+test("new player joins remain closed after the roster is fixed", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const newcomer = await game.server.connectClient();
+
+  newcomer.emit("room:join", { roomCode: game.room.code, playerName: "Late Player" });
+
+  assert.equal((await newcomer.waitFor("room:error")).message, "Игра уже началась");
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.startedPlayerCount, 4);
+});
+
+test("spectator disconnect keeps its grace behavior and never pauses the game", async (t) => {
+  useShortReconnectGrace(t);
+  const game = await createFourHumanSocketGame(t);
+  const spectator = await game.server.connectClient();
+  spectator.emit("room:joinSpectator", {
+    roomCode: game.room.code,
+    spectatorName: "Spectator",
+  });
+  await spectator.waitFor("room:spectatorJoined");
+  await game.host.waitFor("game:state", (state) => state.spectatorCount === 1);
+
+  spectator.disconnect();
+  const state = await game.host.waitFor(
+    "game:state",
+    (candidate) => candidate.spectatorCount === 0,
+  );
+
+  assert.equal(state.paused, false);
+  assert.equal(state.pauseKind, "none");
+  assert.deepEqual(state.disconnectedPlayerIds, []);
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.startedPlayerCount, 4);
+});
+
+test("test reset cancels spectator grace before it can broadcast or reschedule bots", async (t) => {
+  useShortReconnectGrace(t, 30);
+  useFastBotTimers(t);
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const host = await server.connectClient();
+  host.emit("room:create", { playerName: "Host" });
+  const created = await host.waitFor("room:created");
+  await host.waitFor("game:state");
+  for (let playerCount = 2; playerCount <= 4; playerCount++) {
+    host.emit("room:addBot");
+    await host.waitFor("game:state", (state) => state.players.length === playerCount);
+  }
+
+  const characterPromise = host.waitFor("game:character");
+  host.emit("game:start");
+  await characterPromise;
+  await host.waitFor("game:state", (state) => state.phase === "CATASTROPHE_REVEAL");
+
+  const room = getRoom(created.roomCode);
+  const bot = Array.from(room?.players.values() ?? []).find((player) => player.isBot);
+  assert.ok(room);
+  assert.ok(bot);
+
+  const spectator = await server.connectClient();
+  spectator.emit("room:joinSpectator", {
+    roomCode: room.code,
+    spectatorName: "Spectator",
+  });
+  await spectator.waitFor("room:spectatorJoined");
+  await host.waitFor("game:state", (state) => state.spectatorCount === 1);
+
+  moveToPhase(room, "ROUND_REVEAL");
+  assert.ok(room.gameState);
+  room.gameState.roundNumber = 1;
+  room.gameState.turnOrder = [bot.id];
+  room.gameState.currentTurnIndex = 0;
+
+  let lateStateCount = 0;
+  const countLateState = () => {
+    lateStateCount++;
+  };
+  host.socket.on("game:state", countLateState);
+  t.after(() => host.socket.off("game:state", countLateState));
+
+  const spectatorSocketId = spectator.socket.id;
+  assert.ok(spectatorSocketId);
+  const spectatorServerSocket = server.io.sockets.sockets.get(spectatorSocketId);
+  assert.ok(spectatorServerSocket);
+  const disconnectHandled = new Promise<void>((resolve) => {
+    spectatorServerSocket.once("disconnect", () => resolve());
+  });
+  spectator.disconnect();
+  await disconnectHandled;
+
+  resetSocketHandlerStateForTests();
+  await delay(80);
+
+  assert.equal(lateStateCount, 0);
+  assert.deepEqual(bot.revealedIndices, []);
+  assert.equal(room.gameState.currentTurnIndex, 0);
+});
+
 test("pause engine exports composable reason helpers", () => {
   assert.equal(typeof addDisconnectPause, "function");
   assert.equal(typeof removeDisconnectPause, "function");
@@ -178,6 +1107,24 @@ test("pause engine exports composable reason helpers", () => {
   assert.equal(typeof isGameplayPaused, "function");
   assert.equal(typeof resumeGameIfReady, "function");
   assert.equal(typeof clearBotActions, "function");
+});
+
+test("test state reset cancels pending bot actions before clearing rooms", async (t) => {
+  useFastBotTimers(t);
+  const { room, io, bots } = createStartedRoom(t, { humanCount: 1, botCount: 1 });
+  const bot = bots[0];
+  moveToPhase(room, "ROUND_REVEAL");
+  assert.ok(room.gameState);
+  room.gameState.roundNumber = 1;
+  room.gameState.turnOrder = [bot.id];
+  room.gameState.currentTurnIndex = 0;
+
+  scheduleBotActions(room, io);
+  resetSocketHandlerStateForTests();
+  await delay(50);
+
+  assert.deepEqual(bot.revealedIndices, []);
+  assert.equal(room.gameState.currentTurnIndex, 0);
 });
 
 test("startGame cannot replace an active reconnect-paused game", (t) => {
