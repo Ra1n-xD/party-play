@@ -168,6 +168,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const reconnectSessionTombstonedRef = useRef(false);
   const sessionAcceptanceExpectationRef = useRef<SessionAcceptanceExpectation | null>(null);
   const pendingSeatClaimTargetRef = useRef<PendingSeatClaimTarget | null>(null);
+  const membershipRequestPendingRef = useRef(false);
+  const seatLookupPendingRoomRef = useRef<string | null>(null);
   const lastRejoinSocketIdRef = useRef<string | null>(null);
   const explicitLeaveSuppressedRef = useRef(false);
   const ignoreRoomEventsRef = useRef(true);
@@ -214,6 +216,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       ignoreRecoveryEventsRef.current = true;
       sessionAcceptanceExpectationRef.current = null;
       pendingSeatClaimTargetRef.current = null;
+      membershipRequestPendingRef.current = false;
+      seatLookupPendingRoomRef.current = null;
       playerIdRef.current = null;
       setRoomCode(null);
       setPlayerId(null);
@@ -243,11 +247,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
 
     const attemptStoredRejoin = (): boolean => {
+      if (membershipRequestPendingRef.current) return false;
       if (reconnectSessionTombstonedRef.current) return false;
       const savedSession = acceptedSessionRef.current ?? readReconnectSession();
       if (!savedSession) return false;
 
       acceptedSessionRef.current = savedSession;
+      membershipRequestPendingRef.current = true;
       sessionAcceptanceExpectationRef.current = {
         event: savedSession.role === "spectator" ? "room:spectatorJoined" : "room:joined",
         source: "rejoin",
@@ -288,6 +294,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       explicitLeaveSuppressedRef.current = false;
       sessionAcceptanceExpectationRef.current = null;
       pendingSeatClaimTargetRef.current = null;
+      membershipRequestPendingRef.current = false;
+      seatLookupPendingRoomRef.current = null;
       if (
         !reconnectSessionTombstonedRef.current &&
         (acceptedSessionRef.current ?? readReconnectSession())
@@ -320,6 +328,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       reconnectSessionTombstonedRef.current = false;
       sessionAcceptanceExpectationRef.current = null;
       pendingSeatClaimTargetRef.current = null;
+      membershipRequestPendingRef.current = false;
+      seatLookupPendingRoomRef.current = null;
       ignoreRoomEventsRef.current = false;
       ignoreRecoveryEventsRef.current = true;
       explicitLeaveSuppressedRef.current = false;
@@ -384,8 +394,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     const handleRoomError: ServerEvents["room:error"] = ({ message }) => {
       const expectation = sessionAcceptanceExpectationRef.current;
+      if (membershipRequestPendingRef.current) {
+        membershipRequestPendingRef.current = false;
+      }
       if (expectation && expectation.source !== "claim") {
         sessionAcceptanceExpectationRef.current = null;
+      }
+      if (seatLookupPendingRoomRef.current) {
+        seatLookupPendingRoomRef.current = null;
+      }
+      if (pendingSeatClaimTargetRef.current?.requestId === null) {
+        pendingSeatClaimTargetRef.current = null;
       }
       setPendingSeatClaim((current) => {
         if (current?.status === "submitting") {
@@ -405,6 +424,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     const handleReconnectError: ServerEvents["room:reconnectError"] = ({ message, terminal }) => {
       sessionAcceptanceExpectationRef.current = null;
+      membershipRequestPendingRef.current = false;
       if (terminal) {
         clearStoredSession();
       } else {
@@ -418,8 +438,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setTimedError(message);
     };
 
-    const handleReconnectableSeats: ServerEvents["room:reconnectableSeats"] = ({ seats }) => {
+    const handleReconnectableSeats: ServerEvents["room:reconnectableSeats"] = ({
+      roomCode,
+      seats,
+    }) => {
       if (ignoreRecoveryEventsRef.current) return;
+      if (seatLookupPendingRoomRef.current !== roomCode) return;
+      seatLookupPendingRoomRef.current = null;
       setReconnectableSeats(seats);
     };
 
@@ -629,6 +654,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const createRoom = useCallback((name: string) => {
+    if (
+      membershipRequestPendingRef.current ||
+      seatLookupPendingRoomRef.current ||
+      pendingSeatClaimTargetRef.current
+    ) {
+      return;
+    }
+    membershipRequestPendingRef.current = true;
     explicitLeaveSuppressedRef.current = false;
     ignoreRecoveryEventsRef.current = true;
     sessionAcceptanceExpectationRef.current = { event: "room:created", source: "create" };
@@ -636,7 +669,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const joinRoom = useCallback((code: string, name: string) => {
+    if (
+      membershipRequestPendingRef.current ||
+      seatLookupPendingRoomRef.current ||
+      pendingSeatClaimTargetRef.current
+    ) {
+      return;
+    }
     const normalizedRoomCode = code.trim().toUpperCase();
+    membershipRequestPendingRef.current = true;
     explicitLeaveSuppressedRef.current = false;
     ignoreRecoveryEventsRef.current = true;
     sessionAcceptanceExpectationRef.current = {
@@ -648,7 +689,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const joinAsSpectator = useCallback((code: string, name: string) => {
+    if (
+      membershipRequestPendingRef.current ||
+      seatLookupPendingRoomRef.current ||
+      pendingSeatClaimTargetRef.current
+    ) {
+      return;
+    }
     const normalizedRoomCode = code.trim().toUpperCase();
+    membershipRequestPendingRef.current = true;
     explicitLeaveSuppressedRef.current = false;
     ignoreRecoveryEventsRef.current = true;
     sessionAcceptanceExpectationRef.current = {
@@ -660,12 +709,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const rejoinRoom = useCallback((code: string, pid: string) => {
+    if (
+      membershipRequestPendingRef.current ||
+      seatLookupPendingRoomRef.current ||
+      pendingSeatClaimTargetRef.current
+    ) {
+      return;
+    }
     if (reconnectSessionTombstonedRef.current) return;
     const savedSession = acceptedSessionRef.current ?? readReconnectSession();
     if (!savedSession || savedSession.role !== "player") return;
     if (savedSession.roomCode !== code.trim().toUpperCase() || savedSession.participantId !== pid) {
       return;
     }
+    membershipRequestPendingRef.current = true;
     explicitLeaveSuppressedRef.current = false;
     sessionAcceptanceExpectationRef.current = {
       event: "room:joined",
@@ -724,6 +781,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     ignoreRecoveryEventsRef.current = true;
     sessionAcceptanceExpectationRef.current = null;
     pendingSeatClaimTargetRef.current = null;
+    membershipRequestPendingRef.current = false;
+    seatLookupPendingRoomRef.current = null;
     socket.emit("room:leave");
     if (!retainOwnership) {
       reconnectSessionTombstonedRef.current = true;
@@ -821,25 +880,42 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const listReconnectableSeats = useCallback((code: string) => {
+    if (
+      membershipRequestPendingRef.current ||
+      seatLookupPendingRoomRef.current ||
+      pendingSeatClaimTargetRef.current
+    ) {
+      return;
+    }
+    const normalizedRoomCode = code.trim().toUpperCase();
+    seatLookupPendingRoomRef.current = normalizedRoomCode;
     ignoreRecoveryEventsRef.current = false;
     sessionAcceptanceExpectationRef.current = null;
     pendingSeatClaimTargetRef.current = null;
     setReconnectableSeats([]);
     setPendingSeatClaim(null);
-    socket.emit("room:listReconnectableSeats", { roomCode: code.trim().toUpperCase() });
+    socket.emit("room:listReconnectableSeats", { roomCode: normalizedRoomCode });
   }, []);
 
   const requestSeatClaim = useCallback(
     (code: string, targetPlayerId: string, claimantName: string) => {
-      ignoreRecoveryEventsRef.current = false;
       const normalizedRoomCode = code.trim().toUpperCase();
+      const selectedSeat = reconnectableSeats.find((seat) => seat.playerId === targetPlayerId);
+      if (
+        membershipRequestPendingRef.current ||
+        seatLookupPendingRoomRef.current ||
+        pendingSeatClaimTargetRef.current ||
+        !selectedSeat
+      ) {
+        return;
+      }
+      ignoreRecoveryEventsRef.current = false;
       sessionAcceptanceExpectationRef.current = null;
       pendingSeatClaimTargetRef.current = {
         requestId: null,
         roomCode: normalizedRoomCode,
         playerId: targetPlayerId,
       };
-      const selectedSeat = reconnectableSeats.find((seat) => seat.playerId === targetPlayerId);
       setPendingSeatClaim({
         requestId: null,
         roomCode: normalizedRoomCode,
