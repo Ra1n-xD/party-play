@@ -1900,6 +1900,89 @@ test("closed seat returns a typed terminal reconnect error", async (t) => {
   assert.equal(player.socketId, host.socket.id);
 });
 
+test("stored spectator missing room returns a typed terminal reconnect error", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const reconnectingSpectator = await server.connectClient();
+  const outcomePromise = waitForRejoinOutcome(reconnectingSpectator);
+  reconnectingSpectator.emit("room:rejoinSpectator", {
+    roomCode: "DEADBEEF",
+    spectatorId: `p_${"a".repeat(24)}`,
+    sessionToken: "b".repeat(64),
+  });
+
+  assert.deepEqual(await outcomePromise, {
+    event: "reconnectError",
+    payload: {
+      message: "Комната не найдена",
+      code: "ROOM_NOT_FOUND",
+      terminal: true,
+    },
+  });
+});
+
+test("missing spectator returns a typed terminal reconnect error", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const host = await server.connectClient();
+  host.emit("room:create", { playerName: "Host" });
+  const created = await host.waitFor("room:created");
+  await host.waitFor("game:state");
+
+  const reconnectingSpectator = await server.connectClient();
+  const outcomePromise = waitForRejoinOutcome(reconnectingSpectator);
+  reconnectingSpectator.emit("room:rejoinSpectator", {
+    roomCode: created.roomCode,
+    spectatorId: `p_${"c".repeat(24)}`,
+    sessionToken: "d".repeat(64),
+  });
+
+  assert.deepEqual(await outcomePromise, {
+    event: "reconnectError",
+    payload: {
+      message: "Не удалось переподключиться",
+      code: "INVALID_SESSION",
+      terminal: true,
+    },
+  });
+});
+
+test("invalid spectator token returns a typed terminal reconnect error", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const host = await server.connectClient();
+  host.emit("room:create", { playerName: "Host" });
+  const created = await host.waitFor("room:created");
+  await host.waitFor("game:state");
+
+  const owner = await server.connectClient();
+  owner.emit("room:joinSpectator", {
+    roomCode: created.roomCode,
+    spectatorName: "Owner",
+  });
+  const credential = await owner.waitFor("room:spectatorJoined");
+  await host.waitFor("game:state", (state) => state.spectatorCount === 1);
+
+  const reconnectingSpectator = await server.connectClient();
+  const outcomePromise = waitForRejoinOutcome(reconnectingSpectator);
+  reconnectingSpectator.emit("room:rejoinSpectator", {
+    ...credential,
+    sessionToken: credential.sessionToken === "e".repeat(64) ? "f".repeat(64) : "e".repeat(64),
+  });
+
+  assert.deepEqual(await outcomePromise, {
+    event: "reconnectError",
+    payload: {
+      message: "Не удалось переподключиться",
+      code: "INVALID_SESSION",
+      terminal: true,
+    },
+  });
+});
+
 test("started player count is dynamic only while the room is in the lobby", async (t) => {
   const server = await createSocketTestServer();
   t.after(() => server.close());
@@ -2079,12 +2162,16 @@ test("connected spectator ownership is first-winner", async (t) => {
   await host.waitFor("game:state", (state) => state.spectatorCount === 1);
 
   const contender = await server.connectClient();
-  const outcomePromise = waitForMembershipOutcome(contender);
+  const outcomePromise = waitForRejoinOutcome(contender);
   contender.emit("room:rejoinSpectator", credential);
 
   assert.deepEqual(await outcomePromise, {
-    event: "roomError",
-    message: "Место уже подключено",
+    event: "reconnectError",
+    payload: {
+      message: "Место уже подключено",
+      code: "SEAT_ALREADY_CONNECTED",
+      terminal: false,
+    },
   });
   const spectator = getRoom(created.roomCode)?.spectators.get(credential.spectatorId);
   assert.ok(spectator);

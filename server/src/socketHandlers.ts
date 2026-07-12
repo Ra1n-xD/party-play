@@ -736,28 +736,30 @@ export function registerHandlers(io: IOServer): void {
         !isValidSessionToken(sessionToken)
       ) {
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
 
-      const room = getRoom(roomCode);
+      const normalizedRoomCode = roomCode.trim().toUpperCase();
+      const room = getRoom(normalizedRoomCode);
       if (!room) {
+        getCurrentSocketMembership(socket);
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "ROOM_NOT_FOUND", "Комната не найдена", true);
         return;
       }
 
       const spectator = room.spectators.get(spectatorId);
       if (!spectator) {
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
 
       // Validate session token
       if (!sessionToken || !tokensEqual(spectator.sessionToken, sessionToken)) {
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
 
@@ -783,7 +785,7 @@ export function registerHandlers(io: IOServer): void {
         io.sockets.sockets.get(previousSocketId)?.leave(room.code);
       });
       if (!bindResult.ok) {
-        socket.emit("room:error", { message: bindResult.error });
+        emitReconnectError(socket, "SEAT_ALREADY_CONNECTED", bindResult.error, false);
         return;
       }
 
