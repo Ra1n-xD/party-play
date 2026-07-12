@@ -19,6 +19,7 @@ import { threatCards as allThreatCardsData } from "./data/threats.js";
 import { randomPick, shuffle } from "./utils.js";
 import { CONFIG } from "./config.js";
 import { clearBotActions, scheduleBotActions } from "./botManager.js";
+import { runBeforeGameOverHook } from "./gameLifecycle.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 
@@ -554,18 +555,23 @@ function advanceRoundOrEnd(room: Room, io: IOServer): void {
 
   if (room.gameState.roundNumber >= CONFIG.TOTAL_ROUNDS) {
     // Game over after 5 rounds
-    room.gameState.phase = "GAME_OVER";
-    broadcastState(room, io);
+    transitionToGameOver(room, io);
   } else {
     // Check if we still have enough players for elimination
     const alive = getAlivePlayers(room);
     if (alive.length <= room.gameState.bunkerCapacity) {
-      room.gameState.phase = "GAME_OVER";
-      broadcastState(room, io);
+      transitionToGameOver(room, io);
     } else {
       startNewRound(room, io);
     }
   }
+}
+
+function transitionToGameOver(room: Room, io: IOServer): void {
+  if (!room.gameState) return;
+  runBeforeGameOverHook(room, io);
+  room.gameState.phase = "GAME_OVER";
+  broadcastState(room, io);
 }
 
 // ============ Reveal Action Card ============
@@ -1019,7 +1025,6 @@ export function forceEndGame(room: Room, io: IOServer): void {
   if (!room.gameState) return;
   if (room.gameState.phaseTimer) clearTimeout(room.gameState.phaseTimer);
   clearBotActions(room.code);
-  room.gameState.phase = "GAME_OVER";
   room.gameState.phaseTimer = null;
   room.gameState.phaseEndTime = null;
   room.gameState.paused = false;
@@ -1027,7 +1032,7 @@ export function forceEndGame(room: Room, io: IOServer): void {
   room.gameState.pausedCallback = null;
   room.gameState.pauseReasons.admin = false;
   room.gameState.pauseReasons.disconnectedPlayerIds.clear();
-  broadcastState(room, io);
+  transitionToGameOver(room, io);
 }
 
 export function resetGame(room: Room, io: IOServer): void {

@@ -30,6 +30,7 @@ import {
   type Player,
   type Room,
 } from "../../src/roomManager.js";
+import * as reconnectManager from "../../src/reconnectManager.js";
 import { resetSocketHandlerStateForTests } from "../../src/socketHandlers.js";
 import {
   createSocketTestServer,
@@ -68,6 +69,12 @@ interface SocketLobby {
   credentials: SocketPlayerCredential[];
   room: Room;
 }
+
+type ServerEventPayload<Event extends keyof ServerEvents> = ServerEvents[Event] extends (
+  data: infer Payload,
+) => void
+  ? Payload
+  : never;
 
 function createStartedRoom(
   t: TestContext,
@@ -109,6 +116,18 @@ function moveToPhase(room: Room, phase: GamePhase): void {
   room.gameState.phaseEndTime = null;
   room.gameState.pausedCallback = null;
   room.gameState.phase = phase;
+}
+
+function takeScheduledPhaseCallback(room: Room): () => void {
+  const state = room.gameState;
+  assert.ok(state);
+  const callback = state.pausedCallback;
+  assert.ok(callback);
+  if (state.phaseTimer) clearTimeout(state.phaseTimer);
+  state.phaseTimer = null;
+  state.phaseEndTime = null;
+  state.pausedCallback = null;
+  return callback;
 }
 
 function useFastBotTimers(t: TestContext): void {
@@ -268,9 +287,7 @@ function waitForRejoinOutcome(client: SocketTestClient): Promise<RejoinOutcome> 
   });
 }
 
-type MembershipOutcome =
-  | { event: "roomError"; message: string }
-  | { event: "spectatorJoined" };
+type MembershipOutcome = { event: "roomError"; message: string } | { event: "spectatorJoined" };
 
 function waitForMembershipOutcome(client: SocketTestClient): Promise<MembershipOutcome> {
   return new Promise((resolve, reject) => {
@@ -297,6 +314,96 @@ function waitForMembershipOutcome(client: SocketTestClient): Promise<MembershipO
   });
 }
 
+function waitForSocketEvent<Event extends keyof ServerEvents>(
+  client: SocketTestClient,
+  event: Event,
+  predicate: (payload: ServerEventPayload<Event>) => boolean = () => true,
+  timeoutMs = 750,
+): Promise<ServerEventPayload<Event>> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timed out waiting for Socket.IO event: ${String(event)}`));
+    }, timeoutMs);
+    const listener = (payload: ServerEventPayload<Event>) => {
+      if (!predicate(payload)) return;
+      cleanup();
+      resolve(payload);
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      client.socket.off(event, listener as never);
+    };
+
+    client.socket.on(event, listener as never);
+  });
+}
+
+async function disconnectLobbyHuman(lobby: SocketLobby, index: number): Promise<void> {
+  const credential = lobby.credentials[index];
+  const disconnected = lobby.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === credential.playerId)?.connected === false,
+  );
+  lobby.humans[index].disconnect();
+  await disconnected;
+}
+
+async function disconnectStartedHumanWithoutPause(
+  game: SocketStartedGame,
+  index: number,
+): Promise<Player> {
+  const player = game.room.players.get(game.credentials[index].playerId);
+  assert.ok(player);
+  const socketId = game.humans[index].socket.id;
+  assert.ok(socketId);
+  const serverSocket = game.server.io.sockets.sockets.get(socketId);
+  assert.ok(serverSocket);
+  const disconnected = new Promise<void>((resolve) => {
+    serverSocket.once("disconnect", () => resolve());
+  });
+
+  // This seam isolates natural round completion from reconnect-pause behavior.
+  player.connected = false;
+  game.humans[index].disconnect();
+  await disconnected;
+  assert.equal(game.room.gameState?.pauseReasons.disconnectedPlayerIds.has(player.id), false);
+  return player;
+}
+
+async function submitSeatClaim(
+  claimant: SocketTestClient,
+  roomCode: string,
+  playerId: string,
+  claimantName: string,
+): Promise<{ requestId: string }> {
+  const submitted = waitForSocketEvent(claimant, "room:seatClaimSubmitted");
+  claimant.emit("room:requestSeatClaim", { roomCode, playerId, claimantName });
+  return submitted;
+}
+
+async function waitForRoomError(
+  client: SocketTestClient,
+  message?: string,
+): Promise<{ message: string }> {
+  return waitForSocketEvent(
+    client,
+    "room:error",
+    (payload) => message === undefined || payload.message === message,
+  );
+}
+
+function isSocketInRoom(
+  server: SocketTestServer,
+  client: SocketTestClient,
+  roomCode: string,
+): boolean {
+  const socketId = client.socket.id;
+  assert.ok(socketId);
+  return server.io.sockets.adapter.rooms.get(roomCode)?.has(socketId) ?? false;
+}
+
 test("socket harness creates a typed lobby room", async (t) => {
   const server = await createSocketTestServer();
   t.after(() => server.close());
@@ -312,6 +419,1366 @@ test("socket harness creates a typed lobby room", async (t) => {
   assert.equal(state.pauseKind, "none");
   assert.deepEqual(state.disconnectedPlayerIds, []);
   assert.equal(state.players[0]?.kicked, false);
+});
+
+test("reconnectable seat listing exposes only disconnected open humans and keeps the requester private", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  lobby.host.emit("room:addBot");
+  await lobby.host.waitFor("game:state", (state) => state.players.length === 5);
+
+  await disconnectLobbyHuman(lobby, 1);
+  await disconnectLobbyHuman(lobby, 2);
+  const reconnectable = lobby.room.players.get(lobby.credentials[1].playerId);
+  const closed = lobby.room.players.get(lobby.credentials[2].playerId);
+  const bot = Array.from(lobby.room.players.values()).find((player) => player.isBot);
+  assert.ok(reconnectable);
+  assert.ok(closed);
+  assert.ok(bot);
+  reconnectable.alive = false;
+  closed.kicked = true;
+  bot.connected = false;
+
+  const requester = await lobby.server.connectClient();
+  const leakedStates: PublicGameState[] = [];
+  const leakedCharacters: Character[] = [];
+  const leakedClaims: unknown[] = [];
+  requester.socket.on("game:state", (state) => leakedStates.push(state));
+  requester.socket.on("game:character", (character) => leakedCharacters.push(character));
+  requester.socket.on("admin:seatClaimsUpdated", (claims) => leakedClaims.push(claims));
+
+  const seatsPromise = waitForSocketEvent(requester, "room:reconnectableSeats");
+  requester.emit("room:listReconnectableSeats", {
+    roomCode: ` ${lobby.room.code.toLowerCase()} `,
+  });
+
+  assert.deepEqual(await seatsPromise, {
+    roomCode: lobby.room.code,
+    seats: [
+      {
+        playerId: reconnectable.id,
+        playerName: reconnectable.name,
+      },
+    ],
+  });
+  await delay(25);
+
+  const requesterSocketId = requester.socket.id;
+  assert.ok(requesterSocketId);
+  assert.equal(
+    lobby.server.io.sockets.adapter.rooms.get(lobby.room.code)?.has(requesterSocketId) ?? false,
+    false,
+  );
+  assert.deepEqual(leakedStates, []);
+  assert.deepEqual(leakedCharacters, []);
+  assert.deepEqual(leakedClaims, []);
+});
+
+test("seat claim endpoints validate rooms, seats, names, and runtime payloads without mutation", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  await disconnectLobbyHuman(lobby, 2);
+  const closed = lobby.room.players.get(lobby.credentials[2].playerId);
+  assert.ok(closed);
+  closed.kicked = true;
+
+  lobby.host.emit("room:addBot");
+  await lobby.host.waitFor("game:state", (state) => state.players.length === 5);
+  const bot = Array.from(lobby.room.players.values()).find((player) => player.isBot);
+  assert.ok(bot);
+  bot.connected = false;
+
+  const invalidCases: Array<{
+    payload: unknown;
+    message: string;
+  }> = [
+    {
+      payload: { roomCode: "?", playerId: lobby.credentials[1].playerId, claimantName: "A" },
+      message: "Введите код комнаты",
+    },
+    {
+      payload: {
+        roomCode: "DEADBEEF",
+        playerId: lobby.credentials[1].playerId,
+        claimantName: "A",
+      },
+      message: "Комната не найдена",
+    },
+    {
+      payload: { roomCode: lobby.room.code, playerId: "bad", claimantName: "A" },
+      message: "Место недоступно для восстановления",
+    },
+    {
+      payload: {
+        roomCode: lobby.room.code,
+        playerId: lobby.credentials[0].playerId,
+        claimantName: "A",
+      },
+      message: "Место недоступно для восстановления",
+    },
+    {
+      payload: { roomCode: lobby.room.code, playerId: bot.id, claimantName: "A" },
+      message: "Место недоступно для восстановления",
+    },
+    {
+      payload: { roomCode: lobby.room.code, playerId: closed.id, claimantName: "A" },
+      message: "Место недоступно для восстановления",
+    },
+    {
+      payload: {
+        roomCode: lobby.room.code,
+        playerId: lobby.credentials[1].playerId,
+        claimantName: "<> ",
+      },
+      message: `Имя должно быть от 1 до ${CONFIG.MAX_PLAYER_NAME_LENGTH} символов`,
+    },
+    {
+      payload: {
+        roomCode: lobby.room.code,
+        playerId: lobby.credentials[1].playerId,
+        claimantName: "x".repeat(CONFIG.MAX_PLAYER_NAME_LENGTH + 1),
+      },
+      message: `Имя должно быть от 1 до ${CONFIG.MAX_PLAYER_NAME_LENGTH} символов`,
+    },
+  ];
+
+  for (const { payload, message } of invalidCases) {
+    const claimant = await lobby.server.connectClient();
+    const error = waitForRoomError(claimant, message);
+    claimant.socket.emit("room:requestSeatClaim", payload as never);
+    assert.deepEqual(await error, { message });
+    assert.equal(isSocketInRoom(lobby.server, claimant, lobby.room.code), false);
+  }
+
+  const invalidListRequester = await lobby.server.connectClient();
+  const invalidListError = waitForRoomError(invalidListRequester, "Введите код комнаты");
+  invalidListRequester.socket.emit("room:listReconnectableSeats", { roomCode: null } as never);
+  assert.deepEqual(await invalidListError, { message: "Введите код комнаты" });
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+});
+
+test("claim submission uses a crypto id and two-minute expiry without leaking membership or game data", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetIndex = 1;
+  const targetCredential = game.credentials[targetIndex];
+  game.humans[targetIndex].disconnect();
+  await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === targetCredential.playerId)?.connected === false,
+  );
+
+  const claimant = await game.server.connectClient();
+  const nonHost = game.humans[2];
+  const leakedStates: PublicGameState[] = [];
+  const leakedCharacters: Character[] = [];
+  const claimantClaimLists: unknown[] = [];
+  const nonHostClaimLists: unknown[] = [];
+  claimant.socket.on("game:state", (state) => leakedStates.push(state));
+  claimant.socket.on("game:character", (character) => leakedCharacters.push(character));
+  claimant.socket.on("admin:seatClaimsUpdated", (claims) => claimantClaimLists.push(claims));
+  nonHost.socket.on("admin:seatClaimsUpdated", (claims) => nonHostClaimLists.push(claims));
+
+  const submitted = await submitSeatClaim(
+    claimant,
+    ` ${game.room.code.toLowerCase()} `,
+    targetCredential.playerId,
+    " <Replacement> ",
+  );
+  const update = await game.host.waitFor(
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 1,
+  );
+  assert.match(submitted.requestId, /^[a-f0-9]{32}$/);
+  assert.deepEqual(update, {
+    claims: [
+      {
+        requestId: submitted.requestId,
+        playerId: targetCredential.playerId,
+        playerName: "Human 1",
+        claimantName: "Replacement",
+      },
+    ],
+  });
+
+  const stored = game.room.pendingSeatClaims.get(submitted.requestId);
+  assert.ok(stored);
+  assert.equal(stored.socketId, claimant.socket.id);
+  assert.equal(stored.claimantName, "Replacement");
+  assert.equal(stored.expiresAt - stored.createdAt, 120_000);
+  await delay(30);
+
+  assert.equal(isSocketInRoom(game.server, claimant, game.room.code), false);
+  assert.deepEqual(leakedStates, []);
+  assert.deepEqual(leakedCharacters, []);
+  assert.deepEqual(claimantClaimLists, []);
+  assert.deepEqual(nonHostClaimLists, []);
+});
+
+test("host rejection is terminal and duplicate or stale resolutions are idempotent", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    lobby.credentials[1].playerId,
+    "Replacement",
+  );
+  await lobby.host.waitFor("admin:seatClaimsUpdated", ({ claims }) =>
+    claims.some((claim) => claim.requestId === requestId),
+  );
+
+  const resolutions: Array<{ requestId: string; approved: boolean; message: string }> = [];
+  claimant.socket.on("room:seatClaimResolved", (resolution) => resolutions.push(resolution));
+  const rejected = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const cleared = waitForSocketEvent(
+    lobby.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  lobby.host.emit("admin:resolveSeatClaim", { requestId, approved: false });
+
+  assert.deepEqual(await rejected, {
+    requestId,
+    approved: false,
+    message: "Хост отклонил заявку",
+  });
+  assert.deepEqual(await cleared, { claims: [] });
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+
+  const staleError = waitForRoomError(lobby.host, "Заявка уже обработана или не найдена");
+  lobby.host.emit("admin:resolveSeatClaim", { requestId, approved: false });
+  assert.deepEqual(await staleError, { message: "Заявка уже обработана или не найдена" });
+
+  const malformedError = waitForRoomError(lobby.host, "Некорректный ID заявки");
+  lobby.host.socket.emit("admin:resolveSeatClaim", {
+    requestId: "not-a-claim",
+    approved: true,
+  } as never);
+  assert.deepEqual(await malformedError, { message: "Некорректный ID заявки" });
+  await delay(20);
+  assert.equal(resolutions.length, 1);
+});
+
+test("only the owning requester can cancel a claim and repeated cancellation is stale", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+  const intruder = await lobby.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    lobby.credentials[1].playerId,
+    "Replacement",
+  );
+
+  const foreignError = waitForRoomError(intruder, "Заявка не найдена");
+  intruder.emit("room:cancelSeatClaim", { requestId });
+  assert.deepEqual(await foreignError, { message: "Заявка не найдена" });
+  assert.equal(lobby.room.pendingSeatClaims.has(requestId), true);
+
+  const cancelled = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const hostCleared = waitForSocketEvent(
+    lobby.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  claimant.emit("room:cancelSeatClaim", { requestId });
+  assert.deepEqual(await cancelled, {
+    requestId,
+    approved: false,
+    message: "Заявка отменена",
+  });
+  assert.deepEqual(await hostCleared, { claims: [] });
+
+  const repeatedError = waitForRoomError(claimant, "Заявка не найдена");
+  claimant.emit("room:cancelSeatClaim", { requestId });
+  assert.deepEqual(await repeatedError, { message: "Заявка не найдена" });
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+});
+
+test("seat claims expire exactly at the deterministic two-minute boundary", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    lobby.credentials[1].playerId,
+    "Replacement",
+  );
+  const claim = lobby.room.pendingSeatClaims.get(requestId);
+  assert.ok(claim);
+  assert.equal(claim.expiresAt - claim.createdAt, 120_000);
+
+  assert.equal(
+    reconnectManager.expireSeatClaims(lobby.room, lobby.server.io, claim.expiresAt - 1),
+    0,
+  );
+  assert.equal(lobby.room.pendingSeatClaims.has(requestId), true);
+
+  const expired = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const hostCleared = waitForSocketEvent(
+    lobby.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  assert.equal(reconnectManager.expireSeatClaims(lobby.room, lobby.server.io, claim.expiresAt), 1);
+  assert.deepEqual(await expired, {
+    requestId,
+    approved: false,
+    message: "Время ожидания истекло",
+  });
+  assert.deepEqual(await hostCleared, { claims: [] });
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+
+  const staleError = waitForRoomError(lobby.host, "Заявка уже обработана или не найдена");
+  lobby.host.emit("admin:resolveSeatClaim", { requestId, approved: true });
+  assert.deepEqual(await staleError, { message: "Заявка уже обработана или не найдена" });
+});
+
+test("requester cancellation expires a logically overdue claim before cancelling it", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    lobby.credentials[1].playerId,
+    "Replacement",
+  );
+  const claim = lobby.room.pendingSeatClaims.get(requestId);
+  assert.ok(claim);
+  claim.expiresAt = Date.now() - 1;
+
+  const errors: string[] = [];
+  claimant.socket.on("room:error", ({ message }) => errors.push(message));
+  const expired = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const hostCleared = waitForSocketEvent(
+    lobby.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  claimant.emit("room:cancelSeatClaim", { requestId });
+
+  assert.deepEqual(await expired, {
+    requestId,
+    approved: false,
+    message: "Время ожидания истекло",
+  });
+  assert.deepEqual(await hostCleared, { claims: [] });
+  await delay(20);
+  assert.deepEqual(errors, []);
+});
+
+test("requester leave expires overdue claims before socket cleanup cancellation", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    lobby.credentials[1].playerId,
+    "Replacement",
+  );
+  const claim = lobby.room.pendingSeatClaims.get(requestId);
+  assert.ok(claim);
+  claim.expiresAt = Date.now() - 1;
+
+  const expired = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const hostCleared = waitForSocketEvent(
+    lobby.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  claimant.emit("room:leave");
+
+  assert.deepEqual(await expired, {
+    requestId,
+    approved: false,
+    message: "Время ожидания истекло",
+  });
+  assert.deepEqual(await hostCleared, { claims: [] });
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+});
+
+test("original-owner rejoin expires overdue claims before owner-return cancellation", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  const targetCredential = lobby.credentials[1];
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    targetCredential.playerId,
+    "Replacement",
+  );
+  const claim = lobby.room.pendingSeatClaims.get(requestId);
+  assert.ok(claim);
+  claim.expiresAt = Date.now() - 1;
+
+  const expired = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const hostCleared = waitForSocketEvent(
+    lobby.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  const owner = await lobby.server.connectClient();
+  const joined = waitForSocketEvent(owner, "room:joined");
+  owner.emit("room:rejoin", targetCredential);
+
+  assert.deepEqual(await expired, {
+    requestId,
+    approved: false,
+    message: "Время ожидания истекло",
+  });
+  assert.deepEqual(await hostCleared, { claims: [] });
+  assert.deepEqual(await joined, targetCredential);
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+});
+
+test("ending a game expires overdue claims before room-end cancellation", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  game.humans[1].disconnect();
+  await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === game.credentials[1].playerId)?.connected ===
+      false,
+  );
+  const claimant = await game.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    game.room.code,
+    game.credentials[1].playerId,
+    "Replacement",
+  );
+  const claim = game.room.pendingSeatClaims.get(requestId);
+  assert.ok(claim);
+  claim.expiresAt = Date.now() - 1;
+
+  const expired = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const ended = waitForSocketEvent(game.host, "game:state", (state) => state.phase === "GAME_OVER");
+  game.host.emit("game:endGame");
+
+  assert.deepEqual(await expired, {
+    requestId,
+    approved: false,
+    message: "Время ожидания истекло",
+  });
+  assert.equal((await ended).phase, "GAME_OVER");
+  assert.equal(game.room.pendingSeatClaims.size, 0);
+});
+
+test("the autonomous expiry scheduler can use a focused short lifetime", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+  const claimantSocketId = claimant.socket.id;
+  assert.ok(claimantSocketId);
+
+  const result = reconnectManager.createSeatClaim(
+    lobby.room,
+    claimantSocketId,
+    lobby.credentials[1].playerId,
+    "Short claimant",
+    lobby.server.io,
+    { ttlMs: 25 },
+  );
+  assert.equal(result.success, true);
+  if (!result.success) return;
+  const hostUpdate = lobby.host.waitFor(
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 1,
+  );
+  const expired = claimant.waitFor(
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === result.claim.id,
+  );
+  assert.equal(result.claim.expiresAt - result.claim.createdAt, 25);
+  assert.equal((await hostUpdate).claims[0]?.requestId, result.claim.id);
+  assert.deepEqual(await expired, {
+    requestId: result.claim.id,
+    approved: false,
+    message: "Время ожидания истекло",
+  });
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+  assert.equal(isSocketInRoom(lobby.server, claimant, lobby.room.code), false);
+});
+
+test("claim approval reuses the exact player history, rotates only its token, and rejects the old owner", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetIndex = 1;
+  const targetCredential = game.credentials[targetIndex];
+  const originalPlayer = game.room.players.get(targetCredential.playerId);
+  assert.ok(originalPlayer);
+  originalPlayer.revealedIndices = [0, 2];
+  originalPlayer.hasVoted = true;
+  originalPlayer.votedFor = game.credentials[3].playerId;
+  originalPlayer.immuneThisRound = true;
+  originalPlayer.actionCardRevealed = true;
+  assert.ok(game.room.gameState);
+  game.room.gameState.votes.set(originalPlayer.id, game.credentials[3].playerId);
+
+  const originalCharacter = originalPlayer.character;
+  const originalHistory = {
+    alive: originalPlayer.alive,
+    revealedIndices: [...originalPlayer.revealedIndices],
+    hasVoted: originalPlayer.hasVoted,
+    votedFor: originalPlayer.votedFor,
+    immuneThisRound: originalPlayer.immuneThisRound,
+    actionCardRevealed: originalPlayer.actionCardRevealed,
+    recordedVote: game.room.gameState.votes.get(originalPlayer.id),
+  };
+  const originalCapacity = game.room.gameState.bunkerCapacity;
+  const originalSchedule = [...game.room.gameState.votingSchedule];
+  const originalTurnOrder = [...game.room.gameState.turnOrder];
+  const otherCredential = game.room.players.get(game.credentials[2].playerId);
+  const otherToken = otherCredential?.sessionToken;
+  const originalHostId = game.room.hostId;
+
+  await emitLeaveAndWaitForServer(game.server, game.humans[targetIndex]);
+  await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === targetCredential.playerId)?.connected === false,
+  );
+  assert.equal(isSocketInRoom(game.server, game.humans[targetIndex], game.room.code), false);
+
+  const claimant = await game.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    game.room.code,
+    targetCredential.playerId,
+    " <Replacement> ",
+  );
+  const storedClaim = game.room.pendingSeatClaims.get(requestId);
+  assert.ok(storedClaim);
+  storedClaim.claimantName = " <Replacement> ";
+
+  const approved = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId && resolution.approved,
+  );
+  const joined = waitForSocketEvent(claimant, "room:joined");
+  const character = waitForSocketEvent(claimant, "game:character");
+  const hostClaimsCleared = waitForSocketEvent(
+    game.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  const reboundState = waitForSocketEvent(
+    game.host,
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === targetCredential.playerId)?.connected === true,
+  );
+  game.host.emit("admin:resolveSeatClaim", { requestId, approved: true });
+
+  assert.deepEqual(await approved, {
+    requestId,
+    approved: true,
+    message: "Заявка одобрена",
+  });
+  const replacementCredential = await joined;
+  assert.equal(replacementCredential.roomCode, game.room.code);
+  assert.equal(replacementCredential.playerId, targetCredential.playerId);
+  assert.match(replacementCredential.sessionToken, /^[a-f0-9]{64}$/);
+  assert.notEqual(replacementCredential.sessionToken, targetCredential.sessionToken);
+  assert.deepEqual(await character, originalCharacter);
+  assert.deepEqual(await hostClaimsCleared, { claims: [] });
+  const state = await reboundState;
+
+  const reboundPlayer = game.room.players.get(targetCredential.playerId);
+  assert.equal(reboundPlayer, originalPlayer);
+  assert.equal(reboundPlayer?.socketId, claimant.socket.id);
+  assert.equal(reboundPlayer?.sessionToken, replacementCredential.sessionToken);
+  assert.equal(reboundPlayer?.name, "Replacement");
+  assert.deepEqual(reboundPlayer?.character, originalCharacter);
+  assert.deepEqual(
+    {
+      alive: reboundPlayer?.alive,
+      revealedIndices: reboundPlayer?.revealedIndices,
+      hasVoted: reboundPlayer?.hasVoted,
+      votedFor: reboundPlayer?.votedFor,
+      immuneThisRound: reboundPlayer?.immuneThisRound,
+      actionCardRevealed: reboundPlayer?.actionCardRevealed,
+      recordedVote: game.room.gameState.votes.get(originalPlayer.id),
+    },
+    originalHistory,
+  );
+  assert.equal(otherCredential?.sessionToken, otherToken);
+  assert.equal(game.room.hostId, originalHostId);
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.startedPlayerCount, 4);
+  assert.equal(game.room.gameState.bunkerCapacity, originalCapacity);
+  assert.deepEqual(game.room.gameState.votingSchedule, originalSchedule);
+  assert.deepEqual(game.room.gameState.turnOrder, originalTurnOrder);
+  assert.equal(state.startedPlayerCount, 4);
+  assert.equal(state.pauseKind, "none");
+  assert.deepEqual(state.disconnectedPlayerIds, []);
+  assert.equal(isSocketInRoom(game.server, claimant, game.room.code), true);
+
+  const oldOwnerOutcome = waitForRejoinOutcome(game.humans[targetIndex]);
+  game.humans[targetIndex].emit("room:rejoin", targetCredential);
+  assert.deepEqual(await oldOwnerOutcome, {
+    event: "reconnectError",
+    payload: {
+      message: "Не удалось переподключиться",
+      code: "INVALID_SESSION",
+      terminal: true,
+    },
+  });
+  game.humans[targetIndex].disconnect();
+  await delay(20);
+  assert.equal(originalPlayer.connected, true);
+  assert.equal(originalPlayer.socketId, claimant.socket.id);
+});
+
+test("one winning claim cancels competitors and the winner's other claims while preserving mixed pause reasons", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  game.host.emit("admin:pause");
+  await game.host.waitFor("game:state", (state) => state.pauseKind === "admin");
+
+  await emitLeaveAndWaitForServer(game.server, game.humans[1]);
+  await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === game.credentials[1].playerId)?.connected ===
+      false,
+  );
+  await emitLeaveAndWaitForServer(game.server, game.humans[2]);
+  await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === game.credentials[2].playerId)?.connected ===
+      false,
+  );
+
+  const claimantA = await game.server.connectClient();
+  const claimantB = await game.server.connectClient();
+  const first = await submitSeatClaim(
+    claimantA,
+    game.room.code,
+    game.credentials[1].playerId,
+    "Winner",
+  );
+  const sameSocketOtherSeat = await submitSeatClaim(
+    claimantA,
+    game.room.code,
+    game.credentials[2].playerId,
+    "Winner",
+  );
+  const competitor = await submitSeatClaim(
+    claimantB,
+    game.room.code,
+    game.credentials[1].playerId,
+    "Competitor",
+  );
+  assert.equal(
+    new Set([first.requestId, sameSocketOtherSeat.requestId, competitor.requestId]).size,
+    3,
+  );
+
+  const winnerResolution = waitForSocketEvent(
+    claimantA,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === first.requestId,
+  );
+  const winnerOtherResolution = waitForSocketEvent(
+    claimantA,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === sameSocketOtherSeat.requestId,
+  );
+  const competitorResolution = waitForSocketEvent(
+    claimantB,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === competitor.requestId,
+  );
+  const joined = waitForSocketEvent(claimantA, "room:joined");
+  const hostCleared = waitForSocketEvent(
+    game.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  const statePromise = waitForSocketEvent(
+    game.host,
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === game.credentials[1].playerId)?.connected ===
+        true &&
+      state.players.find((player) => player.id === game.credentials[2].playerId)?.connected ===
+        false,
+  );
+  game.host.emit("admin:resolveSeatClaim", { requestId: first.requestId, approved: true });
+
+  assert.deepEqual(await winnerResolution, {
+    requestId: first.requestId,
+    approved: true,
+    message: "Заявка одобрена",
+  });
+  assert.deepEqual(await winnerOtherResolution, {
+    requestId: sameSocketOtherSeat.requestId,
+    approved: false,
+    message: "Вы уже восстановили другое место",
+  });
+  assert.deepEqual(await competitorResolution, {
+    requestId: competitor.requestId,
+    approved: false,
+    message: "Место уже занято другим игроком",
+  });
+  assert.equal((await joined).playerId, game.credentials[1].playerId);
+  assert.deepEqual(await hostCleared, { claims: [] });
+  const state = await statePromise;
+  assert.equal(state.pauseKind, "mixed");
+  assert.deepEqual(state.disconnectedPlayerIds, [game.credentials[2].playerId]);
+  assert.equal(game.room.gameState?.pauseReasons.admin, true);
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.startedPlayerCount, 4);
+  assert.equal(isSocketInRoom(game.server, claimantA, game.room.code), true);
+  assert.equal(isSocketInRoom(game.server, claimantB, game.room.code), false);
+  assert.equal(game.room.pendingSeatClaims.size, 0);
+
+  const staleError = waitForRoomError(game.host, "Заявка уже обработана или не найдена");
+  game.host.emit("admin:resolveSeatClaim", { requestId: competitor.requestId, approved: true });
+  assert.deepEqual(await staleError, { message: "Заявка уже обработана или не найдена" });
+});
+
+test("the original credential owner wins first, rejects all claimants, and refreshes the current host", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetCredential = game.credentials[1];
+  game.humans[1].disconnect();
+  await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === targetCredential.playerId)?.connected === false,
+  );
+
+  const claimantA = await game.server.connectClient();
+  const claimantB = await game.server.connectClient();
+  const claimA = await submitSeatClaim(
+    claimantA,
+    game.room.code,
+    targetCredential.playerId,
+    "Claimant A",
+  );
+  const claimB = await submitSeatClaim(
+    claimantB,
+    game.room.code,
+    targetCredential.playerId,
+    "Claimant B",
+  );
+  const claimantALeaks: unknown[] = [];
+  const claimantBLeaks: unknown[] = [];
+  claimantA.socket.on("game:state", (state) => claimantALeaks.push(state));
+  claimantA.socket.on("game:character", (character) => claimantALeaks.push(character));
+  claimantB.socket.on("game:state", (state) => claimantBLeaks.push(state));
+  claimantB.socket.on("game:character", (character) => claimantBLeaks.push(character));
+
+  const rejectedA = waitForSocketEvent(
+    claimantA,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === claimA.requestId,
+  );
+  const rejectedB = waitForSocketEvent(
+    claimantB,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === claimB.requestId,
+  );
+  const hostCleared = waitForSocketEvent(
+    game.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  const owner = await game.server.connectClient();
+  const ownerJoined = waitForSocketEvent(owner, "room:joined");
+  const ownerCharacter = waitForSocketEvent(owner, "game:character");
+  owner.emit("room:rejoin", targetCredential);
+
+  assert.deepEqual(await rejectedA, {
+    requestId: claimA.requestId,
+    approved: false,
+    message: "Владелец места вернулся",
+  });
+  assert.deepEqual(await rejectedB, {
+    requestId: claimB.requestId,
+    approved: false,
+    message: "Владелец места вернулся",
+  });
+  assert.deepEqual(await hostCleared, { claims: [] });
+  assert.deepEqual(await ownerJoined, targetCredential);
+  assert.deepEqual(await ownerCharacter, game.characters[1]);
+  assert.equal(
+    game.room.players.get(targetCredential.playerId)?.sessionToken,
+    targetCredential.sessionToken,
+  );
+  assert.equal(game.room.pendingSeatClaims.size, 0);
+  assert.equal(isSocketInRoom(game.server, claimantA, game.room.code), false);
+  assert.equal(isSocketInRoom(game.server, claimantB, game.room.code), false);
+  await delay(20);
+  assert.deepEqual(claimantALeaks, []);
+  assert.deepEqual(claimantBLeaks, []);
+
+  const staleError = waitForRoomError(game.host, "Заявка уже обработана или не найдена");
+  game.host.emit("admin:resolveSeatClaim", { requestId: claimA.requestId, approved: true });
+  assert.deepEqual(await staleError, { message: "Заявка уже обработана или не найдена" });
+});
+
+test("claimant disconnect removes every claim and refreshes the host before stale approval", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  await disconnectLobbyHuman(lobby, 2);
+  const claimant = await lobby.server.connectClient();
+  const claimA = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    lobby.credentials[1].playerId,
+    "Replacement",
+  );
+  const claimB = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    lobby.credentials[2].playerId,
+    "Replacement",
+  );
+  assert.equal(lobby.room.pendingSeatClaims.size, 2);
+
+  const hostCleared = waitForSocketEvent(
+    lobby.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  const claimantSocketId = claimant.socket.id;
+  assert.ok(claimantSocketId);
+  const claimantServerSocket = lobby.server.io.sockets.sockets.get(claimantSocketId);
+  assert.ok(claimantServerSocket);
+  const disconnected = new Promise<void>((resolve) => {
+    claimantServerSocket.once("disconnect", () => resolve());
+  });
+  claimant.disconnect();
+  await disconnected;
+
+  assert.deepEqual(await hostCleared, { claims: [] });
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+  assert.equal(
+    reconnectManager.expireSeatClaims(lobby.room, lobby.server.io, Number.MAX_SAFE_INTEGER),
+    0,
+  );
+
+  const staleError = waitForRoomError(lobby.host, "Заявка уже обработана или не найдена");
+  lobby.host.emit("admin:resolveSeatClaim", { requestId: claimA.requestId, approved: true });
+  assert.deepEqual(await staleError, { message: "Заявка уже обработана или не найдена" });
+  assert.equal(lobby.room.pendingSeatClaims.has(claimB.requestId), false);
+  assert.equal(lobby.room.players.get(lobby.credentials[1].playerId)?.connected, false);
+});
+
+test("a claimant acquiring another membership cancels claims instead of being rebound", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const target = lobby.room.players.get(lobby.credentials[1].playerId);
+  assert.ok(target);
+  const oldToken = target.sessionToken;
+  const claimant = await lobby.server.connectClient();
+  const { requestId } = await submitSeatClaim(claimant, lobby.room.code, target.id, "Replacement");
+
+  const cancelled = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const oldHostCleared = waitForSocketEvent(
+    lobby.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  const created = waitForSocketEvent(claimant, "room:created");
+  claimant.emit("room:create", { playerName: "Different room" });
+
+  assert.deepEqual(await cancelled, {
+    requestId,
+    approved: false,
+    message: "Заявитель присоединился к другой комнате",
+  });
+  assert.deepEqual(await oldHostCleared, { claims: [] });
+  const otherRoom = await created;
+  assert.notEqual(otherRoom.roomCode, lobby.room.code);
+  assert.equal(isSocketInRoom(lobby.server, claimant, otherRoom.roomCode), true);
+  assert.equal(isSocketInRoom(lobby.server, claimant, lobby.room.code), false);
+  assert.equal(target.connected, false);
+  assert.equal(target.sessionToken, oldToken);
+
+  const staleError = waitForRoomError(lobby.host, "Заявка уже обработана или не найдена");
+  lobby.host.emit("admin:resolveSeatClaim", { requestId, approved: true });
+  assert.deepEqual(await staleError, { message: "Заявка уже обработана или не найдена" });
+});
+
+test("host transfer delivers real pending claims only to the successor and revokes former resolution", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 3);
+  const claimantA = await lobby.server.connectClient();
+  const claimA = await submitSeatClaim(
+    claimantA,
+    lobby.room.code,
+    lobby.credentials[3].playerId,
+    "Claimant A",
+  );
+  await lobby.host.waitFor("admin:seatClaimsUpdated", ({ claims }) =>
+    claims.some((claim) => claim.requestId === claimA.requestId),
+  );
+
+  const successor = lobby.humans[1];
+  const successorClaims = waitForSocketEvent(successor, "admin:seatClaimsUpdated", ({ claims }) =>
+    claims.some((claim) => claim.requestId === claimA.requestId),
+  );
+  lobby.host.emit("admin:transferHost", { targetPlayerId: lobby.credentials[1].playerId });
+  assert.deepEqual(await successorClaims, {
+    claims: [
+      {
+        requestId: claimA.requestId,
+        playerId: lobby.credentials[3].playerId,
+        playerName: "Human 3",
+        claimantName: "Claimant A",
+      },
+    ],
+  });
+  assert.equal(lobby.room.hostId, lobby.credentials[1].playerId);
+
+  const formerHostUpdates: unknown[] = [];
+  lobby.host.socket.on("admin:seatClaimsUpdated", (claims) => formerHostUpdates.push(claims));
+  const claimantB = await lobby.server.connectClient();
+  const successorUpdate = waitForSocketEvent(
+    successor,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 2,
+  );
+  const claimB = await submitSeatClaim(
+    claimantB,
+    lobby.room.code,
+    lobby.credentials[3].playerId,
+    "Claimant B",
+  );
+  assert.equal(
+    (await successorUpdate).claims.some((claim) => claim.requestId === claimB.requestId),
+    true,
+  );
+  await delay(20);
+  assert.deepEqual(formerHostUpdates, []);
+
+  const denied = waitForRoomError(lobby.host, "Только хост может выполнить это действие");
+  lobby.host.emit("admin:resolveSeatClaim", { requestId: claimA.requestId, approved: false });
+  assert.deepEqual(await denied, { message: "Только хост может выполнить это действие" });
+  assert.equal(lobby.room.pendingSeatClaims.size, 2);
+
+  const rejectedA = waitForSocketEvent(
+    claimantA,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === claimA.requestId,
+  );
+  successor.emit("admin:resolveSeatClaim", { requestId: claimA.requestId, approved: false });
+  assert.equal((await rejectedA).approved, false);
+  const rejectedB = waitForSocketEvent(
+    claimantB,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === claimB.requestId,
+  );
+  successor.emit("admin:resolveSeatClaim", { requestId: claimB.requestId, approved: false });
+  assert.equal((await rejectedB).approved, false);
+});
+
+test("reconnectable seat listing has an explicit deterministic rate limit", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const requester = await lobby.server.connectClient();
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const response = waitForSocketEvent(requester, "room:reconnectableSeats");
+    requester.emit("room:listReconnectableSeats", { roomCode: lobby.room.code });
+    assert.equal((await response).seats.length, 1);
+  }
+
+  const limited = waitForRoomError(requester, "Слишком много запросов, подождите");
+  requester.emit("room:listReconnectableSeats", { roomCode: lobby.room.code });
+  assert.deepEqual(await limited, { message: "Слишком много запросов, подождите" });
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+});
+
+test("seat claim submission has an explicit deterministic rate limit", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const submitted = await submitSeatClaim(
+      claimant,
+      lobby.room.code,
+      lobby.credentials[1].playerId,
+      `Claimant ${attempt}`,
+    );
+    assert.match(submitted.requestId, /^[a-f0-9]{32}$/);
+  }
+  assert.equal(lobby.room.pendingSeatClaims.size, 3);
+
+  const limited = waitForRoomError(claimant, "Слишком много запросов, подождите");
+  claimant.emit("room:requestSeatClaim", {
+    roomCode: lobby.room.code,
+    playerId: lobby.credentials[1].playerId,
+    claimantName: "Too many",
+  });
+  assert.deepEqual(await limited, { message: "Слишком много запросов, подождите" });
+  assert.equal(lobby.room.pendingSeatClaims.size, 3);
+});
+
+test("seat claim submission rate limiting survives fresh socket churn from one IP", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const claimant = await lobby.server.connectClient();
+    const submitted = await submitSeatClaim(
+      claimant,
+      lobby.room.code,
+      lobby.credentials[1].playerId,
+      `Fresh ${attempt}`,
+    );
+    assert.match(submitted.requestId, /^[a-f0-9]{32}$/);
+  }
+  assert.equal(lobby.room.pendingSeatClaims.size, 12);
+
+  const bypass = await lobby.server.connectClient();
+  const limited = waitForRoomError(bypass, "Слишком много запросов, подождите");
+  bypass.emit("room:requestSeatClaim", {
+    roomCode: lobby.room.code,
+    playerId: lobby.credentials[1].playerId,
+    claimantName: "Bypass",
+  });
+  assert.deepEqual(await limited, { message: "Слишком много запросов, подождите" });
+  assert.equal(lobby.room.pendingSeatClaims.size, 12);
+});
+
+test("a room-level pending claim cap bounds timers and host claim payloads", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const seedClaimant = await lobby.server.connectClient();
+  const seedSocketId = seedClaimant.socket.id;
+  assert.ok(seedSocketId);
+
+  for (let attempt = 0; attempt < 32; attempt++) {
+    const seeded = reconnectManager.createSeatClaim(
+      lobby.room,
+      seedSocketId,
+      lobby.credentials[1].playerId,
+      `Seed ${attempt}`,
+      lobby.server.io,
+    );
+    assert.equal(seeded.success, true);
+  }
+  assert.equal(lobby.room.pendingSeatClaims.size, 32);
+
+  const claimant = await lobby.server.connectClient();
+  const capped = waitForRoomError(
+    claimant,
+    "Слишком много заявок на восстановление, попробуйте позже",
+  );
+  claimant.emit("room:requestSeatClaim", {
+    roomCode: lobby.room.code,
+    playerId: lobby.credentials[1].playerId,
+    claimantName: "Overflow",
+  });
+  assert.deepEqual(await capped, {
+    message: "Слишком много заявок на восстановление, попробуйте позже",
+  });
+  assert.equal(lobby.room.pendingSeatClaims.size, 32);
+});
+
+test("seat claim resolution has an explicit deterministic rate limit", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  const staleId = "0".repeat(32);
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const stale = waitForRoomError(lobby.host, "Заявка уже обработана или не найдена");
+    lobby.host.emit("admin:resolveSeatClaim", { requestId: staleId, approved: false });
+    assert.deepEqual(await stale, { message: "Заявка уже обработана или не найдена" });
+  }
+
+  const limited = waitForRoomError(lobby.host, "Слишком много запросов, подождите");
+  lobby.host.emit("admin:resolveSeatClaim", { requestId: staleId, approved: false });
+  assert.deepEqual(await limited, { message: "Слишком много запросов, подождите" });
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+});
+
+test("unauthenticated fresh sockets cannot spend the host's shared-IP resolution budget", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    lobby.credentials[1].playerId,
+    "Replacement",
+  );
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const attacker = await lobby.server.connectClient();
+    const synchronized = waitForSocketEvent(attacker, "room:reconnectableSeats");
+    attacker.emit("admin:resolveSeatClaim", { requestId, approved: true });
+    attacker.emit("room:listReconnectableSeats", { roomCode: lobby.room.code });
+    await synchronized;
+    attacker.disconnect();
+  }
+
+  const outcome = new Promise<"approved" | "limited">((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error("Timed out waiting for the authenticated host resolution"));
+    }, 2_000);
+    const onResolved = (resolution: ServerEventPayload<"room:seatClaimResolved">) => {
+      if (resolution.requestId !== requestId) return;
+      cleanup();
+      resolve(resolution.approved ? "approved" : "limited");
+    };
+    const onError = ({ message }: ServerEventPayload<"room:error">) => {
+      if (message !== "Слишком много запросов, подождите") return;
+      cleanup();
+      resolve("limited");
+    };
+    const cleanup = () => {
+      clearTimeout(timeout);
+      claimant.socket.off("room:seatClaimResolved", onResolved);
+      lobby.host.socket.off("room:error", onError);
+    };
+    claimant.socket.on("room:seatClaimResolved", onResolved);
+    lobby.host.socket.on("room:error", onError);
+  });
+
+  lobby.host.emit("admin:resolveSeatClaim", { requestId, approved: true });
+  assert.equal(await outcome, "approved");
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+});
+
+test("natural final-round completion cancels pending claims before entering GAME_OVER", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const target = await disconnectStartedHumanWithoutPause(game, 1);
+  const claimant = await game.server.connectClient();
+  const { requestId } = await submitSeatClaim(claimant, game.room.code, target.id, "Replacement");
+
+  const state = game.room.gameState;
+  assert.ok(state);
+  if (state.phaseTimer) clearTimeout(state.phaseTimer);
+  state.phaseTimer = null;
+  state.phaseEndTime = null;
+  state.pausedCallback = null;
+  state.phase = "ROUND_DISCUSSION";
+  state.roundNumber = CONFIG.TOTAL_ROUNDS;
+  state.currentVotingInRound = 0;
+  state.votingSchedule[CONFIG.TOTAL_ROUNDS - 1] = 1;
+  state.votes.clear();
+  for (const player of game.room.players.values()) {
+    player.hasVoted = false;
+    player.votedFor = null;
+  }
+
+  const votePhase = waitForSocketEvent(
+    game.host,
+    "game:state",
+    (publicState) => publicState.phase === "ROUND_VOTE",
+  );
+  game.host.emit("admin:skipDiscussion");
+  await votePhase;
+
+  const naturalRoundEnd = takeScheduledPhaseCallback(game.room);
+
+  const resolutions: ServerEventPayload<"room:seatClaimResolved">[] = [];
+  claimant.socket.on("room:seatClaimResolved", (resolution) => resolutions.push(resolution));
+  const cancelled = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const hostCleared = waitForSocketEvent(
+    game.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  const gameOver = waitForSocketEvent(
+    game.host,
+    "game:state",
+    (publicState) => publicState.phase === "GAME_OVER",
+  );
+  naturalRoundEnd();
+
+  const [resolution, claimsUpdate, finalState] = await Promise.all([
+    cancelled,
+    hostCleared,
+    gameOver,
+  ]);
+  assert.deepEqual(resolution, {
+    requestId,
+    approved: false,
+    message: "Игра завершена",
+  });
+  assert.deepEqual(claimsUpdate, { claims: [] });
+  assert.equal(finalState.phase, "GAME_OVER");
+  assert.equal(game.room.pendingSeatClaims.size, 0);
+  assert.equal(isSocketInRoom(game.server, claimant, game.room.code), false);
+
+  const endedError = waitForRoomError(game.host, "Игра завершена");
+  game.host.emit("admin:resolveSeatClaim", { requestId, approved: true });
+  assert.deepEqual(await endedError, { message: "Игра завершена" });
+  assert.equal(
+    reconnectManager.expireSeatClaims(
+      game.room,
+      game.server.io,
+      Date.now() + reconnectManager.SEAT_CLAIM_TTL_MS,
+    ),
+    0,
+  );
+  await delay(20);
+  assert.equal(resolutions.filter((event) => event.requestId === requestId).length, 1);
+});
+
+test("defensive GAME_OVER resolution cancels a retained claim instead of approving it", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const target = await disconnectStartedHumanWithoutPause(game, 1);
+  const claimant = await game.server.connectClient();
+  const { requestId } = await submitSeatClaim(claimant, game.room.code, target.id, "Replacement");
+
+  const state = game.room.gameState;
+  assert.ok(state);
+  if (state.phaseTimer) clearTimeout(state.phaseTimer);
+  state.phaseTimer = null;
+  state.phaseEndTime = null;
+  state.pausedCallback = null;
+  state.phase = "GAME_OVER";
+
+  const hostErrors: string[] = [];
+  const hostClaimUpdates: ServerEventPayload<"admin:seatClaimsUpdated">[] = [];
+  game.host.socket.on("room:error", ({ message }) => hostErrors.push(message));
+  game.host.socket.on("admin:seatClaimsUpdated", (update) => hostClaimUpdates.push(update));
+  const resolved = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  game.host.emit("admin:resolveSeatClaim", { requestId, approved: true });
+
+  assert.deepEqual(await resolved, {
+    requestId,
+    approved: false,
+    message: "Игра завершена",
+  });
+  await delay(20);
+  assert.equal(hostErrors.includes("Игра завершена"), true);
+  assert.equal(
+    hostClaimUpdates.some(({ claims }) => claims.length === 0),
+    true,
+  );
+  assert.equal(game.room.pendingSeatClaims.size, 0);
+  assert.equal(target.connected, false);
+  assert.equal(isSocketInRoom(game.server, claimant, game.room.code), false);
+});
+
+test("ending the game cancels pending claims and makes ended seats unclaimable", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  game.humans[1].disconnect();
+  await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === game.credentials[1].playerId)?.connected ===
+      false,
+  );
+  const claimant = await game.server.connectClient();
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    game.room.code,
+    game.credentials[1].playerId,
+    "Replacement",
+  );
+
+  const cancelled = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const cleared = waitForSocketEvent(
+    game.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+  const ended = waitForSocketEvent(game.host, "game:state", (state) => state.phase === "GAME_OVER");
+  game.host.emit("game:endGame");
+  assert.deepEqual(await cancelled, {
+    requestId,
+    approved: false,
+    message: "Игра завершена",
+  });
+  assert.deepEqual(await cleared, { claims: [] });
+  assert.equal((await ended).phase, "GAME_OVER");
+  assert.equal(game.room.pendingSeatClaims.size, 0);
+
+  const lateClaimant = await game.server.connectClient();
+  const endedError = waitForRoomError(lateClaimant, "Игра завершена");
+  lateClaimant.emit("room:requestSeatClaim", {
+    roomCode: game.room.code,
+    playerId: game.credentials[1].playerId,
+    claimantName: "Late",
+  });
+  assert.deepEqual(await endedError, { message: "Игра завершена" });
+});
+
+test("test reset clears pending claims and cancels their expiry timers hermetically", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient();
+  const claimantSocketId = claimant.socket.id;
+  assert.ok(claimantSocketId);
+  const resolutions: unknown[] = [];
+  claimant.socket.on("room:seatClaimResolved", (resolution) => resolutions.push(resolution));
+
+  const result = reconnectManager.createSeatClaim(
+    lobby.room,
+    claimantSocketId,
+    lobby.credentials[1].playerId,
+    "Reset claimant",
+    lobby.server.io,
+    { ttlMs: 40 },
+  );
+  assert.equal(result.success, true);
+  assert.equal(lobby.room.pendingSeatClaims.size, 1);
+
+  resetSocketHandlerStateForTests();
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+  await delay(70);
+  assert.deepEqual(resolutions, []);
+  assert.equal(getAllRooms().size, 0);
 });
 
 test("consecutive socket harnesses isolate failed rejoin state", async (t) => {
@@ -1792,9 +3259,7 @@ test("startGame cannot replace an active reconnect-paused game", (t) => {
   const originalRemainingMs = room.gameState.pausedTimeRemaining;
   const originalCallback = room.gameState.pausedCallback;
   const originalAdminPause = room.gameState.pauseReasons.admin;
-  const originalDisconnectedIds = Array.from(
-    room.gameState.pauseReasons.disconnectedPlayerIds,
-  );
+  const originalDisconnectedIds = Array.from(room.gameState.pauseReasons.disconnectedPlayerIds);
 
   gameEngine.startGame(room, io);
 
@@ -1835,17 +3300,12 @@ test("game:start socket rejects an active reconnect-paused game without mutation
   assert.ok(hostPlayer?.character);
 
   addDisconnectPause(room, hostPlayer.id, server.io);
-  await host.waitFor(
-    "game:state",
-    (state) => state.paused && state.pauseKind === "reconnect",
-  );
+  await host.waitFor("game:state", (state) => state.paused && state.pauseKind === "reconnect");
 
   const originalGameState = room.gameState;
   const originalCharacter = hostPlayer.character;
   const originalRemainingMs = room.gameState.pausedTimeRemaining;
-  const originalDisconnectedIds = Array.from(
-    room.gameState.pauseReasons.disconnectedPlayerIds,
-  );
+  const originalDisconnectedIds = Array.from(room.gameState.pauseReasons.disconnectedPlayerIds);
 
   type StartAttemptOutcome =
     | { event: "error"; message: string }
