@@ -8,13 +8,21 @@ Replace the current approximate game information strip with the desktop structur
 
 The status strip uses the Codex layout directly instead of composing the generic `ScenarioSummary` component:
 
-1. A wide catastrophe cell containing the red warning icon, uppercase eyebrow, catastrophe title, description, and the existing expand interaction.
+1. A wide static catastrophe cell containing the red warning icon, uppercase eyebrow, catastrophe title, and description. Desktop does not use an expand interaction, chevron, dropdown, or hidden details.
 2. A timer metric with clock icon, contextual label, large gold value, and the current phase description.
 3. A bunker-capacity metric with shield icon, `capacity/alive players` value, and supporting copy.
 4. A round metric with round icon, `current/total` value, and phase label.
 5. A wide reveal-progress metric with title and zero-padded `current round / total rounds` value on one line, followed by one segment per round.
 
-The outer surface, internal gaps, corner radii, cell backgrounds, typography hierarchy, muted text, gold progress, and catastrophe gradient follow the Codex branch CSS values. The strip stays a single row on wide desktop viewports. Scenario details expand below the entire strip using the existing state and callback.
+The outer surface, internal gaps, corner radii, cell backgrounds, typography hierarchy, muted text, gold progress, and catastrophe gradient follow the Codex branch CSS values. The strip stays a single row on wide desktop viewports. Its desktop contents are entirely static.
+
+Immediately below the primary desktop row, the status surface always renders the full catastrophe, revealed-bunker-card, bunker-capacity, and revealed-threat details. This content is visible without a click, chevron, dropdown, or collapsed state.
+
+## Shared Situation Content
+
+`ScenarioSummary` owns the summary presentation, while an exported `ScenarioDetails` unit owns the full catastrophe, bunker, capacity, and threat content. `GameStatusHeader` and the mobile `ScenarioSummary` both render `ScenarioDetails`, so both viewports receive the same game data and copy from one implementation.
+
+The mobile summary receives the same red warning icon treatment as the desktop catastrophe cell. The icon is decorative and does not add a new interaction.
 
 ## Data Mapping
 
@@ -24,22 +32,26 @@ The outer surface, internal gaps, corner radii, cell backgrounds, typography hie
 - Capacity uses `gameState.bunkerCapacity` and the number of alive players.
 - Round uses `roundNumber` and `totalRounds`.
 - Reveal progress intentionally mirrors the Codex reference and is based on round progress, not the count of all player cards.
-- Existing voting information and host skip-discussion action remain available without changing handlers.
+- The redundant “Голосование N из N” status is not rendered or calculated by the game-screen view model and is not displayed on the dedicated voting screen. Server voting state and all voting mechanics remain unchanged.
+- The host skip-discussion action remains available without changing its handler.
 
 ## Mobile Adaptation
 
-At 768 pixels and below, the top strip displays only two equal compact cells: timer and round. The catastrophe cell, capacity metric, reveal-progress metric, and expanded desktop details are hidden from the top strip. Their information remains available through the existing “Ситуация” tab, which continues to render `ScenarioSummary` with bunker and threat details.
+At 768 pixels and below, the top strip displays only two equal compact cells: timer and round. The desktop catastrophe cell, capacity metric, reveal-progress metric, and desktop instance of the shared details are hidden from the top strip. Their complete information remains available through the existing “Ситуация” tab, which renders the warning icon, catastrophe, bunker cards, capacity, and revealed threat using the shared details unit.
 
 ## Constraints
 
 - Do not transfer the rest of the Codex game screen.
 - Do not change server state, shared types, game phases, handlers, or timers.
+- Keep desktop situation information permanently visible and non-interactive.
+- Keep desktop and mobile situation data semantically identical by reusing `ScenarioDetails`.
 - Keep the strip free of horizontal overflow at 320, 390, 1280, and 1920 pixels.
 - Preserve 44-pixel minimum interactive targets.
 
 ## Verification
 
 - Add component contracts for catastrophe icon/copy, alive-player capacity, contextual timer label, round-based zero-padded progress, and segmented round track.
+- Add contracts proving that both desktop and mobile render `ScenarioDetails`, that the mobile summary includes the warning icon, and that desktop details have no dropdown semantics.
 - Observe the new tests fail before implementation and pass afterward.
 - Run the complete game-screen suite and client production build.
 - Compare the desktop strip visually against the supplied reference at 1920 pixels.
