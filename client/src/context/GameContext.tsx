@@ -7,10 +7,39 @@ import {
   ActionCard,
   Attribute,
   GamePhase,
+  HostChangeReason,
+  ReconnectableSeat,
+  SeatClaimInfo,
+  ServerEvents,
 } from "../../../shared/types";
+import {
+  clearReconnectSession,
+  readReconnectSession,
+  saveReconnectSession,
+  shouldRetainReconnectSessionOnLeave,
+} from "./reconnectStorage";
 
 /** Client-side game state with local phaseEndTime computed from server's phaseRemainingMs */
 export type ClientGameState = PublicGameState & { phaseEndTime: number | null };
+
+export type ReconnectState = "idle" | "reconnecting" | "connected";
+export type SeatClaimStatus = "submitting" | "waiting" | "approved" | "rejected" | "cancelled";
+
+export interface PendingSeatClaimState {
+  requestId: string | null;
+  roomCode: string;
+  playerId: string;
+  playerName: string | null;
+  claimantName: string;
+  status: SeatClaimStatus;
+  message: string | null;
+}
+
+export interface HostChangeNotice {
+  hostId: string;
+  hostName: string;
+  reason: HostChangeReason;
+}
 
 /** Overlay queue item types */
 export type OverlayItem =
@@ -32,6 +61,11 @@ interface GameContextType {
   gameState: ClientGameState | null;
   myCharacter: Character | null;
   error: string | null;
+  reconnectState: ReconnectState;
+  reconnectableSeats: ReconnectableSeat[];
+  pendingSeatClaim: PendingSeatClaimState | null;
+  hostSeatClaims: SeatClaimInfo[];
+  hostChangeNotice: HostChangeNotice | null;
   createRoom: (name: string) => void;
   joinRoom: (code: string, name: string) => void;
   joinAsSpectator: (code: string, name: string) => void;
@@ -63,6 +97,13 @@ interface GameContextType {
   adminSkipDiscussion: () => void;
   adminRevivePlayer: (targetPlayerId: string) => void;
   adminEliminatePlayer: (targetPlayerId: string) => void;
+  listReconnectableSeats: (roomCode: string) => void;
+  requestSeatClaim: (roomCode: string, playerId: string, claimantName: string) => void;
+  cancelSeatClaim: () => void;
+  resolveSeatClaim: (requestId: string, approved: boolean) => void;
+  kickPlayer: (targetPlayerId: string) => void;
+  transferHost: (targetPlayerId: string) => void;
+  clearHostChangeNotice: () => void;
   currentOverlay: OverlayItem | null;
   pendingAdminOpen: boolean;
   consumePendingAdminOpen: () => void;
@@ -78,6 +119,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [gameState, setGameState] = useState<ClientGameState | null>(null);
   const [myCharacter, setMyCharacter] = useState<Character | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reconnectState, setReconnectState] = useState<ReconnectState>("idle");
+  const [reconnectableSeats, setReconnectableSeats] = useState<ReconnectableSeat[]>([]);
+  const [pendingSeatClaim, setPendingSeatClaim] = useState<PendingSeatClaimState | null>(null);
+  const [hostSeatClaims, setHostSeatClaims] = useState<SeatClaimInfo[]>([]);
+  const [hostChangeNotice, setHostChangeNotice] = useState<HostChangeNotice | null>(null);
   const [pendingAdminOpen, setPendingAdminOpen] = useState(false);
   // Overlay queue: items shown one at a time, sequentially
   const [currentOverlay, setCurrentOverlay] = useState<OverlayItem | null>(null);
@@ -86,6 +132,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const prevPhaseRef = useRef<GamePhase | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const overlayActiveRef = useRef(false);
+  const playerIdRef = useRef<string | null>(null);
+  const lastRejoinSocketIdRef = useRef<string | null>(null);
+  const explicitLeaveSuppressedRef = useRef(false);
+  const ignoreRoomEventsRef = useRef(false);
 
   // Show an overlay item and schedule its auto-dismiss
   function showOverlayItem(item: OverlayItem) {
@@ -117,46 +167,193 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    socket.connect();
-
-    socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => setConnected(false));
-
-    socket.on("room:created", ({ roomCode: code, playerId: pid, sessionToken: token }) => {
-      setRoomCode(code);
-      setPlayerId(pid);
-      localStorage.setItem("bunker_room", code);
-      localStorage.setItem("bunker_player", pid);
-      localStorage.setItem("bunker_token", token);
-    });
-
-    socket.on("room:joined", ({ roomCode: code, playerId: pid, sessionToken: token }) => {
-      setRoomCode(code);
-      setPlayerId(pid);
-      setIsSpectator(false);
-      localStorage.setItem("bunker_room", code);
-      localStorage.setItem("bunker_player", pid);
-      localStorage.setItem("bunker_token", token);
-      localStorage.removeItem("bunker_spectator");
-    });
-
-    socket.on("room:spectatorJoined", ({ roomCode: code, spectatorId: sid, sessionToken: token }) => {
-      setRoomCode(code);
-      setPlayerId(sid);
-      setIsSpectator(true);
-      localStorage.setItem("bunker_room", code);
-      localStorage.setItem("bunker_player", sid);
-      localStorage.setItem("bunker_token", token);
-      localStorage.setItem("bunker_spectator", "true");
-    });
-
-    socket.on("room:error", ({ message }) => {
+    const setTimedError = (message: string) => {
       setError(message);
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
       errorTimerRef.current = setTimeout(() => setError(null), 4000);
-    });
+    };
 
-    socket.on("game:state", (state) => {
+    const resetRoomUi = () => {
+      ignoreRoomEventsRef.current = true;
+      playerIdRef.current = null;
+      setRoomCode(null);
+      setPlayerId(null);
+      setIsSpectator(false);
+      setGameState(null);
+      setMyCharacter(null);
+      setReconnectState("idle");
+      setReconnectableSeats([]);
+      setPendingSeatClaim(null);
+      setHostSeatClaims([]);
+      setHostChangeNotice(null);
+      setPendingAdminOpen(false);
+      prevPhaseRef.current = null;
+      overlayQueueRef.current = [];
+      overlayActiveRef.current = false;
+      setCurrentOverlay(null);
+      if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current);
+    };
+
+    const clearStoredSession = () => {
+      clearReconnectSession();
+      explicitLeaveSuppressedRef.current = false;
+      lastRejoinSocketIdRef.current = null;
+      resetRoomUi();
+    };
+
+    const attemptStoredRejoin = (): boolean => {
+      const savedSession = readReconnectSession();
+      if (!savedSession) return false;
+
+      ignoreRoomEventsRef.current = false;
+      playerIdRef.current = savedSession.participantId;
+      setRoomCode(savedSession.roomCode);
+      setPlayerId(savedSession.participantId);
+      setIsSpectator(savedSession.role === "spectator");
+      if (savedSession.role === "spectator") {
+        socket.emit("room:rejoinSpectator", {
+          roomCode: savedSession.roomCode,
+          spectatorId: savedSession.participantId,
+          sessionToken: savedSession.sessionToken,
+        });
+      } else {
+        socket.emit("room:rejoin", {
+          roomCode: savedSession.roomCode,
+          playerId: savedSession.participantId,
+          sessionToken: savedSession.sessionToken,
+        });
+      }
+      return true;
+    };
+
+    const handleConnect = () => {
+      setConnected(true);
+      if (explicitLeaveSuppressedRef.current) return;
+      if (lastRejoinSocketIdRef.current === socket.id) return;
+      lastRejoinSocketIdRef.current = socket.id ?? null;
+      setReconnectState(attemptStoredRejoin() ? "reconnecting" : "idle");
+    };
+
+    const handleDisconnect = () => {
+      setConnected(false);
+      lastRejoinSocketIdRef.current = null;
+      explicitLeaveSuppressedRef.current = false;
+      if (playerIdRef.current !== null || readReconnectSession()) {
+        setReconnectState("reconnecting");
+      }
+      setPendingSeatClaim((current) =>
+        current && (current.status === "submitting" || current.status === "waiting")
+          ? { ...current, status: "cancelled", message: "Соединение потеряно" }
+          : current,
+      );
+    };
+
+    const acceptSession = (
+      role: "player" | "spectator",
+      code: string,
+      participantId: string,
+      token: string,
+    ) => {
+      ignoreRoomEventsRef.current = false;
+      explicitLeaveSuppressedRef.current = false;
+      playerIdRef.current = participantId;
+      setRoomCode(code);
+      setPlayerId(participantId);
+      setIsSpectator(role === "spectator");
+      setReconnectState("connected");
+      setReconnectableSeats([]);
+      setPendingSeatClaim(null);
+      saveReconnectSession({ role, roomCode: code, participantId, sessionToken: token });
+    };
+
+    const handleRoomCreated: ServerEvents["room:created"] = ({
+      roomCode: code,
+      playerId: pid,
+      sessionToken: token,
+    }) => {
+      acceptSession("player", code, pid, token);
+    };
+
+    const handleRoomJoined: ServerEvents["room:joined"] = ({
+      roomCode: code,
+      playerId: pid,
+      sessionToken: token,
+    }) => {
+      acceptSession("player", code, pid, token);
+    };
+
+    const handleSpectatorJoined: ServerEvents["room:spectatorJoined"] = ({
+      roomCode: code,
+      spectatorId: sid,
+      sessionToken: token,
+    }) => {
+      acceptSession("spectator", code, sid, token);
+    };
+
+    const handleRoomError: ServerEvents["room:error"] = ({ message }) => {
+      setPendingSeatClaim((current) =>
+        current?.status === "submitting" ? { ...current, status: "rejected", message } : current,
+      );
+      setTimedError(message);
+    };
+
+    const handleReconnectError: ServerEvents["room:reconnectError"] = ({ message, terminal }) => {
+      if (terminal) {
+        clearStoredSession();
+      } else {
+        setReconnectState("reconnecting");
+      }
+      setTimedError(message);
+    };
+
+    const handleKicked: ServerEvents["room:kicked"] = ({ message }) => {
+      clearStoredSession();
+      setTimedError(message);
+    };
+
+    const handleReconnectableSeats: ServerEvents["room:reconnectableSeats"] = ({ seats }) => {
+      setReconnectableSeats(seats);
+    };
+
+    const handleSeatClaimSubmitted: ServerEvents["room:seatClaimSubmitted"] = ({ requestId }) => {
+      setPendingSeatClaim((current) =>
+        current ? { ...current, requestId, status: "waiting", message: null } : current,
+      );
+    };
+
+    const handleSeatClaimResolved: ServerEvents["room:seatClaimResolved"] = ({
+      requestId,
+      approved,
+      message,
+    }) => {
+      setPendingSeatClaim((current) => {
+        if (!current || (current.requestId !== null && current.requestId !== requestId)) {
+          return current;
+        }
+        const status: SeatClaimStatus = approved
+          ? "approved"
+          : message.toLowerCase().includes("отмен")
+            ? "cancelled"
+            : "rejected";
+        return { ...current, requestId, status, message };
+      });
+    };
+
+    const handleSeatClaimsUpdated: ServerEvents["admin:seatClaimsUpdated"] = ({ claims }) => {
+      setHostSeatClaims(claims);
+    };
+
+    const handleHostChanged: ServerEvents["room:hostChanged"] = ({ hostId, hostName, reason }) => {
+      if (hostId === playerIdRef.current) {
+        setHostChangeNotice({ hostId, hostName, reason });
+      } else {
+        setHostChangeNotice(null);
+        setHostSeatClaims([]);
+      }
+    };
+
+    const handleGameState: ServerEvents["game:state"] = (state) => {
+      if (ignoreRoomEventsRef.current) return;
       // Convert server-relative remaining time to local absolute endTime
       // This avoids clock desync between server and client
       const phaseEndTime =
@@ -224,65 +421,111 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      const currentPlayer = state.players.find((player) => player.id === playerIdRef.current);
+      if (!currentPlayer?.isHost) setHostSeatClaims([]);
       setGameState({ ...state, phaseEndTime });
-    });
+    };
 
-    socket.on("game:character", (character) => {
+    const handleCharacter: ServerEvents["game:character"] = (character) => {
+      if (ignoreRoomEventsRef.current) return;
       setMyCharacter(character);
-    });
+    };
 
-    socket.on("game:attributeRevealed", ({ playerName, attribute }) => {
+    const handleAttributeRevealed: ServerEvents["game:attributeRevealed"] = ({
+      playerName,
+      attribute,
+    }) => {
+      if (ignoreRoomEventsRef.current) return;
       enqueueOverlay({ kind: "attribute", playerName, attribute, duration: 4000 });
-    });
+    };
 
-    socket.on("game:actionCardRevealed", ({ playerName, actionCard }) => {
+    const handleActionCardRevealed: ServerEvents["game:actionCardRevealed"] = ({
+      playerName,
+      actionCard,
+    }) => {
+      if (ignoreRoomEventsRef.current) return;
       enqueueOverlay({ kind: "actionCard", playerName, actionCard, duration: 10000 });
-    });
+    };
 
-    // Try to rejoin on page reload
-    const savedRoom = localStorage.getItem("bunker_room");
-    const savedPlayer = localStorage.getItem("bunker_player");
-    const savedToken = localStorage.getItem("bunker_token");
-    const savedSpectator = localStorage.getItem("bunker_spectator");
-    if (savedRoom && savedPlayer && savedToken) {
-      if (savedSpectator === "true") {
-        socket.emit("room:rejoinSpectator", { roomCode: savedRoom, spectatorId: savedPlayer, sessionToken: savedToken });
-      } else {
-        socket.emit("room:rejoin", { roomCode: savedRoom, playerId: savedPlayer, sessionToken: savedToken });
-      }
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("room:created", handleRoomCreated);
+    socket.on("room:joined", handleRoomJoined);
+    socket.on("room:spectatorJoined", handleSpectatorJoined);
+    socket.on("room:error", handleRoomError);
+    socket.on("room:reconnectError", handleReconnectError);
+    socket.on("room:kicked", handleKicked);
+    socket.on("room:reconnectableSeats", handleReconnectableSeats);
+    socket.on("room:seatClaimSubmitted", handleSeatClaimSubmitted);
+    socket.on("room:seatClaimResolved", handleSeatClaimResolved);
+    socket.on("admin:seatClaimsUpdated", handleSeatClaimsUpdated);
+    socket.on("room:hostChanged", handleHostChanged);
+    socket.on("game:state", handleGameState);
+    socket.on("game:character", handleCharacter);
+    socket.on("game:attributeRevealed", handleAttributeRevealed);
+    socket.on("game:actionCardRevealed", handleActionCardRevealed);
+
+    if (socket.connected) {
+      handleConnect();
+    } else {
+      socket.connect();
     }
 
     return () => {
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("room:created");
-      socket.off("room:joined");
-      socket.off("room:spectatorJoined");
-      socket.off("room:error");
-      socket.off("game:state");
-      socket.off("game:character");
-      socket.off("game:actionCardRevealed");
-      socket.off("game:attributeRevealed");
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("room:created", handleRoomCreated);
+      socket.off("room:joined", handleRoomJoined);
+      socket.off("room:spectatorJoined", handleSpectatorJoined);
+      socket.off("room:error", handleRoomError);
+      socket.off("room:reconnectError", handleReconnectError);
+      socket.off("room:kicked", handleKicked);
+      socket.off("room:reconnectableSeats", handleReconnectableSeats);
+      socket.off("room:seatClaimSubmitted", handleSeatClaimSubmitted);
+      socket.off("room:seatClaimResolved", handleSeatClaimResolved);
+      socket.off("admin:seatClaimsUpdated", handleSeatClaimsUpdated);
+      socket.off("room:hostChanged", handleHostChanged);
+      socket.off("game:state", handleGameState);
+      socket.off("game:character", handleCharacter);
+      socket.off("game:attributeRevealed", handleAttributeRevealed);
+      socket.off("game:actionCardRevealed", handleActionCardRevealed);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current);
     };
   }, []);
 
   const createRoom = useCallback((name: string) => {
+    explicitLeaveSuppressedRef.current = false;
+    ignoreRoomEventsRef.current = false;
     socket.emit("room:create", { playerName: name });
   }, []);
 
   const joinRoom = useCallback((code: string, name: string) => {
+    explicitLeaveSuppressedRef.current = false;
+    ignoreRoomEventsRef.current = false;
     socket.emit("room:join", { roomCode: code, playerName: name });
   }, []);
 
   const joinAsSpectator = useCallback((code: string, name: string) => {
+    explicitLeaveSuppressedRef.current = false;
+    ignoreRoomEventsRef.current = false;
     socket.emit("room:joinSpectator", { roomCode: code, spectatorName: name });
   }, []);
 
   const rejoinRoom = useCallback((code: string, pid: string) => {
-    const token = localStorage.getItem("bunker_token");
-    if (token) {
-      socket.emit("room:rejoin", { roomCode: code, playerId: pid, sessionToken: token });
+    const savedSession = readReconnectSession();
+    if (!savedSession || savedSession.role !== "player") return;
+    if (savedSession.roomCode !== code.trim().toUpperCase() || savedSession.participantId !== pid) {
+      return;
     }
+    explicitLeaveSuppressedRef.current = false;
+    ignoreRoomEventsRef.current = false;
+    setReconnectState("reconnecting");
+    socket.emit("room:rejoin", {
+      roomCode: savedSession.roomCode,
+      playerId: savedSession.participantId,
+      sessionToken: savedSession.sessionToken,
+    });
   }, []);
 
   const setReady = useCallback((ready: boolean) => {
@@ -315,17 +558,36 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const leaveRoom = useCallback(() => {
+    const retainOwnership = shouldRetainReconnectSessionOnLeave(
+      gameState?.phase ?? null,
+      isSpectator,
+    );
+    if (retainOwnership) {
+      explicitLeaveSuppressedRef.current = true;
+    } else {
+      explicitLeaveSuppressedRef.current = false;
+    }
+    ignoreRoomEventsRef.current = true;
     socket.emit("room:leave");
+    if (!retainOwnership) clearReconnectSession();
+    playerIdRef.current = null;
     setRoomCode(null);
     setPlayerId(null);
     setIsSpectator(false);
     setGameState(null);
     setMyCharacter(null);
-    localStorage.removeItem("bunker_room");
-    localStorage.removeItem("bunker_player");
-    localStorage.removeItem("bunker_token");
-    localStorage.removeItem("bunker_spectator");
-  }, []);
+    setReconnectState("idle");
+    setReconnectableSeats([]);
+    setPendingSeatClaim(null);
+    setHostSeatClaims([]);
+    setHostChangeNotice(null);
+    setPendingAdminOpen(false);
+    prevPhaseRef.current = null;
+    overlayQueueRef.current = [];
+    overlayActiveRef.current = false;
+    setCurrentOverlay(null);
+    if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current);
+  }, [gameState?.phase, isSpectator]);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -398,6 +660,55 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.emit("admin:eliminatePlayer", { targetPlayerId });
   }, []);
 
+  const listReconnectableSeats = useCallback((code: string) => {
+    setReconnectableSeats([]);
+    setPendingSeatClaim(null);
+    socket.emit("room:listReconnectableSeats", { roomCode: code.trim().toUpperCase() });
+  }, []);
+
+  const requestSeatClaim = useCallback(
+    (code: string, targetPlayerId: string, claimantName: string) => {
+      const normalizedRoomCode = code.trim().toUpperCase();
+      const selectedSeat = reconnectableSeats.find((seat) => seat.playerId === targetPlayerId);
+      setPendingSeatClaim({
+        requestId: null,
+        roomCode: normalizedRoomCode,
+        playerId: targetPlayerId,
+        playerName: selectedSeat?.playerName ?? null,
+        claimantName: claimantName.trim(),
+        status: "submitting",
+        message: null,
+      });
+      socket.emit("room:requestSeatClaim", {
+        roomCode: normalizedRoomCode,
+        playerId: targetPlayerId,
+        claimantName,
+      });
+    },
+    [reconnectableSeats],
+  );
+
+  const cancelSeatClaim = useCallback(() => {
+    if (!pendingSeatClaim?.requestId) return;
+    socket.emit("room:cancelSeatClaim", { requestId: pendingSeatClaim.requestId });
+  }, [pendingSeatClaim?.requestId]);
+
+  const resolveSeatClaim = useCallback((requestId: string, approved: boolean) => {
+    socket.emit("admin:resolveSeatClaim", { requestId, approved });
+  }, []);
+
+  const kickPlayer = useCallback((targetPlayerId: string) => {
+    socket.emit("admin:kickPlayer", { targetPlayerId });
+  }, []);
+
+  const transferHost = useCallback((targetPlayerId: string) => {
+    socket.emit("admin:transferHost", { targetPlayerId });
+  }, []);
+
+  const clearHostChangeNotice = useCallback(() => {
+    setHostChangeNotice(null);
+  }, []);
+
   return (
     <GameContext.Provider
       value={{
@@ -408,6 +719,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         gameState,
         myCharacter,
         error,
+        reconnectState,
+        reconnectableSeats,
+        pendingSeatClaim,
+        hostSeatClaims,
+        hostChangeNotice,
         createRoom,
         joinRoom,
         joinAsSpectator,
@@ -435,6 +751,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         adminSkipDiscussion: adminSkipDiscussionFn,
         adminRevivePlayer: adminRevivePlayerFn,
         adminEliminatePlayer: adminEliminatePlayerFn,
+        listReconnectableSeats,
+        requestSeatClaim,
+        cancelSeatClaim,
+        resolveSeatClaim,
+        kickPlayer,
+        transferHost,
+        clearHostChangeNotice,
         currentOverlay,
         pendingAdminOpen,
         consumePendingAdminOpen: consumePendingAdminOpenFn,
