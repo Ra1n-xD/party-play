@@ -122,6 +122,12 @@ function clearRejoinFailures(socket: IOSocket): void {
   rejoinFailures.delete(ip);
 }
 
+export function resetSocketHandlerStateForTests(): void {
+  socketRoomMap.clear();
+  socketActionCounts.clear();
+  rejoinFailures.clear();
+}
+
 // --- Input validation helpers ---
 const VALID_ATTRIBUTE_TYPES = ["profession", "bio", "health", "hobby", "baggage", "fact", "action"];
 

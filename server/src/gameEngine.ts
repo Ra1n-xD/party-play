@@ -60,6 +60,7 @@ function getVotingSchedule(playerCount: number): number[] {
 
 export function startGame(room: Room, io: IOServer): void {
   const playerCount = room.players.size;
+  room.startedPlayerCount = playerCount;
   const bunkerCapacity = Math.floor(playerCount / 2);
   const votingSchedule = getVotingSchedule(playerCount);
 
@@ -920,6 +921,7 @@ export function forceEndGame(room: Room, io: IOServer): void {
 export function resetGame(room: Room, io: IOServer): void {
   if (room.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
   room.gameState = null;
+  room.startedPlayerCount = null;
 
   for (const player of room.players.values()) {
     player.ready = false;
