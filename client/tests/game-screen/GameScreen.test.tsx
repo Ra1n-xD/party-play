@@ -620,6 +620,38 @@ test("player board uses buttons and only public attributes", () => {
   assert.doesNotMatch(html, /План Б/);
 });
 
+test("player cards compact revealed characteristics into their canonical order", () => {
+  const publicPlayer: PlayerInfo = {
+    ...player,
+    revealedAttributes: [
+      { type: "fact", label: "Доп. факт", value: "Знает азбуку Морзе" },
+      { type: "health", label: "Здоровье", value: "Здорова" },
+      { type: "profession", label: "Профессия", value: "Врач" },
+      { type: "bio", label: "Биология", value: "Женщина, 32 года" },
+    ],
+  };
+  const html = renderToStaticMarkup(
+    <PlayerBoard
+      players={[publicPlayer]}
+      playerId={null}
+      currentTurnPlayerId={null}
+      lastEliminatedPlayerId={null}
+      onSelectPlayer={() => undefined}
+    />,
+  );
+
+  const professionIndex = html.indexOf('data-attr-type="profession"');
+  const bioIndex = html.indexOf('data-attr-type="bio"');
+  const healthIndex = html.indexOf('data-attr-type="health"');
+  const factIndex = html.indexOf('data-attr-type="fact"');
+
+  assert.ok(professionIndex < bioIndex);
+  assert.ok(bioIndex < healthIndex);
+  assert.ok(healthIndex < factIndex);
+  assert.equal((html.match(/class="gs-public-attribute"/g) ?? []).length, 4);
+  assert.doesNotMatch(html, /gs-empty-copy/);
+});
+
 test("player cards illustrate every public characteristic and mark eliminated players", () => {
   const publicPlayer: PlayerInfo = {
     ...player,
@@ -770,7 +802,7 @@ test("hybrid CSS uses the full desktop width and distinct player state accents",
   );
   assert.match(
     css,
-    /\.command-game-screen \.gs-public-attribute-copy > span \{[^}]*font-size: 0\.68rem;/s,
+    /\.command-game-screen \.gs-public-attribute-copy > span \{[^}]*font-size: 0\.6rem !important;/s,
   );
   assert.match(
     css,
