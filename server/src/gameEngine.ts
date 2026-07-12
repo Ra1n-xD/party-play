@@ -926,7 +926,7 @@ function freezeGame(room: Room): void {
   clearBotActions(room.code);
 }
 
-export function resumeGameIfReady(room: Room, io: IOServer): void {
+export function resumeGameIfReady(room: Room, io: IOServer, shouldBroadcast = true): void {
   const gs = room.gameState;
   if (!gs || isGameplayPaused(room) || !gs.paused) return;
 
@@ -941,10 +941,15 @@ export function resumeGameIfReady(room: Room, io: IOServer): void {
   }
 
   // broadcastState schedules bot actions for the resumed current phase.
-  broadcastState(room, io);
+  if (shouldBroadcast) broadcastState(room, io);
 }
 
-export function addDisconnectPause(room: Room, playerId: string, io: IOServer): void {
+export function addDisconnectPause(
+  room: Room,
+  playerId: string,
+  io: IOServer,
+  shouldBroadcast = true,
+): void {
   const gs = room.gameState;
   const player = room.players.get(playerId);
   if (!gs || !isActiveGamePhase(room) || !player || player.isBot || player.kicked) return;
@@ -955,21 +960,31 @@ export function addDisconnectPause(room: Room, playerId: string, io: IOServer): 
   const wasPaused = isGameplayPaused(room);
   reasons.add(playerId);
   if (!wasPaused) freezeGame(room);
-  broadcastState(room, io);
+  if (shouldBroadcast) broadcastState(room, io);
 }
 
-export function removeDisconnectPause(room: Room, playerId: string, io: IOServer): void {
+export function removeDisconnectPause(
+  room: Room,
+  playerId: string,
+  io: IOServer,
+  shouldBroadcast = true,
+): void {
   const gs = room.gameState;
   if (!gs || !gs.pauseReasons.disconnectedPlayerIds.delete(playerId)) return;
 
   if (isGameplayPaused(room)) {
-    broadcastState(room, io);
+    if (shouldBroadcast) broadcastState(room, io);
   } else {
-    resumeGameIfReady(room, io);
+    resumeGameIfReady(room, io, shouldBroadcast);
   }
 }
 
-export function setAdminPause(room: Room, paused: boolean, io: IOServer): PauseResult {
+export function setAdminPause(
+  room: Room,
+  paused: boolean,
+  io: IOServer,
+  shouldBroadcast = true,
+): PauseResult {
   const gs = room.gameState;
   if (!gs) return { success: false, error: "Игра не запущена" };
   if (paused && !isActiveGamePhase(room)) {
@@ -982,11 +997,11 @@ export function setAdminPause(room: Room, paused: boolean, io: IOServer): PauseR
 
   if (paused) {
     if (!wasPaused) freezeGame(room);
-    broadcastState(room, io);
+    if (shouldBroadcast) broadcastState(room, io);
   } else if (isGameplayPaused(room)) {
-    broadcastState(room, io);
+    if (shouldBroadcast) broadcastState(room, io);
   } else {
-    resumeGameIfReady(room, io);
+    resumeGameIfReady(room, io, shouldBroadcast);
   }
 
   return { success: true, error: "" };

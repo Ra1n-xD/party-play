@@ -6,7 +6,6 @@ import {
   joinRoom,
   joinRoomAsSpectator,
   getRoom,
-  removePlayer,
   removeSpectator,
   addBotToRoom,
   removeBotFromRoom,
@@ -44,9 +43,12 @@ import {
   bindPlayerSocket,
   bindSpectatorSocket,
   cancelClaimsForPlayer,
+  ensureConnectedHost,
   isCurrentSocketOwner,
   markPlayerDisconnected,
+  removeLobbyPlayerWithHostFailover,
   removeClaimsForSocket,
+  transferHost,
 } from "./reconnectManager.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
@@ -389,7 +391,7 @@ export function registerHandlers(io: IOServer): void {
       });
 
       socket.emit("room:joined", { roomCode: room.code, playerId: player.id, sessionToken: player.sessionToken });
-      broadcastState(room, io);
+      if (!ensureConnectedHost(room, io)) broadcastState(room, io);
     });
 
     socket.on("room:rejoin", ({ roomCode, playerId, sessionToken }) => {
@@ -492,10 +494,8 @@ export function registerHandlers(io: IOServer): void {
         socket.emit("game:character", player.character);
       }
 
-      const hadDisconnectPause =
-        room.gameState?.pauseReasons.disconnectedPlayerIds.has(player.id) ?? false;
-      removeDisconnectPause(room, player.id, io);
-      if (!hadDisconnectPause) broadcastState(room, io);
+      removeDisconnectPause(room, player.id, io, false);
+      if (!ensureConnectedHost(room, io)) broadcastState(room, io);
     });
 
     socket.on("room:joinSpectator", ({ roomCode, spectatorName }) => {
@@ -772,6 +772,18 @@ export function registerHandlers(io: IOServer): void {
 
     // --- Admin panel events ---
 
+    socket.on("admin:transferHost", ({ targetPlayerId }) => {
+      const ctx = getSocketRoom(socket);
+      if (!ctx) return;
+      if (!isValidId(targetPlayerId)) {
+        socket.emit("room:error", { message: "Игрок не найден" });
+        return;
+      }
+
+      const result = transferHost(ctx.room, ctx.info.playerId, targetPlayerId, io);
+      if (!result.success) socket.emit("room:error", { message: result.error });
+    });
+
     socket.on("admin:shuffleAll", ({ attributeType }) => {
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
@@ -976,11 +988,10 @@ export function registerHandlers(io: IOServer): void {
       }
 
       if (!room.gameState) {
-        removePlayer(room, player.id);
+        removeLobbyPlayerWithHostFailover(room, player.id, io);
         socketRoomMap.delete(socket.id);
         cleanupRateLimitEntry(socket.id);
         socket.leave(info.roomCode);
-        if (room.players.size > 0) broadcastState(room, io);
         return;
       }
 
