@@ -8,15 +8,17 @@ import {
   ClientEvents,
   BunkerCard,
   ThreatCard,
+  GamePhase,
+  PauseKind,
 } from "../../shared/types.js";
-import { Room, GameState, Player, getAlivePlayers, touchRoom } from "./roomManager.js";
+import { Room, Player, getAlivePlayers, touchRoom } from "./roomManager.js";
 import { generateCharacter } from "./characterGenerator.js";
 import { catastrophes } from "./data/catastrophes.js";
 import { bunkerCards as allBunkerCardsData } from "./data/bunkers.js";
 import { threatCards as allThreatCardsData } from "./data/threats.js";
 import { randomPick, shuffle } from "./utils.js";
 import { CONFIG } from "./config.js";
-import { scheduleBotActions } from "./botManager.js";
+import { clearBotActions, scheduleBotActions } from "./botManager.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 
@@ -59,6 +61,8 @@ function getVotingSchedule(playerCount: number): number[] {
 }
 
 export function startGame(room: Room, io: IOServer): void {
+  if (room.gameState) return;
+
   const playerCount = room.players.size;
   room.startedPlayerCount = playerCount;
   const bunkerCapacity = Math.floor(playerCount / 2);
@@ -109,6 +113,10 @@ export function startGame(room: Room, io: IOServer): void {
     paused: false,
     pausedTimeRemaining: null,
     pausedCallback: null,
+    pauseReasons: {
+      admin: false,
+      disconnectedPlayerIds: new Set(),
+    },
   };
 
   // Send each player their character privately
@@ -133,6 +141,7 @@ function schedulePhaseTransition(
   delay: number,
   callback: () => void,
 ): void {
+  if (isGameplayPaused(room)) return;
   if (room.gameState?.phaseTimer) {
     clearTimeout(room.gameState.phaseTimer);
   }
@@ -141,6 +150,7 @@ function schedulePhaseTransition(
     room.gameState.pausedCallback = callback;
     room.gameState.phaseEndTime = Date.now() + delay;
     room.gameState.phaseTimer = setTimeout(() => {
+      if (isGameplayPaused(room)) return;
       if (room.gameState) {
         room.gameState.phaseTimer = null;
         room.gameState.phaseEndTime = null;
@@ -158,7 +168,7 @@ function schedulePhaseTransition(
 // 4. Next round or game end
 
 function startNewRound(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
 
   room.gameState.roundNumber++;
   room.gameState.currentVotingInRound = 0;
@@ -168,7 +178,7 @@ function startNewRound(room: Room, io: IOServer): void {
 }
 
 function startBunkerExplore(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
 
   // Skip explore phase if all bunker cards already revealed
   if (room.gameState.revealedBunkerCount >= room.gameState.bunkerCards.length) {
@@ -188,7 +198,7 @@ function startBunkerExplore(room: Room, io: IOServer): void {
 }
 
 function startRevealPhase(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
   room.gameState.phase = "ROUND_REVEAL";
 
   // Build turn order: alive players in original join order (1 to N)
@@ -205,7 +215,8 @@ export function revealAttribute(
   attributeIndex: number | undefined,
   io: IOServer,
 ): boolean {
-  if (!room.gameState || room.gameState.phase !== "ROUND_REVEAL") return false;
+  if (!room.gameState || isGameplayPaused(room) || room.gameState.phase !== "ROUND_REVEAL")
+    return false;
 
   const player = room.players.get(playerId);
   if (!player || !player.alive || !player.character) return false;
@@ -271,7 +282,7 @@ export function revealAttribute(
 }
 
 function afterRevealPhase(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
 
   const roundIdx = room.gameState.roundNumber - 1;
   const votingsThisRound = room.gameState.votingSchedule[roundIdx] || 0;
@@ -286,7 +297,7 @@ function afterRevealPhase(room: Room, io: IOServer): void {
 }
 
 function startDiscussionPhase(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
   room.gameState.phase = "ROUND_DISCUSSION";
 
   // Schedule before broadcast so phaseEndTime is included in the state
@@ -299,6 +310,7 @@ function startDiscussionPhase(room: Room, io: IOServer): void {
 
 export function skipDiscussion(room: Room, io: IOServer): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
+  if (isGameplayPaused(room)) return { success: false, error: "Игра на паузе" };
   if (room.gameState.phase !== "ROUND_DISCUSSION")
     return { success: false, error: "Сейчас не фаза обсуждения" };
 
@@ -312,7 +324,7 @@ export function skipDiscussion(room: Room, io: IOServer): { success: boolean; er
 }
 
 function startVotePhase(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
   room.gameState.phase = "ROUND_VOTE";
   room.gameState.votes.clear();
   room.gameState.tiebreakCandidateIds = [];
@@ -353,7 +365,7 @@ function getVoters(room: Room): Player[] {
 }
 
 export function castVote(room: Room, voterId: string, targetId: string, io: IOServer): boolean {
-  if (!room.gameState) return false;
+  if (!room.gameState || isGameplayPaused(room)) return false;
   if (room.gameState.phase !== "ROUND_VOTE" && room.gameState.phase !== "ROUND_VOTE_TIEBREAK")
     return false;
 
@@ -396,9 +408,10 @@ export function castVote(room: Room, voterId: string, targetId: string, io: IOSe
 let tallyInProgress = new Set<string>();
 
 function tallyVotes(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
   // Guard against double tally (timer + last vote arriving simultaneously)
-  if (room.gameState.phase !== "ROUND_VOTE" && room.gameState.phase !== "ROUND_VOTE_TIEBREAK") return;
+  if (room.gameState.phase !== "ROUND_VOTE" && room.gameState.phase !== "ROUND_VOTE_TIEBREAK")
+    return;
   // Prevent concurrent tally for the same room
   if (tallyInProgress.has(room.code)) return;
   tallyInProgress.add(room.code);
@@ -457,7 +470,7 @@ function tallyVotes(room: Room, io: IOServer): void {
 }
 
 function startTiebreak(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
 
   room.gameState.phase = "ROUND_VOTE_TIEBREAK";
   room.gameState.votes.clear();
@@ -471,6 +484,7 @@ function startTiebreak(room: Room, io: IOServer): void {
   // Give defense time, then start tiebreak vote
   // Schedule before broadcast so phaseEndTime is included in the state
   schedulePhaseTransition(room, io, CONFIG.TIEBREAK_DEFENSE_TIME, () => {
+    if (isGameplayPaused(room)) return;
     // Now actually collect votes (re-use ROUND_VOTE_TIEBREAK phase)
     schedulePhaseTransition(room, io, CONFIG.VOTE_TIME, () => {
       tallyVotes(room, io);
@@ -482,7 +496,7 @@ function startTiebreak(room: Room, io: IOServer): void {
 }
 
 function eliminatePlayer(room: Room, playerId: string, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
 
   const player = room.players.get(playerId);
   if (!player) return;
@@ -521,7 +535,7 @@ function eliminatePlayer(room: Room, playerId: string, io: IOServer): void {
 }
 
 function afterVoting(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
 
   room.gameState.currentVotingInRound++;
   const roundIdx = room.gameState.roundNumber - 1;
@@ -536,7 +550,7 @@ function afterVoting(room: Room, io: IOServer): void {
 }
 
 function advanceRoundOrEnd(room: Room, io: IOServer): void {
-  if (!room.gameState) return;
+  if (!room.gameState || isGameplayPaused(room)) return;
 
   if (room.gameState.roundNumber >= CONFIG.TOTAL_ROUNDS) {
     // Game over after 5 rounds
@@ -557,7 +571,7 @@ function advanceRoundOrEnd(room: Room, io: IOServer): void {
 // ============ Reveal Action Card ============
 
 export function revealActionCard(room: Room, playerId: string, io: IOServer): boolean {
-  if (!room.gameState) return false;
+  if (!room.gameState || isGameplayPaused(room)) return false;
   const player = room.players.get(playerId);
   if (!player || !player.character || player.actionCardRevealed) return false;
 
@@ -872,54 +886,138 @@ export function adminEliminatePlayer(
 
 // ============ Pause / Unpause ============
 
-export function pauseGame(room: Room, io: IOServer): { success: boolean; error: string } {
-  if (!room.gameState) return { success: false, error: "Игра не запущена" };
-  if (room.gameState.paused) return { success: false, error: "Игра уже на паузе" };
+const ACTIVE_GAME_PHASES: ReadonlySet<GamePhase> = new Set([
+  "CATASTROPHE_REVEAL",
+  "BUNKER_EXPLORE",
+  "ROUND_REVEAL",
+  "ROUND_DISCUSSION",
+  "ROUND_VOTE",
+  "ROUND_VOTE_TIEBREAK",
+  "ROUND_RESULT",
+]);
 
-  room.gameState.paused = true;
+type PauseResult = { success: boolean; error: string };
 
-  // Save remaining time and clear the timer
-  if (room.gameState.phaseTimer && room.gameState.phaseEndTime) {
-    const remaining = Math.max(0, room.gameState.phaseEndTime - Date.now());
-    room.gameState.pausedTimeRemaining = remaining;
-    clearTimeout(room.gameState.phaseTimer);
-    room.gameState.phaseTimer = null;
-    room.gameState.phaseEndTime = null;
-  }
-
-  broadcastState(room, io);
-  return { success: true, error: "" };
+function isActiveGamePhase(room: Room): boolean {
+  return !!room.gameState && ACTIVE_GAME_PHASES.has(room.gameState.phase);
 }
 
-export function unpauseGame(room: Room, io: IOServer): { success: boolean; error: string } {
-  if (!room.gameState) return { success: false, error: "Игра не запущена" };
-  if (!room.gameState.paused) return { success: false, error: "Игра не на паузе" };
+export function isGameplayPaused(room: Room): boolean {
+  const reasons = room.gameState?.pauseReasons;
+  return !!reasons && (reasons.admin || reasons.disconnectedPlayerIds.size > 0);
+}
 
-  room.gameState.paused = false;
+function freezeGame(room: Room): void {
+  const gs = room.gameState;
+  if (!gs || gs.paused) return;
 
-  // Resume timer with remaining time
-  if (room.gameState.pausedTimeRemaining != null && room.gameState.pausedCallback) {
-    const remaining = room.gameState.pausedTimeRemaining;
-    const callback = room.gameState.pausedCallback;
-    room.gameState.pausedTimeRemaining = null;
-    room.gameState.pausedCallback = null;
+  gs.paused = true;
+  gs.pausedTimeRemaining = null;
+
+  if (gs.phaseTimer) {
+    if (gs.phaseEndTime !== null) {
+      gs.pausedTimeRemaining = Math.max(0, gs.phaseEndTime - Date.now());
+    }
+    clearTimeout(gs.phaseTimer);
+    gs.phaseTimer = null;
+  }
+  gs.phaseEndTime = null;
+
+  clearBotActions(room.code);
+}
+
+export function resumeGameIfReady(room: Room, io: IOServer): void {
+  const gs = room.gameState;
+  if (!gs || isGameplayPaused(room) || !gs.paused) return;
+
+  const remaining = gs.pausedTimeRemaining;
+  const callback = gs.pausedCallback;
+  gs.paused = false;
+  gs.pausedTimeRemaining = null;
+  gs.pausedCallback = null;
+
+  if (remaining !== null && callback) {
     schedulePhaseTransition(room, io, remaining, callback);
   }
 
+  // broadcastState schedules bot actions for the resumed current phase.
   broadcastState(room, io);
+}
+
+export function addDisconnectPause(room: Room, playerId: string, io: IOServer): void {
+  const gs = room.gameState;
+  const player = room.players.get(playerId);
+  if (!gs || !isActiveGamePhase(room) || !player || player.isBot || player.kicked) return;
+
+  const reasons = gs.pauseReasons.disconnectedPlayerIds;
+  if (reasons.has(playerId)) return;
+
+  const wasPaused = isGameplayPaused(room);
+  reasons.add(playerId);
+  if (!wasPaused) freezeGame(room);
+  broadcastState(room, io);
+}
+
+export function removeDisconnectPause(room: Room, playerId: string, io: IOServer): void {
+  const gs = room.gameState;
+  if (!gs || !gs.pauseReasons.disconnectedPlayerIds.delete(playerId)) return;
+
+  if (isGameplayPaused(room)) {
+    broadcastState(room, io);
+  } else {
+    resumeGameIfReady(room, io);
+  }
+}
+
+export function setAdminPause(room: Room, paused: boolean, io: IOServer): PauseResult {
+  const gs = room.gameState;
+  if (!gs) return { success: false, error: "Игра не запущена" };
+  if (paused && !isActiveGamePhase(room)) {
+    return { success: false, error: "Игра уже завершена" };
+  }
+  if (gs.pauseReasons.admin === paused) return { success: true, error: "" };
+
+  const wasPaused = isGameplayPaused(room);
+  gs.pauseReasons.admin = paused;
+
+  if (paused) {
+    if (!wasPaused) freezeGame(room);
+    broadcastState(room, io);
+  } else if (isGameplayPaused(room)) {
+    broadcastState(room, io);
+  } else {
+    resumeGameIfReady(room, io);
+  }
+
   return { success: true, error: "" };
+}
+
+export function pauseGame(room: Room, io: IOServer): PauseResult {
+  return setAdminPause(room, true, io);
+}
+
+export function unpauseGame(room: Room, io: IOServer): PauseResult {
+  return setAdminPause(room, false, io);
 }
 
 export function forceEndGame(room: Room, io: IOServer): void {
   if (!room.gameState) return;
   if (room.gameState.phaseTimer) clearTimeout(room.gameState.phaseTimer);
+  clearBotActions(room.code);
   room.gameState.phase = "GAME_OVER";
+  room.gameState.phaseTimer = null;
   room.gameState.phaseEndTime = null;
+  room.gameState.paused = false;
+  room.gameState.pausedTimeRemaining = null;
+  room.gameState.pausedCallback = null;
+  room.gameState.pauseReasons.admin = false;
+  room.gameState.pauseReasons.disconnectedPlayerIds.clear();
   broadcastState(room, io);
 }
 
 export function resetGame(room: Room, io: IOServer): void {
   if (room.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
+  clearBotActions(room.code);
   room.gameState = null;
   room.startedPlayerCount = null;
 
@@ -935,6 +1033,17 @@ export function resetGame(room: Room, io: IOServer): void {
   }
 
   broadcastState(room, io);
+}
+
+function getPauseKind(room: Room): PauseKind {
+  const reasons = room.gameState?.pauseReasons;
+  if (!reasons) return "none";
+
+  const hasReconnectPause = reasons.disconnectedPlayerIds.size > 0;
+  if (reasons.admin && hasReconnectPause) return "mixed";
+  if (reasons.admin) return "admin";
+  if (hasReconnectPause) return "reconnect";
+  return "none";
 }
 
 export function buildPublicState(room: Room): PublicGameState {
@@ -1023,9 +1132,9 @@ export function buildPublicState(room: Room): PublicGameState {
     lastEliminatedPlayerId: gs?.lastEliminatedId || null,
     tiebreakCandidateIds: gs?.tiebreakCandidateIds?.length ? gs.tiebreakCandidateIds : null,
     phaseRemainingMs: gs?.phaseEndTime ? Math.max(0, gs.phaseEndTime - Date.now()) : null,
-    paused: gs?.paused || false,
-    pauseKind: gs?.paused ? "admin" : "none",
-    disconnectedPlayerIds: [],
+    paused: isGameplayPaused(room),
+    pauseKind: getPauseKind(room),
+    disconnectedPlayerIds: gs ? Array.from(gs.pauseReasons.disconnectedPlayerIds) : [],
     spectatorCount: room.spectators.size,
   };
 }

@@ -29,6 +29,11 @@ export interface PendingSeatClaim {
   expiresAt: number;
 }
 
+export interface PauseReasons {
+  admin: boolean;
+  disconnectedPlayerIds: Set<string>;
+}
+
 export interface GameState {
   phase: GamePhase;
   roundNumber: number;
@@ -51,6 +56,7 @@ export interface GameState {
   paused: boolean;
   pausedTimeRemaining: number | null;
   pausedCallback: (() => void) | null;
+  pauseReasons: PauseReasons;
 }
 
 export interface Spectator {
