@@ -16,13 +16,13 @@ The status strip uses the Codex layout directly instead of composing the generic
 
 The outer surface, internal gaps, corner radii, cell backgrounds, typography hierarchy, muted text, gold progress, and catastrophe gradient follow the Codex branch CSS values. The strip stays a single row on wide desktop viewports. Its desktop contents are entirely static.
 
-Immediately below the primary desktop row, the status surface always renders the full catastrophe, revealed-bunker-card, bunker-capacity, and revealed-threat details. This content is visible without a click, chevron, dropdown, or collapsed state.
+Immediately below the primary desktop row, the status surface renders one compact full-width bunker band. The catastrophe description is not repeated in this band because it already sits directly below the catastrophe title in the primary scenario cell. The band contains the revealed bunker cards, bunker capacity, and the revealed threat as the final amber-accented card. This content is visible without a click, chevron, dropdown, or collapsed state.
 
 ## Shared Situation Content
 
-`ScenarioSummary` owns the summary presentation, while an exported `ScenarioDetails` unit owns the full catastrophe, bunker, capacity, and threat content. `GameStatusHeader` and the mobile `ScenarioSummary` both render `ScenarioDetails`, so both viewports receive the same game data and copy from one implementation.
+`ScenarioSummary` owns the catastrophe presentation, including the warning icon, title, and description. An exported `ScenarioDetails` unit owns the compact bunker band: revealed bunker cards, capacity, and the revealed threat card. `GameStatusHeader` and the mobile `ScenarioSummary` both render `ScenarioDetails`, so both viewports receive the same game data and copy from one implementation.
 
-The mobile summary receives the same red warning icon treatment as the desktop catastrophe cell. The icon is decorative and does not add a new interaction.
+The mobile summary receives the same red warning icon treatment as the desktop catastrophe cell and displays the catastrophe description immediately beside/below the title within the same summary surface. The icon is decorative and does not add a new interaction.
 
 ## Data Mapping
 
@@ -37,14 +37,16 @@ The mobile summary receives the same red warning icon treatment as the desktop c
 
 ## Mobile Adaptation
 
-At 768 pixels and below, the top strip displays only two equal compact cells: timer and round. The desktop catastrophe cell, capacity metric, reveal-progress metric, and desktop instance of the shared details are hidden from the top strip. Their complete information remains available through the existing “Ситуация” tab, which renders the warning icon, catastrophe, bunker cards, capacity, and revealed threat using the shared details unit.
+At 768 pixels and below, the top strip displays only two equal compact cells: timer and round. The desktop catastrophe cell, capacity metric, reveal-progress metric, and desktop instance of the shared bunker band are hidden from the top strip. Their complete information remains available through the existing “Ситуация” tab: warning icon, catastrophe title and description in one summary, followed by the same compact bunker band used on desktop.
 
 ## Constraints
 
 - Do not transfer the rest of the Codex game screen.
 - Do not change server state, shared types, game phases, handlers, or timers.
 - Keep desktop situation information permanently visible and non-interactive.
-- Keep desktop and mobile situation data semantically identical by reusing `ScenarioDetails`.
+- Keep desktop and mobile bunker/threat data semantically identical by reusing `ScenarioDetails`.
+- Do not render the catastrophe description a second time below the primary scenario summary.
+- Keep the bunker band content-sized rather than stretching sparse text into tall cards.
 - Keep the strip free of horizontal overflow at 320, 390, 1280, and 1920 pixels.
 - Preserve 44-pixel minimum interactive targets.
 
