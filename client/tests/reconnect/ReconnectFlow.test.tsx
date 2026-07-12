@@ -301,6 +301,7 @@ function makeGameState(
 async function acceptPlayerSession(
   mounted: Awaited<ReturnType<typeof mountProvider>>,
 ): Promise<void> {
+  await act(async () => mounted.snapshot().joinRoom(roomCode, "Player"));
   await act(async () => {
     mounted.fake.serverEmit("room:joined", {
       roomCode,
@@ -482,9 +483,15 @@ test("every room-scoped recovery handler ignores late events", () => {
     "handleReconnectableSeats",
     "handleSeatClaimSubmitted",
     "handleSeatClaimResolved",
-    "handleSeatClaimsUpdated",
-    "handleHostChanged",
   ]) {
+    const start = contextSource.indexOf(`const ${handler}`);
+    assert.notEqual(start, -1, `${handler} must exist`);
+    const nextHandler = contextSource.indexOf("\n\n    const handle", start + handler.length);
+    const handlerSource = contextSource.slice(start, nextHandler === -1 ? undefined : nextHandler);
+    assert.match(handlerSource, /if \(ignoreRecoveryEventsRef\.current\) return;/);
+  }
+
+  for (const handler of ["handleSeatClaimsUpdated", "handleHostChanged"]) {
     const start = contextSource.indexOf(`const ${handler}`);
     assert.notEqual(start, -1, `${handler} must exist`);
     const nextHandler = contextSource.indexOf("\n\n    const handle", start + handler.length);
@@ -637,6 +644,15 @@ test("terminal teardown tombstones a stored session when browser deletion fails"
     assert.equal(mounted.snapshot().roomCode, null);
     assert.equal(mounted.fake.emittedFor("room:rejoin").length, 1);
 
+    await act(async () => mounted.snapshot().joinRoom("WXYZ", "Fresh player"));
+    await act(async () => {
+      mounted.fake.serverEmit("room:error", { message: "Комната не найдена" });
+      mounted.fake.serverEmit("disconnect");
+    });
+    mounted.fake.id = "fake-socket-3";
+    await act(async () => mounted.fake.serverEmit("connect"));
+    assert.equal(mounted.fake.emittedFor("room:rejoin").length, 1);
+
     await act(async () => mounted.snapshot().createRoom("Fresh player"));
     await act(async () => {
       mounted.fake.serverEmit("room:created", {
@@ -713,11 +729,17 @@ test("late recovery events stay ignored while Home recovery actions deliberately
 
     await act(async () => mounted.snapshot().listReconnectableSeats("efgh"));
     await act(async () => {
+      mounted.fake.serverEmit("room:joined", {
+        roomCode: "WXYZ",
+        playerId: otherPlayerId,
+        sessionToken: "c".repeat(64),
+      });
       mounted.fake.serverEmit("room:reconnectableSeats", {
         roomCode: "EFGH",
         seats: [{ playerId: otherPlayerId, playerName: "Available seat" }],
       });
     });
+    assert.equal(mounted.snapshot().roomCode, null);
     assert.deepEqual(mounted.snapshot().reconnectableSeats, [
       { playerId: otherPlayerId, playerName: "Available seat" },
     ]);
@@ -725,10 +747,31 @@ test("late recovery events stay ignored while Home recovery actions deliberately
     await act(async () => mounted.snapshot().leaveRoom());
     await act(async () => mounted.snapshot().requestSeatClaim("efgh", otherPlayerId, "Claimant"));
     await act(async () => {
+      mounted.fake.serverEmit("room:joined", {
+        roomCode: "EFGH",
+        playerId: otherPlayerId,
+        sessionToken: "d".repeat(64),
+      });
       mounted.fake.serverEmit("room:seatClaimSubmitted", { requestId: "claim-1" });
     });
+    assert.equal(mounted.snapshot().roomCode, null);
     assert.equal(mounted.snapshot().pendingSeatClaim?.status, "waiting");
     assert.equal(mounted.snapshot().pendingSeatClaim?.requestId, "claim-1");
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:seatClaimResolved", {
+        requestId: "claim-1",
+        approved: true,
+        message: "Заявка одобрена",
+      });
+      mounted.fake.serverEmit("room:joined", {
+        roomCode: "EFGH",
+        playerId: otherPlayerId,
+        sessionToken: "d".repeat(64),
+      });
+    });
+    assert.equal(mounted.snapshot().roomCode, "EFGH");
+    assert.equal(mounted.snapshot().playerId, otherPlayerId);
   } finally {
     await mounted.cleanup();
   }
