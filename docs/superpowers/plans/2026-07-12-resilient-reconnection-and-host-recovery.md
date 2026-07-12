@@ -258,7 +258,7 @@ Expected: FAIL because active seats are still deleted after grace expiry and rec
 
 - [ ] **Step 3: Implement seat reservation and atomic binding**
 
-Add `kicked: false`, `startedPlayerCount`, and `pendingSeatClaims` defaults in room creation. Set `startedPlayerCount` in `startGame`.
+Use the `kicked`, `startedPlayerCount`, and `pendingSeatClaims` defaults introduced in Task 1. Capture the final `startedPlayerCount` in `startGame` and leave it unchanged thereafter.
 
 `bindPlayerSocket` must:
 
