@@ -1,10 +1,20 @@
-import { useState, useEffect } from "react";
-import { useGame } from "../context/GameContext";
-import { Timer } from "../components/Timer";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CardImage } from "../components/CardImage";
-import { AttributeType } from "../../../shared/types";
-import { ATTR_TYPES } from "../utils/constants";
-import { toggleInSet } from "../utils/setUtils";
+import { useGame } from "../context/GameContext";
+import "../styles/game-screen.css";
+import { AccessibleModal } from "./game/AccessibleModal";
+import { CharacterLoadingState } from "./game/CharacterLoadingState";
+import { CharacterDossier } from "./game/CharacterDossier";
+import { GameStatusHeader } from "./game/GameStatusHeader";
+import { HostControlDialog } from "./game/HostControlDialog";
+import { MobileGameTabs } from "./game/MobileGameTabs";
+import { PlayerBoard } from "./game/PlayerBoard";
+import { ScenarioSummary } from "./game/ScenarioSummary";
+import {
+  buildGameScreenViewModel,
+  isExpandedActionCardPublic,
+  type MobileGameTab,
+} from "./game/gameScreenViewModel";
 
 export function GameScreen() {
   const {
@@ -12,6 +22,7 @@ export function GameScreen() {
     playerId,
     isSpectator,
     myCharacter,
+    connected,
     revealAttribute,
     revealActionCard,
     endGame,
@@ -34,735 +45,190 @@ export function GameScreen() {
   const [showAttrPicker, setShowAttrPicker] = useState(false);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [confirmRevealAction, setConfirmRevealAction] = useState(false);
-  const [scenarioCollapsed, setScenarioCollapsed] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState<MobileGameTab>("players");
+  const [scenarioExpanded, setScenarioExpanded] = useState(false);
+  const [hostControlsOpen, setHostControlsOpen] = useState(false);
+  const hostPauseActiveRef = useRef(false);
 
-  // Admin panel state
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [adminAction, setAdminAction] = useState<
-    | "shuffle"
-    | "swap"
-    | "replace"
-    | "deleteAttr"
-    | "forceReveal"
-    | "removeBunker"
-    | "replaceBunker"
-    | "revive"
-    | "eliminate"
-    | null
-  >(null);
-  const [adminAttrType, setAdminAttrType] = useState<AttributeType | "action">("profession");
-  const [adminAttrTypes, setAdminAttrTypes] = useState<Set<AttributeType | "action">>(new Set());
-  const [adminPlayer1, setAdminPlayer1] = useState<string>("");
-  const [adminPlayer2, setAdminPlayer2] = useState<string>("");
-  const [adminPlayers, setAdminPlayers] = useState<Set<string>>(new Set());
-  const [adminBunkerCardIndex, setAdminBunkerCardIndex] = useState<number | null>(null);
+  const closeLocalModals = useCallback(() => {
+    setShowAttrPicker(false);
+    setExpandedPlayerId(null);
+    setConfirmRevealAction(false);
+  }, []);
 
-  // Auto-open admin panel after action card reveal overlay
-  useEffect(() => {
-    if (pendingAdminOpen) {
-      consumePendingAdminOpen();
-      const me = gameState?.players.find((p) => p.id === playerId);
-      if (me?.isHost && !adminOpen) {
-        setAdminOpen(true);
-        adminPause();
-      }
+  const openAttributePicker = useCallback(() => {
+    if (hostControlsOpen || hostPauseActiveRef.current) return;
+    closeLocalModals();
+    setShowAttrPicker(true);
+  }, [closeLocalModals, hostControlsOpen]);
+
+  const openExpandedPlayer = useCallback(
+    (nextPlayerId: string) => {
+      if (hostControlsOpen || hostPauseActiveRef.current) return;
+      closeLocalModals();
+      setExpandedPlayerId(nextPlayerId);
+    },
+    [closeLocalModals, hostControlsOpen],
+  );
+
+  const openRevealActionConfirmation = useCallback(() => {
+    if (hostControlsOpen || hostPauseActiveRef.current) return;
+    closeLocalModals();
+    setConfirmRevealAction(true);
+  }, [closeLocalModals, hostControlsOpen]);
+
+  const openHostControls = useCallback(() => {
+    if (hostControlsOpen || hostPauseActiveRef.current) return;
+    closeLocalModals();
+    hostPauseActiveRef.current = true;
+    setHostControlsOpen(true);
+    adminPause();
+  }, [adminPause, closeLocalModals, hostControlsOpen]);
+
+  const closeHostControls = useCallback(() => {
+    if (!hostControlsOpen && !hostPauseActiveRef.current) return;
+    setHostControlsOpen(false);
+    if (!hostPauseActiveRef.current) return;
+
+    hostPauseActiveRef.current = false;
+    adminUnpause();
+  }, [adminUnpause, hostControlsOpen]);
+
+  const endGameFromHostControls = useCallback(() => {
+    if (hostPauseActiveRef.current) {
+      hostPauseActiveRef.current = false;
+      adminUnpause();
     }
-  }, [pendingAdminOpen]);
+    endGame();
+  }, [adminUnpause, endGame]);
+
+  useEffect(() => {
+    if (!pendingAdminOpen) return;
+
+    consumePendingAdminOpen();
+    const isHost =
+      !isSpectator && gameState?.players.find((player) => player.id === playerId)?.isHost;
+    if (isHost) openHostControls();
+  }, [
+    consumePendingAdminOpen,
+    gameState,
+    isSpectator,
+    openHostControls,
+    pendingAdminOpen,
+    playerId,
+  ]);
 
   if (!gameState) return null;
-  if (!isSpectator && !myCharacter) return null;
-
-  const me = isSpectator ? undefined : gameState.players.find((p) => p.id === playerId);
-  const isMyTurn = !isSpectator && gameState.currentTurnPlayerId === playerId;
-  const allPlayers = gameState.players;
-
-  // Find which indices are revealed by matching
-  const revealedIndices = new Set<number>();
-  if (me && myCharacter) {
-    for (const ra of me.revealedAttributes) {
-      const idx = myCharacter.attributes.findIndex(
-        (a, i) => !revealedIndices.has(i) && a.type === ra.type && a.value === ra.value,
-      );
-      if (idx !== -1) revealedIndices.add(idx);
-    }
+  if (!isSpectator && !myCharacter) {
+    return <CharacterLoadingState error={error} />;
   }
 
-  const unrevealedIndices = myCharacter
-    ? myCharacter.attributes.map((_, i) => i).filter((i) => !revealedIndices.has(i))
-    : [];
+  const view = buildGameScreenViewModel({ gameState, playerId, isSpectator, myCharacter });
 
-  const canReveal =
-    !isSpectator && gameState.phase === "ROUND_REVEAL" && isMyTurn && unrevealedIndices.length > 1;
-  const canRevealAction = !isSpectator && myCharacter?.actionCard && !me?.actionCardRevealed;
-
-  const phaseLabels: Record<string, string> = {
-    CATASTROPHE_REVEAL: "Катастрофа!",
-    BUNKER_EXPLORE: "Исследование бункера",
-    ROUND_REVEAL: "Раскрытие карт",
-    ROUND_DISCUSSION: "Обсуждение",
-    ROUND_VOTE: "Голосование",
-    ROUND_RESULT: "Результат раунда",
+  const handleReveal = (attributeIndex: number) => {
+    revealAttribute(attributeIndex);
+    closeLocalModals();
   };
 
-  const phaseDescriptions: Record<string, string> = {
-    CATASTROPHE_REVEAL: "Ознакомьтесь с ситуацией",
-    BUNKER_EXPLORE: "Открыта новая карта бункера",
-    ROUND_REVEAL: isMyTurn
-      ? gameState.roundNumber === 1
-        ? "Ваш ход! Раскройте профессию"
-        : "Ваш ход! Выберите характеристику"
-      : `Ход: ${gameState.players.find((p) => p.id === gameState.currentTurnPlayerId)?.name || "..."}`,
-    ROUND_DISCUSSION: "Обсудите, кого изгнать",
-    ROUND_RESULT: "Результат голосования",
-  };
+  const playerBoard = (
+    <PlayerBoard
+      players={gameState.players}
+      playerId={playerId}
+      currentTurnPlayerId={gameState.currentTurnPlayerId}
+      lastEliminatedPlayerId={gameState.lastEliminatedPlayerId}
+      onSelectPlayer={openExpandedPlayer}
+    />
+  );
 
-  const handleReveal = (attrIndex: number) => {
-    revealAttribute(attrIndex);
-    setShowAttrPicker(false);
-  };
-
-  const votingInfo =
-    gameState.votingsInCurrentRound > 0
-      ? `Голосование ${gameState.currentVotingInRound + 1} из ${gameState.votingsInCurrentRound}`
-      : "";
-
-  const alivePlayers = gameState.players.filter((p) => p.alive);
-  const hasBottomAction = canReveal || canRevealAction;
-
-  const handleAdminExecute = () => {
-    if (!adminAction) return;
-    if (adminAction === "shuffle") {
-      adminShuffleAll(adminAttrType);
-    } else if (adminAction === "swap") {
-      if (adminPlayer1 && adminPlayer2 && adminPlayer1 !== adminPlayer2) {
-        adminSwapAttribute(adminPlayer1, adminPlayer2, adminAttrType);
-      }
-    } else if (adminAction === "replace") {
-      const players = Array.from(adminPlayers);
-      const types = Array.from(adminAttrTypes);
-      if (players.length > 0 && types.length > 0) {
-        for (const pid of players) {
-          for (const t of types) {
-            adminReplaceAttribute(pid, t);
-          }
-        }
-      }
-    } else if (adminAction === "deleteAttr") {
-      const players = Array.from(adminPlayers);
-      const types = Array.from(adminAttrTypes);
-      if (players.length > 0 && types.length > 0) {
-        for (const pid of players) {
-          for (const t of types) {
-            if (t !== "action") adminDeleteAttribute(pid, t);
-          }
-        }
-      }
-    } else if (adminAction === "forceReveal") {
-      if (adminAttrType !== "action") {
-        adminForceRevealType(adminAttrType as AttributeType);
-      }
-    } else if (adminAction === "removeBunker") {
-      if (adminBunkerCardIndex !== null) {
-        adminRemoveBunkerCard(adminBunkerCardIndex);
-      }
-    } else if (adminAction === "replaceBunker") {
-      if (adminBunkerCardIndex !== null) {
-        adminReplaceBunkerCard(adminBunkerCardIndex);
-      }
-    } else if (adminAction === "revive") {
-      if (adminPlayer1) adminRevivePlayer(adminPlayer1);
-    } else if (adminAction === "eliminate") {
-      if (adminPlayer1) adminEliminatePlayer(adminPlayer1);
-    }
-    setAdminAction(null);
-    setAdminPlayer1("");
-    setAdminPlayer2("");
-    setAdminPlayers(new Set());
-    setAdminAttrTypes(new Set());
-    setAdminBunkerCardIndex(null);
-  };
+  const characterDossier =
+    !isSpectator && myCharacter ? (
+      <CharacterDossier
+        character={myCharacter}
+        revealedIndices={view.revealedIndices}
+        alive={view.me?.alive ?? false}
+        actionCardRevealed={view.me?.actionCardRevealed ?? false}
+      />
+    ) : null;
 
   return (
-    <div className={`screen game-screen ${hasBottomAction ? "has-bottom-bar" : ""}`}>
-      {/* === STICKY TOP BAR === */}
-      <div className={`sticky-top-bar ${isMyTurn ? "my-turn" : ""}`}>
-        <div className="top-bar-content">
-          <div className="top-bar-left">
-            <span className="top-bar-phase">{phaseLabels[gameState.phase] || gameState.phase}</span>
-            <span className="top-bar-desc">{phaseDescriptions[gameState.phase]}</span>
-          </div>
-          <div className="top-bar-right">
-            <Timer endTime={gameState.phaseEndTime} size="large" />
-          </div>
+    <main
+      className={`screen command-game-screen ${view.hasBottomAction ? "has-game-actions" : ""}`}
+    >
+      <GameStatusHeader
+        gameState={gameState}
+        phaseLabel={view.phaseLabel}
+        phaseDescription={view.phaseDescription}
+        votingInfo={view.votingInfo}
+        isMyTurn={view.isMyTurn}
+        connected={connected}
+        canSkipDiscussion={gameState.phase === "ROUND_DISCUSSION" && Boolean(view.me?.isHost)}
+        canManageGame={Boolean(view.me?.isHost)}
+        onSkipDiscussion={adminSkipDiscussion}
+        onOpenHostControls={openHostControls}
+      />
+
+      {isSpectator && (
+        <div className="gs-spectator-status" role="status">
+          Режим наблюдателя
         </div>
+      )}
 
-        {/* Round progress dots */}
-        <div className="round-progress">
-          {Array.from({ length: gameState.totalRounds }, (_, i) => (
-            <div
-              key={i}
-              className={`round-dot ${i + 1 < gameState.roundNumber ? "completed" : ""} ${i + 1 === gameState.roundNumber ? "current" : ""}`}
-            >
-              {i + 1}
-            </div>
-          ))}
-          {votingInfo && <span className="voting-info-badge">{votingInfo}</span>}
+      <div className="gs-desktop-layout">
+        <div className="gs-scenario-desktop">
+          <ScenarioSummary
+            idPrefix="gs-scenario-desktop"
+            gameState={gameState}
+            expanded={scenarioExpanded}
+            onToggle={() => setScenarioExpanded((expanded) => !expanded)}
+          />
         </div>
-
-        {/* YOUR TURN banner */}
-        {isMyTurn && gameState.phase === "ROUND_REVEAL" && (
-          <div className="your-turn-banner">
-            {gameState.roundNumber === 1
-              ? "ВАШ ХОД — нажмите кнопку внизу, чтобы раскрыть профессию"
-              : "ВАШ ХОД — нажмите кнопку внизу, чтобы выбрать характеристику"}
-          </div>
-        )}
-
-        {/* Discussion host controls */}
-        {gameState.phase === "ROUND_DISCUSSION" && me?.isHost && (
-          <button className="btn btn-secondary btn-skip-discussion" onClick={adminSkipDiscussion}>
-            Пропустить обсуждение
-          </button>
-        )}
+        <div className="gs-workspace">
+          {playerBoard}
+          {characterDossier && <div className="gs-dossier-column">{characterDossier}</div>}
+        </div>
       </div>
 
-      {/* === MAIN CONTENT (scrollable) === */}
-      <div className="game-content">
-        {/* Scenario (collapsible) */}
-        {gameState.catastrophe && (
-          <div className={`scenario-panel ${scenarioCollapsed ? "collapsed" : ""}`}>
-            <button
-              className="scenario-toggle"
-              onClick={() => setScenarioCollapsed(!scenarioCollapsed)}
-            >
-              <span className="scenario-toggle-title">
-                {gameState.catastrophe.title}
-                {gameState.revealedBunkerCards.length > 0 && (
-                  <span className="scenario-toggle-meta">
-                    | Бункер: {gameState.revealedBunkerCards.length}/{gameState.totalBunkerCards}{" "}
-                    карт | Мест: {gameState.bunkerCapacity}
-                  </span>
-                )}
-              </span>
-              <span className="scenario-toggle-arrow">{scenarioCollapsed ? "+" : "-"}</span>
-            </button>
-
-            {!scenarioCollapsed && (
-              <div className="scenario-body">
-                <div className="catastrophe-card">
-                  <p>{gameState.catastrophe.description}</p>
-                </div>
-
-                {gameState.revealedBunkerCards.length > 0 && (
-                  <div className="bunker-cards-panel">
-                    <h3>
-                      Бункер ({gameState.revealedBunkerCards.length}/{gameState.totalBunkerCards}{" "}
-                      карт)
-                    </h3>
-                    <div className="bunker-cards-list">
-                      {gameState.revealedBunkerCards.map((card, i) => (
-                        <div
-                          key={i}
-                          className={`bunker-card-item ${i === gameState.revealedBunkerCards.length - 1 && gameState.phase === "BUNKER_EXPLORE" ? "newly-revealed" : ""}`}
-                        >
-                          <span className="bunker-card-title">{card.title}</span>
-                          <span className="bunker-card-desc">{card.description}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="bunker-capacity">Мест в бункере: {gameState.bunkerCapacity}</p>
-                  </div>
-                )}
-
-                {gameState.threatCard && (
-                  <div className="threat-card-panel">
-                    <h3>Угроза</h3>
-                    <div className="threat-card-item">
-                      <span className="threat-card-title">{gameState.threatCard.title}</span>
-                      <span className="threat-card-desc">{gameState.threatCard.description}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Desktop: My Character */}
-        {!isSpectator && myCharacter && (
-          <div className="my-character desktop-only">
-            <h3>Ваш персонаж {!me?.alive && <span className="eliminated-badge">ИЗГНАН</span>}</h3>
-            <div className="attributes-grid">
-              {myCharacter.attributes.map((attr, i) => {
-                const isRevealed = revealedIndices.has(i);
-                return (
-                  <div
-                    key={i}
-                    className={`attribute-card ${isRevealed ? "revealed" : "hidden"}`}
-                    data-attr-type={attr.type}
-                  >
-                    <div className="attr-content">
-                      <CardImage type={attr.type} className="attr-card-image" />
-                      <div className="attr-text">
-                        <span className="attr-label">{attr.label}</span>
-                        <span className="attr-value">{attr.value}</span>
-                        {attr.detail && <span className="attr-detail">{attr.detail}</span>}
-                      </div>
-                    </div>
-                    {!isRevealed && <span className="attr-status">Скрыто</span>}
-                  </div>
-                );
-              })}
-            </div>
-
-            {myCharacter.actionCard && (
-              <div className="action-card-display">
-                <div className="attribute-card revealed" data-attr-type="action">
-                  <div className="attr-content">
-                    <CardImage type="action" className="attr-card-image" />
-                    <div className="attr-text">
-                      <span className="attr-label">Особое условие</span>
-                      <span className="attr-value">{myCharacter.actionCard.title}</span>
-                      <span className="attr-detail">{myCharacter.actionCard.description}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Desktop: Other Players */}
-        <div className="players-grid desktop-only">
-          <h3>Игроки ({alivePlayers.length} в игре)</h3>
-          <div className="players-list">
-            {allPlayers.map((player, idx) => {
-              const isMe = player.id === playerId;
-              return (
-                <div
-                  key={player.id}
-                  className={`player-card ${isMe ? "is-me" : ""} ${!player.alive ? "eliminated" : ""} ${!player.connected ? "disconnected" : ""} ${gameState.currentTurnPlayerId === player.id ? "is-current-turn" : ""}`}
-                  onClick={() => setExpandedPlayerId(player.id)}
-                >
-                  <div className="player-header">
-                    <span className="player-name">
-                      <span className="player-number">{idx + 1}</span>
-                      {player.isBot && <span className="bot-badge">BOT</span>}
-                      {player.name}
-                      {isMe && <span className="me-badge">ВЫ</span>}
-                      {gameState.currentTurnPlayerId === player.id && (
-                        <span className="turn-badge">ХОД ИГРОКА</span>
-                      )}
-                    </span>
-                    {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
-                    {!player.connected && !player.isBot && (
-                      <span className="dc-badge">Отключён</span>
-                    )}
-                    {player.id === gameState.lastEliminatedPlayerId && player.alive && (
-                      <span className="last-elim-badge">Голосует</span>
-                    )}
-                  </div>
-                  <div className="player-attributes">
-                    {player.revealedAttributes.length === 0 && !player.actionCard ? (
-                      <span className="no-attrs">Пока ничего не раскрыто</span>
-                    ) : (
-                      <>
-                        {player.revealedAttributes.map((attr, i) => (
-                          <div key={i} className="mini-attr" data-attr-type={attr.type}>
-                            <CardImage type={attr.type} className="mini-card-image" />
-                            <span className="mini-label">{attr.label}:</span>
-                            <span className="mini-value">{attr.value}</span>
-                          </div>
-                        ))}
-                        {player.actionCard && (
-                          <div className="mini-attr" data-attr-type="action">
-                            <CardImage type="action" className="mini-card-image" />
-                            <span className="mini-label">Особое условие:</span>
-                            <span className="mini-value">{player.actionCard.title}</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Mobile: All Players in one grid */}
-        <div className="players-grid mobile-only">
-          <h3>Игроки ({alivePlayers.length} в игре)</h3>
-          <div className="players-list">
-            {allPlayers.map((player, idx) => {
-              const isMe = player.id === playerId;
-              return (
-                <div
-                  key={player.id}
-                  className={`player-card ${isMe ? "is-me" : ""} ${!player.alive ? "eliminated" : ""} ${!player.connected ? "disconnected" : ""} ${gameState.currentTurnPlayerId === player.id ? "is-current-turn" : ""}`}
-                  onClick={() => setExpandedPlayerId(player.id)}
-                >
-                  <div className="player-header">
-                    <span className="player-name">
-                      <span className="player-number">{idx + 1}</span>
-                      {player.isBot && <span className="bot-badge">BOT</span>}
-                      {player.name}
-                      {isMe && <span className="me-badge">ВЫ</span>}
-                      {gameState.currentTurnPlayerId === player.id && (
-                        <span className="turn-badge">ХОД</span>
-                      )}
-                    </span>
-                    {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
-                    {!player.connected && !player.isBot && (
-                      <span className="dc-badge">Отключён</span>
-                    )}
-                  </div>
-                  <div className="player-attributes">
-                    {isMe && myCharacter ? (
-                      <>
-                        {myCharacter.attributes.map((attr, i) => {
-                          const isRevealed = revealedIndices.has(i);
-                          return (
-                            <div
-                              key={i}
-                              className={`mini-attr ${isRevealed ? "" : "attr-hidden"}`}
-                              data-attr-type={attr.type}
-                            >
-                              <span className="mini-label">{attr.label}:</span>
-                              <span className="mini-value">{attr.value}</span>
-                              {!isRevealed && <span className="mini-hidden-tag">скрыто</span>}
-                            </div>
-                          );
-                        })}
-                        {myCharacter.actionCard && (
-                          <div
-                            className={`mini-attr ${player.actionCard ? "" : "attr-hidden"}`}
-                            data-attr-type="action"
-                          >
-                            <span className="mini-label">Особое условие:</span>
-                            <span className="mini-value">{myCharacter.actionCard.title}</span>
-                            {!player.actionCard && <span className="mini-hidden-tag">скрыто</span>}
-                          </div>
-                        )}
-                      </>
-                    ) : player.revealedAttributes.length === 0 && !player.actionCard ? (
-                      <span className="no-attrs">Пока ничего не раскрыто</span>
-                    ) : (
-                      <>
-                        {player.revealedAttributes.map((attr, i) => (
-                          <div key={i} className="mini-attr" data-attr-type={attr.type}>
-                            <span className="mini-label">{attr.label}:</span>
-                            <span className="mini-value">{attr.value}</span>
-                          </div>
-                        ))}
-                        {player.actionCard && (
-                          <div className="mini-attr" data-attr-type="action">
-                            <span className="mini-label">Особое условие:</span>
-                            <span className="mini-value">{player.actionCard.title}</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Host Admin Panel */}
-        {me?.isHost && (
-          <div className="admin-panel">
-            <button
-              className="btn btn-admin-toggle"
-              onClick={() => {
-                const next = !adminOpen;
-                setAdminOpen(next);
-                if (next) {
-                  adminPause();
-                } else {
-                  adminUnpause();
-                }
-              }}
-            >
-              {adminOpen ? "Скрыть админ-панель" : "Админ-панель"}
-            </button>
-
-            {adminOpen && (
-              <div className="admin-panel-body">
-                {!adminAction && (
-                  <div className="admin-actions-list">
-                    <label className="admin-group-label">Карты игроков</label>
-                    <button className="btn btn-admin" onClick={() => setAdminAction("shuffle")}>
-                      Перемешать
-                    </button>
-                    <button className="btn btn-admin" onClick={() => setAdminAction("swap")}>
-                      Поменять местами
-                    </button>
-                    <button className="btn btn-admin" onClick={() => setAdminAction("replace")}>
-                      Заменить
-                    </button>
-                    <button className="btn btn-admin" onClick={() => setAdminAction("deleteAttr")}>
-                      Удалить
-                    </button>
-                    <button className="btn btn-admin" onClick={() => setAdminAction("forceReveal")}>
-                      Раскрыть у всех
-                    </button>
-                    <label className="admin-group-label">Карты бункера</label>
-                    <button
-                      className="btn btn-admin"
-                      onClick={() => setAdminAction("removeBunker")}
-                    >
-                      Убрать карту
-                    </button>
-                    <button
-                      className="btn btn-admin"
-                      onClick={() => setAdminAction("replaceBunker")}
-                    >
-                      Заменить карту
-                    </button>
-                    <label className="admin-group-label">Игроки</label>
-                    <button className="btn btn-admin" onClick={() => setAdminAction("revive")}>
-                      Вернуть в игру
-                    </button>
-                    <button className="btn btn-admin" onClick={() => setAdminAction("eliminate")}>
-                      Изгнать
-                    </button>
-                  </div>
-                )}
-
-                {adminAction && (
-                  <div className="admin-form">
-                    <h4>
-                      {adminAction === "shuffle" && "Перемешать карты"}
-                      {adminAction === "swap" && "Поменять местами"}
-                      {adminAction === "replace" && "Заменить карту"}
-                      {adminAction === "deleteAttr" && "Удалить карту"}
-                      {adminAction === "forceReveal" && "Раскрыть у всех"}
-                      {adminAction === "removeBunker" && "Убрать карту бункера"}
-                      {adminAction === "replaceBunker" && "Заменить карту бункера"}
-                      {adminAction === "revive" && "Вернуть в игру"}
-                      {adminAction === "eliminate" && "Изгнать игрока"}
-                    </h4>
-
-                    {adminAction === "revive" || adminAction === "eliminate" ? (
-                      <>
-                        <label>Игрок:</label>
-                        <div className="admin-chips">
-                          {gameState.players
-                            .filter((p) => (adminAction === "revive" ? !p.alive : p.alive))
-                            .map((p) => (
-                              <button
-                                key={p.id}
-                                className={`admin-chip ${adminPlayer1 === p.id ? "active" : ""}`}
-                                onClick={() => setAdminPlayer1(p.id)}
-                              >
-                                {p.name}
-                              </button>
-                            ))}
-                        </div>
-                      </>
-                    ) : adminAction === "removeBunker" || adminAction === "replaceBunker" ? (
-                      <>
-                        <label>Карта бункера:</label>
-                        <div className="admin-chips">
-                          {gameState.revealedBunkerCards.map((card, i) => (
-                            <button
-                              key={i}
-                              className={`admin-chip ${adminBunkerCardIndex === i ? "active" : ""}`}
-                              onClick={() => setAdminBunkerCardIndex(i)}
-                            >
-                              {card.title}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    ) : adminAction === "forceReveal" ? (
-                      <>
-                        <label>Тип карты:</label>
-                        <div className="admin-chips">
-                          {ATTR_TYPES.filter((t) => t.type !== "action").map((t) => (
-                            <button
-                              key={t.type}
-                              className={`admin-chip ${adminAttrType === t.type ? "active" : ""}`}
-                              onClick={() => setAdminAttrType(t.type)}
-                            >
-                              {t.label}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    ) : adminAction === "deleteAttr" ? (
-                      <>
-                        <label>Тип карты (можно несколько):</label>
-                        <div className="admin-chips">
-                          {ATTR_TYPES.filter((t) => t.type !== "action").map((t) => (
-                            <button
-                              key={t.type}
-                              className={`admin-chip ${adminAttrTypes.has(t.type) ? "active" : ""}`}
-                              onClick={() => setAdminAttrTypes(toggleInSet(adminAttrTypes, t.type))}
-                            >
-                              {t.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <label>Игроки (можно несколько):</label>
-                        <div className="admin-chips">
-                          {alivePlayers.map((p) => (
-                            <button
-                              key={p.id}
-                              className={`admin-chip ${adminPlayers.has(p.id) ? "active" : ""}`}
-                              onClick={() => setAdminPlayers(toggleInSet(adminPlayers, p.id))}
-                            >
-                              {p.name}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    ) : adminAction === "replace" ? (
-                      <>
-                        <label>Тип карты (можно несколько):</label>
-                        <div className="admin-chips">
-                          {ATTR_TYPES.map((t) => (
-                            <button
-                              key={t.type}
-                              className={`admin-chip ${adminAttrTypes.has(t.type) ? "active" : ""}`}
-                              onClick={() => setAdminAttrTypes(toggleInSet(adminAttrTypes, t.type))}
-                            >
-                              {t.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <label>Игроки (можно несколько):</label>
-                        <div className="admin-chips">
-                          {alivePlayers.map((p) => (
-                            <button
-                              key={p.id}
-                              className={`admin-chip ${adminPlayers.has(p.id) ? "active" : ""}`}
-                              onClick={() => setAdminPlayers(toggleInSet(adminPlayers, p.id))}
-                            >
-                              {p.name}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <label>Тип карты:</label>
-                        <div className="admin-chips">
-                          {ATTR_TYPES.map((t) => (
-                            <button
-                              key={t.type}
-                              className={`admin-chip ${adminAttrType === t.type ? "active" : ""}`}
-                              onClick={() => setAdminAttrType(t.type)}
-                            >
-                              {t.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        {adminAction === "swap" && (
-                          <>
-                            <label>Игрок 1:</label>
-                            <div className="admin-chips">
-                              {alivePlayers.map((p) => (
-                                <button
-                                  key={p.id}
-                                  className={`admin-chip ${adminPlayer1 === p.id ? "active" : ""}`}
-                                  onClick={() => setAdminPlayer1(p.id)}
-                                >
-                                  {p.name}
-                                </button>
-                              ))}
-                            </div>
-
-                            <label>Игрок 2:</label>
-                            <div className="admin-chips">
-                              {alivePlayers
-                                .filter((p) => p.id !== adminPlayer1)
-                                .map((p) => (
-                                  <button
-                                    key={p.id}
-                                    className={`admin-chip ${adminPlayer2 === p.id ? "active" : ""}`}
-                                    onClick={() => setAdminPlayer2(p.id)}
-                                  >
-                                    {p.name}
-                                  </button>
-                                ))}
-                            </div>
-                          </>
-                        )}
-                      </>
-                    )}
-
-                    <div className="admin-form-actions">
-                      <button
-                        className="btn btn-primary"
-                        onClick={handleAdminExecute}
-                        disabled={
-                          (adminAction === "swap" && (!adminPlayer1 || !adminPlayer2)) ||
-                          (adminAction === "replace" &&
-                            (adminPlayers.size === 0 || adminAttrTypes.size === 0)) ||
-                          (adminAction === "deleteAttr" &&
-                            (adminPlayers.size === 0 || adminAttrTypes.size === 0)) ||
-                          ((adminAction === "removeBunker" || adminAction === "replaceBunker") &&
-                            adminBunkerCardIndex === null) ||
-                          ((adminAction === "revive" || adminAction === "eliminate") &&
-                            !adminPlayer1)
-                        }
-                      >
-                        Применить
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => {
-                          setAdminAction(null);
-                          setAdminPlayer1("");
-                          setAdminPlayer2("");
-                          setAdminBunkerCardIndex(null);
-                        }}
-                      >
-                        Отмена
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Host: End Game */}
-        {me?.isHost && (
-          <button className="btn btn-danger btn-end-game" onClick={endGame}>
-            Закончить игру
-          </button>
-        )}
+      <div className="gs-mobile-layout">
+        <MobileGameTabs
+          activeTab={activeMobileTab}
+          showCharacter={!isSpectator}
+          onChange={setActiveMobileTab}
+          players={playerBoard}
+          character={characterDossier}
+          situation={
+            <ScenarioSummary
+              idPrefix="gs-scenario-mobile"
+              gameState={gameState}
+              expanded
+              alwaysExpanded
+              onToggle={() => undefined}
+            />
+          }
+        />
       </div>
 
-      {/* === STICKY BOTTOM ACTION BAR === */}
-      {hasBottomAction && (
-        <div className="sticky-bottom-bar">
-          {canReveal && (
+      {view.hasBottomAction && (
+        <div className="gs-action-bar" aria-label="Игровые действия">
+          {view.canReveal && (
             <button
+              type="button"
               className="btn btn-primary btn-reveal btn-bottom-action"
               onClick={() => {
                 if (gameState.roundNumber === 1) {
                   revealAttribute(0);
                 } else {
-                  setShowAttrPicker(true);
+                  openAttributePicker();
                 }
               }}
             >
               Раскрыть характеристику
             </button>
           )}
-          {canRevealAction && (
+          {view.canRevealAction && (
             <button
+              type="button"
               className="btn btn-reveal-action btn-bottom-action"
-              onClick={() => setConfirmRevealAction(true)}
+              onClick={openRevealActionConfirmation}
             >
               Раскрыть особое условие
             </button>
@@ -770,145 +236,197 @@ export function GameScreen() {
         </div>
       )}
 
-      {/* Attribute Picker Modal */}
-      {showAttrPicker && myCharacter && (
-        <div className="modal-overlay" onClick={() => setShowAttrPicker(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Выберите характеристику для раскрытия</h3>
-            <p>Одна карта должна остаться закрытой до финала</p>
-            <div className="target-list">
-              {unrevealedIndices
-                .filter(() => unrevealedIndices.length > 1)
-                .map((idx) => (
-                  <button key={idx} className="btn btn-target" onClick={() => handleReveal(idx)}>
-                    {myCharacter.attributes[idx].label}: {myCharacter.attributes[idx].value}
-                  </button>
-                ))}
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowAttrPicker(false)}>
-                Отмена
-              </button>
-            </div>
-          </div>
-        </div>
+      {view.me?.isHost && (
+        <HostControlDialog
+          open={hostControlsOpen}
+          gameState={gameState}
+          onClose={closeHostControls}
+          onShuffleAll={adminShuffleAll}
+          onSwapAttribute={adminSwapAttribute}
+          onReplaceAttribute={adminReplaceAttribute}
+          onDeleteAttribute={adminDeleteAttribute}
+          onForceRevealType={adminForceRevealType}
+          onRemoveBunkerCard={adminRemoveBunkerCard}
+          onReplaceBunkerCard={adminReplaceBunkerCard}
+          onRevivePlayer={adminRevivePlayer}
+          onEliminatePlayer={adminEliminatePlayer}
+          onEndGame={endGameFromHostControls}
+        />
       )}
 
-      {/* Expanded Player Modal */}
+      {showAttrPicker && myCharacter && (
+        <AccessibleModal labelledBy="gs-attribute-picker-title" onClose={closeLocalModals}>
+          <h3 id="gs-attribute-picker-title">Выберите характеристику для раскрытия</h3>
+          <p>Одна карта должна остаться закрытой до финала</p>
+          <div className="target-list">
+            {view.unrevealedIndices
+              .filter(() => view.unrevealedIndices.length > 1)
+              .map((index) => (
+                <button
+                  type="button"
+                  key={index}
+                  className="btn btn-target"
+                  onClick={() => handleReveal(index)}
+                >
+                  {myCharacter.attributes[index].label}: {myCharacter.attributes[index].value}
+                </button>
+              ))}
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-secondary" onClick={closeLocalModals}>
+              Отмена
+            </button>
+          </div>
+        </AccessibleModal>
+      )}
+
       {expandedPlayerId &&
         (() => {
-          const player = gameState.players.find((p) => p.id === expandedPlayerId);
+          const player = gameState.players.find((candidate) => candidate.id === expandedPlayerId);
           if (!player) return null;
+
           const isMe = !isSpectator && player.id === playerId;
-          const attrs = isMe && myCharacter ? myCharacter.attributes : [];
-          const revealedAttrs = player.revealedAttributes;
-          const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;
+          const attributes = isMe && myCharacter ? myCharacter.attributes : [];
+          const playerNumber =
+            gameState.players.findIndex((candidate) => candidate.id === player.id) + 1;
 
           return (
-            <div className="modal-overlay" onClick={() => setExpandedPlayerId(null)}>
-              <div className="modal expanded-player-modal" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className="modal-close-btn"
-                  onClick={() => setExpandedPlayerId(null)}
-                  aria-label="Закрыть"
-                >
-                  &times;
-                </button>
-                <div className="expanded-player-header">
-                  <span className="player-number">{playerNumber}</span>
-                  <h3>
-                    {player.isBot && <span className="bot-badge">BOT</span>}
-                    {player.name}
-                    {isMe && <span className="me-badge">ВЫ</span>}
-                  </h3>
-                  {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
-                </div>
-                <div className="attributes-grid">
-                  {isMe ? (
-                    attrs.map((attr, i) => {
-                      const isRevealed = revealedIndices.has(i);
-                      return (
-                        <div
-                          key={i}
-                          className={`attribute-card ${isRevealed ? "revealed" : "hidden"}`}
-                          data-attr-type={attr.type}
-                        >
-                          <div className="attr-content">
-                            <CardImage type={attr.type} className="attr-card-image" />
-                            <div className="attr-text">
-                              <span className="attr-label">{attr.label}</span>
-                              <span className="attr-value">{attr.value}</span>
-                              {attr.detail && <span className="attr-detail">{attr.detail}</span>}
-                            </div>
-                          </div>
-                          {!isRevealed && <span className="attr-status">Скрыто</span>}
-                        </div>
-                      );
-                    })
-                  ) : revealedAttrs.length === 0 ? (
-                    <p className="no-attrs">Пока ничего не раскрыто</p>
-                  ) : (
-                    revealedAttrs.map((attr, i) => (
-                      <div key={i} className="attribute-card revealed" data-attr-type={attr.type}>
-                        <div className="attr-content">
-                          <CardImage type={attr.type} className="attr-card-image" />
-                          <div className="attr-text">
-                            <span className="attr-label">{attr.label}</span>
-                            <span className="attr-value">{attr.value}</span>
-                            {attr.detail && <span className="attr-detail">{attr.detail}</span>}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                {((isMe && myCharacter?.actionCard) || (!isMe && player.actionCard)) &&
-                  (() => {
-                    const ac = isMe && myCharacter ? myCharacter.actionCard! : player.actionCard!;
+            <AccessibleModal
+              labelledBy="gs-expanded-player-title"
+              onClose={closeLocalModals}
+              panelClassName="expanded-player-modal"
+            >
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={closeLocalModals}
+                aria-label="Закрыть"
+              >
+                &times;
+              </button>
+              <div className="expanded-player-header">
+                <span className="player-number">{playerNumber}</span>
+                <h3 id="gs-expanded-player-title">
+                  {player.isBot && <span className="bot-badge">BOT</span>}
+                  {player.name}
+                  {isMe && <span className="me-badge">ВЫ</span>}
+                </h3>
+                {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
+              </div>
+              <div className="attributes-grid">
+                {isMe ? (
+                  attributes.map((attribute, index) => {
+                    const isRevealed = view.revealedIndices.has(index);
+
                     return (
-                      <div className="action-card-display">
-                        <div className="attribute-card revealed" data-attr-type="action">
-                          <div className="attr-content">
-                            <CardImage type="action" className="attr-card-image" />
-                            <div className="attr-text">
-                              <span className="attr-label">Особое условие</span>
-                              <span className="attr-value">{ac.title}</span>
-                              <span className="attr-detail">{ac.description}</span>
-                            </div>
+                      <div
+                        key={index}
+                        className={`attribute-card ${isRevealed ? "revealed" : "hidden"}`}
+                        data-attr-type={attribute.type}
+                      >
+                        <div className="attr-content">
+                          <CardImage type={attribute.type} className="attr-card-image" />
+                          <div className="attr-text">
+                            <span className="attr-label">{attribute.label}</span>
+                            <span className="attr-value">{attribute.value}</span>
+                            {attribute.detail && (
+                              <span className="attr-detail">{attribute.detail}</span>
+                            )}
                           </div>
                         </div>
+                        {!isRevealed && <span className="attr-status">Скрыто</span>}
                       </div>
                     );
-                  })()}
+                  })
+                ) : player.revealedAttributes.length === 0 ? (
+                  <p className="no-attrs">Пока ничего не раскрыто</p>
+                ) : (
+                  player.revealedAttributes.map((attribute, index) => (
+                    <div
+                      key={index}
+                      className="attribute-card revealed"
+                      data-attr-type={attribute.type}
+                    >
+                      <div className="attr-content">
+                        <CardImage type={attribute.type} className="attr-card-image" />
+                        <div className="attr-text">
+                          <span className="attr-label">{attribute.label}</span>
+                          <span className="attr-value">{attribute.value}</span>
+                          {attribute.detail && (
+                            <span className="attr-detail">{attribute.detail}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-            </div>
+              {((isMe && myCharacter?.actionCard) || (!isMe && player.actionCard)) &&
+                (() => {
+                  const actionCard =
+                    isMe && myCharacter ? myCharacter.actionCard : player.actionCard;
+                  if (!actionCard) return null;
+                  const isActionCardPublic = isExpandedActionCardPublic(
+                    isMe,
+                    Boolean(view.me?.actionCardRevealed),
+                  );
+
+                  return (
+                    <div className="action-card-display">
+                      <div
+                        className={`attribute-card ${isActionCardPublic ? "revealed" : "hidden"}`}
+                        data-attr-type="action"
+                      >
+                        <div className="attr-content">
+                          <CardImage type="action" className="attr-card-image" />
+                          <div className="attr-text">
+                            <span className="attr-label">Особое условие</span>
+                            <span className="attr-value">{actionCard.title}</span>
+                            <span className="attr-detail">{actionCard.description}</span>
+                          </div>
+                        </div>
+                        {isMe && (
+                          <span className="attr-status">
+                            {isActionCardPublic
+                              ? "Раскрыто всем"
+                              : "Видно только вам · Не раскрыто"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+            </AccessibleModal>
           );
         })()}
 
-      {error && <div className="error-toast">{error}</div>}
-
       {confirmRevealAction && (
-        <div className="modal-overlay" onClick={() => setConfirmRevealAction(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Раскрыть особое условие?</h3>
-            <p>Это действие нельзя отменить. Все игроки увидят вашу карту.</p>
-            <div className="modal-actions">
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  revealActionCard();
-                  setConfirmRevealAction(false);
-                }}
-              >
-                Раскрыть
-              </button>
-              <button className="btn btn-secondary" onClick={() => setConfirmRevealAction(false)}>
-                Отмена
-              </button>
-            </div>
+        <AccessibleModal labelledBy="gs-action-reveal-title" onClose={closeLocalModals}>
+          <h3 id="gs-action-reveal-title">Раскрыть особое условие?</h3>
+          <p>Это действие нельзя отменить. Все игроки увидят вашу карту.</p>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                revealActionCard();
+                closeLocalModals();
+              }}
+            >
+              Раскрыть
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={closeLocalModals}>
+              Отмена
+            </button>
           </div>
+        </AccessibleModal>
+      )}
+
+      {error && (
+        <div className="error-toast" role="alert">
+          {error}
         </div>
       )}
-    </div>
+    </main>
   );
 }
