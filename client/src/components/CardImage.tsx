@@ -9,7 +9,7 @@ interface CardImageProps {
 
 const CARD_CONFIG: Record<CardType, { color: string; label: string; icon: JSX.Element }> = {
   profession: {
-    color: "#f59e0b",
+    color: "var(--card-profession-color, #fbbf24)",
     label: "ПРОФЕССИЯ",
     icon: (
       // Person with briefcase
@@ -29,7 +29,7 @@ const CARD_CONFIG: Record<CardType, { color: string; label: string; icon: JSX.El
     ),
   },
   bio: {
-    color: "#f97316",
+    color: "var(--card-bio-color, #fb923c)",
     label: "БИОЛОГИЯ",
     icon: (
       // Male/Female symbol combined
@@ -77,7 +77,7 @@ const CARD_CONFIG: Record<CardType, { color: string; label: string; icon: JSX.El
     ),
   },
   health: {
-    color: "#ef4444",
+    color: "var(--card-health-color, #f87171)",
     label: "ЗДОРОВЬЕ",
     icon: (
       // Heart with pulse line
@@ -98,7 +98,7 @@ const CARD_CONFIG: Record<CardType, { color: string; label: string; icon: JSX.El
     ),
   },
   hobby: {
-    color: "#22c55e",
+    color: "var(--card-hobby-color, #34d399)",
     label: "ХОББИ",
     icon: (
       // Gamepad controller
@@ -127,7 +127,7 @@ const CARD_CONFIG: Record<CardType, { color: string; label: string; icon: JSX.El
     ),
   },
   baggage: {
-    color: "#3b82f6",
+    color: "var(--card-baggage-color, #60a5fa)",
     label: "БАГАЖ",
     icon: (
       // Backpack
@@ -173,7 +173,7 @@ const CARD_CONFIG: Record<CardType, { color: string; label: string; icon: JSX.El
     ),
   },
   fact: {
-    color: "#06b6d4",
+    color: "var(--card-fact-color, #22d3ee)",
     label: "ФАКТ",
     icon: (
       // Warning triangle with exclamation
@@ -199,7 +199,7 @@ const CARD_CONFIG: Record<CardType, { color: string; label: string; icon: JSX.El
     ),
   },
   action: {
-    color: "#a855f7",
+    color: "var(--card-action-color, #c084fc)",
     label: "ОСОБОЕ",
     icon: (
       // Lightning bolt

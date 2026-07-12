@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGame } from "../context/GameContext";
 import { Timer } from "../components/Timer";
 import { VoteProgressBar } from "../components/VoteProgressBar";
@@ -49,24 +49,50 @@ export function VoteScreen() {
   const [adminPlayer2, setAdminPlayer2] = useState<string>("");
   const [adminPlayers, setAdminPlayers] = useState<Set<string>>(new Set());
   const [adminBunkerCardIndex, setAdminBunkerCardIndex] = useState<number | null>(null);
+  const adminPauseActiveRef = useRef(false);
+
+  const openAdminPanel = useCallback(() => {
+    if (adminOpen || adminPauseActiveRef.current) return;
+
+    setConfirmTarget(null);
+    setConfirmRevealAction(false);
+    adminPauseActiveRef.current = true;
+    setAdminOpen(true);
+    adminPause();
+  }, [adminOpen, adminPause]);
+
+  const closeAdminPanel = useCallback(() => {
+    setAdminOpen(false);
+    if (!adminPauseActiveRef.current) return;
+
+    adminPauseActiveRef.current = false;
+    adminUnpause();
+  }, [adminUnpause]);
 
   // Reset voted state when phase changes (e.g. tiebreak)
   useEffect(() => {
     setVoted(false);
     setConfirmTarget(null);
+    setAdminOpen(false);
   }, [gameState?.phase]);
+
+  useEffect(() => {
+    return () => {
+      if (!adminPauseActiveRef.current) return;
+
+      adminPauseActiveRef.current = false;
+      adminUnpause();
+    };
+  }, [adminUnpause, gameState?.phase]);
 
   // Auto-open admin panel after action card reveal overlay
   useEffect(() => {
-    if (pendingAdminOpen) {
-      consumePendingAdminOpen();
-      const me = gameState?.players.find((p) => p.id === playerId);
-      if (me?.isHost && !adminOpen) {
-        setAdminOpen(true);
-        adminPause();
-      }
-    }
-  }, [pendingAdminOpen]);
+    if (!pendingAdminOpen) return;
+
+    consumePendingAdminOpen();
+    const me = gameState?.players.find((p) => p.id === playerId);
+    if (me?.isHost) openAdminPanel();
+  }, [consumePendingAdminOpen, gameState, openAdminPanel, pendingAdminOpen, playerId]);
 
   if (!gameState) return null;
 
@@ -168,79 +194,17 @@ export function VoteScreen() {
   };
 
   const handleVote = (targetId: string) => {
+    if (adminPauseActiveRef.current) return;
     setConfirmTarget(targetId);
   };
 
   const confirmVote = () => {
-    if (confirmTarget) {
-      castVote(confirmTarget);
-      setVoted(true);
-      setConfirmTarget(null);
-    }
+    if (!confirmTarget || adminPauseActiveRef.current) return;
+
+    castVote(confirmTarget);
+    setVoted(true);
+    setConfirmTarget(null);
   };
-
-  // Can't vote view
-  if (!canVote) {
-    return (
-      <div className="screen vote-screen">
-        <div className="sticky-top-bar">
-          <div className="top-bar-content">
-            <div className="top-bar-left">
-              <span className="top-bar-phase">
-                {isTiebreak ? "Переголосование" : "Голосование"}
-              </span>
-              <span className="top-bar-desc">Вы изгнаны</span>
-            </div>
-            <div className="top-bar-right">
-              <Timer endTime={gameState.phaseEndTime} size="large" />
-            </div>
-          </div>
-        </div>
-        <div className="vote-container">
-          <div className="vote-waiting-card">
-            <p>Вы были изгнаны и не можете голосовать</p>
-          </div>
-          <VoteProgressBar
-            votesCount={gameState.votesCount}
-            totalVotesExpected={gameState.totalVotesExpected}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // Already voted view
-  if (voted) {
-    return (
-      <div className="screen vote-screen">
-        <div className="sticky-top-bar">
-          <div className="top-bar-content">
-            <div className="top-bar-left">
-              <span className="top-bar-phase">
-                {isTiebreak ? "Переголосование" : "Голосование"}
-              </span>
-              <span className="top-bar-desc">Голос принят</span>
-            </div>
-            <div className="top-bar-right">
-              <Timer endTime={gameState.phaseEndTime} size="large" />
-            </div>
-          </div>
-        </div>
-        <div className="vote-container">
-          <div className="vote-waiting-card vote-accepted">
-            <p>Ваш голос принят! Ожидаем остальных...</p>
-            {isLastEliminated && !me?.alive && (
-              <p className="last-elim-note">Вы голосуете как последний изгнанный</p>
-            )}
-          </div>
-          <VoteProgressBar
-            votesCount={gameState.votesCount}
-            totalVotesExpected={gameState.totalVotesExpected}
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="screen vote-screen">
@@ -249,10 +213,22 @@ export function VoteScreen() {
         <div className="top-bar-content">
           <div className="top-bar-left">
             <span className="top-bar-phase">
-              {isTiebreak ? "Переголосование" : "Кого изгнать?"}
+              {!canVote || voted
+                ? isTiebreak
+                  ? "Переголосование"
+                  : "Голосование"
+                : isTiebreak
+                  ? "Переголосование"
+                  : "Кого изгнать?"}
             </span>
             <span className="top-bar-desc">
-              {isTiebreak ? "Ничья! Выберите одного из кандидатов" : "Выберите игрока для изгнания"}
+              {!canVote
+                ? "Вы изгнаны"
+                : voted
+                  ? "Голос принят"
+                  : isTiebreak
+                    ? "Ничья! Выберите одного из кандидатов"
+                    : "Выберите игрока для изгнания"}
             </span>
           </div>
           <div className="top-bar-right">
@@ -262,105 +238,126 @@ export function VoteScreen() {
       </div>
 
       <div className="vote-container">
-        {isLastEliminated && !me?.alive && (
-          <div className="last-elim-banner">
-            Вы голосуете как последний изгнанный — от лица всех изгнанных
-          </div>
-        )}
+        {!canVote ? (
+          <>
+            <div className="vote-waiting-card">
+              <p>Вы были изгнаны и не можете голосовать</p>
+            </div>
+            <VoteProgressBar
+              votesCount={gameState.votesCount}
+              totalVotesExpected={gameState.totalVotesExpected}
+            />
+          </>
+        ) : voted ? (
+          <>
+            <div className="vote-waiting-card vote-accepted">
+              <p>Ваш голос принят! Ожидаем остальных...</p>
+              {isLastEliminated && !me?.alive && (
+                <p className="last-elim-note">Вы голосуете как последний изгнанный</p>
+              )}
+            </div>
+            <VoteProgressBar
+              votesCount={gameState.votesCount}
+              totalVotesExpected={gameState.totalVotesExpected}
+            />
+          </>
+        ) : (
+          <>
+            {isLastEliminated && !me?.alive && (
+              <div className="last-elim-banner">
+                Вы голосуете как последний изгнанный — от лица всех изгнанных
+              </div>
+            )}
 
-        {gameState.votingsInCurrentRound > 1 && (
-          <div className="voting-counter">
-            Голосование {gameState.currentVotingInRound + 1} из {gameState.votingsInCurrentRound}
-          </div>
-        )}
+            <div className="vote-candidates">
+              {candidates.map((player) => {
+                const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;
+                return (
+                  <div
+                    key={player.id}
+                    className="vote-candidate"
+                    onClick={() => handleVote(player.id)}
+                  >
+                    <div className="candidate-info">
+                      <span className="candidate-name">
+                        <span className="player-number">{playerNumber}</span>
+                        {player.isBot && <span className="bot-badge">BOT</span>}
+                        {player.name}
+                      </span>
+                      <div className="candidate-attrs">
+                        {player.revealedAttributes.map((attr, i) => (
+                          <span key={i} className="mini-tag" data-attr-type={attr.type}>
+                            <span className="mini-tag-label">{attr.label}:</span> {attr.value}
+                          </span>
+                        ))}
+                        {player.actionCard && (
+                          <span className="mini-tag" data-attr-type="action">
+                            <span className="mini-tag-label">Особое условие:</span>{" "}
+                            {player.actionCard.title}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button className="btn btn-vote">Изгнать</button>
+                  </div>
+                );
+              })}
+            </div>
 
-        <div className="vote-candidates">
-          {candidates.map((player) => {
-            const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;
-            return (
-              <div key={player.id} className="vote-candidate" onClick={() => handleVote(player.id)}>
-                <div className="candidate-info">
-                  <span className="candidate-name">
-                    <span className="player-number">{playerNumber}</span>
-                    {player.isBot && <span className="bot-badge">BOT</span>}
-                    {player.name}
-                  </span>
-                  <div className="candidate-attrs">
-                    {player.revealedAttributes.map((attr, i) => (
-                      <span key={i} className="mini-tag" data-attr-type={attr.type}>
-                        <span className="mini-tag-label">{attr.label}:</span> {attr.value}
-                      </span>
-                    ))}
-                    {player.actionCard && (
-                      <span className="mini-tag" data-attr-type="action">
-                        <span className="mini-tag-label">Особое условие:</span>{" "}
-                        {player.actionCard.title}
-                      </span>
-                    )}
+            {confirmTarget && (
+              <div className="modal-overlay" onClick={() => setConfirmTarget(null)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()}>
+                  <h3>Подтвердите голос</h3>
+                  <p>
+                    Вы уверены, что хотите изгнать{" "}
+                    <strong>{gameState.players.find((p) => p.id === confirmTarget)?.name}</strong>?
+                  </p>
+                  <div className="modal-actions">
+                    <button className="btn btn-danger" onClick={confirmVote}>
+                      Изгнать
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => setConfirmTarget(null)}>
+                      Отмена
+                    </button>
                   </div>
                 </div>
-                <button className="btn btn-vote">Изгнать</button>
               </div>
-            );
-          })}
-        </div>
+            )}
 
-        {/* Confirm Modal */}
-        {confirmTarget && (
-          <div className="modal-overlay" onClick={() => setConfirmTarget(null)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h3>Подтвердите голос</h3>
-              <p>
-                Вы уверены, что хотите изгнать{" "}
-                <strong>{gameState.players.find((p) => p.id === confirmTarget)?.name}</strong>?
-              </p>
-              <div className="modal-actions">
-                <button className="btn btn-danger" onClick={confirmVote}>
-                  Изгнать
-                </button>
-                <button className="btn btn-secondary" onClick={() => setConfirmTarget(null)}>
-                  Отмена
-                </button>
+            <div className="vote-progress-bar">
+              <div className="vote-progress-label">
+                Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+              </div>
+              <div className="vote-progress-track">
+                <div
+                  className="vote-progress-fill"
+                  style={{
+                    width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%`,
+                  }}
+                />
               </div>
             </div>
-          </div>
+
+            {canRevealAction && (
+              <button
+                className="btn btn-reveal-action"
+                onClick={() => setConfirmRevealAction(true)}
+              >
+                Раскрыть особое условие
+              </button>
+            )}
+          </>
         )}
-
-        <div className="vote-progress-bar">
-          <div className="vote-progress-label">
-            Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
-          </div>
-          <div className="vote-progress-track">
-            <div
-              className="vote-progress-fill"
-              style={{ width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%` }}
-            />
-          </div>
-        </div>
-
-        {canRevealAction && (
-          <button className="btn btn-reveal-action" onClick={() => setConfirmRevealAction(true)}>
-            Раскрыть особое условие
-          </button>
-        )}
-
-        {error && <div className="error-toast">{error}</div>}
       </div>
+
+      {error && <div className="error-toast">{error}</div>}
 
       {/* Host Admin Panel */}
       {me?.isHost && (
-        <div className="admin-panel">
+        <div className={`admin-panel vote-admin-panel${adminOpen ? " is-open" : ""}`}>
           <button
             className="btn btn-admin-toggle"
-            onClick={() => {
-              const next = !adminOpen;
-              setAdminOpen(next);
-              if (next) {
-                adminPause();
-              } else {
-                adminUnpause();
-              }
-            }}
+            onClick={adminOpen ? closeAdminPanel : openAdminPanel}
           >
             {adminOpen ? "Скрыть админ-панель" : "Админ-панель"}
           </button>
