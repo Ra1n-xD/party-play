@@ -160,7 +160,9 @@ export function GameScreen() {
         roomCode={roomCode}
         connected={connected}
         canManageGame={Boolean(view.me?.isHost)}
+        canSkipDiscussion={gameState.phase === "ROUND_DISCUSSION"}
         onOpenHostControls={openHostControls}
+        onSkipDiscussion={adminSkipDiscussion}
         onLeaveRoom={leaveRoom}
       />
       <GameStatusHeader
@@ -168,8 +170,6 @@ export function GameScreen() {
         phaseLabel={view.phaseLabel}
         phaseDescription={view.phaseDescription}
         isMyTurn={view.isMyTurn}
-        canSkipDiscussion={gameState.phase === "ROUND_DISCUSSION" && Boolean(view.me?.isHost)}
-        onSkipDiscussion={adminSkipDiscussion}
       />
 
       {isSpectator && (
