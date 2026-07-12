@@ -1,6 +1,15 @@
 import React from "react";
-import type { PlayerInfo } from "../../../../shared/types";
+import type { AttributeType, PlayerInfo } from "../../../../shared/types";
 import { CardImage } from "../../components/CardImage";
+
+const ATTRIBUTE_DISPLAY_ORDER: Record<AttributeType, number> = {
+  profession: 0,
+  bio: 1,
+  health: 2,
+  hobby: 3,
+  baggage: 4,
+  fact: 5,
+};
 
 export interface PlayerBoardProps {
   players: PlayerInfo[];
@@ -30,6 +39,9 @@ export function PlayerCard({
   const isMe = player.id === playerId;
   const isCurrentTurn = player.id === currentTurnPlayerId;
   const isLastEliminated = player.id === lastEliminatedPlayerId;
+  const sortedRevealedAttributes = [...player.revealedAttributes].sort(
+    (left, right) => ATTRIBUTE_DISPLAY_ORDER[left.type] - ATTRIBUTE_DISPLAY_ORDER[right.type],
+  );
   const classNames = [
     "gs-player-card",
     isMe && "is-me",
@@ -64,7 +76,7 @@ export function PlayerCard({
           <span className="gs-empty-copy">Пока ничего не раскрыто</span>
         ) : (
           <>
-            {player.revealedAttributes.map((attribute, attributeIndex) => (
+            {sortedRevealedAttributes.map((attribute, attributeIndex) => (
               <span
                 key={`${attribute.type}-${attributeIndex}`}
                 className="gs-public-attribute"
