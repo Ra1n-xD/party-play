@@ -6,6 +6,7 @@ import type {
   Character,
   ClientEvents,
   GamePhase,
+  PublicGameState,
   ReconnectErrorCode,
   ServerEvents,
 } from "../../../shared/types.js";
@@ -172,6 +173,53 @@ async function createFourHumanSocketGame(t: TestContext): Promise<SocketStartedG
   await lobby.host.waitFor("game:state", (state) => state.phase === "CATASTROPHE_REVEAL");
 
   return { ...lobby, characters };
+}
+
+async function emitTransferAndWaitForServer(
+  server: SocketTestServer,
+  actor: SocketTestClient,
+  targetPlayerId: string,
+): Promise<void> {
+  const actorSocketId = actor.socket.id;
+  assert.ok(actorSocketId);
+  const serverSocket = server.io.sockets.sockets.get(actorSocketId);
+  assert.ok(serverSocket);
+  const handled = new Promise<void>((resolve) => {
+    serverSocket.once("admin:transferHost", () => resolve());
+  });
+
+  actor.emit("admin:transferHost", { targetPlayerId });
+  await handled;
+  await delay(10);
+}
+
+async function emitLeaveAndWaitForServer(
+  server: SocketTestServer,
+  client: SocketTestClient,
+): Promise<void> {
+  const socketId = client.socket.id;
+  assert.ok(socketId);
+  const serverSocket = server.io.sockets.sockets.get(socketId);
+  assert.ok(serverSocket);
+  const handled = new Promise<void>((resolve) => {
+    serverSocket.once("room:leave", () => resolve());
+  });
+
+  client.emit("room:leave");
+  await handled;
+  await delay(10);
+}
+
+async function joinSpectator(
+  server: SocketTestServer,
+  roomCode: string,
+  name = "Observer",
+): Promise<SocketTestClient> {
+  const spectator = await server.connectClient();
+  spectator.emit("room:joinSpectator", { roomCode, spectatorName: name });
+  await spectator.waitFor("room:spectatorJoined");
+  await spectator.waitFor("game:state");
+  return spectator;
 }
 
 type RejoinOutcome =
@@ -617,6 +665,609 @@ const ACTIVE_DISCONNECT_PHASES: GamePhase[] = [
   "ROUND_VOTE_TIEBREAK",
   "ROUND_RESULT",
 ];
+
+for (const phase of ACTIVE_DISCONNECT_PHASES) {
+  test(`host disconnect transfers authority once during ${phase}`, async (t) => {
+    const game = await createFourHumanSocketGame(t);
+    const originalHost = game.credentials[0];
+    const successor = game.credentials[1];
+    assert.ok(game.room.gameState);
+    if (phase !== "CATASTROPHE_REVEAL") moveToPhase(game.room, phase);
+
+    const sequence: string[] = [];
+    const visibleStates: PublicGameState[] = [];
+    game.humans[1].socket.on("game:state", (state) => {
+      if (
+        state.players.find((player) => player.id === originalHost.playerId)?.connected === false
+      ) {
+        visibleStates.push(state);
+        sequence.push("state");
+      }
+    });
+    game.humans[1].socket.on("room:hostChanged", () => sequence.push("hostChanged"));
+
+    game.host.disconnect();
+
+    const state = await game.humans[1].waitFor(
+      "game:state",
+      (candidate) =>
+        candidate.players.find((player) => player.id === originalHost.playerId)?.connected ===
+        false,
+    );
+    assert.equal(game.room.hostId, successor.playerId);
+    assert.equal(
+      state.players.find((player) => player.id === originalHost.playerId)?.isHost,
+      false,
+    );
+    assert.equal(state.players.find((player) => player.id === successor.playerId)?.isHost, true);
+    assert.deepEqual(await game.humans[1].waitFor("room:hostChanged"), {
+      hostId: successor.playerId,
+      hostName: "Human 1",
+      reason: "disconnect",
+    });
+    await delay(20);
+
+    assert.equal(visibleStates.length, 1);
+    assert.deepEqual(sequence, ["state", "hostChanged"]);
+    assert.equal(state.phase, phase);
+    assert.equal(state.pauseKind, "reconnect");
+    assert.deepEqual(state.disconnectedPlayerIds, [originalHost.playerId]);
+  });
+}
+
+test("lobby host disconnect transfers authority with the disconnect reason", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  const originalHost = lobby.credentials[0];
+  const successor = lobby.credentials[1];
+  lobby.room.pendingSeatClaims.set("automatic-claim", {
+    id: "automatic-claim",
+    socketId: "automatic-claimant",
+    playerId: lobby.credentials[3].playerId,
+    claimantName: "Automatic replacement",
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 120_000,
+  });
+
+  lobby.host.disconnect();
+
+  const state = await lobby.humans[1].waitFor(
+    "game:state",
+    (candidate) =>
+      candidate.players.find((player) => player.id === originalHost.playerId)?.connected === false,
+  );
+  assert.equal(lobby.room.hostId, successor.playerId);
+  assert.equal(state.phase, "LOBBY");
+  assert.equal(state.players.find((player) => player.id === successor.playerId)?.isHost, true);
+  assert.deepEqual(await lobby.humans[1].waitFor("room:hostChanged"), {
+    hostId: successor.playerId,
+    hostName: "Human 1",
+    reason: "disconnect",
+  });
+  assert.deepEqual(await lobby.humans[1].waitFor("admin:seatClaimsUpdated"), {
+    claims: [
+      {
+        requestId: "automatic-claim",
+        playerId: lobby.credentials[3].playerId,
+        playerName: "Human 3",
+        claimantName: "Automatic replacement",
+      },
+    ],
+  });
+});
+
+test("host failover skips bots, disconnected humans, and kicked humans cyclically", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  lobby.host.emit("room:addBot");
+  await lobby.host.waitFor("game:state", (state) => state.players.length === 5);
+  const bot = Array.from(lobby.room.players.values()).find((player) => player.isBot);
+  assert.ok(bot);
+
+  lobby.room.allPlayerIds = [
+    lobby.credentials[0].playerId,
+    bot.id,
+    lobby.credentials[1].playerId,
+    lobby.credentials[2].playerId,
+    lobby.credentials[3].playerId,
+  ];
+  lobby.humans[1].disconnect();
+  await lobby.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === lobby.credentials[1].playerId)?.connected ===
+      false,
+  );
+  const kicked = lobby.room.players.get(lobby.credentials[2].playerId);
+  assert.ok(kicked);
+  kicked.kicked = true;
+  kicked.connected = false;
+  lobby.humans[2].disconnect();
+
+  lobby.host.disconnect();
+  await lobby.humans[3].waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === lobby.credentials[0].playerId)?.connected ===
+      false,
+  );
+
+  assert.equal(lobby.room.hostId, lobby.credentials[3].playerId);
+  assert.deepEqual(await lobby.humans[3].waitFor("room:hostChanged"), {
+    hostId: lobby.credentials[3].playerId,
+    hostName: "Human 3",
+    reason: "disconnect",
+  });
+});
+
+test("an eliminated connected human remains eligible for host failover", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const successor = game.room.players.get(game.credentials[1].playerId);
+  assert.ok(successor);
+  successor.alive = false;
+
+  game.host.disconnect();
+  const state = await game.humans[1].waitFor(
+    "game:state",
+    (candidate) =>
+      candidate.players.find((player) => player.id === game.credentials[0].playerId)?.connected ===
+      false,
+  );
+
+  assert.equal(game.room.hostId, successor.id);
+  assert.equal(state.players.find((player) => player.id === successor.id)?.alive, false);
+  assert.equal(state.players.find((player) => player.id === successor.id)?.isHost, true);
+});
+
+test("automatic host transfer clears admin pause while retaining reconnect pause", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  game.host.emit("admin:pause");
+  await game.humans[1].waitFor("game:state", (state) => state.pauseKind === "admin");
+  assert.ok(game.room.gameState);
+  const frozenRemaining = game.room.gameState.pausedTimeRemaining;
+  const visibleStates: PublicGameState[] = [];
+  game.humans[1].socket.on("game:state", (state) => {
+    if (
+      state.players.find((player) => player.id === game.credentials[0].playerId)?.connected ===
+      false
+    ) {
+      visibleStates.push(state);
+    }
+  });
+
+  game.host.disconnect();
+  const transferredState = await game.humans[1].waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === game.credentials[0].playerId)?.connected ===
+      false,
+  );
+
+  assert.equal(game.room.hostId, game.credentials[1].playerId);
+  assert.equal(game.room.gameState.pauseReasons.admin, false);
+  assert.equal(game.room.gameState.pausedTimeRemaining, frozenRemaining);
+  assert.equal(transferredState.pauseKind, "reconnect");
+  assert.deepEqual(transferredState.disconnectedPlayerIds, [game.credentials[0].playerId]);
+  await game.humans[1].waitFor("room:hostChanged");
+  await delay(20);
+  assert.equal(visibleStates.length, 1);
+});
+
+test("no eligible host keeps the seat and pause until a different human recovers authority", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const observer = await joinSpectator(game.server, game.room.code);
+  const originalHost = game.credentials[0];
+  const recoveringIndex = 2;
+  const hostChanges: Array<{ hostId: string; reason: string }> = [];
+  observer.socket.on("room:hostChanged", ({ hostId, reason }) => {
+    hostChanges.push({ hostId, reason });
+  });
+
+  game.host.emit("admin:pause");
+  await observer.waitFor("game:state", (state) => state.pauseKind === "admin");
+  for (const index of [1, 2, 3]) {
+    game.humans[index].disconnect();
+    await observer.waitFor(
+      "game:state",
+      (state) =>
+        state.players.find((player) => player.id === game.credentials[index].playerId)
+          ?.connected === false,
+    );
+  }
+
+  game.host.disconnect();
+  const abandonedState = await observer.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === originalHost.playerId)?.connected === false,
+  );
+  assert.equal(game.room.hostId, originalHost.playerId);
+  assert.equal(game.room.gameState?.pauseReasons.admin, true);
+  assert.equal(abandonedState.pauseKind, "mixed");
+  assert.equal(hostChanges.length, 0);
+
+  const recoveringClient = await game.server.connectClient();
+  const joinedPromise = recoveringClient.waitFor("room:joined");
+  recoveringClient.emit("room:rejoin", game.credentials[recoveringIndex]);
+  await joinedPromise;
+  const recoveredState = await observer.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === game.credentials[recoveringIndex].playerId)
+        ?.connected === true,
+  );
+
+  assert.equal(game.room.hostId, game.credentials[recoveringIndex].playerId);
+  assert.equal(game.room.gameState?.pauseReasons.admin, false);
+  assert.equal(recoveredState.pauseKind, "reconnect");
+  assert.deepEqual(await observer.waitFor("room:hostChanged"), {
+    hostId: game.credentials[recoveringIndex].playerId,
+    hostName: "Human 2",
+    reason: "recovery",
+  });
+});
+
+test("the original host returning first keeps the anchored seat without a recovery event", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const observer = await joinSpectator(game.server, game.room.code);
+  const hostChanges: string[] = [];
+  observer.socket.on("room:hostChanged", ({ reason }) => hostChanges.push(reason));
+
+  for (const index of [1, 2, 3]) {
+    game.humans[index].disconnect();
+    await observer.waitFor(
+      "game:state",
+      (state) =>
+        state.players.find((player) => player.id === game.credentials[index].playerId)
+          ?.connected === false,
+    );
+  }
+  game.host.disconnect();
+  await observer.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === game.credentials[0].playerId)?.connected ===
+      false,
+  );
+
+  const returningHost = await game.server.connectClient();
+  const joinedPromise = returningHost.waitFor("room:joined");
+  returningHost.emit("room:rejoin", game.credentials[0]);
+  await joinedPromise;
+  const state = await observer.waitFor(
+    "game:state",
+    (candidate) =>
+      candidate.players.find((player) => player.id === game.credentials[0].playerId)?.connected ===
+      true,
+  );
+  await delay(20);
+
+  assert.equal(game.room.hostId, game.credentials[0].playerId);
+  assert.equal(
+    state.players.find((player) => player.id === game.credentials[0].playerId)?.isHost,
+    true,
+  );
+  assert.deepEqual(hostChanges, []);
+});
+
+test("a former host reconnects without reclaiming authority and cannot use host actions", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const originalHost = game.credentials[0];
+  const successor = game.credentials[1];
+
+  game.host.disconnect();
+  await game.humans[1].waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === originalHost.playerId)?.connected === false,
+  );
+  assert.equal(game.room.hostId, successor.playerId);
+  await game.humans[1].waitFor("room:hostChanged");
+
+  const formerHost = await game.server.connectClient();
+  const joinedPromise = formerHost.waitFor("room:joined");
+  formerHost.emit("room:rejoin", originalHost);
+  await joinedPromise;
+  const restoredState = await game.humans[1].waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === originalHost.playerId)?.connected === true &&
+      state.players.find((player) => player.id === successor.playerId)?.isHost === true,
+  );
+  assert.equal(game.room.hostId, successor.playerId);
+  assert.equal(
+    restoredState.players.find((player) => player.id === originalHost.playerId)?.isHost,
+    false,
+  );
+
+  formerHost.emit("admin:pause");
+  assert.equal(
+    (await formerHost.waitFor("room:error")).message,
+    "Только хост может выполнить это действие",
+  );
+  assert.equal(game.room.gameState?.pauseReasons.admin, false);
+});
+
+test("manual host transfer broadcasts once, sends pending claims, and revokes former authority", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  const originalHost = lobby.credentials[0];
+  const successor = lobby.credentials[1];
+  lobby.room.pendingSeatClaims.set("claim-one", {
+    id: "claim-one",
+    socketId: "claimant-one",
+    playerId: lobby.credentials[3].playerId,
+    claimantName: "Replacement",
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 120_000,
+  });
+  const sequence: string[] = [];
+  const visibleStates: PublicGameState[] = [];
+  lobby.humans[1].socket.on("game:state", (state) => {
+    if (state.players.find((player) => player.id === successor.playerId)?.isHost) {
+      visibleStates.push(state);
+      sequence.push("state");
+    }
+  });
+  lobby.humans[1].socket.on("room:hostChanged", () => sequence.push("hostChanged"));
+  lobby.humans[1].socket.on("admin:seatClaimsUpdated", () => sequence.push("claims"));
+
+  await emitTransferAndWaitForServer(lobby.server, lobby.host, successor.playerId);
+
+  assert.equal(lobby.room.hostId, successor.playerId);
+  const state = await lobby.humans[1].waitFor(
+    "game:state",
+    (candidate) =>
+      candidate.players.find((player) => player.id === successor.playerId)?.isHost === true,
+  );
+  assert.equal(state.players.find((player) => player.id === originalHost.playerId)?.isHost, false);
+  assert.deepEqual(await lobby.humans[1].waitFor("room:hostChanged"), {
+    hostId: successor.playerId,
+    hostName: "Human 1",
+    reason: "manual",
+  });
+  assert.deepEqual(await lobby.humans[1].waitFor("admin:seatClaimsUpdated"), {
+    claims: [
+      {
+        requestId: "claim-one",
+        playerId: lobby.credentials[3].playerId,
+        playerName: "Human 3",
+        claimantName: "Replacement",
+      },
+    ],
+  });
+  await delay(20);
+  assert.equal(visibleStates.length, 1);
+  assert.deepEqual(sequence, ["state", "hostChanged", "claims"]);
+
+  lobby.host.emit("room:addBot");
+  assert.equal(
+    (await lobby.host.waitFor("room:error")).message,
+    "Только хост может выполнить это действие",
+  );
+  await emitTransferAndWaitForServer(lobby.server, lobby.host, lobby.credentials[2].playerId);
+  assert.equal(lobby.room.hostId, successor.playerId);
+  assert.equal(
+    (await lobby.host.waitFor("room:error")).message,
+    "Только текущий хост может передать права",
+  );
+});
+
+test("manual host transfer clears only admin pause during a reconnect pause", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const missing = game.credentials[3];
+  game.humans[3].disconnect();
+  await game.host.waitFor(
+    "game:state",
+    (state) => state.players.find((player) => player.id === missing.playerId)?.connected === false,
+  );
+  game.host.emit("admin:pause");
+  await game.humans[1].waitFor("game:state", (state) => state.pauseKind === "mixed");
+  assert.ok(game.room.gameState);
+  const frozenRemaining = game.room.gameState.pausedTimeRemaining;
+  const visibleStates: PublicGameState[] = [];
+  game.humans[1].socket.on("game:state", (state) => {
+    if (state.players.find((player) => player.id === game.credentials[1].playerId)?.isHost) {
+      visibleStates.push(state);
+    }
+  });
+
+  await emitTransferAndWaitForServer(game.server, game.host, game.credentials[1].playerId);
+
+  assert.equal(game.room.hostId, game.credentials[1].playerId);
+  assert.equal(game.room.gameState.pauseReasons.admin, false);
+  assert.equal(game.room.gameState.pausedTimeRemaining, frozenRemaining);
+  const state = await game.humans[1].waitFor(
+    "game:state",
+    (candidate) =>
+      candidate.players.find((player) => player.id === game.credentials[1].playerId)?.isHost ===
+      true,
+  );
+  assert.equal(state.pauseKind, "reconnect");
+  assert.deepEqual(state.disconnectedPlayerIds, [missing.playerId]);
+  assert.deepEqual(await game.humans[1].waitFor("room:hostChanged"), {
+    hostId: game.credentials[1].playerId,
+    hostName: "Human 1",
+    reason: "manual",
+  });
+  await delay(20);
+  assert.equal(visibleStates.length, 1);
+});
+
+test("manual host transfer rejects self, missing, bot, disconnected, and kicked targets", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  lobby.host.emit("room:addBot");
+  await lobby.host.waitFor("game:state", (state) => state.players.length === 5);
+  const bot = Array.from(lobby.room.players.values()).find((player) => player.isBot);
+  assert.ok(bot);
+
+  lobby.humans[2].disconnect();
+  await lobby.host.waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === lobby.credentials[2].playerId)?.connected ===
+      false,
+  );
+  const kicked = lobby.room.players.get(lobby.credentials[3].playerId);
+  assert.ok(kicked);
+  kicked.kicked = true;
+  kicked.connected = false;
+  lobby.humans[3].disconnect();
+
+  const errors: string[] = [];
+  const hostChanges: string[] = [];
+  lobby.host.socket.on("room:error", ({ message }) => errors.push(message));
+  lobby.host.socket.on("room:hostChanged", ({ reason }) => hostChanges.push(reason));
+  const invalidTargets = [
+    lobby.credentials[0].playerId,
+    "not-a-player-id",
+    `p_${"f".repeat(24)}`,
+    bot.id,
+    lobby.credentials[2].playerId,
+    lobby.credentials[3].playerId,
+  ];
+
+  for (const [index, targetPlayerId] of invalidTargets.entries()) {
+    await emitTransferAndWaitForServer(lobby.server, lobby.host, targetPlayerId);
+    assert.equal(errors.length, index + 1);
+    assert.equal(lobby.room.hostId, lobby.credentials[0].playerId);
+  }
+  assert.deepEqual(hostChanges, []);
+});
+
+test("automatic failover remains cyclic after a manual transfer", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await emitTransferAndWaitForServer(lobby.server, lobby.host, lobby.credentials[2].playerId);
+  assert.equal(lobby.room.hostId, lobby.credentials[2].playerId);
+  await lobby.humans[2].waitFor("room:hostChanged");
+
+  lobby.humans[2].disconnect();
+  await lobby.humans[3].waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === lobby.credentials[2].playerId)?.connected ===
+      false,
+  );
+
+  assert.equal(lobby.room.hostId, lobby.credentials[3].playerId);
+  assert.deepEqual(
+    await lobby.humans[3].waitFor(
+      "room:hostChanged",
+      (event) => event.hostId === lobby.credentials[3].playerId && event.reason === "disconnect",
+    ),
+    {
+      hostId: lobby.credentials[3].playerId,
+      hostName: "Human 3",
+      reason: "disconnect",
+    },
+  );
+});
+
+test("explicit active-game host leave retains the seat and transfers authority", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  await emitLeaveAndWaitForServer(game.server, game.host);
+  const state = await game.humans[1].waitFor(
+    "game:state",
+    (candidate) =>
+      candidate.players.find((player) => player.id === game.credentials[0].playerId)?.connected ===
+      false,
+  );
+
+  assert.ok(game.room.players.has(game.credentials[0].playerId));
+  assert.equal(game.room.hostId, game.credentials[1].playerId);
+  assert.equal(state.pauseKind, "reconnect");
+  assert.deepEqual(await game.humans[1].waitFor("room:hostChanged"), {
+    hostId: game.credentials[1].playerId,
+    hostName: "Human 1",
+    reason: "disconnect",
+  });
+});
+
+test("explicit lobby host leave removes the seat and transfers to a connected human", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  const changes: Array<{ hostId: string; reason: string }> = [];
+  lobby.humans[1].socket.on("room:hostChanged", ({ hostId, reason }) => {
+    changes.push({ hostId, reason });
+  });
+
+  await emitLeaveAndWaitForServer(lobby.server, lobby.host);
+  const state = await lobby.humans[1].waitFor(
+    "game:state",
+    (candidate) =>
+      candidate.players.length === 3 &&
+      !candidate.players.some((player) => player.id === lobby.credentials[0].playerId) &&
+      candidate.players.find((player) => player.id === lobby.credentials[1].playerId)?.isHost ===
+        true,
+  );
+  await delay(20);
+
+  assert.equal(lobby.room.players.has(lobby.credentials[0].playerId), false);
+  assert.equal(lobby.room.hostId, lobby.credentials[1].playerId);
+  assert.equal(
+    state.players.find((player) => player.id === lobby.credentials[1].playerId)?.isHost,
+    true,
+  );
+  assert.deepEqual(changes, [{ hostId: lobby.credentials[1].playerId, reason: "disconnect" }]);
+});
+
+test("lobby host leave without an eligible successor recovers on the next human join", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+  const host = await server.connectClient();
+  host.emit("room:create", { playerName: "Host" });
+  const credential = await host.waitFor("room:created");
+  await host.waitFor("game:state");
+  host.emit("room:addBot");
+  await host.waitFor("game:state", (state) => state.players.length === 2);
+  const room = getRoom(credential.roomCode);
+  assert.ok(room);
+
+  await emitLeaveAndWaitForServer(server, host);
+  assert.equal(room.players.has(credential.playerId), false);
+  assert.equal(room.hostId, credential.playerId);
+  assert.equal(
+    Array.from(room.players.values()).every((player) => player.isBot),
+    true,
+  );
+
+  const newcomer = await server.connectClient();
+  newcomer.emit("room:join", { roomCode: room.code, playerName: "Recovery host" });
+  const joined = await newcomer.waitFor("room:joined");
+  const state = await newcomer.waitFor(
+    "game:state",
+    (candidate) =>
+      candidate.players.find((player) => player.id === joined.playerId)?.isHost === true,
+  );
+
+  assert.equal(room.hostId, joined.playerId);
+  assert.equal(state.players.find((player) => player.id === joined.playerId)?.isHost, true);
+  assert.deepEqual(await newcomer.waitFor("room:hostChanged"), {
+    hostId: joined.playerId,
+    hostName: "Recovery host",
+    reason: "recovery",
+  });
+});
+
+test("GAME_OVER host disconnect transfers authority without pausing", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  game.host.emit("game:endGame");
+  await game.humans[1].waitFor("game:state", (state) => state.phase === "GAME_OVER");
+
+  game.host.disconnect();
+  const state = await game.humans[1].waitFor(
+    "game:state",
+    (candidate) =>
+      candidate.players.find((player) => player.id === game.credentials[0].playerId)?.connected ===
+      false,
+  );
+
+  assert.equal(game.room.hostId, game.credentials[1].playerId);
+  assert.equal(state.phase, "GAME_OVER");
+  assert.equal(state.paused, false);
+  assert.deepEqual(state.disconnectedPlayerIds, []);
+  assert.deepEqual(await game.humans[1].waitFor("room:hostChanged"), {
+    hostId: game.credentials[1].playerId,
+    hostName: "Human 1",
+    reason: "disconnect",
+  });
+});
 
 for (const phase of ACTIVE_DISCONNECT_PHASES) {
   test(`network disconnect reserves the seat and pauses ${phase}`, async (t) => {
