@@ -212,6 +212,24 @@ async function emitTransferAndWaitForServer(
   await delay(10);
 }
 
+async function emitKickAndWaitForServer(
+  server: SocketTestServer,
+  actor: SocketTestClient,
+  targetPlayerId: string,
+): Promise<void> {
+  const actorSocketId = actor.socket.id;
+  assert.ok(actorSocketId);
+  const serverSocket = server.io.sockets.sockets.get(actorSocketId);
+  assert.ok(serverSocket);
+  const handled = new Promise<void>((resolve) => {
+    serverSocket.once("admin:kickPlayer", () => resolve());
+  });
+
+  actor.emit("admin:kickPlayer", { targetPlayerId });
+  await handled;
+  await delay(10);
+}
+
 async function emitLeaveAndWaitForServer(
   server: SocketTestServer,
   client: SocketTestClient,
@@ -3541,4 +3559,750 @@ test("bot seats never create reconnect pause reasons", (t) => {
   assert.equal(state.paused, false);
   assert.equal(state.pauseKind, "none");
   assert.deepEqual(state.disconnectedPlayerIds, []);
+});
+
+test("permanent kick deletes a disconnected lobby seat before the roster is fixed", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  const targetId = lobby.credentials[2].playerId;
+  await disconnectLobbyHuman(lobby, 2);
+
+  await emitKickAndWaitForServer(lobby.server, lobby.host, targetId);
+
+  assert.equal(lobby.room.players.has(targetId), false);
+  assert.equal(lobby.room.allPlayerIds.includes(targetId), false);
+  assert.equal(lobby.room.startedPlayerCount, null);
+  assert.equal(gameEngine.buildPublicState(lobby.room).players.length, 3);
+});
+
+const PERMANENT_KICK_ACTIVE_PHASES: GamePhase[] = [
+  "CATASTROPHE_REVEAL",
+  "BUNKER_EXPLORE",
+  "ROUND_REVEAL",
+  "ROUND_DISCUSSION",
+  "ROUND_VOTE",
+  "ROUND_VOTE_TIEBREAK",
+  "ROUND_RESULT",
+];
+
+for (const phase of PERMANENT_KICK_ACTIVE_PHASES) {
+  test(`permanent kick preserves the fixed historical seat and normalizes ${phase}`, async (t) => {
+    const game = await createFourHumanSocketGame(t);
+    const targetId = game.credentials[3].playerId;
+    const state = game.room.gameState;
+    assert.ok(state);
+    moveToPhase(game.room, phase);
+    state.roundNumber = 1;
+    state.turnOrder = game.credentials.map(({ playerId }) => playerId);
+    state.currentTurnIndex = 0;
+    state.currentVotingInRound = 0;
+    state.votingSchedule[0] = 2;
+    if (phase === "ROUND_VOTE_TIEBREAK") {
+      state.tiebreakCandidateIds = game.credentials.slice(1).map(({ playerId }) => playerId);
+    }
+    const originalStartedPlayerCount = game.room.startedPlayerCount;
+    const originalCapacity = state.bunkerCapacity;
+    const originalSchedule = [...state.votingSchedule];
+
+    await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+    const target = game.room.players.get(targetId);
+    assert.ok(target);
+    assert.equal(target.kicked, true);
+    assert.equal(target.connected, false);
+    assert.equal(target.alive, false);
+    assert.equal(game.room.players.size, originalStartedPlayerCount);
+    assert.equal(game.room.allPlayerIds.includes(targetId), true);
+    assert.equal(game.room.startedPlayerCount, originalStartedPlayerCount);
+    assert.equal(state.bunkerCapacity, originalCapacity);
+    assert.deepEqual(state.votingSchedule, originalSchedule);
+    assert.equal(state.turnOrder.includes(targetId), false);
+    assert.equal(
+      state.phase,
+      phase === "ROUND_VOTE" || phase === "ROUND_VOTE_TIEBREAK" ? "ROUND_RESULT" : phase,
+    );
+  });
+}
+
+test("connected permanent kick notifies and releases the owner before stale actions", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetClient = game.humans[2];
+  const targetId = game.credentials[2].playerId;
+  const target = game.room.players.get(targetId);
+  const targetSocketId = targetClient.socket.id;
+  assert.ok(target);
+  assert.ok(targetSocketId);
+  target.ready = false;
+
+  const kicked = waitForSocketEvent(targetClient, "room:kicked");
+  const disconnected = new Promise<string>((resolve) => {
+    targetClient.socket.once("disconnect", (reason) => resolve(reason));
+  });
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+  assert.deepEqual(await kicked, { message: "Вы удалены из комнаты хостом" });
+  await disconnected;
+  assert.equal(
+    game.server.io.sockets.adapter.rooms.get(game.room.code)?.has(targetSocketId),
+    false,
+  );
+  assert.equal(targetClient.socket.connected, false);
+
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Timed out reconnecting stale socket")), 750);
+    targetClient.socket.once("connect", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    targetClient.socket.connect();
+  });
+  targetClient.emit("player:ready", { ready: true });
+  targetClient.emit("game:revealActionCard");
+  await delay(20);
+
+  assert.equal(target.ready, false);
+  assert.equal(target.actionCardRevealed, false);
+  assert.equal(target.kicked, true);
+});
+
+test("permanent kick validates host authority, self, bots, missing IDs, and closed seats", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetId = game.credentials[3].playerId;
+
+  const selfError = waitForRoomError(game.host, "Хост не может удалить самого себя");
+  await emitKickAndWaitForServer(game.server, game.host, game.credentials[0].playerId);
+  await selfError;
+
+  const nonHostError = waitForRoomError(game.humans[1], "Только хост может удалить игрока");
+  await emitKickAndWaitForServer(game.server, game.humans[1], targetId);
+  await nonHostError;
+
+  for (const missingId of ["not-a-player-id", `p_${"f".repeat(24)}`]) {
+    const missingError = waitForRoomError(game.host, "Игрок не найден");
+    await emitKickAndWaitForServer(game.server, game.host, missingId);
+    await missingError;
+  }
+
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+  const closedError = waitForRoomError(game.host, "Место уже закрыто");
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+  await closedError;
+
+  const lobby = await createFourHumanSocketLobby(t);
+  lobby.host.emit("room:addBot");
+  const lobbyState = await lobby.host.waitFor("game:state", (state) => state.players.length === 5);
+  const bot = lobbyState.players.find((player) => player.isBot);
+  assert.ok(bot);
+  const botError = waitForRoomError(lobby.host, "Бота нельзя удалить этой командой");
+  await emitKickAndWaitForServer(lobby.server, lobby.host, bot.id);
+  await botError;
+  assert.equal(lobby.room.players.has(bot.id), true);
+});
+
+test("successor host can permanently kick the disconnected former host", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const formerHostId = game.credentials[0].playerId;
+  game.host.disconnect();
+  await game.humans[1].waitFor(
+    "game:state",
+    (state) =>
+      state.players.find((player) => player.id === formerHostId)?.connected === false &&
+      state.players.find((player) => player.id === game.credentials[1].playerId)?.isHost === true,
+  );
+
+  await emitKickAndWaitForServer(game.server, game.humans[1], formerHostId);
+
+  const formerHost = game.room.players.get(formerHostId);
+  assert.ok(formerHost);
+  assert.equal(formerHost.kicked, true);
+  assert.equal(formerHost.connected, false);
+  assert.equal(formerHost.alive, false);
+  assert.equal(game.room.hostId, game.credentials[1].playerId);
+  assert.equal(game.room.gameState?.pauseReasons.disconnectedPlayerIds.has(formerHostId), false);
+});
+
+test("permanent kick invalidates credentials, cancels claim timers, and closes seat listing", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const credential = game.credentials[2];
+  const target = game.room.players.get(credential.playerId);
+  assert.ok(target);
+  const oldSessionToken = target.sessionToken;
+  game.humans[2].disconnect();
+  await game.host.waitFor(
+    "game:state",
+    (state) => state.players.find((player) => player.id === target.id)?.connected === false,
+  );
+
+  const claimant = await game.server.connectClient();
+  const { requestId } = await submitSeatClaim(claimant, game.room.code, target.id, "Replacement");
+  const claimCancelled = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const claimsCleared = waitForSocketEvent(
+    game.host,
+    "admin:seatClaimsUpdated",
+    ({ claims }) => claims.length === 0,
+  );
+
+  await emitKickAndWaitForServer(game.server, game.host, target.id);
+
+  assert.deepEqual(await claimCancelled, {
+    requestId,
+    approved: false,
+    message: "Место закрыто администратором",
+  });
+  assert.deepEqual(await claimsCleared, { claims: [] });
+  assert.equal(game.room.pendingSeatClaims.size, 0);
+  assert.notEqual(target.sessionToken, oldSessionToken);
+  assert.equal(
+    reconnectManager.expireSeatClaims(
+      game.room,
+      game.server.io,
+      Date.now() + reconnectManager.SEAT_CLAIM_TTL_MS,
+    ),
+    0,
+  );
+
+  const oldOwner = await game.server.connectClient();
+  const rejoin = waitForRejoinOutcome(oldOwner);
+  oldOwner.emit("room:rejoin", credential);
+  assert.deepEqual(await rejoin, {
+    event: "reconnectError",
+    payload: { code: "SEAT_CLOSED", message: "Место закрыто", terminal: true },
+  });
+
+  const browser = await game.server.connectClient();
+  const seats = waitForSocketEvent(browser, "room:reconnectableSeats");
+  browser.emit("room:listReconnectableSeats", { roomCode: game.room.code });
+  assert.equal(
+    (await seats).seats.some((seat) => seat.playerId === target.id),
+    false,
+  );
+});
+
+for (const revealCase of [
+  { name: "current", targetIndex: 1, currentTurnIndex: 1, expectedCurrentIndex: 2 },
+  { name: "future", targetIndex: 2, currentTurnIndex: 1, expectedCurrentIndex: 1 },
+  { name: "past", targetIndex: 1, currentTurnIndex: 2, expectedCurrentIndex: 2 },
+]) {
+  test(`permanent kick repairs a ${revealCase.name} reveal turn without skipping`, async (t) => {
+    const game = await createFourHumanSocketGame(t);
+    const state = game.room.gameState;
+    assert.ok(state);
+    moveToPhase(game.room, "ROUND_REVEAL");
+    state.roundNumber = 1;
+    state.turnOrder = game.credentials.map(({ playerId }) => playerId);
+    state.currentTurnIndex = revealCase.currentTurnIndex;
+    const expectedCurrentId = game.credentials[revealCase.expectedCurrentIndex].playerId;
+    const targetId = game.credentials[revealCase.targetIndex].playerId;
+
+    await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+    assert.equal(state.turnOrder.includes(targetId), false);
+    assert.equal(state.turnOrder[state.currentTurnIndex], expectedCurrentId);
+    assert.equal(gameEngine.buildPublicState(game.room).currentTurnPlayerId, expectedCurrentId);
+  });
+}
+
+test("discussion kick resumes its timer only after disconnected-seat normalization", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetId = game.credentials[2].playerId;
+  const state = game.room.gameState;
+  assert.ok(state);
+  moveToPhase(game.room, "ROUND_DISCUSSION");
+  const discussionCallback = () => {};
+  state.pausedCallback = discussionCallback;
+  state.phaseEndTime = Date.now() + 60_000;
+  state.phaseTimer = setTimeout(discussionCallback, 60_000);
+
+  game.humans[2].disconnect();
+  await game.host.waitFor(
+    "game:state",
+    (publicState) =>
+      publicState.players.find((player) => player.id === targetId)?.connected === false,
+  );
+  const frozenRemaining = state.pausedTimeRemaining;
+  assert.ok(frozenRemaining);
+  const visibleStates: PublicGameState[] = [];
+  game.host.socket.on("game:state", (publicState) => visibleStates.push(publicState));
+
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+  assert.equal(state.phase, "ROUND_DISCUSSION");
+  assert.equal(state.paused, false);
+  assert.equal(state.phaseTimer !== null, true);
+  assert.ok(state.phaseEndTime);
+  assert.ok((state.phaseEndTime ?? 0) - Date.now() <= frozenRemaining);
+  assert.equal(
+    visibleStates.some(
+      (publicState) =>
+        !publicState.paused &&
+        publicState.players.find((player) => player.id === targetId)?.kicked !== true,
+    ),
+    false,
+  );
+});
+
+test("mixed permanent kicks retain admin and other reconnect reasons until the final resume", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const firstMissingId = game.credentials[2].playerId;
+  const secondMissingId = game.credentials[3].playerId;
+  assert.ok(game.room.gameState);
+  game.room.gameState.bunkerCapacity = 1;
+
+  game.humans[2].disconnect();
+  await game.host.waitFor("game:state", (state) =>
+    state.disconnectedPlayerIds.includes(firstMissingId),
+  );
+  game.humans[3].disconnect();
+  await game.host.waitFor("game:state", (state) =>
+    state.disconnectedPlayerIds.includes(secondMissingId),
+  );
+  game.host.emit("admin:pause");
+  await game.host.waitFor("game:state", (state) => state.pauseKind === "mixed");
+
+  await emitKickAndWaitForServer(game.server, game.host, secondMissingId);
+  let publicState = gameEngine.buildPublicState(game.room);
+  assert.equal(publicState.pauseKind, "mixed");
+  assert.deepEqual(publicState.disconnectedPlayerIds, [firstMissingId]);
+
+  game.host.emit("admin:unpause");
+  await game.host.waitFor("game:state", (state) => state.pauseKind === "reconnect");
+  await emitKickAndWaitForServer(game.server, game.host, firstMissingId);
+  publicState = gameEngine.buildPublicState(game.room);
+  assert.equal(publicState.pauseKind, "none");
+  assert.deepEqual(publicState.disconnectedPlayerIds, []);
+  assert.equal(game.room.gameState.paused, false);
+});
+
+test("regular-vote permanent kick consumes one ballot and schedules one administrative result", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const state = game.room.gameState;
+  assert.ok(state);
+  moveToPhase(game.room, "ROUND_DISCUSSION");
+  state.roundNumber = 1;
+  state.currentVotingInRound = 0;
+  state.votingSchedule[0] = 2;
+
+  const voteStarted = waitForSocketEvent(
+    game.host,
+    "game:state",
+    (publicState) => publicState.phase === "ROUND_VOTE",
+  );
+  game.host.emit("admin:skipDiscussion");
+  await voteStarted;
+
+  game.humans[1].emit("vote:cast", { targetPlayerId: game.credentials[3].playerId });
+  await game.host.waitFor("game:state", (publicState) => publicState.votesCount === 1);
+  game.humans[2].emit("vote:cast", { targetPlayerId: game.credentials[1].playerId });
+  await game.host.waitFor("game:state", (publicState) => publicState.votesCount === 2);
+  game.humans[3].emit("vote:cast", { targetPlayerId: game.credentials[2].playerId });
+  await game.host.waitFor("game:state", (publicState) => publicState.votesCount === 3);
+  const interruptedBallotCallback = state.pausedCallback;
+  assert.ok(interruptedBallotCallback);
+
+  const targetId = game.credentials[3].playerId;
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+  assert.equal(state.phase, "ROUND_RESULT");
+  assert.equal(state.votes.size, 0);
+  assert.deepEqual(state.tiebreakCandidateIds, []);
+  assert.equal(
+    Array.from(game.room.players.values()).every((player) => !player.hasVoted),
+    true,
+  );
+  assert.equal(
+    Array.from(game.room.players.values()).every((player) => player.votedFor === null),
+    true,
+  );
+  assert.equal(state.eliminationOrder[state.eliminationOrder.length - 1], targetId);
+  assert.equal(gameEngine.buildPublicState(game.room).eliminatedPlayerId, targetId);
+  assert.equal(state.currentVotingInRound, 0);
+
+  interruptedBallotCallback();
+  assert.equal(state.phase, "ROUND_RESULT");
+  assert.equal(state.currentVotingInRound, 0);
+
+  const resultCallback = takeScheduledPhaseCallback(game.room);
+  resultCallback();
+  assert.equal(state.currentVotingInRound, 1);
+  assert.equal(state.phase, "ROUND_DISCUSSION");
+  interruptedBallotCallback();
+  assert.equal(state.currentVotingInRound, 1);
+});
+
+test("tiebreak permanent kick clears candidates, votes, and the interrupted ballot timer", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const state = game.room.gameState;
+  assert.ok(state);
+  moveToPhase(game.room, "ROUND_VOTE_TIEBREAK");
+  state.roundNumber = 1;
+  state.currentVotingInRound = 0;
+  state.votingSchedule[0] = 2;
+  state.tiebreakCandidateIds = game.credentials.slice(1).map(({ playerId }) => playerId);
+  for (let index = 0; index < game.credentials.length; index++) {
+    const voter = game.room.players.get(game.credentials[index].playerId);
+    assert.ok(voter);
+    voter.hasVoted = true;
+    voter.votedFor = game.credentials[(index + 1) % game.credentials.length].playerId;
+    state.votes.set(voter.id, voter.votedFor);
+  }
+  const oldTimer = setTimeout(() => {}, 60_000);
+  state.phaseTimer = oldTimer;
+  state.phaseEndTime = Date.now() + 60_000;
+  state.pausedCallback = () => {};
+
+  const targetId = game.credentials[2].playerId;
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+  assert.equal(state.phase, "ROUND_RESULT");
+  assert.equal(state.votes.size, 0);
+  assert.deepEqual(state.tiebreakCandidateIds, []);
+  assert.equal(
+    Array.from(game.room.players.values()).every((player) => !player.hasVoted),
+    true,
+  );
+  assert.equal(
+    Array.from(game.room.players.values()).every((player) => player.votedFor === null),
+    true,
+  );
+  assert.notEqual(state.phaseTimer, oldTimer);
+  assert.equal(state.currentVotingInRound, 0);
+  assert.equal(gameEngine.buildPublicState(game.room).eliminatedPlayerId, targetId);
+});
+
+test("already-eliminated permanent kick repairs last voter without erasing administrative history", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const state = game.room.gameState;
+  assert.ok(state);
+  moveToPhase(game.room, "ROUND_RESULT");
+  state.bunkerCapacity = 1;
+  const previousId = game.credentials[1].playerId;
+  const targetId = game.credentials[2].playerId;
+  const previous = game.room.players.get(previousId);
+  const target = game.room.players.get(targetId);
+  assert.ok(previous);
+  assert.ok(target);
+  previous.alive = false;
+  target.alive = false;
+  state.eliminationOrder = [previousId, targetId];
+  state.lastEliminatedId = targetId;
+  const resultCallback = () => {};
+  state.phaseTimer = setTimeout(resultCallback, 60_000);
+  state.phaseEndTime = Date.now() + 60_000;
+  state.pausedCallback = resultCallback;
+
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+  assert.equal(state.phase, "ROUND_RESULT");
+  assert.equal(state.eliminationOrder.includes(targetId), true);
+  assert.equal(state.eliminationOrder.filter((id) => id === targetId).length, 1);
+  assert.equal(state.lastEliminatedId, previousId);
+  assert.equal(state.phaseTimer !== null, true);
+  assert.equal(state.pausedCallback, resultCallback);
+  assert.equal(gameEngine.buildPublicState(game.room).lastEliminatedPlayerId, previousId);
+  assert.equal(gameEngine.buildPublicState(game.room).totalVotesExpected, 3);
+
+  state.phase = "ROUND_VOTE";
+  assert.equal(
+    gameEngine.castVote(game.room, targetId, game.credentials[3].playerId, game.server.io),
+    false,
+  );
+  assert.equal(state.votes.has(targetId), false);
+});
+
+test("permanent kick reaches capacity through the central GAME_OVER lifecycle", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const state = game.room.gameState;
+  assert.ok(state);
+  moveToPhase(game.room, "ROUND_DISCUSSION");
+  const originalSchedule = [...state.votingSchedule];
+  const originalCapacity = state.bunkerCapacity;
+  const originalStartedPlayerCount = game.room.startedPlayerCount;
+
+  const missing = await disconnectStartedHumanWithoutPause(game, 3);
+  missing.alive = false;
+  state.eliminationOrder = [missing.id];
+  state.lastEliminatedId = missing.id;
+  const claimant = await game.server.connectClient();
+  const { requestId } = await submitSeatClaim(claimant, game.room.code, missing.id, "Replacement");
+  const cancelled = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+  const gameOver = waitForSocketEvent(
+    game.host,
+    "game:state",
+    (publicState) => publicState.phase === "GAME_OVER",
+  );
+
+  await emitKickAndWaitForServer(game.server, game.host, game.credentials[2].playerId);
+
+  assert.deepEqual(await cancelled, {
+    requestId,
+    approved: false,
+    message: "Игра завершена",
+  });
+  const finalState = await gameOver;
+  assert.equal(finalState.phase, "GAME_OVER");
+  assert.equal(finalState.paused, false);
+  assert.equal(state.phaseTimer, null);
+  assert.equal(state.phaseEndTime, null);
+  assert.equal(game.room.pendingSeatClaims.size, 0);
+  assert.equal(game.room.startedPlayerCount, originalStartedPlayerCount);
+  assert.equal(state.bunkerCapacity, originalCapacity);
+  assert.deepEqual(state.votingSchedule, originalSchedule);
+  assert.equal(game.room.players.size, originalStartedPlayerCount);
+});
+
+test("permanent kick rejects GAME_OVER without rewriting final history", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetId = game.credentials[2].playerId;
+  const target = game.room.players.get(targetId);
+  assert.ok(target);
+  const ended = waitForSocketEvent(game.host, "game:state", (state) => state.phase === "GAME_OVER");
+  game.host.emit("game:endGame");
+  await ended;
+  const eliminationOrder = [...(game.room.gameState?.eliminationOrder ?? [])];
+
+  const error = waitForRoomError(game.host, "Игра завершена");
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+  await error;
+
+  assert.equal(target.kicked, false);
+  assert.equal(target.connected, true);
+  assert.equal(target.alive, true);
+  assert.deepEqual(game.room.gameState?.eliminationOrder, eliminationOrder);
+  assert.equal(game.room.gameState?.phase, "GAME_OVER");
+});
+
+test("permanent kick cannot be reopened by the existing admin revive command", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetId = game.credentials[2].playerId;
+  const target = game.room.players.get(targetId);
+  assert.ok(target);
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+  const error = waitForRoomError(game.host, "Место закрыто");
+  game.host.emit("admin:revivePlayer", { targetPlayerId: targetId });
+  await error;
+
+  assert.equal(target.kicked, true);
+  assert.equal(target.alive, false);
+  assert.equal(target.connected, false);
+});
+
+test("permanent kick never disconnects a live socket that left for a different room", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetClient = game.humans[2];
+  const oldSeatId = game.credentials[2].playerId;
+  await emitLeaveAndWaitForServer(game.server, targetClient);
+  assert.equal(targetClient.socket.connected, true);
+
+  const created = waitForSocketEvent(targetClient, "room:created");
+  targetClient.emit("room:create", { playerName: "New Host" });
+  const newCredential = await created;
+  const newRoomState = await targetClient.waitFor(
+    "game:state",
+    (state) => state.phase === "LOBBY" && state.players.length === 1,
+  );
+  const newRoom = getRoom(newCredential.roomCode);
+  const newPlayer = newRoom?.players.get(newCredential.playerId);
+  assert.ok(newRoom);
+  assert.ok(newPlayer);
+  assert.equal(newRoomState.players[0]?.id, newCredential.playerId);
+
+  await emitKickAndWaitForServer(game.server, game.host, oldSeatId);
+
+  const oldSeat = game.room.players.get(oldSeatId);
+  assert.ok(oldSeat);
+  assert.equal(oldSeat.kicked, true);
+  assert.equal(oldSeat.connected, false);
+  assert.equal(gameEngine.buildPublicState(game.room).paused, false);
+  assert.equal(targetClient.socket.connected, true);
+  assert.equal(newRoom.players.get(newPlayer.id), newPlayer);
+  assert.equal(newPlayer.connected, true);
+  assert.equal(newPlayer.kicked, false);
+
+  const newRoomIntact = waitForSocketEvent(
+    targetClient,
+    "game:state",
+    (state) => state.phase === "LOBBY" && state.players.length === 2,
+  );
+  targetClient.emit("room:addBot");
+  assert.equal((await newRoomIntact).players.length, 2);
+});
+
+test("play again removes closed seats from the unfixed lobby and can start a refilled roster", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const targetId = game.credentials[2].playerId;
+  const remainingOrder = [
+    game.credentials[0].playerId,
+    game.credentials[1].playerId,
+    game.credentials[3].playerId,
+  ];
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+  const gameOver = waitForSocketEvent(
+    game.host,
+    "game:state",
+    (state) => state.phase === "GAME_OVER",
+  );
+  game.host.emit("game:endGame");
+  await gameOver;
+
+  const hostSocketId = game.host.socket.id;
+  assert.ok(hostSocketId);
+  const hostServerSocket = game.server.io.sockets.sockets.get(hostSocketId);
+  assert.ok(hostServerSocket);
+  const replayHandled = new Promise<void>((resolve) => {
+    hostServerSocket.once("game:playAgain", () => resolve());
+  });
+  game.host.emit("game:playAgain");
+  await replayHandled;
+  await delay(10);
+
+  const lobbyState = gameEngine.buildPublicState(game.room);
+  assert.equal(lobbyState.phase, "LOBBY");
+  assert.equal(
+    lobbyState.players.some((player) => player.id === targetId),
+    false,
+  );
+  assert.equal(game.room.players.has(targetId), false);
+  assert.deepEqual(game.room.allPlayerIds, remainingOrder);
+  assert.equal(game.room.startedPlayerCount, null);
+  assert.equal(lobbyState.startedPlayerCount, 3);
+
+  const newcomer = await game.server.connectClient();
+  newcomer.emit("room:join", { roomCode: game.room.code, playerName: "New Player" });
+  const newcomerCredential = await newcomer.waitFor("room:joined");
+  await game.host.waitFor("game:state", (state) => state.players.length === 4);
+  assert.deepEqual(game.room.allPlayerIds, [...remainingOrder, newcomerCredential.playerId]);
+
+  game.humans[1].emit("player:ready", { ready: true });
+  game.humans[3].emit("player:ready", { ready: true });
+  newcomer.emit("player:ready", { ready: true });
+  await game.host.waitFor("game:state", (state) =>
+    state.players.filter((player) => !player.isHost).every((player) => player.ready),
+  );
+
+  const characters = [game.host, game.humans[1], game.humans[3], newcomer].map((client) =>
+    client.waitFor("game:character"),
+  );
+  game.host.emit("game:start");
+  await Promise.all(characters);
+  const restarted = await game.host.waitFor(
+    "game:state",
+    (state) => state.phase === "CATASTROPHE_REVEAL",
+  );
+  assert.equal(restarted.startedPlayerCount, 4);
+  assert.equal(
+    restarted.players.some((player) => player.id === targetId),
+    false,
+  );
+});
+
+test("paused final-turn kick advances once without skipping the next reveal round", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const state = game.room.gameState;
+  assert.ok(state);
+  const targetId = game.credentials[3].playerId;
+  moveToPhase(game.room, "ROUND_REVEAL");
+  state.roundNumber = 1;
+  state.votingSchedule[0] = 0;
+  state.revealedBunkerCount = state.bunkerCards.length;
+  state.turnOrder = [targetId];
+  state.currentTurnIndex = 0;
+
+  game.humans[3].disconnect();
+  await game.host.waitFor(
+    "game:state",
+    (publicState) =>
+      publicState.phase === "ROUND_REVEAL" && publicState.disconnectedPlayerIds.includes(targetId),
+  );
+
+  const normalizedPublications: PublicGameState[] = [];
+  game.host.socket.on("game:state", (publicState) => {
+    if (publicState.players.find((player) => player.id === targetId)?.kicked) {
+      normalizedPublications.push(publicState);
+    }
+  });
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+  await delay(20);
+
+  const expectedNextOrder = game.credentials.slice(0, 3).map(({ playerId }) => playerId);
+  assert.equal(state.roundNumber, 2);
+  assert.equal(state.phase, "ROUND_REVEAL");
+  assert.deepEqual(state.turnOrder, expectedNextOrder);
+  assert.equal(state.currentTurnIndex, 0);
+  assert.equal(gameEngine.buildPublicState(game.room).currentTurnPlayerId, expectedNextOrder[0]);
+  assert.equal(normalizedPublications.length, 1);
+  assert.equal(normalizedPublications[0]?.phase, "ROUND_REVEAL");
+  assert.equal(normalizedPublications[0]?.roundNumber, 2);
+});
+
+test("already-eliminated kick at capacity preserves the active result timer", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const state = game.room.gameState;
+  assert.ok(state);
+  moveToPhase(game.room, "ROUND_VOTE");
+  state.roundNumber = 1;
+  state.currentVotingInRound = 0;
+  state.votingSchedule[0] = 1;
+  const previousEliminatedId = game.credentials[3].playerId;
+  const targetId = game.credentials[2].playerId;
+  const previousEliminated = game.room.players.get(previousEliminatedId);
+  assert.ok(previousEliminated);
+  previousEliminated.alive = false;
+  state.eliminationOrder = [previousEliminatedId];
+  state.lastEliminatedId = previousEliminatedId;
+  state.votes.clear();
+  for (const player of game.room.players.values()) {
+    player.hasVoted = false;
+    player.votedFor = null;
+  }
+
+  game.host.emit("vote:cast", { targetPlayerId: targetId });
+  await game.host.waitFor("game:state", (publicState) => publicState.votesCount === 1);
+  game.humans[1].emit("vote:cast", { targetPlayerId: targetId });
+  await game.host.waitFor("game:state", (publicState) => publicState.votesCount === 2);
+  game.humans[2].emit("vote:cast", { targetPlayerId: game.credentials[1].playerId });
+  await game.host.waitFor("game:state", (publicState) => publicState.votesCount === 3);
+  game.humans[3].emit("vote:cast", { targetPlayerId: targetId });
+  await game.host.waitFor("game:state", (publicState) => publicState.phase === "ROUND_RESULT");
+
+  const target = game.room.players.get(targetId);
+  assert.ok(target);
+  assert.equal(target.alive, false);
+  assert.equal(game.room.players.size, 4);
+  assert.equal(game.room.gameState?.bunkerCapacity, 2);
+  assert.equal(Array.from(game.room.players.values()).filter((player) => player.alive).length, 2);
+  const existingResultTimer = state.phaseTimer;
+  const existingResultCallback = state.pausedCallback;
+  const existingResultEndTime = state.phaseEndTime;
+  assert.ok(existingResultTimer);
+  assert.ok(existingResultCallback);
+  assert.ok(existingResultEndTime);
+
+  await emitKickAndWaitForServer(game.server, game.host, targetId);
+
+  assert.equal(target.kicked, true);
+  assert.equal(target.alive, false);
+  assert.equal(state.phase, "ROUND_RESULT");
+  assert.equal(state.phaseTimer, existingResultTimer);
+  assert.equal(state.pausedCallback, existingResultCallback);
+  assert.equal(state.phaseEndTime, existingResultEndTime);
+  assert.equal(state.lastEliminatedId, previousEliminatedId);
+
+  const resultCallback = takeScheduledPhaseCallback(game.room);
+  assert.equal(resultCallback, existingResultCallback);
+  const gameOver = waitForSocketEvent(
+    game.host,
+    "game:state",
+    (publicState) => publicState.phase === "GAME_OVER",
+  );
+  resultCallback();
+  assert.equal((await gameOver).phase, "GAME_OVER");
 });

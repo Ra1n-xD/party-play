@@ -8,7 +8,12 @@ import type {
   SeatClaimInfo,
   ServerEvents,
 } from "../../shared/types.js";
-import { addDisconnectPause, broadcastState, setAdminPause } from "./gameEngine.js";
+import {
+  addDisconnectPause,
+  broadcastState,
+  normalizeGameAfterPermanentKick,
+  setAdminPause,
+} from "./gameEngine.js";
 import {
   getAllRooms,
   getRoom,
@@ -18,6 +23,7 @@ import {
   type Room,
   type Spectator,
 } from "./roomManager.js";
+import { generateSessionToken } from "./utils.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 
@@ -427,6 +433,48 @@ export function transferHost(
 
   commitHostTransfer(room, target, io, "manual");
   return { success: true };
+}
+
+export type PermanentKickResult =
+  | { success: true; releasedSocketId: string | null }
+  | { success: false; error: string };
+
+export function kickPlayerPermanently(
+  room: Room,
+  actorId: string,
+  playerId: string,
+  io: IOServer,
+): PermanentKickResult {
+  const actor = room.players.get(actorId);
+  if (room.hostId !== actorId || !isEligibleHost(actor)) {
+    return { success: false, error: "Только хост может удалить игрока" };
+  }
+  if (room.gameState?.phase === "GAME_OVER") {
+    return { success: false, error: "Игра завершена" };
+  }
+  if (playerId === actorId) {
+    return { success: false, error: "Хост не может удалить самого себя" };
+  }
+
+  const player = room.players.get(playerId);
+  if (!player) return { success: false, error: "Игрок не найден" };
+  if (player.isBot) return { success: false, error: "Бота нельзя удалить этой командой" };
+  if (player.kicked) return { success: false, error: "Место уже закрыто" };
+
+  const releasedSocketId = player.connected && player.socketId ? player.socketId : null;
+  player.sessionToken = generateSessionToken();
+  cancelClaimsForPlayer(room, player.id, io, "Место закрыто администратором");
+
+  if (!room.gameState) {
+    player.connected = false;
+    player.socketId = "";
+    removePlayer(room, player.id);
+    if (room.players.size > 0) broadcastState(room, io);
+    return { success: true, releasedSocketId };
+  }
+
+  normalizeGameAfterPermanentKick(room, player.id, io);
+  return { success: true, releasedSocketId };
 }
 
 export function removeLobbyPlayerWithHostFailover(
