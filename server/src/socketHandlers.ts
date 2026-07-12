@@ -462,6 +462,10 @@ export function registerHandlers(io: IOServer): void {
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
+      if (ctx.room.gameState) {
+        socket.emit("room:error", { message: "Игра уже началась" });
+        return;
+      }
 
       if (ctx.room.players.size < CONFIG.MIN_PLAYERS) {
         socket.emit("room:error", {
