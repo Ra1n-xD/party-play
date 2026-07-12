@@ -23,6 +23,13 @@
   --success: #76c69e;
   --info: #6aa7d2;
   --warning: #efbd58;
+  --card-profession-color: #fbbf24;
+  --card-bio-color: #fb923c;
+  --card-health-color: #f87171;
+  --card-hobby-color: #34d399;
+  --card-baggage-color: #60a5fa;
+  --card-fact-color: #22d3ee;
+  --card-action-color: #c084fc;
   --border: rgba(178, 199, 185, 0.14);
   --border-light: rgba(178, 199, 185, 0.24);
   --radius: 16px;
@@ -1264,31 +1271,31 @@ body {
 /* Attribute type colors */
 [data-attr-type="profession"] .mini-label,
 [data-attr-type="profession"] .attr-label {
-  color: #fbbf24;
+  color: var(--card-profession-color);
 }
 [data-attr-type="bio"] .mini-label,
 [data-attr-type="bio"] .attr-label {
-  color: #fb923c;
+  color: var(--card-bio-color);
 }
 [data-attr-type="health"] .mini-label,
 [data-attr-type="health"] .attr-label {
-  color: #f87171;
+  color: var(--card-health-color);
 }
 [data-attr-type="hobby"] .mini-label,
 [data-attr-type="hobby"] .attr-label {
-  color: #34d399;
+  color: var(--card-hobby-color);
 }
 [data-attr-type="baggage"] .mini-label,
 [data-attr-type="baggage"] .attr-label {
-  color: #60a5fa;
+  color: var(--card-baggage-color);
 }
 [data-attr-type="fact"] .mini-label,
 [data-attr-type="fact"] .attr-label {
-  color: #22d3ee;
+  color: var(--card-fact-color);
 }
 [data-attr-type="action"] .mini-label,
 [data-attr-type="action"] .attr-label {
-  color: #c084fc;
+  color: var(--card-action-color);
 }
 
 .mini-value {
@@ -1426,25 +1433,25 @@ body {
 }
 
 .mini-tag[data-attr-type="profession"] .mini-tag-label {
-  color: #fbbf24;
+  color: var(--card-profession-color);
 }
 .mini-tag[data-attr-type="bio"] .mini-tag-label {
-  color: #fb923c;
+  color: var(--card-bio-color);
 }
 .mini-tag[data-attr-type="health"] .mini-tag-label {
-  color: #f87171;
+  color: var(--card-health-color);
 }
 .mini-tag[data-attr-type="hobby"] .mini-tag-label {
-  color: #34d399;
+  color: var(--card-hobby-color);
 }
 .mini-tag[data-attr-type="baggage"] .mini-tag-label {
-  color: #60a5fa;
+  color: var(--card-baggage-color);
 }
 .mini-tag[data-attr-type="fact"] .mini-tag-label {
-  color: #22d3ee;
+  color: var(--card-fact-color);
 }
 .mini-tag[data-attr-type="action"] .mini-tag-label {
-  color: #c084fc;
+  color: var(--card-action-color);
 }
 
 .vote-progress {
@@ -1560,25 +1567,25 @@ body {
 }
 
 .result-tag[data-attr-type="profession"] .result-tag-label {
-  color: #fbbf24;
+  color: var(--card-profession-color);
 }
 .result-tag[data-attr-type="bio"] .result-tag-label {
-  color: #fb923c;
+  color: var(--card-bio-color);
 }
 .result-tag[data-attr-type="health"] .result-tag-label {
-  color: #f87171;
+  color: var(--card-health-color);
 }
 .result-tag[data-attr-type="hobby"] .result-tag-label {
-  color: #34d399;
+  color: var(--card-hobby-color);
 }
 .result-tag[data-attr-type="baggage"] .result-tag-label {
-  color: #60a5fa;
+  color: var(--card-baggage-color);
 }
 .result-tag[data-attr-type="fact"] .result-tag-label {
-  color: #22d3ee;
+  color: var(--card-fact-color);
 }
 .result-tag[data-attr-type="action"] .result-tag-label {
-  color: #c084fc;
+  color: var(--card-action-color);
 }
 
 .result-attr-detail {
@@ -1784,6 +1791,23 @@ body {
   border-radius: var(--radius);
   overflow: hidden;
   backdrop-filter: blur(12px);
+}
+
+.vote-admin-panel {
+  position: fixed;
+  z-index: 90;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: min(240px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.46);
+}
+
+.vote-admin-panel.is-open {
+  width: min(520px, calc(100vw - 24px));
 }
 
 .btn-admin-toggle {

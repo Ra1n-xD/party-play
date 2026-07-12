@@ -80,6 +80,7 @@
   display: flex;
   min-height: 52px;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   margin-inline: -18px;
@@ -92,16 +93,56 @@
 }
 
 .command-game-screen .gs-room-brand,
+.command-game-screen .gs-room-host-actions,
 .command-game-screen .gs-room-controls,
 .command-game-screen .gs-room-connection,
-.command-game-screen .gs-room-action {
+.command-game-screen .gs-room-action,
+.command-game-screen .gs-room-host-action {
   display: flex;
   align-items: center;
 }
 
 .command-game-screen .gs-room-brand {
+  order: 1;
   min-width: 0;
   gap: 10px;
+}
+
+.command-game-screen .gs-room-host-actions {
+  order: 2;
+  min-width: 0;
+  margin-left: auto;
+  gap: 8px;
+}
+
+.command-game-screen .gs-room-host-action {
+  min-width: 0;
+  min-height: 40px;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 11px;
+  background: rgba(239, 189, 88, 0.08);
+  border: 1px solid rgba(239, 189, 88, 0.26);
+  border-radius: 10px;
+  color: var(--gs-gold);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.command-game-screen .gs-room-host-action:hover:not(:disabled) {
+  background: rgba(239, 189, 88, 0.14);
+  border-color: rgba(239, 189, 88, 0.42);
+}
+
+.command-game-screen .gs-room-host-action:disabled {
+  border-color: var(--gs-border);
+  color: var(--gs-muted);
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .command-game-screen .gs-room-brand-icon {
@@ -131,6 +172,7 @@
 }
 
 .command-game-screen .gs-room-controls {
+  order: 3;
   min-width: 0;
   justify-content: flex-end;
   gap: 8px;
@@ -644,10 +686,20 @@
   overflow-wrap: anywhere;
 }
 
-.command-game-screen .gs-bunker-details h3 {
+.command-game-screen .gs-bunker-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 7px;
   color: var(--text-primary);
   font-size: 0.9rem;
+}
+
+.command-game-screen .gs-bunker-heading-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  color: var(--info);
 }
 
 .command-game-screen .gs-bunker-cards {
@@ -845,7 +897,7 @@
 .command-game-screen .gs-public-attributes {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 6px;
   align-items: stretch;
 }
@@ -911,31 +963,31 @@
 }
 
 .command-game-screen [data-attr-type="profession"] {
-  --gs-attribute-color: #fbbf24;
+  --gs-attribute-color: var(--card-profession-color);
 }
 
 .command-game-screen [data-attr-type="bio"] {
-  --gs-attribute-color: #fb923c;
+  --gs-attribute-color: var(--card-bio-color);
 }
 
 .command-game-screen [data-attr-type="health"] {
-  --gs-attribute-color: #f87171;
+  --gs-attribute-color: var(--card-health-color);
 }
 
 .command-game-screen [data-attr-type="hobby"] {
-  --gs-attribute-color: #34d399;
+  --gs-attribute-color: var(--card-hobby-color);
 }
 
 .command-game-screen [data-attr-type="baggage"] {
-  --gs-attribute-color: #60a5fa;
+  --gs-attribute-color: var(--card-baggage-color);
 }
 
 .command-game-screen [data-attr-type="fact"] {
-  --gs-attribute-color: #22d3ee;
+  --gs-attribute-color: var(--card-fact-color);
 }
 
 .command-game-screen [data-attr-type="action"] {
-  --gs-attribute-color: var(--gs-gold);
+  --gs-attribute-color: var(--card-action-color);
 }
 
 .command-game-screen .gs-dossier-cards {
@@ -958,8 +1010,8 @@
 }
 
 .command-game-screen .gs-dossier-card[data-attr-type="action"] {
-  background: rgba(239, 189, 88, 0.07);
-  border-color: rgba(239, 189, 88, 0.28);
+  background: rgba(192, 132, 252, 0.07);
+  border-color: rgba(192, 132, 252, 0.28);
   border-left-color: var(--gs-attribute-color);
 }
 
@@ -1377,9 +1429,9 @@
 }
 
 .command-game-screen .expanded-player-modal .attribute-card.revealed[data-attr-type="action"] {
-  background: rgba(239, 189, 88, 0.07);
+  background: rgba(192, 132, 252, 0.07);
   border-color: var(--gs-attribute-color);
-  box-shadow: 0 0 8px rgba(239, 189, 88, 0.16);
+  box-shadow: 0 0 8px rgba(192, 132, 252, 0.18);
 }
 
 .command-game-screen .expanded-player-modal .attribute-card.hidden {
@@ -1461,7 +1513,23 @@
   }
 
   .command-game-screen .gs-room-controls {
+    order: 2;
     gap: 4px;
+  }
+
+  .command-game-screen .gs-room-host-actions {
+    order: 3;
+    flex: 1 0 100%;
+    margin-left: 0;
+    gap: 6px;
+  }
+
+  .command-game-screen .gs-room-host-action {
+    flex: 1 1 0;
+    min-height: 40px;
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    white-space: normal;
   }
 
   .command-game-screen .gs-room-code {
@@ -1539,12 +1607,43 @@
     grid-template-columns: 1fr;
   }
 
+  .command-game-screen .gs-public-attributes {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
   .command-game-screen .gs-public-attribute {
     grid-template-columns: minmax(0, 1fr);
+    padding: 2px 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
   }
 
   .command-game-screen .gs-public-attribute-visual {
     display: none;
+  }
+
+  .command-game-screen .gs-public-attribute-copy {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 5px;
+  }
+
+  .command-game-screen .gs-public-attribute-copy > span {
+    font-size: 0.8rem;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .command-game-screen .gs-public-attribute-copy > span::after {
+    content: ":";
+  }
+
+  .command-game-screen .gs-public-attribute-copy strong {
+    font-size: 0.84rem;
+    line-height: 1.35;
   }
 
   .command-game-screen .gs-scenario-summary {

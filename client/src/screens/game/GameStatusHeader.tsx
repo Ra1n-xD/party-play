@@ -9,8 +9,6 @@ interface GameStatusHeaderProps {
   phaseLabel: string;
   phaseDescription: string;
   isMyTurn: boolean;
-  canSkipDiscussion: boolean;
-  onSkipDiscussion: () => void;
 }
 
 export function GameStatusHeader({
@@ -18,8 +16,6 @@ export function GameStatusHeader({
   phaseLabel,
   phaseDescription,
   isMyTurn,
-  canSkipDiscussion,
-  onSkipDiscussion,
 }: GameStatusHeaderProps) {
   const alivePlayers = gameState.players.filter((player) => player.alive);
   const timerLabel = gameState.phase === "ROUND_DISCUSSION" ? "До голосования" : "До конца этапа";
@@ -100,14 +96,6 @@ export function GameStatusHeader({
       <section className="gs-desktop-situation-details" aria-label="Подробности ситуации">
         <ScenarioDetails idPrefix="gs-scenario-desktop" gameState={gameState} />
       </section>
-
-      <div className="gs-status-actions">
-        {canSkipDiscussion && (
-          <button type="button" className="btn btn-secondary" onClick={onSkipDiscussion}>
-            Пропустить обсуждение
-          </button>
-        )}
-      </div>
     </header>
   );
 }

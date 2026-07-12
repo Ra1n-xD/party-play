@@ -262,8 +262,6 @@ test("status header exposes phase and round progress", () => {
       phaseLabel="Раскрытие карт"
       phaseDescription="Сейчас ходит Михаил"
       isMyTurn={false}
-      canSkipDiscussion={false}
-      onSkipDiscussion={() => undefined}
     />,
   );
   assert.match(html, /aria-label="Состояние игры"/);
@@ -319,7 +317,9 @@ test("room header exposes existing room actions", () => {
       roomCode="AX-204"
       connected={true}
       canManageGame={true}
+      canSkipDiscussion={true}
       onOpenHostControls={() => undefined}
+      onSkipDiscussion={() => undefined}
       onLeaveRoom={() => undefined}
     />,
   );
@@ -329,7 +329,29 @@ test("room header exposes existing room actions", () => {
   assert.match(html, /AX-204/);
   assert.match(html, /Связь установлена/);
   assert.match(html, /aria-label="Управление игрой"/);
+  assert.match(html, />Админ-панель</);
+  assert.match(html, />Пропустить обсуждение</);
   assert.match(html, /aria-label="Выйти из комнаты"/);
+});
+
+test("host actions stay visible when discussion cannot be skipped", () => {
+  const html = renderToStaticMarkup(
+    <GameRoomHeader
+      roomCode="AX-204"
+      connected={true}
+      canManageGame={true}
+      canSkipDiscussion={false}
+      onOpenHostControls={() => undefined}
+      onSkipDiscussion={() => undefined}
+      onLeaveRoom={() => undefined}
+    />,
+  );
+
+  assert.match(
+    html,
+    /<button[^>]*disabled=""[^>]*>[\s\S]*?Пропустить обсуждение[\s\S]*?<\/button>/,
+  );
+  assert.match(html, />Админ-панель</);
 });
 
 test("room header hides management from non-host players", () => {
@@ -338,7 +360,9 @@ test("room header hides management from non-host players", () => {
       roomCode="AX-204"
       connected={false}
       canManageGame={false}
+      canSkipDiscussion={false}
       onOpenHostControls={() => undefined}
+      onSkipDiscussion={() => undefined}
       onLeaveRoom={() => undefined}
     />,
   );
@@ -354,6 +378,25 @@ test("game screen wires existing room actions into the room header", () => {
   assert.match(source, /roomCode=\{roomCode\}/);
   assert.match(source, /onOpenHostControls=\{openHostControls\}/);
   assert.match(source, /onLeaveRoom=\{leaveRoom\}/);
+});
+
+test("vote screen keeps host controls in the common render path", () => {
+  const source = readFileSync(new URL("../../src/screens/VoteScreen.tsx", import.meta.url), "utf8");
+
+  assert.doesNotMatch(source, /if \(!canVote\) \{\s*return \(/);
+  assert.doesNotMatch(source, /if \(voted\) \{\s*return \(/);
+  assert.match(source, /className=\{`admin-panel vote-admin-panel/);
+  assert.match(source, /const adminPauseActiveRef = useRef\(false\);/);
+  assert.match(source, /const closeAdminPanel = useCallback/);
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{\s*return \(\) => \{[^}]*adminPauseActiveRef\.current = false;\s*adminUnpause\(\);/s,
+  );
+  assert.match(source, /if \(!confirmTarget \|\| adminPauseActiveRef\.current\) return;/);
+  assert.match(
+    source,
+    /<\/div>\s*\{error && <div className="error-toast">\{error\}<\/div>\}\s*\{\/\* Host Admin Panel \*\//,
+  );
 });
 
 test("scenario summary keeps its description visible while bunker details are collapsed", () => {
@@ -411,6 +454,30 @@ test("mobile situation shows the warning icon and complete shared details", () =
   assert.match(scenarioSource, /<ScenarioDetails/);
   assert.match(statusSource, /import \{ ScenarioDetails \}/);
   assert.match(statusSource, /<ScenarioDetails/);
+});
+
+test("bunker information heading includes a compact decorative icon", () => {
+  const html = renderToStaticMarkup(
+    <ScenarioSummary
+      idPrefix="bunker-icon"
+      gameState={state}
+      expanded
+      alwaysExpanded
+      onToggle={() => undefined}
+    />,
+  );
+  const css = readFileSync(new URL("../../src/styles/game-screen.css", import.meta.url), "utf8");
+
+  assert.match(html, /<h3 class="gs-bunker-heading"/);
+  assert.match(html, /class="gs-bunker-heading-icon"[^>]*aria-hidden="true"/);
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-bunker-heading \{[^}]*display: flex;[^}]*align-items: center;[^}]*gap: 6px;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-bunker-heading-icon \{[^}]*width: 13px;[^}]*height: 13px;[^}]*color: var\(--info\);/s,
+  );
 });
 
 const player = {
@@ -478,6 +545,34 @@ test("player cards illustrate every public characteristic and mark eliminated pl
   assert.match(html, />Изгнан</);
   assert.equal((html.match(/class="gs-public-attribute-icon"/g) ?? []).length, 3);
   assert.equal((html.match(/class="gs-public-attribute-copy"/g) ?? []).length, 3);
+});
+
+test("player characteristic names reuse the exact card palette", () => {
+  const css = readFileSync(new URL("../../src/styles/game-screen.css", import.meta.url), "utf8");
+  const semanticTypes = ["profession", "bio", "health", "hobby", "baggage", "fact", "action"];
+
+  for (const type of semanticTypes) {
+    assert.match(
+      css,
+      new RegExp(
+        `\\.command-game-screen \\[data-attr-type="${type}"\\] \\{[^}]*--gs-attribute-color: var\\(--card-${type}-color\\);`,
+        "s",
+      ),
+    );
+  }
+
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-public-attribute-copy > span \{[^}]*color: var\(--gs-attribute-color\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-dossier-card-label \{[^}]*color: var\(--gs-attribute-color\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-dossier-card\[data-attr-type="action"\] \{[^}]*rgba\(192, 132, 252, 0\.07\)[^}]*rgba\(192, 132, 252, 0\.28\);/s,
+  );
 });
 
 test("private hidden cards stay readable and explain visibility", () => {
@@ -550,7 +645,7 @@ test("hybrid CSS uses the full desktop width and distinct player state accents",
   );
   assert.match(
     css,
-    /\.command-game-screen \.gs-public-attributes \{[^}]*display: grid;[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
+    /\.command-game-screen \.gs-public-attributes \{[^}]*display: grid;[^}]*grid-template-columns: 1fr;/s,
   );
   assert.match(
     css,
@@ -591,8 +686,30 @@ test("mobile info and actions stay compact while desktop host controls use two c
   );
   assert.match(
     css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-public-attributes \{[^}]*grid-template-columns: 1fr;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-public-attribute-copy \{[^}]*flex-direction: row;[^}]*flex-wrap: wrap;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-public-attribute \{[^}]*padding: 2px 0;[^}]*background: transparent;[^}]*border: 0;/,
+  );
+  assert.match(
+    css,
     /@media \(max-width: 768px\)[\s\S]*\.screen\.command-game-screen\.has-game-actions \{[^}]*padding-bottom: calc\(82px \+ env\(safe-area-inset-bottom\)\);/,
   );
+});
+
+test("vote admin panel remains fixed above responsive content", () => {
+  const css = readFileSync(new URL("../../src/styles/global.css", import.meta.url), "utf8");
+
+  assert.match(
+    css,
+    /\.vote-admin-panel \{[^}]*position: fixed;[^}]*z-index: 90;[^}]*max-height: calc\(100dvh - 24px\);/s,
+  );
+  assert.match(css, /\.modal-overlay \{[^}]*z-index: 100;/s);
 });
 
 test("desktop status strip uses the Codex reference geometry", () => {
@@ -664,10 +781,16 @@ test("desktop status strip uses the Codex reference geometry", () => {
 test("game-screen modals and action cards do not fall back to the purple legacy theme", () => {
   const css = readFileSync(new URL("../../src/styles/game-screen.css", import.meta.url), "utf8");
 
-  assert.doesNotMatch(
-    css,
-    /#8b5cf6|#a78bfa|#c4b5fd|#c084fc|rgba\(139, 92, 246|rgba\(192, 132, 252/,
-  );
+  assert.doesNotMatch(css, /#8b5cf6|#a78bfa|#c4b5fd|rgba\(139, 92, 246/);
+
+  const semanticPurpleBlocks = [
+    ...css.matchAll(/([^{}]+)\{([^{}]*(?:#c084fc|rgba\(192, 132, 252)[^{}]*)\}/g),
+  ];
+  assert.equal(semanticPurpleBlocks.length, 2);
+  for (const [, selector] of semanticPurpleBlocks) {
+    assert.match(selector, /\[data-attr-type="action"\]/);
+  }
+
   assert.match(
     css,
     /\.command-game-screen > \.modal-overlay > \.modal \{[^}]*color: var\(--gs-text\);[^}]*background: var\(--gs-surface\);[^}]*border-color: rgba\(178, 199, 185, 0\.24\);/s,

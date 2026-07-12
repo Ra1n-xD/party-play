@@ -1,5 +1,5 @@
 import React, { type ReactNode } from "react";
-import { FiAlertTriangle } from "react-icons/fi";
+import { FiAlertTriangle, FiHome } from "react-icons/fi";
 import type { ClientGameState } from "../../context/GameContext";
 
 interface ScenarioSummaryProps {
@@ -21,7 +21,10 @@ export function ScenarioDetails({ idPrefix, gameState }: ScenarioDetailsProps) {
   return (
     <div id={`${idPrefix}-details`} className="gs-scenario-details">
       <div className="gs-bunker-details">
-        <h3>Бункер</h3>
+        <h3 className="gs-bunker-heading">
+          <FiHome className="gs-bunker-heading-icon" aria-hidden="true" />
+          Бункер
+        </h3>
         <div className="gs-bunker-cards">
           {gameState.revealedBunkerCards.map((card, index) => {
             const isNew = gameState.phase === "BUNKER_EXPLORE" && index === revealedCount - 1;

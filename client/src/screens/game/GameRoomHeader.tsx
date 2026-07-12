@@ -1,10 +1,12 @@
-import { FiHome, FiLogOut, FiSettings, FiWifi, FiWifiOff } from "react-icons/fi";
+import { FiHome, FiLogOut, FiSettings, FiSkipForward, FiWifi, FiWifiOff } from "react-icons/fi";
 
 interface GameRoomHeaderProps {
   roomCode: string | null;
   connected: boolean;
   canManageGame: boolean;
+  canSkipDiscussion: boolean;
   onOpenHostControls: () => void;
+  onSkipDiscussion: () => void;
   onLeaveRoom: () => void;
 }
 
@@ -12,7 +14,9 @@ export function GameRoomHeader({
   roomCode,
   connected,
   canManageGame,
+  canSkipDiscussion,
   onOpenHostControls,
+  onSkipDiscussion,
   onLeaveRoom,
 }: GameRoomHeaderProps) {
   return (
@@ -26,6 +30,34 @@ export function GameRoomHeader({
         </span>
       </div>
 
+      {canManageGame && (
+        <div className="gs-room-host-actions" aria-label="Действия хоста">
+          <button
+            type="button"
+            className="gs-room-host-action"
+            onClick={onSkipDiscussion}
+            disabled={!canSkipDiscussion}
+            title={
+              canSkipDiscussion
+                ? "Завершить обсуждение и перейти к голосованию"
+                : "Доступно во время обсуждения"
+            }
+          >
+            <FiSkipForward aria-hidden="true" />
+            <span>Пропустить обсуждение</span>
+          </button>
+          <button
+            type="button"
+            className="gs-room-host-action"
+            onClick={onOpenHostControls}
+            aria-label="Управление игрой"
+          >
+            <FiSettings aria-hidden="true" />
+            <span>Админ-панель</span>
+          </button>
+        </div>
+      )}
+
       <div className="gs-room-controls">
         <div className="gs-room-code" aria-label={`Код комнаты ${roomCode || "неизвестен"}`}>
           <span>Комната</span>
@@ -38,16 +70,6 @@ export function GameRoomHeader({
           {connected ? <FiWifi aria-hidden="true" /> : <FiWifiOff aria-hidden="true" />}
           <span>{connected ? "Связь установлена" : "Нет соединения"}</span>
         </div>
-        {canManageGame && (
-          <button
-            type="button"
-            className="gs-room-action"
-            onClick={onOpenHostControls}
-            aria-label="Управление игрой"
-          >
-            <FiSettings aria-hidden="true" />
-          </button>
-        )}
         <button
           type="button"
           className="gs-room-action"

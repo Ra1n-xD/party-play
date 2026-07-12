@@ -109,12 +109,30 @@ test("legacy purple shell colors are removed while semantic colors remain", () =
   };
 
   for (const [type, color] of Object.entries(semanticColors)) {
+    assert.match(css, new RegExp(`--card-${type}-color: ${color};`));
     assert.match(
       css,
       new RegExp(
-        `\\.mini-tag\\[data-attr-type="${type}"\\] \\.mini-tag-label \\{[^}]*color: ${color};`,
+        `\\.mini-tag\\[data-attr-type="${type}"\\] \\.mini-tag-label \\{[^}]*color: var\\(--card-${type}-color\\);`,
         "s",
       ),
+    );
+    assert.match(
+      css,
+      new RegExp(
+        `\\[data-attr-type="${type}"\\] \\.mini-label,[\\s\\S]*?\\[data-attr-type="${type}"\\] \\.attr-label \\{[^}]*color: var\\(--card-${type}-color\\);`,
+      ),
+    );
+    assert.match(
+      css,
+      new RegExp(
+        `\\.result-tag\\[data-attr-type="${type}"\\] \\.result-tag-label \\{[^}]*color: var\\(--card-${type}-color\\);`,
+        "s",
+      ),
+    );
+    assert.match(
+      cardImageSource,
+      new RegExp(`${type}: \\{\\s*color: "var\\(--card-${type}-color, ${color}\\)"`, "s"),
     );
   }
 
@@ -124,5 +142,4 @@ test("legacy purple shell colors are removed while semantic colors remain", () =
   );
   assert.match(css, /\.home-footer-socials a:nth-child\(3\):hover \{[^}]*color: #9146ff;/s);
   assert.match(css, /\.home-footer-donate svg \{[^}]*color: #f57b22;/s);
-  assert.match(cardImageSource, /action:[\s\S]*color: "#c084fc"/);
 });
