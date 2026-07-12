@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:game-screen": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/game-screen/GameScreen.test.tsx",
+    "test:server": "TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx --test server/tests/*.test.ts",
     "test:theme": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/theme/GlobalTheme.test.ts"
   },
   "devDependencies": {

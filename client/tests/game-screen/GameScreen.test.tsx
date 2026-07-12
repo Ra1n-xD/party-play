@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import React, { type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -311,73 +311,166 @@ test("game screen keeps the desktop scenario static and omits voting status", ()
   assert.doesNotMatch(source, /gs-scenario-desktop/);
 });
 
-test("room header exposes existing room actions", () => {
+test("room header keeps only room-level controls and uses a bunker mark", () => {
+  const headerSource = readFileSync(
+    new URL("../../src/screens/game/GameRoomHeader.tsx", import.meta.url),
+    "utf8",
+  );
   const html = renderToStaticMarkup(
-    <GameRoomHeader
-      roomCode="AX-204"
-      connected={true}
-      canManageGame={true}
-      canSkipDiscussion={true}
-      onOpenHostControls={() => undefined}
-      onSkipDiscussion={() => undefined}
-      onLeaveRoom={() => undefined}
-    />,
+    <GameRoomHeader roomCode="ABCD" connected={true} onLeaveRoom={() => undefined} />,
   );
 
   assert.match(html, /Бункер/);
   assert.doesNotMatch(html, /Протокол выживания/);
-  assert.match(html, /AX-204/);
+  assert.match(html, /ABCD/);
   assert.match(html, /Связь установлена/);
-  assert.match(html, /aria-label="Управление игрой"/);
-  assert.match(html, />Админ-панель</);
-  assert.match(html, />Пропустить обсуждение</);
+  assert.doesNotMatch(html, /Админ-панель|Пропустить обсуждение/);
   assert.match(html, /aria-label="Выйти из комнаты"/);
+  assert.match(headerSource, /import \{ GiFalloutShelter \} from "react-icons\/gi"/);
+  assert.match(headerSource, /<GiFalloutShelter \/>/);
+  assert.doesNotMatch(headerSource, /GiBunker|FiHome|canManageGame|canSkipDiscussion/);
 });
 
-test("host actions stay visible when discussion cannot be skipped", () => {
+test("room header reports a disconnected room without game management", () => {
   const html = renderToStaticMarkup(
-    <GameRoomHeader
-      roomCode="AX-204"
-      connected={true}
-      canManageGame={true}
-      canSkipDiscussion={false}
-      onOpenHostControls={() => undefined}
-      onSkipDiscussion={() => undefined}
-      onLeaveRoom={() => undefined}
-    />,
-  );
-
-  assert.match(
-    html,
-    /<button[^>]*disabled=""[^>]*>[\s\S]*?Пропустить обсуждение[\s\S]*?<\/button>/,
-  );
-  assert.match(html, />Админ-панель</);
-});
-
-test("room header hides management from non-host players", () => {
-  const html = renderToStaticMarkup(
-    <GameRoomHeader
-      roomCode="AX-204"
-      connected={false}
-      canManageGame={false}
-      canSkipDiscussion={false}
-      onOpenHostControls={() => undefined}
-      onSkipDiscussion={() => undefined}
-      onLeaveRoom={() => undefined}
-    />,
+    <GameRoomHeader roomCode="WXYZ" connected={false} onLeaveRoom={() => undefined} />,
   );
 
   assert.doesNotMatch(html, /aria-label="Управление игрой"/);
   assert.match(html, /Нет соединения/);
 });
 
-test("game screen wires existing room actions into the room header", () => {
+test("game screen moves game and host actions into the persistent command bar", () => {
   const source = readFileSync(new URL("../../src/screens/GameScreen.tsx", import.meta.url), "utf8");
+  const viewSource = readFileSync(
+    new URL("../../src/screens/game/gameScreenViewModel.ts", import.meta.url),
+    "utf8",
+  );
 
   assert.match(source, /<GameRoomHeader/);
   assert.match(source, /roomCode=\{roomCode\}/);
-  assert.match(source, /onOpenHostControls=\{openHostControls\}/);
   assert.match(source, /onLeaveRoom=\{leaveRoom\}/);
+  assert.match(source, /<GameCommandBar/);
+  assert.match(source, /onOpenHostControls=\{openHostControls\}/);
+  assert.match(source, /onSkipDiscussion=\{adminSkipDiscussion\}/);
+  assert.match(source, /className="screen command-game-screen has-game-command-bar"/);
+  assert.doesNotMatch(source, /view\.hasBottomAction/);
+  assert.doesNotMatch(viewSource, /hasBottomAction/);
+});
+
+test("home room-code inputs accept exactly four canonical letters", () => {
+  const source = readFileSync(new URL("../../src/screens/HomeScreen.tsx", import.meta.url), "utf8");
+
+  assert.match(
+    source,
+    /import \{ ROOM_CODE_LENGTH, sanitizeRoomCodeInput \} from "\.\.\/\.\.\/\.\.\/shared\/roomCode"/,
+  );
+  assert.equal((source.match(/sanitizeRoomCodeInput\(e\.target\.value\)/g) ?? []).length, 2);
+  assert.equal((source.match(/maxLength=\{ROOM_CODE_LENGTH\}/g) ?? []).length, 2);
+  assert.equal(
+    (source.match(/disabled=\{joinCode\.length !== ROOM_CODE_LENGTH\}/g) ?? []).length,
+    2,
+  );
+  assert.equal((source.match(/Код комнаты \(4 буквы\)/g) ?? []).length, 2);
+});
+
+test("command bar shows the current player on the left and all host actions on the right", async () => {
+  const componentUrl = new URL("../../src/screens/game/GameCommandBar.tsx", import.meta.url);
+  assert.equal(existsSync(componentUrl), true, "GameCommandBar component must exist");
+  const { GameCommandBar } = await import("../../src/screens/game/GameCommandBar.tsx");
+  const currentTurnPlayer: PlayerInfo = {
+    ...other,
+    revealedAttributes: [{ type: "profession", label: "Профессия", value: "Врач" }],
+  };
+
+  const html = renderToStaticMarkup(
+    <GameCommandBar
+      currentTurnPlayer={currentTurnPlayer}
+      isMyTurn={false}
+      phaseLabel="Раскрытие карт"
+      phaseDescription="Сейчас ходит Михаил"
+      canReveal={true}
+      canRevealAction={true}
+      canManageGame={true}
+      canSkipDiscussion={true}
+      hostControlsOpen={false}
+      onReveal={() => undefined}
+      onRevealAction={() => undefined}
+      onOpenHostControls={() => undefined}
+      onSkipDiscussion={() => undefined}
+    />,
+  );
+
+  assert.match(html, /aria-label="Панель хода и игровых действий"/);
+  assert.match(html, /role="status"/);
+  assert.match(html, /aria-live="polite"/);
+  assert.match(html, /Сейчас ходит Михаил/);
+  assert.match(html, /Профессия: Врач/);
+  assert.match(html, />Раскрыть особое условие</);
+  assert.match(html, />Пропустить обсуждение</);
+  assert.match(html, /aria-haspopup="dialog"/);
+  assert.match(html, />Админ-панель</);
+  assert.match(html, />Раскрыть характеристику</);
+  assert.equal((html.match(/<button/g) ?? []).length, 4);
+});
+
+test("command bar keeps host controls visible outside discussion and falls back to phase copy", async () => {
+  const componentUrl = new URL("../../src/screens/game/GameCommandBar.tsx", import.meta.url);
+  assert.equal(existsSync(componentUrl), true, "GameCommandBar component must exist");
+  const { GameCommandBar } = await import("../../src/screens/game/GameCommandBar.tsx");
+  const html = renderToStaticMarkup(
+    <GameCommandBar
+      currentTurnPlayer={undefined}
+      isMyTurn={false}
+      phaseLabel="Обсуждение"
+      phaseDescription="Обсудите, кого оставить за пределами бункера"
+      canReveal={false}
+      canRevealAction={false}
+      canManageGame={true}
+      canSkipDiscussion={false}
+      hostControlsOpen={true}
+      onReveal={() => undefined}
+      onRevealAction={() => undefined}
+      onOpenHostControls={() => undefined}
+      onSkipDiscussion={() => undefined}
+    />,
+  );
+
+  assert.match(html, /Обсуждение/);
+  assert.match(html, /Обсудите, кого оставить за пределами бункера/);
+  assert.match(
+    html,
+    /<button[^>]*disabled=""[^>]*>[\s\S]*?Пропустить обсуждение[\s\S]*?<\/button>/,
+  );
+  assert.match(html, /aria-expanded="true"/);
+  assert.equal((html.match(/<button/g) ?? []).length, 2);
+});
+
+test("command bar stays present without actions for a non-host observer", async () => {
+  const componentUrl = new URL("../../src/screens/game/GameCommandBar.tsx", import.meta.url);
+  assert.equal(existsSync(componentUrl), true, "GameCommandBar component must exist");
+  const { GameCommandBar } = await import("../../src/screens/game/GameCommandBar.tsx");
+  const html = renderToStaticMarkup(
+    <GameCommandBar
+      currentTurnPlayer={other}
+      isMyTurn={false}
+      phaseLabel="Раскрытие карт"
+      phaseDescription="Сейчас ходит Михаил"
+      canReveal={false}
+      canRevealAction={false}
+      canManageGame={false}
+      canSkipDiscussion={false}
+      hostControlsOpen={false}
+      onReveal={() => undefined}
+      onRevealAction={() => undefined}
+      onOpenHostControls={() => undefined}
+      onSkipDiscussion={() => undefined}
+    />,
+  );
+
+  assert.match(html, /Сейчас ходит Михаил/);
+  assert.doesNotMatch(html, /<button/);
+  assert.doesNotMatch(html, /Админ-панель|Пропустить обсуждение/);
 });
 
 test("vote screen keeps host controls in the common render path", () => {
@@ -467,9 +560,16 @@ test("bunker information heading includes a compact decorative icon", () => {
     />,
   );
   const css = readFileSync(new URL("../../src/styles/game-screen.css", import.meta.url), "utf8");
+  const source = readFileSync(
+    new URL("../../src/screens/game/ScenarioSummary.tsx", import.meta.url),
+    "utf8",
+  );
 
   assert.match(html, /<h3 class="gs-bunker-heading"/);
   assert.match(html, /class="gs-bunker-heading-icon"[^>]*aria-hidden="true"/);
+  assert.match(source, /import \{ GiFalloutShelter \} from "react-icons\/gi"/);
+  assert.match(source, /<GiFalloutShelter className="gs-bunker-heading-icon"/);
+  assert.doesNotMatch(source, /GiBunker/);
   assert.match(
     css,
     /\.command-game-screen \.gs-bunker-heading \{[^}]*display: flex;[^}]*align-items: center;[^}]*gap: 6px;/s,
@@ -527,6 +627,10 @@ test("player cards illustrate every public characteristic and mark eliminated pl
     revealedAttributes: [
       { type: "profession", label: "Профессия", value: "Врач" },
       { type: "bio", label: "Биология", value: "Женщина, 32 года" },
+      { type: "health", label: "Здоровье", value: "Здорова" },
+      { type: "hobby", label: "Хобби", value: "Шахматы" },
+      { type: "baggage", label: "Багаж", value: "Аптечка" },
+      { type: "fact", label: "Доп. факт", value: "Знает азбуку Морзе" },
     ],
     actionCard: privateCharacter.actionCard,
     actionCardRevealed: true,
@@ -543,8 +647,9 @@ test("player cards illustrate every public characteristic and mark eliminated pl
 
   assert.match(html, /class="gs-player-card is-eliminated/);
   assert.match(html, />Изгнан</);
-  assert.equal((html.match(/class="gs-public-attribute-icon"/g) ?? []).length, 3);
-  assert.equal((html.match(/class="gs-public-attribute-copy"/g) ?? []).length, 3);
+  assert.equal((html.match(/class="gs-public-attribute-icon"/g) ?? []).length, 7);
+  assert.equal((html.match(/class="gs-public-attribute-copy"/g) ?? []).length, 7);
+  assert.ok(html.indexOf("Особое условие") > html.indexOf("Знает азбуку Морзе"));
 });
 
 test("player characteristic names reuse the exact card palette", () => {
@@ -645,16 +750,41 @@ test("hybrid CSS uses the full desktop width and distinct player state accents",
   );
   assert.match(
     css,
-    /\.command-game-screen \.gs-public-attributes \{[^}]*display: grid;[^}]*grid-template-columns: 1fr;/s,
+    /\.command-game-screen \.gs-public-attributes \{[^}]*display: grid;[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
   );
   assert.match(
     css,
     /\.command-game-screen \.gs-public-attribute \{[^}]*grid-template-columns: 30px minmax\(0, 1fr\);/s,
   );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-public-attribute\[data-attr-type="action"\] \{[^}]*grid-column: 1 \/ -1;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-public-attribute-visual \{[^}]*place-items: center;[^}]*padding: 1px;[^}]*overflow: visible;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-public-attribute-icon \{[^}]*width: 100%;[^}]*height: 100%;[^}]*border-radius: 0;[^}]*overflow: visible;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-public-attribute-copy > span \{[^}]*font-size: 0\.68rem;/s,
+  );
+  assert.match(
+    css,
+    /@media \(min-width: 769px\)[\s\S]*\.command-game-screen \.gs-public-attribute-copy \{[^}]*gap: 0;[\s\S]*\.command-game-screen \.gs-public-attribute-copy > span \{[^}]*font-size: 0\.58rem;[^}]*line-height: 1\.1;[\s\S]*\.command-game-screen \.gs-public-attribute-copy strong \{[^}]*font-size: 0\.8rem;[^}]*line-height: 1\.2;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-public-attribute-copy > span \{[^}]*font-size: 0\.75rem;/,
+  );
 });
 
-test("mobile info and actions stay compact while desktop host controls use two columns", () => {
+test("persistent command bar uses left status and right actions without header host controls", () => {
   const css = readFileSync(new URL("../../src/styles/game-screen.css", import.meta.url), "utf8");
+  const mobileCss = css.slice(css.indexOf("@media (max-width: 768px)"));
 
   assert.match(
     css,
@@ -664,17 +794,43 @@ test("mobile info and actions stay compact while desktop host controls use two c
     css,
     /\.command-game-screen \.gs-host-control-groups \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
   );
+  assert.doesNotMatch(css, /\.gs-room-host-actions|\.gs-room-host-action/);
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-action-bar \{[^}]*left: 18px;[^}]*right: 18px;[^}]*bottom: 12px;[^}]*width: auto;[^}]*grid-template-columns: minmax\(220px, 1fr\) auto;[^}]*border-radius: 16px;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-command-actions \{[^}]*display: flex;[^}]*flex-wrap: wrap;[^}]*justify-content: flex-end;/s,
+  );
+  assert.match(
+    css,
+    /\.screen\.command-game-screen\.has-game-command-bar \{[^}]*padding-bottom: calc\(104px \+ env\(safe-area-inset-bottom\)\);/s,
+  );
+  assert.match(
+    css,
+    /@media \(min-width: 769px\) and \(max-width: 1023px\)[\s\S]*\.screen\.command-game-screen\.has-game-command-bar:has\(\.gs-command-actions > :nth-child\(3\)\) \{[^}]*padding-bottom: calc\(152px \+ env\(safe-area-inset-bottom\)\);/,
+  );
+  assert.match(
+    css,
+    /@media \(min-width: 769px\) and \(max-width: 1023px\)[\s\S]*\.screen\.command-game-screen\.has-game-command-bar:has\(\.gs-command-actions > :nth-child\(3\)\)\s*\.error-toast \{[^}]*bottom: calc\(152px \+ env\(safe-area-inset-bottom\)\);/,
+  );
   assert.match(
     css,
     /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-info-scenario,[\s\S]*\.command-game-screen \.gs-info-capacity,[\s\S]*\.command-game-screen \.gs-info-progress \{[^}]*display: none;/,
   );
   assert.match(
     css,
-    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-action-bar \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-action-bar \{[^}]*left: 8px;[^}]*right: 8px;[^}]*bottom: 8px;[^}]*grid-template-columns: 1fr;/,
+  );
+  assert.match(mobileCss, /\.command-game-screen \.gs-action-bar \{[^}]*gap: 0;/s);
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-command-actions \{[^}]*display: grid;[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
   );
   assert.match(
     css,
-    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-action-bar \.btn \{[^}]*height: 56px;/,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-action-bar \.btn \{[^}]*min-height: 44px;/,
   );
   assert.match(
     css,
@@ -697,9 +853,46 @@ test("mobile info and actions stay compact while desktop host controls use two c
     /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-public-attribute \{[^}]*padding: 2px 0;[^}]*background: transparent;[^}]*border: 0;/,
   );
   assert.match(
-    css,
-    /@media \(max-width: 768px\)[\s\S]*\.screen\.command-game-screen\.has-game-actions \{[^}]*padding-bottom: calc\(82px \+ env\(safe-area-inset-bottom\)\);/,
+    mobileCss,
+    /\.command-game-screen \.gs-command-status \{[^}]*position: absolute;[^}]*width: 1px;[^}]*height: 1px;[^}]*overflow: hidden;[^}]*clip-path: inset\(50%\);/s,
   );
+  assert.doesNotMatch(
+    mobileCss,
+    /\.command-game-screen \.gs-command-status \{[^}]*display: none;/s,
+  );
+  assert.match(
+    mobileCss,
+    /\.command-game-screen \.gs-action-bar:not\(:has\(\.gs-command-actions > \*\)\) \{[^}]*right: auto;[^}]*width: 1px;[^}]*height: 1px;[^}]*padding: 0;[^}]*overflow: hidden;[^}]*background: transparent;[^}]*border: 0;[^}]*box-shadow: none;[^}]*pointer-events: none;/s,
+  );
+  assert.doesNotMatch(
+    mobileCss,
+    /\.command-game-screen \.gs-action-bar:not\(:has\(\.gs-command-actions > \*\)\) \{[^}]*display: none;/s,
+  );
+  assert.match(
+    mobileCss,
+    /\.screen\.command-game-screen\.has-game-command-bar \{[^}]*padding-bottom: calc\(80px \+ env\(safe-area-inset-bottom\)\);/s,
+  );
+  assert.match(
+    mobileCss,
+    /\.screen\.command-game-screen\.has-game-command-bar:has\(\.gs-command-actions > :nth-child\(3\)\) \{[^}]*padding-bottom: calc\(140px \+ env\(safe-area-inset-bottom\)\);/s,
+  );
+  assert.match(
+    mobileCss,
+    /\.screen\.command-game-screen\.has-game-command-bar:not\(:has\(\.gs-command-actions > \*\)\) \{[^}]*padding-bottom: calc\(16px \+ env\(safe-area-inset-bottom\)\);/s,
+  );
+  assert.match(
+    mobileCss,
+    /\.screen\.command-game-screen\.has-game-command-bar \.error-toast \{[^}]*bottom: calc\(80px \+ env\(safe-area-inset-bottom\)\);/s,
+  );
+  assert.match(
+    mobileCss,
+    /\.screen\.command-game-screen\.has-game-command-bar:has\(\.gs-command-actions > :nth-child\(3\)\)\s*\.error-toast \{[^}]*bottom: calc\(140px \+ env\(safe-area-inset-bottom\)\);/s,
+  );
+  assert.match(
+    mobileCss,
+    /\.screen\.command-game-screen\.has-game-command-bar:not\(:has\(\.gs-command-actions > \*\)\)\s*\.error-toast \{[^}]*bottom: calc\(24px \+ env\(safe-area-inset-bottom\)\);/s,
+  );
+  assert.doesNotMatch(mobileCss, /calc\(184px/);
 });
 
 test("vote admin panel remains fixed above responsive content", () => {
