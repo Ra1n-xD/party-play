@@ -952,6 +952,7 @@ export function buildPublicState(room: Room): PublicGameState {
       actionCardRevealed: p.actionCardRevealed,
       isHost: p.id === room.hostId,
       isBot: p.isBot,
+      kicked: p.kicked,
     };
     // Show action card if revealed by player or at game over
     if (p.character && (p.actionCardRevealed || isGameOver)) {
@@ -1006,6 +1007,7 @@ export function buildPublicState(room: Room): PublicGameState {
     totalBunkerCards: gs?.bunkerCards.length || 0,
     threatCard: gs && gs.revealedBunkerCount >= gs.bunkerCards.length ? gs.threatCard : null,
     bunkerCapacity: gs?.bunkerCapacity || 0,
+    startedPlayerCount: room.startedPlayerCount ?? room.players.size,
     players,
     currentTurnPlayerId:
       gs?.phase === "ROUND_REVEAL" ? gs.turnOrder[gs.currentTurnIndex] || null : null,
@@ -1020,6 +1022,8 @@ export function buildPublicState(room: Room): PublicGameState {
     tiebreakCandidateIds: gs?.tiebreakCandidateIds?.length ? gs.tiebreakCandidateIds : null,
     phaseRemainingMs: gs?.phaseEndTime ? Math.max(0, gs.phaseEndTime - Date.now()) : null,
     paused: gs?.paused || false,
+    pauseKind: gs?.paused ? "admin" : "none",
+    disconnectedPlayerIds: [],
     spectatorCount: room.spectators.size,
   };
 }

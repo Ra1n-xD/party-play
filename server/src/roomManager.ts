@@ -17,6 +17,16 @@ export interface Player {
   votedFor: string | null;
   immuneThisRound: boolean;
   actionCardRevealed: boolean;
+  kicked: boolean;
+}
+
+export interface PendingSeatClaim {
+  id: string;
+  socketId: string;
+  playerId: string;
+  claimantName: string;
+  createdAt: number;
+  expiresAt: number;
 }
 
 export interface GameState {
@@ -58,13 +68,15 @@ export interface Room {
   spectators: Map<string, Spectator>;
   gameState: GameState | null;
   allPlayerIds: string[]; // Original player order (for round rotation)
+  startedPlayerCount: number | null;
+  pendingSeatClaims: Map<string, PendingSeatClaim>;
 }
 
 const rooms = new Map<string, Room>();
 const roomLastActivity = new Map<string, number>();
 
 // Auto-cleanup inactive rooms every 5 minutes
-setInterval(
+const roomCleanupTimer = setInterval(
   () => {
     const now = Date.now();
     for (const [code, lastActivity] of roomLastActivity.entries()) {
@@ -78,6 +90,7 @@ setInterval(
   },
   5 * 60 * 1000,
 );
+roomCleanupTimer.unref();
 
 export function touchRoom(code: string): void {
   roomLastActivity.set(code, Date.now());
@@ -105,6 +118,7 @@ export function createRoom(socketId: string, playerName: string): { room: Room; 
     votedFor: null,
     immuneThisRound: false,
     actionCardRevealed: false,
+    kicked: false,
   };
 
   const room: Room = {
@@ -114,6 +128,8 @@ export function createRoom(socketId: string, playerName: string): { room: Room; 
     spectators: new Map(),
     gameState: null,
     allPlayerIds: [playerId],
+    startedPlayerCount: null,
+    pendingSeatClaims: new Map(),
   };
 
   rooms.set(code, room);
@@ -147,6 +163,7 @@ export function joinRoom(
     votedFor: null,
     immuneThisRound: false,
     actionCardRevealed: false,
+    kicked: false,
   };
 
   room.players.set(playerId, player);
@@ -246,6 +263,7 @@ export function addBotToRoom(room: Room): Player | null {
     votedFor: null,
     immuneThisRound: false,
     actionCardRevealed: false,
+    kicked: false,
   };
 
   room.players.set(playerId, player);
