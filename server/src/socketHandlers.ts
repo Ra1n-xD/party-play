@@ -51,6 +51,7 @@ import {
   expireSeatClaims,
   finalizeApprovedSeatClaim,
   isCurrentSocketOwner,
+  kickPlayerPermanently,
   listReconnectableSeats,
   markPlayerDisconnected,
   removeLobbyPlayerWithHostFailover,
@@ -84,6 +85,7 @@ const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
   "room:requestSeatClaim": { max: 3, windowMs: 10000 },
   "room:cancelSeatClaim": { max: 5, windowMs: 10000 },
   "admin:resolveSeatClaim": { max: 5, windowMs: 10000 },
+  "admin:kickPlayer": { max: 5, windowMs: 10000 },
   "vote:cast": { max: 2, windowMs: 5000 },
   "game:revealAttribute": { max: 2, windowMs: 2000 },
   "game:revealActionCard": { max: 2, windowMs: 2000 },
@@ -1049,6 +1051,41 @@ export function registerHandlers(io: IOServer): void {
 
       const result = transferHost(ctx.room, ctx.info.playerId, targetPlayerId, io);
       if (!result.success) socket.emit("room:error", { message: result.error });
+    });
+
+    socket.on("admin:kickPlayer", (data) => {
+      const ctx = getSocketRoom(socket, "admin:kickPlayer");
+      if (!ctx) return;
+      const targetPlayerId = data?.targetPlayerId;
+      if (!isValidId(targetPlayerId)) {
+        socket.emit("room:error", { message: "Игрок не найден" });
+        return;
+      }
+
+      const result = kickPlayerPermanently(ctx.room, ctx.info.playerId, targetPlayerId, io);
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+        return;
+      }
+
+      const releasedSocketId = result.releasedSocketId;
+      if (!releasedSocketId) return;
+      const releasedMembership = socketRoomMap.get(releasedSocketId);
+      if (
+        !releasedMembership ||
+        releasedMembership.roomCode !== ctx.room.code ||
+        releasedMembership.playerId !== targetPlayerId ||
+        releasedMembership.role !== "player"
+      ) {
+        return;
+      }
+      socketRoomMap.delete(releasedSocketId);
+
+      const releasedSocket = io.sockets.sockets.get(releasedSocketId);
+      if (!releasedSocket) return;
+      releasedSocket.emit("room:kicked", { message: "Вы удалены из комнаты хостом" });
+      releasedSocket.leave(ctx.room.code);
+      releasedSocket.disconnect(true);
     });
 
     socket.on("admin:shuffleAll", ({ attributeType }) => {

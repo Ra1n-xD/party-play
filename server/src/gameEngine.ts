@@ -349,7 +349,7 @@ function getVoters(room: Room): Player[] {
   const voters: Player[] = [];
 
   for (const player of room.players.values()) {
-    if (player.alive) {
+    if (player.alive && !player.kicked) {
       voters.push(player);
     }
   }
@@ -357,7 +357,7 @@ function getVoters(room: Room): Player[] {
   // Last eliminated player also votes (per original rules)
   if (room.gameState.lastEliminatedId) {
     const lastElim = room.players.get(room.gameState.lastEliminatedId);
-    if (lastElim && !lastElim.alive) {
+    if (lastElim && !lastElim.alive && !lastElim.kicked) {
       voters.push(lastElim);
     }
   }
@@ -372,7 +372,7 @@ export function castVote(room: Room, voterId: string, targetId: string, io: IOSe
 
   const voter = room.players.get(voterId);
   const target = room.players.get(targetId);
-  if (!voter || !target || !target.alive) return false;
+  if (!voter || voter.kicked || !target || target.kicked || !target.alive) return false;
   if (voterId === targetId) return false;
   if (voter.hasVoted) return false;
 
@@ -595,10 +595,7 @@ export function revealActionCard(room: Room, playerId: string, io: IOServer): bo
 
 // ============ Admin Panel Functions ============
 
-const ADMIN_BLOCKED_PHASES: Set<string> = new Set([
-  "ROUND_VOTE",
-  "ROUND_VOTE_TIEBREAK",
-]);
+const ADMIN_BLOCKED_PHASES: Set<string> = new Set(["ROUND_VOTE", "ROUND_VOTE_TIEBREAK"]);
 
 function isAdminBlockedPhase(room: Room): boolean {
   return !!room.gameState && ADMIN_BLOCKED_PHASES.has(room.gameState.phase);
@@ -610,7 +607,8 @@ export function adminShuffleAll(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
-  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
+  if (isAdminBlockedPhase(room))
+    return { success: false, error: "Нельзя изменять во время голосования" };
 
   const alivePlayers = getAlivePlayers(room).filter((p) => p.character);
   if (alivePlayers.length < 2) return { success: false, error: "Недостаточно игроков" };
@@ -669,7 +667,8 @@ export function adminSwapAttribute(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
-  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
+  if (isAdminBlockedPhase(room))
+    return { success: false, error: "Нельзя изменять во время голосования" };
 
   const p1 = room.players.get(p1Id);
   const p2 = room.players.get(p2Id);
@@ -711,7 +710,8 @@ export function adminReplaceAttribute(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
-  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
+  if (isAdminBlockedPhase(room))
+    return { success: false, error: "Нельзя изменять во время голосования" };
 
   const player = room.players.get(targetPlayerId);
   if (!player?.character) return { success: false, error: "Игрок не найден" };
@@ -796,7 +796,8 @@ export function adminDeleteAttribute(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
-  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
+  if (isAdminBlockedPhase(room))
+    return { success: false, error: "Нельзя изменять во время голосования" };
 
   const player = room.players.get(targetPlayerId);
   if (!player?.character) return { success: false, error: "Игрок не найден" };
@@ -845,10 +846,12 @@ export function adminRevivePlayer(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
-  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
+  if (isAdminBlockedPhase(room))
+    return { success: false, error: "Нельзя изменять во время голосования" };
 
   const player = room.players.get(targetPlayerId);
   if (!player) return { success: false, error: "Игрок не найден" };
+  if (player.kicked) return { success: false, error: "Место закрыто" };
   if (player.alive) return { success: false, error: "Игрок уже в игре" };
 
   player.alive = true;
@@ -876,7 +879,8 @@ export function adminEliminatePlayer(
   io: IOServer,
 ): { success: boolean; error: string } {
   if (!room.gameState) return { success: false, error: "Игра не запущена" };
-  if (isAdminBlockedPhase(room)) return { success: false, error: "Нельзя изменять во время голосования" };
+  if (isAdminBlockedPhase(room))
+    return { success: false, error: "Нельзя изменять во время голосования" };
 
   const player = room.players.get(targetPlayerId);
   if (!player) return { success: false, error: "Игрок не найден" };
@@ -888,6 +892,147 @@ export function adminEliminatePlayer(
 
   broadcastState(room, io);
   return { success: true, error: "" };
+}
+
+function removeVotesInvolvingPlayer(room: Room, playerId: string): void {
+  const gs = room.gameState;
+  if (!gs) return;
+
+  for (const [voterId, targetId] of Array.from(gs.votes.entries())) {
+    if (voterId !== playerId && targetId !== playerId) continue;
+    gs.votes.delete(voterId);
+    const voter = room.players.get(voterId);
+    if (voter) {
+      voter.hasVoted = false;
+      voter.votedFor = null;
+    }
+  }
+
+  const player = room.players.get(playerId);
+  if (player) {
+    player.hasVoted = false;
+    player.votedFor = null;
+  }
+}
+
+function clearCurrentBallot(room: Room): void {
+  const gs = room.gameState;
+  if (!gs) return;
+  gs.votes.clear();
+  gs.tiebreakCandidateIds = [];
+  for (const player of room.players.values()) {
+    player.hasVoted = false;
+    player.votedFor = null;
+  }
+}
+
+function repairLastEliminatedPlayer(room: Room, kickedPlayerId: string): void {
+  const gs = room.gameState;
+  if (!gs || gs.lastEliminatedId !== kickedPlayerId) return;
+
+  gs.lastEliminatedId = null;
+  for (let index = gs.eliminationOrder.length - 1; index >= 0; index--) {
+    const candidateId = gs.eliminationOrder[index];
+    if (candidateId === kickedPlayerId) continue;
+    const candidate = room.players.get(candidateId);
+    if (!candidate || candidate.alive || candidate.kicked) continue;
+    gs.lastEliminatedId = candidateId;
+    break;
+  }
+}
+
+function removePlayerFromRevealOrder(room: Room, playerId: string): void {
+  const gs = room.gameState;
+  if (!gs) return;
+  const removedIndex = gs.turnOrder.indexOf(playerId);
+  if (removedIndex < 0) return;
+
+  gs.turnOrder.splice(removedIndex, 1);
+  if (removedIndex < gs.currentTurnIndex) gs.currentTurnIndex--;
+  gs.currentTurnIndex = Math.max(0, gs.currentTurnIndex);
+}
+
+function beginAdministrativeResult(room: Room, io: IOServer): void {
+  const gs = room.gameState;
+  if (!gs) return;
+
+  if (gs.phaseTimer) clearTimeout(gs.phaseTimer);
+  clearBotActions(room.code);
+  gs.phaseTimer = null;
+  gs.phaseEndTime = null;
+  gs.phase = "ROUND_RESULT";
+
+  const continueAfterResult = () => afterVoting(room, io);
+  if (isGameplayPaused(room)) {
+    gs.paused = true;
+    gs.pausedTimeRemaining = CONFIG.RESULT_DISPLAY_TIME;
+    gs.pausedCallback = continueAfterResult;
+  } else {
+    // The interrupted ballot is consumed, so its frozen callback must never be resumed.
+    gs.paused = false;
+    gs.pausedTimeRemaining = null;
+    gs.pausedCallback = null;
+    schedulePhaseTransition(room, io, CONFIG.RESULT_DISPLAY_TIME, continueAfterResult);
+  }
+
+  broadcastState(room, io);
+}
+
+export function normalizeGameAfterPermanentKick(
+  room: Room,
+  playerId: string,
+  io: IOServer,
+): boolean {
+  const gs = room.gameState;
+  const player = room.players.get(playerId);
+  if (!gs || !player) return false;
+
+  const ballotWasActive = gs.phase === "ROUND_VOTE" || gs.phase === "ROUND_VOTE_TIEBREAK";
+  const wasAlive = player.alive;
+
+  player.kicked = true;
+  player.connected = false;
+  player.alive = false;
+  player.socketId = "";
+  gs.pauseReasons.disconnectedPlayerIds.delete(playerId);
+  removePlayerFromRevealOrder(room, playerId);
+
+  if (ballotWasActive) {
+    clearCurrentBallot(room);
+    // Keep exactly one historical record and make this kick the visible administrative result.
+    gs.eliminationOrder = gs.eliminationOrder.filter((id) => id !== playerId);
+    gs.eliminationOrder.push(playerId);
+  } else {
+    removeVotesInvolvingPlayer(room, playerId);
+    gs.tiebreakCandidateIds = gs.tiebreakCandidateIds.filter((id) => id !== playerId);
+    if (wasAlive && !gs.eliminationOrder.includes(playerId)) {
+      gs.eliminationOrder.push(playerId);
+    }
+  }
+  repairLastEliminatedPlayer(room, playerId);
+
+  if (wasAlive && getAlivePlayers(room).length <= gs.bunkerCapacity) {
+    forceEndGame(room, io);
+    return true;
+  }
+
+  if (ballotWasActive) {
+    beginAdministrativeResult(room, io);
+    return true;
+  }
+
+  const revealFinished = gs.phase === "ROUND_REVEAL" && gs.currentTurnIndex >= gs.turnOrder.length;
+  if (!isGameplayPaused(room)) {
+    const revealAdvancedOnResume = resumeGameIfReady(room, io, false);
+    if (revealAdvancedOnResume) return true;
+    if (revealFinished && room.gameState?.phase === "ROUND_REVEAL") {
+      afterRevealPhase(room, io);
+      return true;
+    }
+  }
+
+  broadcastState(room, io);
+  return true;
 }
 
 // ============ Pause / Unpause ============
@@ -932,9 +1077,9 @@ function freezeGame(room: Room): void {
   clearBotActions(room.code);
 }
 
-export function resumeGameIfReady(room: Room, io: IOServer, shouldBroadcast = true): void {
+export function resumeGameIfReady(room: Room, io: IOServer, shouldBroadcast = true): boolean {
   const gs = room.gameState;
-  if (!gs || isGameplayPaused(room) || !gs.paused) return;
+  if (!gs || isGameplayPaused(room) || !gs.paused) return false;
 
   const remaining = gs.pausedTimeRemaining;
   const callback = gs.pausedCallback;
@@ -942,12 +1087,18 @@ export function resumeGameIfReady(room: Room, io: IOServer, shouldBroadcast = tr
   gs.pausedTimeRemaining = null;
   gs.pausedCallback = null;
 
+  if (gs.phase === "ROUND_REVEAL" && gs.currentTurnIndex >= gs.turnOrder.length) {
+    afterRevealPhase(room, io);
+    return true;
+  }
+
   if (remaining !== null && callback) {
     schedulePhaseTransition(room, io, remaining, callback);
   }
 
   // broadcastState schedules bot actions for the resumed current phase.
   if (shouldBroadcast) broadcastState(room, io);
+  return false;
 }
 
 export function addDisconnectPause(
@@ -1040,6 +1191,14 @@ export function resetGame(room: Room, io: IOServer): void {
   clearBotActions(room.code);
   room.gameState = null;
   room.startedPlayerCount = null;
+
+  const kickedPlayerIds = new Set(
+    Array.from(room.players.values())
+      .filter((player) => player.kicked)
+      .map((player) => player.id),
+  );
+  for (const playerId of kickedPlayerIds) room.players.delete(playerId);
+  room.allPlayerIds = room.allPlayerIds.filter((playerId) => !kickedPlayerIds.has(playerId));
 
   for (const player of room.players.values()) {
     player.ready = false;
@@ -1165,14 +1324,14 @@ function getVoters_fromState(room: Room): Player[] {
   const voters: Player[] = [];
 
   for (const player of room.players.values()) {
-    if (player.alive) {
+    if (player.alive && !player.kicked) {
       voters.push(player);
     }
   }
 
   if (room.gameState.lastEliminatedId) {
     const lastElim = room.players.get(room.gameState.lastEliminatedId);
-    if (lastElim && !lastElim.alive) {
+    if (lastElim && !lastElim.alive && !lastElim.kicked) {
       voters.push(lastElim);
     }
   }
