@@ -745,6 +745,13 @@ test("late recovery events stay ignored while Home recovery actions deliberately
     ]);
 
     await act(async () => mounted.snapshot().leaveRoom());
+    await act(async () => mounted.snapshot().listReconnectableSeats("efgh"));
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode: "EFGH",
+        seats: [{ playerId: otherPlayerId, playerName: "Available seat" }],
+      });
+    });
     await act(async () => mounted.snapshot().requestSeatClaim("efgh", otherPlayerId, "Claimant"));
     await act(async () => {
       mounted.fake.serverEmit("room:joined", {
@@ -873,6 +880,13 @@ test("claim cancellation is explicit and does not depend on localized server cop
   const mounted = await mountProvider();
 
   try {
+    await act(async () => mounted.snapshot().listReconnectableSeats(roomCode));
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode,
+        seats: [{ playerId: otherPlayerId, playerName: "Seat owner" }],
+      });
+    });
     await act(async () => mounted.snapshot().requestSeatClaim(roomCode, otherPlayerId, "Claimant"));
     await act(async () => {
       mounted.fake.serverEmit("room:seatClaimSubmitted", { requestId: "claim-1" });
@@ -923,6 +937,89 @@ test("claim cancellation is explicit and does not depend on localized server cop
     );
     assert.equal(mounted.snapshot().pendingSeatClaim?.status, "rejected");
     assert.equal(mounted.snapshot().pendingSeatClaim?.message, "Некорректная заявка");
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("membership requests serialize until the current attempt resolves", async () => {
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider();
+
+  try {
+    await act(async () => {
+      mounted.snapshot().joinRoom("AAAA", "Player");
+      mounted.snapshot().joinRoom("BBBB", "Player");
+    });
+    assert.deepEqual(
+      mounted.fake.emittedFor("room:join").map((entry) => entry.args),
+      [[{ roomCode: "AAAA", playerName: "Player" }]],
+    );
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:error", { message: "Комната AAAA не найдена" });
+      mounted.snapshot().joinRoom("BBBB", "Player");
+    });
+    assert.equal(mounted.fake.emittedFor("room:join").length, 2);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:joined", {
+        roomCode: "BBBB",
+        playerId: participantId,
+        sessionToken,
+      });
+    });
+    assert.equal(mounted.snapshot().roomCode, "BBBB");
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("seat lookup and claim submission serialize recovery operations", async () => {
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider();
+  const thirdPlayerId = `p_${"3".repeat(24)}`;
+
+  try {
+    await act(async () => {
+      mounted.snapshot().listReconnectableSeats("AAAA");
+      mounted.snapshot().listReconnectableSeats("BBBB");
+      mounted.snapshot().requestSeatClaim("AAAA", otherPlayerId, "First claimant");
+    });
+    assert.deepEqual(
+      mounted.fake.emittedFor("room:listReconnectableSeats").map((entry) => entry.args),
+      [[{ roomCode: "AAAA" }]],
+    );
+    assert.equal(mounted.fake.emittedFor("room:requestSeatClaim").length, 0);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:error", { message: "Комната AAAA не найдена" });
+      mounted.snapshot().listReconnectableSeats("BBBB");
+    });
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode: "BBBB",
+        seats: [
+          { playerId: otherPlayerId, playerName: "Михаил" },
+          { playerId: thirdPlayerId, playerName: "Ольга" },
+        ],
+      });
+    });
+
+    await act(async () => {
+      mounted.snapshot().requestSeatClaim("BBBB", otherPlayerId, "First claimant");
+      mounted.snapshot().requestSeatClaim("BBBB", thirdPlayerId, "Second claimant");
+    });
+    assert.equal(mounted.fake.emittedFor("room:requestSeatClaim").length, 1);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:error", { message: "Первая заявка отклонена" });
+      mounted.snapshot().requestSeatClaim("BBBB", thirdPlayerId, "Second claimant");
+    });
+    assert.equal(mounted.fake.emittedFor("room:requestSeatClaim").length, 2);
+    assert.deepEqual(mounted.fake.emittedFor("room:requestSeatClaim").at(-1)?.args, [
+      { roomCode: "BBBB", playerId: thirdPlayerId, claimantName: "Second claimant" },
+    ]);
   } finally {
     await mounted.cleanup();
   }
