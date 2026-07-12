@@ -268,12 +268,6 @@ export function VoteScreen() {
           </div>
         )}
 
-        {gameState.votingsInCurrentRound > 1 && (
-          <div className="voting-counter">
-            Голосование {gameState.currentVotingInRound + 1} из {gameState.votingsInCurrentRound}
-          </div>
-        )}
-
         <div className="vote-candidates">
           {candidates.map((player) => {
             const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;

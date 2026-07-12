@@ -9,6 +9,7 @@ import { AccessibleModal } from "../../src/screens/game/AccessibleModal";
 import { CharacterLoadingState } from "../../src/screens/game/CharacterLoadingState";
 import { CharacterDossier } from "../../src/screens/game/CharacterDossier";
 import { GameStatusHeader } from "../../src/screens/game/GameStatusHeader";
+import { GameRoomHeader } from "../../src/screens/game/GameRoomHeader";
 import { HostControlDialog } from "../../src/screens/game/HostControlDialog";
 import { getNextMobileTab, MobileGameTabs } from "../../src/screens/game/MobileGameTabs";
 import { PlayerBoard } from "../../src/screens/game/PlayerBoard";
@@ -172,6 +173,7 @@ test("marks matched attributes as public while keeping the rest available", () =
   assert.deepEqual(view.unrevealedIndices, [1, 2]);
   assert.equal(view.canReveal, true);
   assert.equal(view.phaseDescription, "Ваш ход — выберите характеристику");
+  assert.equal("votingInfo" in view, false);
 });
 
 test("does not instruct the player to reveal when only one private card remains", () => {
@@ -249,26 +251,112 @@ test("validates host operation selections", () => {
 });
 
 test("status header exposes phase and round progress", () => {
+  const statusState: ClientGameState = {
+    ...state,
+    players: [me, { ...other, alive: false }],
+    threatCard: { title: "Радиационная буря", description: "Фильтры работают на пределе" },
+  };
   const html = renderToStaticMarkup(
     <GameStatusHeader
-      gameState={state}
+      gameState={statusState}
       phaseLabel="Раскрытие карт"
       phaseDescription="Сейчас ходит Михаил"
-      votingInfo=""
       isMyTurn={false}
-      connected={true}
       canSkipDiscussion={false}
-      canManageGame={false}
       onSkipDiscussion={() => undefined}
-      onOpenHostControls={() => undefined}
     />,
   );
   assert.match(html, /aria-label="Состояние игры"/);
+  assert.match(html, /class="gs-info-strip/);
+  assert.match(html, /<section class="gs-info-scenario/);
+  assert.doesNotMatch(html, /<button[^>]*class="gs-info-scenario/);
+  assert.doesNotMatch(html, /aria-expanded/);
+  assert.doesNotMatch(html, /gs-codex-scenario-chevron/);
+  assert.match(html, /class="gs-codex-scenario-icon/);
+  assert.match(html, /Сценарий катастрофы/);
+  assert.match(html, /Началось вторжение/);
+  assert.match(html, /class="gs-info-metric gs-info-timer/);
+  assert.match(html, /class="gs-info-timer-empty">—</);
+  assert.match(html, /class="gs-info-metric gs-info-capacity/);
+  assert.match(html, /class="gs-info-capacity-value">2<span>\/1<\/span>/);
+  assert.match(html, /class="gs-info-metric gs-info-round/);
+  assert.match(html, /class="gs-info-progress/);
+  assert.match(html, /02 \/ 05/);
+  assert.equal((html.match(/gs-info-round-segment/g) ?? []).length, 5);
+  assert.equal((html.match(/gs-info-round-segment is-filled/g) ?? []).length, 2);
+  assert.doesNotMatch(html, /gs-scenario-summary/);
   assert.match(html, /Раунд 2 из 5/);
   assert.match(html, /Раскрытие карт/);
+  assert.match(html, /Инопланетяне/);
+  assert.match(html, /class="gs-desktop-situation-details/);
+  assert.match(html, /Генератор/);
+  assert.doesNotMatch(html, /Мест в бункере:/);
+  assert.doesNotMatch(html, /gs-bunker-capacity/);
+  assert.match(html, /Радиационная буря/);
+  assert.match(html, /Фильтры работают на пределе/);
+  assert.equal((html.match(/Началось вторжение/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /gs-catastrophe-details/);
+  assert.match(html, /class="gs-bunker-card gs-bunker-threat-card/);
 });
 
-test("scenario toggle reports its expanded state", () => {
+test("game screen keeps the desktop scenario static and omits voting status", () => {
+  const source = readFileSync(new URL("../../src/screens/GameScreen.tsx", import.meta.url), "utf8");
+  const voteSource = readFileSync(
+    new URL("../../src/screens/VoteScreen.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(source, /scenarioExpanded/);
+  assert.doesNotMatch(source, /onToggleScenario/);
+  assert.doesNotMatch(source, /votingInfo/);
+  assert.doesNotMatch(voteSource, /Голосование \{gameState\.currentVotingInRound/);
+  assert.doesNotMatch(source, /gs-scenario-desktop/);
+});
+
+test("room header exposes existing room actions", () => {
+  const html = renderToStaticMarkup(
+    <GameRoomHeader
+      roomCode="AX-204"
+      connected={true}
+      canManageGame={true}
+      onOpenHostControls={() => undefined}
+      onLeaveRoom={() => undefined}
+    />,
+  );
+
+  assert.match(html, /Бункер/);
+  assert.doesNotMatch(html, /Протокол выживания/);
+  assert.match(html, /AX-204/);
+  assert.match(html, /Связь установлена/);
+  assert.match(html, /aria-label="Управление игрой"/);
+  assert.match(html, /aria-label="Выйти из комнаты"/);
+});
+
+test("room header hides management from non-host players", () => {
+  const html = renderToStaticMarkup(
+    <GameRoomHeader
+      roomCode="AX-204"
+      connected={false}
+      canManageGame={false}
+      onOpenHostControls={() => undefined}
+      onLeaveRoom={() => undefined}
+    />,
+  );
+
+  assert.doesNotMatch(html, /aria-label="Управление игрой"/);
+  assert.match(html, /Нет соединения/);
+});
+
+test("game screen wires existing room actions into the room header", () => {
+  const source = readFileSync(new URL("../../src/screens/GameScreen.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /<GameRoomHeader/);
+  assert.match(source, /roomCode=\{roomCode\}/);
+  assert.match(source, /onOpenHostControls=\{openHostControls\}/);
+  assert.match(source, /onLeaveRoom=\{leaveRoom\}/);
+});
+
+test("scenario summary keeps its description visible while bunker details are collapsed", () => {
   const html = renderToStaticMarkup(
     <ScenarioSummary
       idPrefix="test-scenario"
@@ -280,7 +368,49 @@ test("scenario toggle reports its expanded state", () => {
   assert.match(html, /aria-expanded="false"/);
   assert.match(html, /Инопланетяне/);
   assert.match(html, /1 из 3/);
-  assert.doesNotMatch(html, /Началось вторжение/);
+  assert.match(html, /Началось вторжение/);
+  assert.doesNotMatch(html, /gs-scenario-details/);
+});
+
+test("mobile situation shows the warning icon and complete shared details", () => {
+  const richState: ClientGameState = {
+    ...state,
+    threatCard: { title: "Радиационная буря", description: "Фильтры работают на пределе" },
+  };
+  const html = renderToStaticMarkup(
+    <ScenarioSummary
+      idPrefix="mobile-situation"
+      gameState={richState}
+      expanded
+      alwaysExpanded
+      onToggle={() => undefined}
+    />,
+  );
+  const scenarioSource = readFileSync(
+    new URL("../../src/screens/game/ScenarioSummary.tsx", import.meta.url),
+    "utf8",
+  );
+  const statusSource = readFileSync(
+    new URL("../../src/screens/game/GameStatusHeader.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(html, /class="gs-scenario-alert-icon/);
+  assert.match(html, /class="gs-scenario-description">Началось вторжение/);
+  assert.equal((html.match(/Началось вторжение/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /gs-catastrophe-details/);
+  assert.match(html, /Началось вторжение/);
+  assert.match(html, /Генератор/);
+  assert.match(html, /Мест: 2/);
+  assert.doesNotMatch(html, /Мест в бункере:/);
+  assert.doesNotMatch(html, /gs-bunker-capacity/);
+  assert.match(html, /Радиационная буря/);
+  assert.match(html, /Фильтры работают на пределе/);
+  assert.match(html, /class="gs-bunker-card gs-bunker-threat-card/);
+  assert.match(scenarioSource, /export function ScenarioDetails/);
+  assert.match(scenarioSource, /<ScenarioDetails/);
+  assert.match(statusSource, /import \{ ScenarioDetails \}/);
+  assert.match(statusSource, /<ScenarioDetails/);
 });
 
 const player = {
@@ -323,6 +453,33 @@ test("player board uses buttons and only public attributes", () => {
   assert.doesNotMatch(html, /План Б/);
 });
 
+test("player cards illustrate every public characteristic and mark eliminated players", () => {
+  const publicPlayer: PlayerInfo = {
+    ...player,
+    alive: false,
+    revealedAttributes: [
+      { type: "profession", label: "Профессия", value: "Врач" },
+      { type: "bio", label: "Биология", value: "Женщина, 32 года" },
+    ],
+    actionCard: privateCharacter.actionCard,
+    actionCardRevealed: true,
+  };
+  const html = renderToStaticMarkup(
+    <PlayerBoard
+      players={[publicPlayer]}
+      playerId={null}
+      currentTurnPlayerId={null}
+      lastEliminatedPlayerId="player-1"
+      onSelectPlayer={() => undefined}
+    />,
+  );
+
+  assert.match(html, /class="gs-player-card is-eliminated/);
+  assert.match(html, />Изгнан</);
+  assert.equal((html.match(/class="gs-public-attribute-icon"/g) ?? []).length, 3);
+  assert.equal((html.match(/class="gs-public-attribute-copy"/g) ?? []).length, 3);
+});
+
 test("private hidden cards stay readable and explain visibility", () => {
   const html = renderToStaticMarkup(
     <CharacterDossier
@@ -333,7 +490,7 @@ test("private hidden cards stay readable and explain visibility", () => {
     />,
   );
   assert.match(html, /Женщина, 32 года/);
-  assert.match(html, /Видно только вам/);
+  assert.match(html, /Не раскрыто/);
   assert.match(html, /Раскрыто всем/);
   assert.match(html, /План Б/);
 });
@@ -348,6 +505,176 @@ test("host chips and modal close controls keep 44px touch targets", () => {
   assert.match(
     css,
     /\.command-game-screen \.modal-close-btn \{[^}]*min-width: 44px;[^}]*min-height: 44px;/s,
+  );
+});
+
+test("hybrid CSS uses the full desktop width and distinct player state accents", () => {
+  const css = readFileSync(new URL("../../src/styles/game-screen.css", import.meta.url), "utf8");
+
+  assert.match(
+    css,
+    /\.screen\.command-game-screen \{[^}]*--gs-page: #07100c;[^}]*--gs-gold: #efbd58;[^}]*--gs-green: #76c69e;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-room-action \{[^}]*min-width: 44px;[^}]*min-height: 44px;/s,
+  );
+  assert.match(css, /\.screen\.command-game-screen \{[^}]*width: 100%;[^}]*max-width: none;/s);
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-player-list \{[^}]*grid-template-columns: repeat\(auto-fit, minmax\(min\(280px, 100%\), 1fr\)\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-workspace \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(300px, 320px\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-player-card\.is-me \{[^}]*border-color: rgba\(239, 189, 88,[^}]*box-shadow: inset 3px 0 0 var\(--gs-gold\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-player-card\.is-current-turn \{[^}]*border-color: var\(--gs-green\);[^}]*box-shadow:/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-player-card\.is-eliminated \{[^}]*background: #080d0a;[^}]*border-color: rgba\(217, 120, 108, 0\.28\);[^}]*box-shadow: inset 3px 0 0 rgba\(217, 120, 108, 0\.58\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-player-card\.is-disconnected:not\(\.is-eliminated\) \{[^}]*opacity: 0\.72;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-player-card\.is-me\.is-eliminated \{[^}]*border-color: rgba\(239, 189, 88, 0\.38\);[^}]*box-shadow:[^}]*inset 3px 0 0 var\(--gs-gold\),[^}]*inset 6px 0 0 rgba\(217, 120, 108, 0\.58\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-public-attributes \{[^}]*display: grid;[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-public-attribute \{[^}]*grid-template-columns: 30px minmax\(0, 1fr\);/s,
+  );
+});
+
+test("mobile info and actions stay compact while desktop host controls use two columns", () => {
+  const css = readFileSync(new URL("../../src/styles/game-screen.css", import.meta.url), "utf8");
+
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-host-dialog-panel \{[^}]*width: min\(100%, 1040px\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-host-control-groups \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-info-scenario,[\s\S]*\.command-game-screen \.gs-info-capacity,[\s\S]*\.command-game-screen \.gs-info-progress \{[^}]*display: none;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-action-bar \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-action-bar \.btn \{[^}]*height: 56px;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-public-attribute-visual \{[^}]*display: none;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-public-attribute \{[^}]*grid-template-columns: minmax\(0, 1fr\);/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.screen\.command-game-screen\.has-game-actions \{[^}]*padding-bottom: calc\(82px \+ env\(safe-area-inset-bottom\)\);/,
+  );
+});
+
+test("desktop status strip uses the Codex reference geometry", () => {
+  const css = readFileSync(new URL("../../src/styles/game-screen.css", import.meta.url), "utf8");
+
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-info-strip \{[^}]*grid-template-columns: minmax\(360px, 1\.7fr\) minmax\(650px, 2\.3fr\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-info-scenario \{[^}]*grid-template-columns: 44px minmax\(0, 1fr\);[^}]*gap: 12px;[^}]*padding: 12px;/s,
+  );
+  assert.doesNotMatch(css, /\.command-game-screen \.gs-info-scenario \{[^}]*cursor: pointer;/s);
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-scenario-alert-icon \{[^}]*width: 34px;[^}]*height: 34px;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-desktop-situation-details \{[^}]*grid-column: 1 \/ -1;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-desktop-situation-details \.gs-scenario-details \{[^}]*grid-template-columns: 1fr;[^}]*padding: 4px;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-bunker-details \{[^}]*background: transparent;[^}]*border: 0;[^}]*border-radius: 0;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-bunker-cards \{[^}]*grid-template-columns: repeat\(auto-fit, minmax\(min\(190px, 100%\), 1fr\)\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-bunker-threat-card \{[^}]*border-color: rgba\(239, 189, 88, 0\.32\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-info-metrics \{[^}]*grid-template-columns:[^;]*repeat\(3, minmax\(132px, 0\.9fr\)\)[^;]*minmax\(230px, 1\.55fr\)[^;]*;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-info-round-segment \{[^}]*height: 4px;[^}]*flex: 1;[^}]*border-radius: 999px;/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.gs-info-round-segment\.is-filled \{[^}]*background: var\(--gs-gold\);/s,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-info-scenario,[\s\S]*\.command-game-screen \.gs-info-capacity,[\s\S]*\.command-game-screen \.gs-info-progress \{[^}]*display: none;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-desktop-situation-details \{[^}]*display: none;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-bunker-cards \{[^}]*grid-template-columns: 1fr;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-scenario-summary \{[^}]*align-items: start;/,
+  );
+});
+
+test("game-screen modals and action cards do not fall back to the purple legacy theme", () => {
+  const css = readFileSync(new URL("../../src/styles/game-screen.css", import.meta.url), "utf8");
+
+  assert.doesNotMatch(
+    css,
+    /#8b5cf6|#a78bfa|#c4b5fd|#c084fc|rgba\(139, 92, 246|rgba\(192, 132, 252/,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen > \.modal-overlay > \.modal \{[^}]*color: var\(--gs-text\);[^}]*background: var\(--gs-surface\);[^}]*border-color: rgba\(178, 199, 185, 0\.24\);/s,
+  );
+  assert.match(
+    css,
+    /\.command-game-screen \.expanded-player-modal \.me-badge \{[^}]*background: var\(--gs-gold\);/s,
   );
 });
 

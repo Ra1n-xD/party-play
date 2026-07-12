@@ -1,5 +1,6 @@
 import React from "react";
 import type { PlayerInfo } from "../../../../shared/types";
+import { CardImage } from "../../components/CardImage";
 
 export interface PlayerBoardProps {
   players: PlayerInfo[];
@@ -69,14 +70,24 @@ export function PlayerCard({
                 className="gs-public-attribute"
                 data-attr-type={attribute.type}
               >
-                <span>{attribute.label}</span>
-                <strong>{attribute.value}</strong>
+                <span className="gs-public-attribute-visual" aria-hidden="true">
+                  <CardImage type={attribute.type} className="gs-public-attribute-icon" />
+                </span>
+                <span className="gs-public-attribute-copy">
+                  <span>{attribute.label}</span>
+                  <strong>{attribute.value}</strong>
+                </span>
               </span>
             ))}
             {player.actionCard && (
               <span className="gs-public-attribute" data-attr-type="action">
-                <span>Особое условие</span>
-                <strong>{player.actionCard.title}</strong>
+                <span className="gs-public-attribute-visual" aria-hidden="true">
+                  <CardImage type="action" className="gs-public-attribute-icon" />
+                </span>
+                <span className="gs-public-attribute-copy">
+                  <span>Особое условие</span>
+                  <strong>{player.actionCard.title}</strong>
+                </span>
               </span>
             )}
           </>

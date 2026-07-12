@@ -14,7 +14,8 @@
     "build": "npm -w server run build && npm -w client run build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:game-screen": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/game-screen/GameScreen.test.tsx"
+    "test:game-screen": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/game-screen/GameScreen.test.tsx",
+    "test:theme": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/theme/GlobalTheme.test.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

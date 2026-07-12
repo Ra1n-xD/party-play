@@ -1,70 +1,110 @@
 import React from "react";
+import { FiAlertTriangle, FiClock, FiRadio, FiShield } from "react-icons/fi";
 import { Timer } from "../../components/Timer";
 import type { ClientGameState } from "../../context/GameContext";
+import { ScenarioDetails } from "./ScenarioSummary";
 
 interface GameStatusHeaderProps {
   gameState: ClientGameState;
   phaseLabel: string;
   phaseDescription: string;
-  votingInfo: string;
   isMyTurn: boolean;
-  connected: boolean;
   canSkipDiscussion: boolean;
-  canManageGame: boolean;
   onSkipDiscussion: () => void;
-  onOpenHostControls: () => void;
 }
 
 export function GameStatusHeader({
   gameState,
   phaseLabel,
   phaseDescription,
-  votingInfo,
   isMyTurn,
-  connected,
   canSkipDiscussion,
-  canManageGame,
   onSkipDiscussion,
-  onOpenHostControls,
 }: GameStatusHeaderProps) {
+  const alivePlayers = gameState.players.filter((player) => player.alive);
+  const timerLabel = gameState.phase === "ROUND_DISCUSSION" ? "До голосования" : "До конца этапа";
+
   return (
     <header
-      className={`gs-status-header${isMyTurn ? " is-my-turn" : ""}`}
+      className={`gs-info-strip gs-status-header${isMyTurn ? " is-my-turn" : ""}`}
       aria-label="Состояние игры"
     >
-      <div className="gs-status-copy">
-        <span className="gs-eyebrow">
-          Раунд {gameState.roundNumber} из {gameState.totalRounds}
+      <section className="gs-info-scenario">
+        <span className="gs-codex-scenario-icon" aria-hidden="true">
+          <FiAlertTriangle />
         </span>
-        <h1>{phaseLabel}</h1>
-        <p>{phaseDescription}</p>
-      </div>
-      <div
-        className="gs-round-progress"
-        aria-label={`Раунд ${gameState.roundNumber} из ${gameState.totalRounds}`}
-      >
-        {Array.from({ length: gameState.totalRounds }, (_, index) => (
-          <span
-            key={index}
-            className={`gs-round-step ${index + 1 < gameState.roundNumber ? "is-complete" : ""} ${index + 1 === gameState.roundNumber ? "is-current" : ""}`}
-            aria-hidden="true"
-          >
-            {index + 1}
+        <span className="gs-codex-scenario-copy">
+          <small>Сценарий катастрофы · раунд {gameState.roundNumber}</small>
+          <strong>{gameState.catastrophe?.title ?? "Сценарий загружается"}</strong>
+          <span>{gameState.catastrophe?.description ?? phaseDescription}</span>
+        </span>
+      </section>
+
+      <div className="gs-info-metrics">
+        <section className="gs-info-metric gs-info-timer">
+          <span className="gs-info-label">
+            <FiClock aria-hidden="true" /> {timerLabel}
           </span>
-        ))}
+          {gameState.phaseEndTime ? (
+            <Timer endTime={gameState.phaseEndTime} size="large" />
+          ) : (
+            <strong className="gs-info-timer-empty">—</strong>
+          )}
+          <small>{phaseDescription}</small>
+        </section>
+
+        <section className="gs-info-metric gs-info-capacity">
+          <span className="gs-info-label">
+            <FiShield aria-hidden="true" /> Мест
+          </span>
+          <strong className="gs-info-capacity-value">
+            {gameState.bunkerCapacity}
+            <span>/{alivePlayers.length}</span>
+          </strong>
+          <small>осталось в бункере</small>
+        </section>
+
+        <section className="gs-info-metric gs-info-round">
+          <span className="gs-info-label">
+            <FiRadio aria-hidden="true" /> Раунд
+          </span>
+          <strong>
+            {gameState.roundNumber}
+            <span>/{gameState.totalRounds}</span>
+          </strong>
+          <small>{phaseLabel}</small>
+        </section>
+
+        <section className="gs-info-progress">
+          <span className="gs-info-progress-heading">
+            <strong>Раскрытие характеристик</strong>
+            <b>
+              {String(gameState.roundNumber).padStart(2, "0")} /{" "}
+              {String(gameState.totalRounds).padStart(2, "0")}
+            </b>
+          </span>
+          <span
+            className="gs-info-round-track"
+            aria-label={`Раунд ${gameState.roundNumber} из ${gameState.totalRounds}`}
+          >
+            {Array.from({ length: gameState.totalRounds }, (_, index) => (
+              <i
+                key={index}
+                className={`gs-info-round-segment${index < gameState.roundNumber ? " is-filled" : ""}`}
+              />
+            ))}
+          </span>
+        </section>
       </div>
+
+      <section className="gs-desktop-situation-details" aria-label="Подробности ситуации">
+        <ScenarioDetails idPrefix="gs-scenario-desktop" gameState={gameState} />
+      </section>
+
       <div className="gs-status-actions">
-        {!connected && <span className="gs-connection-status">Нет соединения</span>}
-        {votingInfo && <span className="gs-voting-status">{votingInfo}</span>}
-        <Timer endTime={gameState.phaseEndTime} size="large" />
         {canSkipDiscussion && (
-          <button className="btn btn-secondary" onClick={onSkipDiscussion}>
+          <button type="button" className="btn btn-secondary" onClick={onSkipDiscussion}>
             Пропустить обсуждение
-          </button>
-        )}
-        {canManageGame && (
-          <button className="btn btn-secondary" onClick={onOpenHostControls}>
-            Управление
           </button>
         )}
       </div>

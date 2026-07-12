@@ -1,0 +1,62 @@
+import { FiHome, FiLogOut, FiSettings, FiWifi, FiWifiOff } from "react-icons/fi";
+
+interface GameRoomHeaderProps {
+  roomCode: string | null;
+  connected: boolean;
+  canManageGame: boolean;
+  onOpenHostControls: () => void;
+  onLeaveRoom: () => void;
+}
+
+export function GameRoomHeader({
+  roomCode,
+  connected,
+  canManageGame,
+  onOpenHostControls,
+  onLeaveRoom,
+}: GameRoomHeaderProps) {
+  return (
+    <header className="gs-room-header" aria-label="Комната игры">
+      <div className="gs-room-brand">
+        <span className="gs-room-brand-icon" aria-hidden="true">
+          <FiHome />
+        </span>
+        <span className="gs-room-brand-copy">
+          <strong>Бункер</strong>
+        </span>
+      </div>
+
+      <div className="gs-room-controls">
+        <div className="gs-room-code" aria-label={`Код комнаты ${roomCode || "неизвестен"}`}>
+          <span>Комната</span>
+          <strong>{roomCode || "—"}</strong>
+        </div>
+        <div
+          className={`gs-room-connection ${connected ? "is-connected" : "is-disconnected"}`}
+          role="status"
+        >
+          {connected ? <FiWifi aria-hidden="true" /> : <FiWifiOff aria-hidden="true" />}
+          <span>{connected ? "Связь установлена" : "Нет соединения"}</span>
+        </div>
+        {canManageGame && (
+          <button
+            type="button"
+            className="gs-room-action"
+            onClick={onOpenHostControls}
+            aria-label="Управление игрой"
+          >
+            <FiSettings aria-hidden="true" />
+          </button>
+        )}
+        <button
+          type="button"
+          className="gs-room-action"
+          onClick={onLeaveRoom}
+          aria-label="Выйти из комнаты"
+        >
+          <FiLogOut aria-hidden="true" />
+        </button>
+      </div>
+    </header>
+  );
+}

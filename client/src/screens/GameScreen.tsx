@@ -6,6 +6,7 @@ import { AccessibleModal } from "./game/AccessibleModal";
 import { CharacterLoadingState } from "./game/CharacterLoadingState";
 import { CharacterDossier } from "./game/CharacterDossier";
 import { GameStatusHeader } from "./game/GameStatusHeader";
+import { GameRoomHeader } from "./game/GameRoomHeader";
 import { HostControlDialog } from "./game/HostControlDialog";
 import { MobileGameTabs } from "./game/MobileGameTabs";
 import { PlayerBoard } from "./game/PlayerBoard";
@@ -23,9 +24,11 @@ export function GameScreen() {
     isSpectator,
     myCharacter,
     connected,
+    roomCode,
     revealAttribute,
     revealActionCard,
     endGame,
+    leaveRoom,
     error,
     adminShuffleAll,
     adminSwapAttribute,
@@ -46,7 +49,6 @@ export function GameScreen() {
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [confirmRevealAction, setConfirmRevealAction] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState<MobileGameTab>("players");
-  const [scenarioExpanded, setScenarioExpanded] = useState(false);
   const [hostControlsOpen, setHostControlsOpen] = useState(false);
   const hostPauseActiveRef = useRef(false);
 
@@ -154,17 +156,20 @@ export function GameScreen() {
     <main
       className={`screen command-game-screen ${view.hasBottomAction ? "has-game-actions" : ""}`}
     >
+      <GameRoomHeader
+        roomCode={roomCode}
+        connected={connected}
+        canManageGame={Boolean(view.me?.isHost)}
+        onOpenHostControls={openHostControls}
+        onLeaveRoom={leaveRoom}
+      />
       <GameStatusHeader
         gameState={gameState}
         phaseLabel={view.phaseLabel}
         phaseDescription={view.phaseDescription}
-        votingInfo={view.votingInfo}
         isMyTurn={view.isMyTurn}
-        connected={connected}
         canSkipDiscussion={gameState.phase === "ROUND_DISCUSSION" && Boolean(view.me?.isHost)}
-        canManageGame={Boolean(view.me?.isHost)}
         onSkipDiscussion={adminSkipDiscussion}
-        onOpenHostControls={openHostControls}
       />
 
       {isSpectator && (
@@ -174,14 +179,6 @@ export function GameScreen() {
       )}
 
       <div className="gs-desktop-layout">
-        <div className="gs-scenario-desktop">
-          <ScenarioSummary
-            idPrefix="gs-scenario-desktop"
-            gameState={gameState}
-            expanded={scenarioExpanded}
-            onToggle={() => setScenarioExpanded((expanded) => !expanded)}
-          />
-        </div>
         <div className="gs-workspace">
           {playerBoard}
           {characterDossier && <div className="gs-dossier-column">{characterDossier}</div>}
@@ -209,6 +206,15 @@ export function GameScreen() {
 
       {view.hasBottomAction && (
         <div className="gs-action-bar" aria-label="Игровые действия">
+          {view.canRevealAction && (
+            <button
+              type="button"
+              className="btn btn-reveal-action btn-bottom-action"
+              onClick={openRevealActionConfirmation}
+            >
+              Раскрыть особое условие
+            </button>
+          )}
           {view.canReveal && (
             <button
               type="button"
@@ -222,15 +228,6 @@ export function GameScreen() {
               }}
             >
               Раскрыть характеристику
-            </button>
-          )}
-          {view.canRevealAction && (
-            <button
-              type="button"
-              className="btn btn-reveal-action btn-bottom-action"
-              onClick={openRevealActionConfirmation}
-            >
-              Раскрыть особое условие
             </button>
           )}
         </div>
@@ -387,9 +384,7 @@ export function GameScreen() {
                         </div>
                         {isMe && (
                           <span className="attr-status">
-                            {isActionCardPublic
-                              ? "Раскрыто всем"
-                              : "Видно только вам · Не раскрыто"}
+                            {isActionCardPublic ? "Раскрыто всем" : "Не раскрыто"}
                           </span>
                         )}
                       </div>

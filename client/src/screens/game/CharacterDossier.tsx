@@ -13,7 +13,7 @@ function VisibilityStatus({ isRevealed }: { isRevealed: boolean }) {
   return isRevealed ? (
     <span className="gs-card-visibility is-public">Раскрыто всем</span>
   ) : (
-    <span className="gs-card-visibility is-private">Видно только вам · Не раскрыто</span>
+    <span className="gs-card-visibility is-private">Не раскрыто</span>
   );
 }
 

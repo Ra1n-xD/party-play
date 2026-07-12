@@ -33,7 +33,6 @@ export interface GameScreenViewModel {
   hasBottomAction: boolean;
   phaseLabel: string;
   phaseDescription: string;
-  votingInfo: string;
 }
 
 interface BuildViewModelArgs {
@@ -123,10 +122,6 @@ export function buildGameScreenViewModel({
     hasBottomAction: canReveal || canRevealAction,
     phaseLabel: PHASE_LABELS[gameState.phase] ?? gameState.phase,
     phaseDescription,
-    votingInfo:
-      gameState.votingsInCurrentRound > 0
-        ? `Голосование ${gameState.currentVotingInRound + 1} из ${gameState.votingsInCurrentRound}`
-        : "",
   };
 }
 
