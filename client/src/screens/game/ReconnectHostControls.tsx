@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { PlayerInfo, SeatClaimInfo } from "../../../../shared/types";
 
 interface ReconnectHostControlsProps {
@@ -43,10 +44,20 @@ export function ReconnectHostControls({
   onTransferHost,
   compact = false,
 }: ReconnectHostControlsProps) {
+  const [kickConfirmationId, setKickConfirmationId] = useState<string | null>(null);
   const removablePlayers = players.filter(
     (player) => !player.isBot && !player.isHost && !player.kicked,
   );
   const hostCandidates = removablePlayers.filter((player) => player.connected);
+
+  useEffect(() => {
+    if (
+      kickConfirmationId &&
+      !removablePlayers.some((player) => player.id === kickConfirmationId)
+    ) {
+      setKickConfirmationId(null);
+    }
+  }, [kickConfirmationId, removablePlayers]);
 
   return (
     <section
@@ -110,11 +121,32 @@ export function ReconnectHostControls({
                 <button
                   type="button"
                   className="reconnect-host-action is-kick"
-                  aria-label={`Удалить игрока ${player.name}`}
-                  onClick={() => onKickPlayer(player.id)}
+                  aria-label={
+                    kickConfirmationId === player.id
+                      ? `Подтвердить удаление ${player.name}`
+                      : `Удалить игрока ${player.name}`
+                  }
+                  onClick={() => {
+                    if (kickConfirmationId !== player.id) {
+                      setKickConfirmationId(player.id);
+                      return;
+                    }
+                    onKickPlayer(player.id);
+                    setKickConfirmationId(null);
+                  }}
                 >
-                  Удалить навсегда
+                  {kickConfirmationId === player.id ? "Подтвердить удаление" : "Удалить навсегда"}
                 </button>
+                {kickConfirmationId === player.id && (
+                  <button
+                    type="button"
+                    className="reconnect-host-action is-reject"
+                    aria-label={`Отменить удаление ${player.name}`}
+                    onClick={() => setKickConfirmationId(null)}
+                  >
+                    Отмена
+                  </button>
+                )}
                 {hostCandidates.some((candidate) => candidate.id === player.id) && (
                   <button
                     type="button"

@@ -2641,8 +2641,8 @@ test("no eligible host keeps the seat and pause until a different human recovers
       state.players.find((player) => player.id === originalHost.playerId)?.connected === false,
   );
   assert.equal(game.room.hostId, originalHost.playerId);
-  assert.equal(game.room.gameState?.pauseReasons.admin, true);
-  assert.equal(abandonedState.pauseKind, "mixed");
+  assert.equal(game.room.gameState?.pauseReasons.admin, false);
+  assert.equal(abandonedState.pauseKind, "reconnect");
   assert.equal(hostChanges.length, 0);
 
   const recoveringClient = await game.server.connectClient();
@@ -2672,6 +2672,9 @@ test("the original host returning first keeps the anchored seat without a recove
   const hostChanges: string[] = [];
   observer.socket.on("room:hostChanged", ({ reason }) => hostChanges.push(reason));
 
+  game.host.emit("admin:pause");
+  await observer.waitFor("game:state", (state) => state.pauseKind === "admin");
+
   for (const index of [1, 2, 3]) {
     game.humans[index].disconnect();
     await observer.waitFor(
@@ -2682,12 +2685,14 @@ test("the original host returning first keeps the anchored seat without a recove
     );
   }
   game.host.disconnect();
-  await observer.waitFor(
+  const abandonedState = await observer.waitFor(
     "game:state",
     (state) =>
       state.players.find((player) => player.id === game.credentials[0].playerId)?.connected ===
       false,
   );
+  assert.equal(abandonedState.pauseKind, "reconnect");
+  assert.equal(game.room.gameState?.pauseReasons.admin, false);
 
   const returningHost = await game.server.connectClient();
   const joinedPromise = returningHost.waitFor("room:joined");
@@ -2702,6 +2707,7 @@ test("the original host returning first keeps the anchored seat without a recove
   await delay(20);
 
   assert.equal(game.room.hostId, game.credentials[0].playerId);
+  assert.equal(state.pauseKind, "reconnect");
   assert.equal(
     state.players.find((player) => player.id === game.credentials[0].playerId)?.isHost,
     true,
@@ -4261,6 +4267,62 @@ test("regular-vote permanent kick consumes one ballot and schedules one administ
   assert.equal(state.phase, "ROUND_DISCUSSION");
   interruptedBallotCallback();
   assert.equal(state.currentVotingInRound, 1);
+});
+
+test("voter completion stays private and survives an exact-seat reconnect", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const state = game.room.gameState;
+  assert.ok(state);
+  moveToPhase(game.room, "ROUND_VOTE");
+  state.votes.clear();
+  for (const player of game.room.players.values()) {
+    player.hasVoted = false;
+    player.votedFor = null;
+  }
+
+  const voter = game.humans[1];
+  const voterId = game.credentials[1].playerId;
+  const accepted = voter.waitFor(
+    "game:voterStatus",
+    (status) => status.phase === "ROUND_VOTE" && status.hasVoted,
+  );
+  const publicUpdate = game.host.waitFor(
+    "game:state",
+    (publicState) => publicState.votesCount === 1,
+  );
+  voter.emit("vote:cast", { targetPlayerId: game.credentials[2].playerId });
+
+  assert.deepEqual(await accepted, {
+    phase: "ROUND_VOTE",
+    roundNumber: state.roundNumber,
+    currentVotingInRound: state.currentVotingInRound,
+    hasVoted: true,
+  });
+  const publicState = await publicUpdate;
+  assert.equal(
+    publicState.players.some((player) => "hasVoted" in player),
+    false,
+  );
+
+  voter.disconnect();
+  await game.host.waitFor("game:state", (nextState) =>
+    nextState.disconnectedPlayerIds.includes(voterId),
+  );
+
+  const reconnecting = await game.server.connectClient();
+  const joined = reconnecting.waitFor("room:joined");
+  const restoredStatus = reconnecting.waitFor(
+    "game:voterStatus",
+    (status) => status.phase === "ROUND_VOTE" && status.hasVoted,
+  );
+  reconnecting.emit("room:rejoin", game.credentials[1]);
+  await joined;
+  assert.deepEqual(await restoredStatus, {
+    phase: "ROUND_VOTE",
+    roundNumber: state.roundNumber,
+    currentVotingInRound: state.currentVotingInRound,
+    hasVoted: true,
+  });
 });
 
 test("tiebreak permanent kick clears candidates, votes, and the interrupted ballot timer", async (t) => {

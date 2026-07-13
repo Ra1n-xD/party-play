@@ -73,6 +73,11 @@
   display: none;
 }
 
+.command-game-screen.vote-screen .sticky-top-bar {
+  position: static;
+  margin: 0 -18px 16px;
+}
+
 .command-game-screen .gs-room-header {
   position: sticky;
   z-index: 70;
@@ -1495,6 +1500,10 @@
     gap: 8px;
     margin-inline: -12px;
     padding: 4px 12px;
+  }
+
+  .command-game-screen.vote-screen .sticky-top-bar {
+    margin-inline: -12px;
   }
 
   .command-game-screen .gs-room-brand {

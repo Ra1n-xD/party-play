@@ -335,7 +335,11 @@ export function GameScreen() {
                   {player.name}
                   {isMe && <span className="me-badge">ВЫ</span>}
                 </h3>
-                {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
+                {!player.alive && (
+                  <span className="eliminated-badge">
+                    {player.kicked ? "УДАЛЁН АДМИНИСТРАТОРОМ" : "ИЗГНАН"}
+                  </span>
+                )}
               </div>
               <div className="attributes-grid">
                 {isMe ? (

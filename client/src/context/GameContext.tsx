@@ -113,6 +113,7 @@ interface GameContextType {
   isSpectator: boolean;
   gameState: ClientGameState | null;
   myCharacter: Character | null;
+  myHasVoted: boolean;
   error: string | null;
   reconnectState: ReconnectState;
   reconnectableSeats: ReconnectableSeat[];
@@ -177,6 +178,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [isSpectator, setIsSpectator] = useState(false);
   const [gameState, setGameState] = useState<ClientGameState | null>(null);
   const [myCharacter, setMyCharacter] = useState<Character | null>(null);
+  const [privateVoterStatus, setPrivateVoterStatus] = useState<{
+    phase: GamePhase;
+    roundNumber: number;
+    currentVotingInRound: number;
+    hasVoted: boolean;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reconnectState, setReconnectState] = useState<ReconnectState>("idle");
   const [reconnectableSeats, setReconnectableSeats] = useState<ReconnectableSeat[]>([]);
@@ -267,6 +274,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setIsSpectator(false);
       setGameState(null);
       setMyCharacter(null);
+      setPrivateVoterStatus(null);
       setReconnectState("idle");
       setReconnectableSeats([]);
       setReconnectableSeatsRoomCode(null);
@@ -401,6 +409,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setSeatLookupState({ status: "idle", roomCode: null });
       setRetainedReconnectSession(summarizeRetainedSession(acceptedSession));
       setPendingSeatClaim(null);
+      setPrivateVoterStatus(null);
       saveReconnectSession(acceptedSession);
     };
 
@@ -665,6 +674,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setMyCharacter(character);
     };
 
+    const handleVoterStatus: ServerEvents["game:voterStatus"] = (status) => {
+      if (ignoreRoomEventsRef.current) return;
+      setPrivateVoterStatus(status);
+    };
+
     const handleAttributeRevealed: ServerEvents["game:attributeRevealed"] = ({
       playerName,
       attribute,
@@ -696,6 +710,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     socket.on("room:hostChanged", handleHostChanged);
     socket.on("game:state", handleGameState);
     socket.on("game:character", handleCharacter);
+    socket.on("game:voterStatus", handleVoterStatus);
     socket.on("game:attributeRevealed", handleAttributeRevealed);
     socket.on("game:actionCardRevealed", handleActionCardRevealed);
 
@@ -721,6 +736,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       socket.off("room:hostChanged", handleHostChanged);
       socket.off("game:state", handleGameState);
       socket.off("game:character", handleCharacter);
+      socket.off("game:voterStatus", handleVoterStatus);
       socket.off("game:attributeRevealed", handleAttributeRevealed);
       socket.off("game:actionCardRevealed", handleActionCardRevealed);
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
@@ -882,6 +898,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setIsSpectator(false);
     setGameState(null);
     setMyCharacter(null);
+    setPrivateVoterStatus(null);
     setReconnectState("idle");
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
@@ -1088,6 +1105,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setHostChangeNotice(null);
   }, []);
 
+  const myHasVoted = Boolean(
+    !isSpectator &&
+    privateVoterStatus &&
+    gameState &&
+    privateVoterStatus.phase === gameState.phase &&
+    privateVoterStatus.roundNumber === gameState.roundNumber &&
+    privateVoterStatus.currentVotingInRound === gameState.currentVotingInRound &&
+    privateVoterStatus.hasVoted,
+  );
+
   return (
     <GameContext.Provider
       value={{
@@ -1097,6 +1124,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         isSpectator,
         gameState,
         myCharacter,
+        myHasVoted,
         error,
         reconnectState,
         reconnectableSeats,
