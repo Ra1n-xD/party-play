@@ -1080,3 +1080,49 @@ test("completed seat lookup stays bound to its room and clears before claim", as
     await mounted.cleanup();
   }
 });
+
+test("clearing an in-flight lookup hides its result without releasing serialization", async () => {
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider();
+
+  try {
+    await act(async () => mounted.snapshot().listReconnectableSeats("AAAA"));
+    await act(async () => {
+      mounted.snapshot().clearReconnectableSeats();
+      mounted.snapshot().listReconnectableSeats("BBBB");
+      mounted.snapshot().joinRoom("CCCC", "Player");
+    });
+    assert.deepEqual(
+      mounted.fake.emittedFor("room:listReconnectableSeats").map((entry) => entry.args),
+      [[{ roomCode: "AAAA" }]],
+    );
+    assert.equal(mounted.fake.emittedFor("room:join").length, 0);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode: "AAAA",
+        seats: [{ playerId: otherPlayerId, playerName: "Stale seat" }],
+      });
+    });
+    assert.deepEqual(mounted.snapshot().reconnectableSeats, []);
+    assert.equal(mounted.snapshot().reconnectableSeatsRoomCode, null);
+
+    await act(async () => mounted.snapshot().listReconnectableSeats("BBBB"));
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode: "AAAA",
+        seats: [{ playerId: otherPlayerId, playerName: "Late stale seat" }],
+      });
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode: "BBBB",
+        seats: [{ playerId: otherPlayerId, playerName: "Current seat" }],
+      });
+    });
+    assert.equal(mounted.snapshot().reconnectableSeatsRoomCode, "BBBB");
+    assert.deepEqual(mounted.snapshot().reconnectableSeats, [
+      { playerId: otherPlayerId, playerName: "Current seat" },
+    ]);
+  } finally {
+    await mounted.cleanup();
+  }
+});
