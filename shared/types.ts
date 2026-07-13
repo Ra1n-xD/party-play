@@ -293,6 +293,7 @@ export interface WeddingServerEvents {
   "wedding:guestState": (data: GuestWeddingState) => void;
   "wedding:hostState": (data: HostWeddingState) => void;
   "wedding:error": (data: { message: string }) => void;
+  "wedding:contestReset": () => void;
   "wedding:expired": () => void;
 }
 
