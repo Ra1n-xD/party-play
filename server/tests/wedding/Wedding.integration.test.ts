@@ -252,7 +252,7 @@ test("rejects host mutations from guests and broadcasts manual score changes", a
   }
 });
 
-test("host restarts a finished contest while guests keep their seats", async () => {
+test("host restarts a finished contest and guests must join again", async () => {
   const harness = await createHarness();
   try {
     const host = await harness.connect();
@@ -273,19 +273,28 @@ test("host restarts a finished contest while guests keep their seats", async () 
     await guest.waitFor("wedding:guestState", (state) => state.phase === "FINISHED");
 
     host.emit("wedding:restartContest");
+    await guest.waitFor("wedding:contestReset");
     const restartedHost = await host.waitFor(
       "wedding:hostState",
-      (state) => state.phase === "PREPARING" && state.questionNumber === 0,
-    );
-    const restartedGuest = await guest.waitFor(
-      "wedding:guestState",
-      (state) => state.phase === "PREPARING",
+      (state) =>
+        state.phase === "PREPARING" &&
+        state.questionNumber === 0 &&
+        state.participants.length === 0,
     );
 
-    assert.equal(restartedHost.participants[0].id, joined.participantId);
-    assert.equal(restartedHost.participants[0].correctAnswers, 0);
-    assert.equal(restartedGuest.participantId, joined.participantId);
-    assert.equal(restartedGuest.participantName, "Вера");
+    assert.deepEqual(restartedHost.participants, []);
+    guest.emit("wedding:answer", { optionIndex: 0 });
+    assert.match((await guest.waitFor("wedding:error")).message, /выберите своё имя/i);
+
+    guest.emit("wedding:joinNew", { name: "Вера" });
+    const rejoined = await guest.waitFor("wedding:joined");
+    assert.notEqual(rejoined.participantId, joined.participantId);
+    const newGuestState = await guest.waitFor(
+      "wedding:guestState",
+      (state) => state.participantId === rejoined.participantId,
+    );
+    assert.equal(newGuestState.phase, "PREPARING");
+    assert.equal(newGuestState.participantName, "Вера");
   } finally {
     await harness.close();
   }

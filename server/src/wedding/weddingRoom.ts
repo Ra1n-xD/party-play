@@ -422,11 +422,7 @@ export class WeddingRoomService {
       draft.optionStyle = "letters";
       draft.correctOption = null;
       draft.answers = [];
-      for (const participant of draft.participants) {
-        participant.correctAnswers = 0;
-        participant.answerOption = null;
-        participant.answerSubmittedAt = null;
-      }
+      draft.participants = [];
       return this.serializeHost(draft);
     });
   }

@@ -267,6 +267,8 @@ export function registerWeddingHandlers(
       if (!requireHost()) return;
       try {
         service.restartContest();
+        participantBySocket.clear();
+        namespace.emit("wedding:contestReset");
         broadcastAll();
       } catch (error) {
         emitError(socket.id, error);
