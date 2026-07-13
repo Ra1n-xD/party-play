@@ -256,10 +256,7 @@ export function addBotToRoom(room: Room): Player | null {
   // Pick unused bot name
   const usedNames = new Set(Array.from(room.players.values()).map((p) => p.name));
   const available = BOT_NAMES.filter((n) => !usedNames.has(n));
-  const name =
-    available.length > 0
-      ? randomPick(available)
-      : `Бот ${room.players.size + 1}`;
+  const name = available.length > 0 ? randomPick(available) : `Бот ${room.players.size + 1}`;
 
   const playerId = generatePlayerId();
   const player: Player = {
@@ -302,7 +299,8 @@ export function joinRoomAsSpectator(
 ): { room: Room; spectator: Spectator } | { error: string } {
   const room = rooms.get(roomCode);
   if (!room) return { error: "Комната не найдена" };
-  if (room.spectators.size >= CONFIG.MAX_SPECTATORS_PER_ROOM) return { error: "Слишком много зрителей" };
+  if (room.spectators.size >= CONFIG.MAX_SPECTATORS_PER_ROOM)
+    return { error: "Слишком много зрителей" };
 
   const spectatorId = generatePlayerId();
   const spectator: Spectator = {
