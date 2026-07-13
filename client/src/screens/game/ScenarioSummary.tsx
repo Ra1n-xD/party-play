@@ -1,5 +1,6 @@
 import React, { type ReactNode } from "react";
-import { FiAlertTriangle, FiHome } from "react-icons/fi";
+import { FiAlertTriangle } from "react-icons/fi";
+import { GiFalloutShelter } from "react-icons/gi";
 import type { ClientGameState } from "../../context/GameContext";
 
 interface ScenarioSummaryProps {
@@ -22,7 +23,7 @@ export function ScenarioDetails({ idPrefix, gameState }: ScenarioDetailsProps) {
     <div id={`${idPrefix}-details`} className="gs-scenario-details">
       <div className="gs-bunker-details">
         <h3 className="gs-bunker-heading">
-          <FiHome className="gs-bunker-heading-icon" aria-hidden="true" />
+          <GiFalloutShelter className="gs-bunker-heading-icon" aria-hidden="true" />
           Бункер
         </h3>
         <div className="gs-bunker-cards">

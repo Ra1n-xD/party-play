@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ROOM_CODE_LENGTH, sanitizeRoomCodeInput } from "../../../shared/roomCode";
 import { useGame } from "../context/GameContext";
 
 interface ReconnectScreenProps {
@@ -24,7 +25,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [claimantName, setClaimantName] = useState("");
 
-  const normalizedRoomCode = roomCode.trim().toUpperCase();
+  const normalizedRoomCode = roomCode;
   const claimInProgress =
     pendingSeatClaim?.status === "submitting" ||
     pendingSeatClaim?.status === "waiting" ||
@@ -37,7 +38,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
     lookupMatchesRoom && seatLookupState.status === "complete" && reconnectableSeats.length === 0;
 
   const findSeats = () => {
-    if (normalizedRoomCode.length < 4) return;
+    if (normalizedRoomCode.length !== ROOM_CODE_LENGTH) return;
     setSelectedPlayerId(null);
     listReconnectableSeats(normalizedRoomCode);
   };
@@ -48,7 +49,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
   };
 
   const changeRoomCode = (value: string) => {
-    setRoomCode(value.toUpperCase());
+    setRoomCode(sanitizeRoomCodeInput(value));
     setSelectedPlayerId(null);
     clearReconnectableSeats();
   };
@@ -87,7 +88,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
               aria-label="Код комнаты"
               value={roomCode}
               onChange={(event) => changeRoomCode(event.target.value)}
-              maxLength={8}
+              maxLength={ROOM_CODE_LENGTH}
               autoFocus
             />
           </label>
@@ -95,7 +96,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
             type="button"
             className="btn btn-primary"
             onClick={findSeats}
-            disabled={normalizedRoomCode.length < 4 || lookupPending}
+            disabled={normalizedRoomCode.length !== ROOM_CODE_LENGTH || lookupPending}
           >
             {lookupPending ? "Ищем места…" : "Найти места"}
           </button>

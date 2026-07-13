@@ -1,14 +1,11 @@
 import { useState } from "react";
-import { FiHome, FiLogOut, FiSettings, FiSkipForward, FiWifi, FiWifiOff } from "react-icons/fi";
+import { FiLogOut, FiWifi, FiWifiOff } from "react-icons/fi";
+import { GiFalloutShelter } from "react-icons/gi";
 import { AccessibleModal } from "./AccessibleModal";
 
 interface GameRoomHeaderProps {
   roomCode: string | null;
   connected: boolean;
-  canManageGame: boolean;
-  canSkipDiscussion: boolean;
-  onOpenHostControls: () => void;
-  onSkipDiscussion: () => void;
   onLeaveRoom: () => void;
   confirmActiveLeave?: boolean;
 }
@@ -16,10 +13,6 @@ interface GameRoomHeaderProps {
 export function GameRoomHeader({
   roomCode,
   connected,
-  canManageGame,
-  canSkipDiscussion,
-  onOpenHostControls,
-  onSkipDiscussion,
   onLeaveRoom,
   confirmActiveLeave = false,
 }: GameRoomHeaderProps) {
@@ -38,40 +31,12 @@ export function GameRoomHeader({
       <header className="gs-room-header" aria-label="Комната игры">
         <div className="gs-room-brand">
           <span className="gs-room-brand-icon" aria-hidden="true">
-            <FiHome />
+            <GiFalloutShelter />
           </span>
           <span className="gs-room-brand-copy">
             <strong>Бункер</strong>
           </span>
         </div>
-
-        {canManageGame && (
-          <div className="gs-room-host-actions" aria-label="Действия хоста">
-            <button
-              type="button"
-              className="gs-room-host-action"
-              onClick={onSkipDiscussion}
-              disabled={!canSkipDiscussion}
-              title={
-                canSkipDiscussion
-                  ? "Завершить обсуждение и перейти к голосованию"
-                  : "Доступно во время обсуждения"
-              }
-            >
-              <FiSkipForward aria-hidden="true" />
-              <span>Пропустить обсуждение</span>
-            </button>
-            <button
-              type="button"
-              className="gs-room-host-action"
-              onClick={onOpenHostControls}
-              aria-label="Управление игрой"
-            >
-              <FiSettings aria-hidden="true" />
-              <span>Админ-панель</span>
-            </button>
-          </div>
-        )}
 
         <div className="gs-room-controls">
           <div className="gs-room-code" aria-label={`Код комнаты ${roomCode || "неизвестен"}`}>

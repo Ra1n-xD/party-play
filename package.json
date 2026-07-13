@@ -1,6 +1,6 @@
 {
   "name": "party-play",
-  "version": "1.2.5",
+  "version": "1.2.7",
   "private": true,
   "workspaces": [
     "shared",
@@ -17,6 +17,7 @@
     "test:reconnect": "TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx --test server/tests/reconnect/Reconnection.integration.test.ts",
     "test:reconnect-client": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/reconnect/ReconnectFlow.test.tsx",
     "test:game-screen": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/game-screen/GameScreen.test.tsx",
+    "test:server": "TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx --test server/tests/*.test.ts server/tests/reconnect/*.test.ts",
     "test:theme": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/theme/GlobalTheme.test.ts"
   },
   "devDependencies": {

@@ -1359,6 +1359,30 @@ test("Home renders a recovery failure only once", async () => {
   }
 });
 
+test("seat recovery accepts exactly four canonical room-code letters", async () => {
+  const { ReconnectScreen } = await import("../../src/screens/ReconnectScreen");
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({
+    children: <ReconnectScreen onBack={() => undefined} />,
+  });
+
+  try {
+    const codeInput = mounted.renderer.root.findByProps({ "aria-label": "Код комнаты" });
+    const findSeatsButton = findButton(mounted.renderer, "Найти места");
+
+    assert.equal(codeInput.props.maxLength, 4);
+    await act(async () => codeInput.props.onChange({ target: { value: "a1-bcdi" } }));
+    assert.equal(codeInput.props.value, "ABCD");
+    assert.equal(findSeatsButton.props.disabled, false);
+
+    await act(async () => codeInput.props.onChange({ target: { value: "abc" } }));
+    assert.equal(codeInput.props.value, "ABC");
+    assert.equal(findSeatsButton.props.disabled, true);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
 test("seat lookup exposes pending and completed-empty states for the exact room", async () => {
   const { ReconnectScreen } = await import("../../src/screens/ReconnectScreen");
   setBrowserStorage(new MemoryStorage());

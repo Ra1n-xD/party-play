@@ -252,7 +252,9 @@ export function HostControlDialog({
               <label>Игрок:</label>
               <div className="admin-chips">
                 {gameState.players
-                  .filter((player) => (action === "revive" ? !player.alive : player.alive))
+                  .filter((player) =>
+                    action === "revive" ? !player.alive && !player.kicked : player.alive,
+                  )
                   .map((player) => (
                     <button
                       type="button"

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FiSettings } from "react-icons/fi";
 import { Timer } from "../components/Timer";
 import { VoteProgressBar } from "../components/VoteProgressBar";
 import { useGame } from "../context/GameContext";
@@ -48,16 +49,17 @@ export function VoteScreen() {
   const adminPauseActiveRef = useRef(false);
   const isCurrentHost =
     !isSpectator && Boolean(gameState?.players.find((player) => player.id === playerId)?.isHost);
+  const canUseRoomActions = connected && reconnectState === "connected";
 
   const openAdminPanel = useCallback(() => {
-    if (!isCurrentHost || adminOpen || adminPauseActiveRef.current) return;
+    if (!isCurrentHost || !canUseRoomActions || adminOpen || adminPauseActiveRef.current) return;
 
     setConfirmTarget(null);
     setConfirmRevealAction(false);
     adminPauseActiveRef.current = true;
     setAdminOpen(true);
     adminPause();
-  }, [adminOpen, adminPause, isCurrentHost]);
+  }, [adminOpen, adminPause, canUseRoomActions, isCurrentHost]);
 
   const closeAdminPanel = useCallback(() => {
     setAdminOpen(false);
@@ -98,18 +100,18 @@ export function VoteScreen() {
   }, [adminUnpause]);
 
   useEffect(() => {
-    if (!isCurrentHost) {
+    if (!isCurrentHost || !canUseRoomActions) {
       setAdminOpen(false);
       adminPauseActiveRef.current = false;
     }
-  }, [isCurrentHost]);
+  }, [canUseRoomActions, isCurrentHost]);
 
   useEffect(() => {
     if (!pendingAdminOpen) return;
 
     consumePendingAdminOpen();
-    if (isCurrentHost) openAdminPanel();
-  }, [consumePendingAdminOpen, isCurrentHost, openAdminPanel, pendingAdminOpen]);
+    if (isCurrentHost && canUseRoomActions) openAdminPanel();
+  }, [canUseRoomActions, consumePendingAdminOpen, isCurrentHost, openAdminPanel, pendingAdminOpen]);
 
   if (!gameState) return null;
 
@@ -119,15 +121,7 @@ export function VoteScreen() {
   if (isSpectator) {
     return (
       <main className="screen command-game-screen vote-screen">
-        <GameRoomHeader
-          roomCode={roomCode}
-          connected={connected}
-          canManageGame={false}
-          canSkipDiscussion={false}
-          onOpenHostControls={() => undefined}
-          onSkipDiscussion={() => undefined}
-          onLeaveRoom={leaveRoom}
-        />
+        <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
         <div className="sticky-top-bar">
           <div className="top-bar-content">
             <div className="top-bar-left">
@@ -183,15 +177,11 @@ export function VoteScreen() {
       <GameRoomHeader
         roomCode={roomCode}
         connected={connected}
-        canManageGame={isCurrentHost}
-        canSkipDiscussion={false}
-        onOpenHostControls={openAdminPanel}
-        onSkipDiscussion={() => undefined}
         onLeaveRoom={leaveRoom}
         confirmActiveLeave
       />
 
-      {isCurrentHost && (
+      {isCurrentHost && canUseRoomActions && (
         <ReconnectHostBanner
           players={gameState.players}
           claimsCount={hostSeatClaims.length}
@@ -226,6 +216,19 @@ export function VoteScreen() {
             </span>
           </div>
           <div className="top-bar-right">
+            {isCurrentHost && canUseRoomActions && (
+              <button
+                type="button"
+                className="btn btn-secondary vote-admin-trigger"
+                onClick={openAdminPanel}
+                aria-label="Управление игрой"
+                aria-haspopup="dialog"
+                aria-expanded={adminOpen}
+              >
+                <FiSettings aria-hidden="true" />
+                <span>Админ-панель</span>
+              </button>
+            )}
             <Timer endTime={gameState.phaseEndTime} size="large" />
           </div>
         </div>
@@ -333,7 +336,7 @@ export function VoteScreen() {
 
       {error && <div className="error-toast">{error}</div>}
 
-      {isCurrentHost && (
+      {isCurrentHost && canUseRoomActions && (
         <HostControlDialog
           open={adminOpen}
           gameState={gameState}

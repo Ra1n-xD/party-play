@@ -5,6 +5,7 @@ import "../styles/game-screen.css";
 import { AccessibleModal } from "./game/AccessibleModal";
 import { CharacterLoadingState } from "./game/CharacterLoadingState";
 import { CharacterDossier } from "./game/CharacterDossier";
+import { GameCommandBar } from "./game/GameCommandBar";
 import { GameStatusHeader } from "./game/GameStatusHeader";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { HostControlDialog } from "./game/HostControlDialog";
@@ -25,6 +26,7 @@ export function GameScreen() {
     isSpectator,
     myCharacter,
     connected,
+    reconnectState,
     roomCode,
     revealAttribute,
     revealActionCard,
@@ -58,6 +60,7 @@ export function GameScreen() {
   const hostPauseActiveRef = useRef(false);
   const isCurrentHost =
     !isSpectator && Boolean(gameState?.players.find((player) => player.id === playerId)?.isHost);
+  const canUseRoomActions = connected && reconnectState === "connected";
 
   const closeLocalModals = useCallback(() => {
     setShowAttrPicker(false);
@@ -66,10 +69,10 @@ export function GameScreen() {
   }, []);
 
   const openAttributePicker = useCallback(() => {
-    if (hostControlsOpen || hostPauseActiveRef.current) return;
+    if (!canUseRoomActions || hostControlsOpen || hostPauseActiveRef.current) return;
     closeLocalModals();
     setShowAttrPicker(true);
-  }, [closeLocalModals, hostControlsOpen]);
+  }, [canUseRoomActions, closeLocalModals, hostControlsOpen]);
 
   const openExpandedPlayer = useCallback(
     (nextPlayerId: string) => {
@@ -81,19 +84,19 @@ export function GameScreen() {
   );
 
   const openRevealActionConfirmation = useCallback(() => {
-    if (hostControlsOpen || hostPauseActiveRef.current) return;
+    if (!canUseRoomActions || hostControlsOpen || hostPauseActiveRef.current) return;
     closeLocalModals();
     setConfirmRevealAction(true);
-  }, [closeLocalModals, hostControlsOpen]);
+  }, [canUseRoomActions, closeLocalModals, hostControlsOpen]);
 
   const openHostControls = useCallback(() => {
-    if (!isCurrentHost) return;
+    if (!isCurrentHost || !canUseRoomActions) return;
     if (hostControlsOpen || hostPauseActiveRef.current) return;
     closeLocalModals();
     hostPauseActiveRef.current = true;
     setHostControlsOpen(true);
     adminPause();
-  }, [adminPause, closeLocalModals, hostControlsOpen, isCurrentHost]);
+  }, [adminPause, canUseRoomActions, closeLocalModals, hostControlsOpen, isCurrentHost]);
 
   const closeHostControls = useCallback(() => {
     if (!hostControlsOpen && !hostPauseActiveRef.current) return;
@@ -129,11 +132,11 @@ export function GameScreen() {
   ]);
 
   useEffect(() => {
-    if (!isCurrentHost) {
+    if (!isCurrentHost || !canUseRoomActions) {
       setHostControlsOpen(false);
       hostPauseActiveRef.current = false;
     }
-  }, [isCurrentHost]);
+  }, [canUseRoomActions, isCurrentHost]);
 
   if (!gameState) return null;
   if (!isSpectator && !myCharacter) {
@@ -168,20 +171,14 @@ export function GameScreen() {
     ) : null;
 
   return (
-    <main
-      className={`screen command-game-screen ${view.hasBottomAction ? "has-game-actions" : ""}`}
-    >
+    <main className="screen command-game-screen has-game-command-bar">
       <GameRoomHeader
         roomCode={roomCode}
         connected={connected}
-        canManageGame={Boolean(view.me?.isHost)}
-        canSkipDiscussion={gameState.phase === "ROUND_DISCUSSION"}
-        onOpenHostControls={openHostControls}
-        onSkipDiscussion={adminSkipDiscussion}
         onLeaveRoom={leaveRoom}
         confirmActiveLeave={!isSpectator}
       />
-      {isCurrentHost && (
+      {isCurrentHost && canUseRoomActions && (
         <ReconnectHostBanner
           players={gameState.players}
           claimsCount={hostSeatClaims.length}
@@ -227,36 +224,29 @@ export function GameScreen() {
         />
       </div>
 
-      {view.hasBottomAction && (
-        <div className="gs-action-bar" aria-label="Игровые действия">
-          {view.canRevealAction && (
-            <button
-              type="button"
-              className="btn btn-reveal-action btn-bottom-action"
-              onClick={openRevealActionConfirmation}
-            >
-              Раскрыть особое условие
-            </button>
-          )}
-          {view.canReveal && (
-            <button
-              type="button"
-              className="btn btn-primary btn-reveal btn-bottom-action"
-              onClick={() => {
-                if (gameState.roundNumber === 1) {
-                  revealAttribute(0);
-                } else {
-                  openAttributePicker();
-                }
-              }}
-            >
-              Раскрыть характеристику
-            </button>
-          )}
-        </div>
-      )}
+      <GameCommandBar
+        currentTurnPlayer={view.currentTurnPlayer}
+        isMyTurn={view.isMyTurn}
+        phaseLabel={view.phaseLabel}
+        phaseDescription={view.phaseDescription}
+        canReveal={canUseRoomActions && view.canReveal}
+        canRevealAction={canUseRoomActions && view.canRevealAction}
+        canManageGame={canUseRoomActions && Boolean(view.me?.isHost)}
+        canSkipDiscussion={canUseRoomActions && view.canSkipDiscussion}
+        hostControlsOpen={hostControlsOpen}
+        onReveal={() => {
+          if (gameState.roundNumber === 1) {
+            revealAttribute(0);
+          } else {
+            openAttributePicker();
+          }
+        }}
+        onRevealAction={openRevealActionConfirmation}
+        onOpenHostControls={openHostControls}
+        onSkipDiscussion={adminSkipDiscussion}
+      />
 
-      {isCurrentHost && (
+      {isCurrentHost && canUseRoomActions && (
         <HostControlDialog
           open={hostControlsOpen}
           gameState={gameState}

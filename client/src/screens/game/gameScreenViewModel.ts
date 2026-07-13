@@ -25,12 +25,13 @@ export interface AdminSelection {
 export interface GameScreenViewModel {
   me?: PlayerInfo;
   alivePlayers: PlayerInfo[];
+  currentTurnPlayer?: PlayerInfo;
   isMyTurn: boolean;
   revealedIndices: Set<number>;
   unrevealedIndices: number[];
   canReveal: boolean;
   canRevealAction: boolean;
-  hasBottomAction: boolean;
+  canSkipDiscussion: boolean;
   phaseLabel: string;
   phaseDescription: string;
 }
@@ -80,22 +81,37 @@ export function buildGameScreenViewModel({
   myCharacter,
 }: BuildViewModelArgs): GameScreenViewModel {
   const me = isSpectator ? undefined : gameState.players.find((player) => player.id === playerId);
+  const currentTurnPlayer = gameState.players.find(
+    (player) => player.id === gameState.currentTurnPlayerId,
+  );
   const isMyTurn = Boolean(me && gameState.currentTurnPlayerId === me.id);
   const revealedIndices = getRevealedIndices(myCharacter, me);
   const unrevealedIndices = myCharacter
     ? myCharacter.attributes.map((_, index) => index).filter((index) => !revealedIndices.has(index))
     : [];
   const canReveal =
-    Boolean(me) && gameState.phase === "ROUND_REVEAL" && isMyTurn && unrevealedIndices.length > 1;
-  const canRevealAction = Boolean(me && myCharacter?.actionCard && !me.actionCardRevealed);
+    !gameState.paused &&
+    Boolean(me) &&
+    gameState.phase === "ROUND_REVEAL" &&
+    isMyTurn &&
+    unrevealedIndices.length > 1;
+  const canRevealAction = Boolean(
+    !gameState.paused && me && myCharacter?.actionCard && !me.actionCardRevealed,
+  );
+  const canSkipDiscussion = !gameState.paused && gameState.phase === "ROUND_DISCUSSION";
 
   let phaseDescription = "Следите за ходом игры";
-  if (gameState.phase === "CATASTROPHE_REVEAL") phaseDescription = "Ознакомьтесь с ситуацией";
-  if (gameState.phase === "BUNKER_EXPLORE") phaseDescription = "Открыта новая карта бункера";
-  if (gameState.phase === "ROUND_DISCUSSION")
+  if (gameState.paused) {
+    phaseDescription = "Игра приостановлена";
+  } else if (gameState.phase === "CATASTROPHE_REVEAL") {
+    phaseDescription = "Ознакомьтесь с ситуацией";
+  } else if (gameState.phase === "BUNKER_EXPLORE") {
+    phaseDescription = "Открыта новая карта бункера";
+  } else if (gameState.phase === "ROUND_DISCUSSION") {
     phaseDescription = "Обсудите, кого оставить за пределами бункера";
-  if (gameState.phase === "ROUND_RESULT") phaseDescription = "Подведены итоги голосования";
-  if (gameState.phase === "ROUND_REVEAL") {
+  } else if (gameState.phase === "ROUND_RESULT") {
+    phaseDescription = "Подведены итоги голосования";
+  } else if (gameState.phase === "ROUND_REVEAL") {
     if (isMyTurn && canReveal) {
       phaseDescription =
         gameState.roundNumber === 1
@@ -104,22 +120,22 @@ export function buildGameScreenViewModel({
     } else if (isMyTurn) {
       phaseDescription = "Все доступные характеристики уже раскрыты";
     } else {
-      const current = gameState.players.find(
-        (player) => player.id === gameState.currentTurnPlayerId,
-      );
-      phaseDescription = current ? `Сейчас ходит ${current.name}` : "Ожидаем следующего игрока";
+      phaseDescription = currentTurnPlayer
+        ? `Сейчас ходит ${currentTurnPlayer.name}`
+        : "Ожидаем следующего игрока";
     }
   }
 
   return {
     me,
     alivePlayers: gameState.players.filter((player) => player.alive),
+    currentTurnPlayer,
     isMyTurn,
     revealedIndices,
     unrevealedIndices,
     canReveal,
     canRevealAction,
-    hasBottomAction: canReveal || canRevealAction,
+    canSkipDiscussion,
     phaseLabel: PHASE_LABELS[gameState.phase] ?? gameState.phase,
     phaseDescription,
   };
