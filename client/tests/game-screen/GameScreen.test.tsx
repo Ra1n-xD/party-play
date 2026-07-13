@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import React, { type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { act, create } from "react-test-renderer";
 import type { Character, PlayerInfo } from "../../../shared/types";
 import type { ClientGameState } from "../../src/context/GameContext";
 import { AccessibleModal } from "../../src/screens/game/AccessibleModal";
@@ -44,6 +45,7 @@ const me: PlayerInfo = {
   actionCardRevealed: false,
   isHost: true,
   isBot: false,
+  kicked: false,
 };
 
 const other: PlayerInfo = {
@@ -63,6 +65,7 @@ const viewModelState: ClientGameState = {
   totalBunkerCards: 3,
   threatCard: null,
   bunkerCapacity: 2,
+  startedPlayerCount: 2,
   players: [me, other],
   currentTurnPlayerId: "me",
   votesCount: 0,
@@ -77,6 +80,8 @@ const viewModelState: ClientGameState = {
   phaseRemainingMs: 40_000,
   phaseEndTime: 40_000,
   paused: false,
+  pauseKind: "none",
+  disconnectedPlayerIds: [],
   spectatorCount: 0,
 };
 
@@ -89,6 +94,7 @@ const state = {
   totalBunkerCards: 3,
   threatCard: null,
   bunkerCapacity: 2,
+  startedPlayerCount: 0,
   players: [],
   currentTurnPlayerId: null,
   votesCount: 0,
@@ -103,6 +109,8 @@ const state = {
   phaseRemainingMs: null,
   phaseEndTime: null,
   paused: false,
+  pauseKind: "none",
+  disconnectedPlayerIds: [],
   spectatorCount: 0,
 } satisfies ClientGameState;
 
@@ -490,6 +498,7 @@ const player = {
   actionCardRevealed: false,
   isHost: false,
   isBot: false,
+  kicked: false,
 } satisfies PlayerInfo;
 
 const privateCharacter = {
@@ -846,4 +855,244 @@ test("mobile tabs select players when the active character tab is unavailable", 
   const playersPanel = html.match(/<div role="tabpanel" id="gs-mobile-panel-players"[^>]*>/)?.[0];
   assert.ok(playersPanel);
   assert.doesNotMatch(playersPanel, /hidden/);
+});
+
+test("reconnect host controls expose claim decisions, permanent kick, and host transfer", async () => {
+  const { ReconnectHostControls } = await import("../../src/screens/game/ReconnectHostControls");
+  const connectedPlayer: PlayerInfo = {
+    ...other,
+    id: "connected-player",
+    name: "Михаил",
+    connected: true,
+  };
+  const missingPlayer: PlayerInfo = {
+    ...other,
+    id: "missing-player",
+    name: "Ольга",
+    connected: false,
+  };
+  const calls: string[] = [];
+  const renderer = create(
+    <ReconnectHostControls
+      players={[me, connectedPlayer, missingPlayer]}
+      claims={[
+        {
+          requestId: "claim-1",
+          playerId: missingPlayer.id,
+          playerName: missingPlayer.name,
+          claimantName: "Новая Ольга",
+        },
+      ]}
+      onResolveClaim={(requestId, approved) => calls.push(`claim:${requestId}:${approved}`)}
+      onKickPlayer={(playerId) => calls.push(`kick:${playerId}`)}
+      onTransferHost={(playerId) => calls.push(`transfer:${playerId}`)}
+    />,
+  );
+
+  const html = renderToStaticMarkup(
+    <ReconnectHostControls
+      players={[me, connectedPlayer, missingPlayer]}
+      claims={[
+        {
+          requestId: "claim-1",
+          playerId: missingPlayer.id,
+          playerName: missingPlayer.name,
+          claimantName: "Новая Ольга",
+        },
+      ]}
+      onResolveClaim={() => undefined}
+      onKickPlayer={() => undefined}
+      onTransferHost={() => undefined}
+    />,
+  );
+  assert.match(html, /Новая Ольга/);
+  assert.match(html, /Претендует на место «Ольга»/);
+  assert.match(html, /Одобрить/);
+  assert.match(html, /Отклонить/);
+  assert.match(html, /Удалить навсегда/);
+  assert.match(html, /Передать права хоста/);
+
+  const clickByLabel = async (label: string) => {
+    const button = renderer.root
+      .findAllByType("button")
+      .find((candidate) => candidate.props["aria-label"] === label);
+    assert.ok(button, `Expected ${label}`);
+    await act(async () => button.props.onClick());
+  };
+  await clickByLabel("Одобрить заявку Новая Ольга");
+  await clickByLabel("Отклонить заявку Новая Ольга");
+  await clickByLabel("Удалить игрока Ольга");
+  await clickByLabel("Передать права игроку Михаил");
+  assert.deepEqual(calls, [
+    "claim:claim-1:true",
+    "claim:claim-1:false",
+    "kick:missing-player",
+    "transfer:connected-player",
+  ]);
+});
+
+test("active-game leave requires confirmation before preserving the seat", async () => {
+  let leaveCalls = 0;
+  const renderer = create(
+    <GameRoomHeader
+      roomCode="AX-204"
+      connected
+      canManageGame={false}
+      canSkipDiscussion={false}
+      confirmActiveLeave
+      onOpenHostControls={() => undefined}
+      onSkipDiscussion={() => undefined}
+      onLeaveRoom={() => {
+        leaveCalls++;
+      }}
+    />,
+  );
+  const leaveButton = renderer.root.findByProps({ "aria-label": "Выйти из комнаты" });
+  await act(async () => leaveButton.props.onClick());
+  assert.equal(leaveCalls, 0);
+  assert.equal(renderer.root.findAllByProps({ role: "dialog" }).length, 1);
+  const modalButtons = renderer.root.findByProps({ role: "dialog" }).findAllByType("button");
+  assert.match(modalButtons[0]?.children.join("") ?? "", /Остаться/);
+  assert.match(
+    renderToStaticMarkup(
+      <GameRoomHeader
+        roomCode="AX-204"
+        connected
+        canManageGame={false}
+        canSkipDiscussion={false}
+        confirmActiveLeave
+        onOpenHostControls={() => undefined}
+        onSkipDiscussion={() => undefined}
+        onLeaveRoom={() => undefined}
+      />,
+    ),
+    /aria-label="Выйти из комнаты"/,
+  );
+  const confirmButton = renderer.root
+    .findAllByType("button")
+    .find((candidate) => candidate.children.join("").includes("Покинуть и сохранить место"));
+  assert.ok(confirmButton);
+  await act(async () => confirmButton.props.onClick());
+  assert.equal(leaveCalls, 1);
+});
+
+test("kicked player cards use the permanent administrator label", () => {
+  const html = renderToStaticMarkup(
+    <PlayerBoard
+      players={[{ ...player, connected: false, alive: false, kicked: true }]}
+      playerId={null}
+      currentTurnPlayerId={null}
+      lastEliminatedPlayerId={null}
+      onSelectPlayer={() => undefined}
+    />,
+  );
+  assert.match(html, /is-kicked/);
+  assert.match(html, /Удалён администратором/);
+  assert.doesNotMatch(html, />Изгнан</);
+  assert.doesNotMatch(html, />Отключён</);
+});
+
+test("reconnect moderation is reused in game, vote, and compact lobby host surfaces", () => {
+  const gameSource = readFileSync(
+    new URL("../../src/screens/GameScreen.tsx", import.meta.url),
+    "utf8",
+  );
+  const voteSource = readFileSync(
+    new URL("../../src/screens/VoteScreen.tsx", import.meta.url),
+    "utf8",
+  );
+  const dialogSource = readFileSync(
+    new URL("../../src/screens/game/HostControlDialog.tsx", import.meta.url),
+    "utf8",
+  );
+  const lobbySource = readFileSync(
+    new URL("../../src/screens/LobbyScreen.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(dialogSource, /<ReconnectHostControls/);
+  assert.match(lobbySource, /<ReconnectHostControls[\s\S]*compact/);
+  assert.match(voteSource, /<ReconnectHostControls/);
+  assert.match(gameSource, /hostSeatClaims/);
+  assert.match(gameSource, /if \(!isCurrentHost\)[\s\S]*setHostControlsOpen\(false\)/);
+  assert.match(voteSource, /if \(!isCurrentHost\)[\s\S]*setAdminOpen\(false\)/);
+  assert.match(voteSource, /if \(!isCurrentHost\)[\s\S]*setAdminBunkerCardIndex\(null\)/);
+  assert.match(gameSource, /confirmActiveLeave=\{!isSpectator\}/);
+  assert.match(gameSource, /<ReconnectHostBanner/);
+  assert.match(voteSource, /<ReconnectHostBanner/);
+});
+
+test("host recovery banner names missing players and opens moderation", async () => {
+  const { ReconnectHostBanner } = await import("../../src/screens/game/ReconnectHostControls");
+  let openCalls = 0;
+  const players = [me, { ...other, connected: false, name: "Ольга" }];
+  const renderer = create(
+    <ReconnectHostBanner
+      players={players}
+      claimsCount={2}
+      onOpen={() => {
+        openCalls++;
+      }}
+    />,
+  );
+  const html = renderToStaticMarkup(
+    <ReconnectHostBanner players={players} claimsCount={2} onOpen={() => undefined} />,
+  );
+  assert.match(html, /Ольга/);
+  assert.match(html, /2/);
+  await act(async () => renderer.root.findByType("button").props.onClick());
+  assert.equal(openCalls, 1);
+
+  assert.equal(
+    renderToStaticMarkup(
+      <ReconnectHostBanner players={[me, other]} claimsCount={0} onOpen={() => undefined} />,
+    ),
+    "",
+  );
+});
+
+test("final results preserve permanent administrator removal labels", () => {
+  const resultsSource = readFileSync(
+    new URL("../../src/screens/ResultsScreen.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(resultsSource, /p\.alive && !p\.kicked/);
+  assert.match(resultsSource, /!p\.alive && !p\.kicked/);
+  assert.match(resultsSource, /Удалённые администратором/);
+  assert.match(resultsSource, /Удалён администратором/);
+});
+
+test("reconnect controls and room actions retain 44px mobile touch targets", () => {
+  const globalCss = readFileSync(new URL("../../src/styles/global.css", import.meta.url), "utf8");
+  const gameCss = readFileSync(
+    new URL("../../src/styles/game-screen.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(globalCss, /\.reconnect-host-action \{[^}]*min-height: 44px;/s);
+  assert.match(globalCss, /\.btn-admin-toggle \{[^}]*min-height: 44px;/s);
+  assert.match(globalCss, /\.btn-admin \{[^}]*min-height: 44px;/s);
+  assert.match(globalCss, /\.admin-chip \{[^}]*min-height: 44px;/s);
+  assert.match(globalCss, /\.player-item \{[^}]*min-width: 0;/s);
+  assert.match(
+    globalCss,
+    /\.player-name \{[^}]*min-width: 0;[^}]*flex-wrap: wrap;[^}]*overflow-wrap: anywhere;/s,
+  );
+  assert.match(
+    globalCss,
+    /\.result-player-name \{[^}]*min-width: 0;[^}]*flex-wrap: wrap;[^}]*overflow-wrap: anywhere;/s,
+  );
+  assert.match(
+    globalCss,
+    /@media \(max-width: 768px\)[\s\S]*\.player-item \{[^}]*flex-wrap: wrap;/,
+  );
+  assert.match(
+    globalCss,
+    /@media \(max-width: 768px\)[\s\S]*\.reconnect-host-action,[\s\S]*\.reconnect-screen \.btn \{[^}]*min-height: 44px;/,
+  );
+  assert.match(gameCss, /\.command-game-screen \.gs-room-host-action \{[^}]*min-height: 44px;/s);
+  assert.match(
+    gameCss,
+    /@media \(max-width: 768px\)[\s\S]*\.command-game-screen \.gs-room-host-action \{[^}]*min-height: 44px;/,
+  );
 });

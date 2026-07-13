@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useGame } from "../context/GameContext";
+import { AccessibleModal } from "./game/AccessibleModal";
+import { ReconnectHostControls } from "./game/ReconnectHostControls";
 
 export function LobbyScreen() {
   const {
@@ -12,17 +14,28 @@ export function LobbyScreen() {
     leaveRoom,
     addBot,
     removeBot,
+    hostSeatClaims,
+    resolveSeatClaim,
+    kickPlayer,
+    transferHost,
     error,
   } = useGame();
   const [copied, setCopied] = useState(false);
+  const [managementOpen, setManagementOpen] = useState(false);
+
+  const me = isSpectator ? undefined : gameState?.players.find((p) => p.id === playerId);
+  const isHost = me?.isHost ?? false;
+
+  useEffect(() => {
+    if (!isHost) setManagementOpen(false);
+  }, [isHost]);
 
   if (!gameState || !roomCode) return null;
 
-  const me = isSpectator ? undefined : gameState.players.find((p) => p.id === playerId);
-  const isHost = me?.isHost ?? false;
-  const allReady = gameState.players.every((p) => p.ready || p.isHost);
-  const enoughPlayers = gameState.players.length >= 4;
-  const bunkerCapacity = Math.floor(gameState.players.length / 2);
+  const activePlayers = gameState.players.filter((player) => !player.kicked);
+  const allReady = activePlayers.every((p) => p.connected && (p.ready || p.isHost));
+  const enoughPlayers = activePlayers.length >= 4;
+  const bunkerCapacity = Math.floor(activePlayers.length / 2);
   const botCount = gameState.players.filter((p) => p.isBot).length;
   const canAddBot = gameState.players.length < 16;
 
@@ -47,7 +60,7 @@ export function LobbyScreen() {
         </div>
 
         <div className="lobby-info">
-          <span>Игроков: {gameState.players.length}/16</span>
+          <span>Игроков: {activePlayers.length}/16</span>
           <span>В бункер попадут: {bunkerCapacity}</span>
           {botCount > 0 && <span>Ботов: {botCount}</span>}
           {gameState.spectatorCount > 0 && <span>Зрителей: {gameState.spectatorCount}</span>}
@@ -59,7 +72,7 @@ export function LobbyScreen() {
           {gameState.players.map((player, idx) => (
             <div
               key={player.id}
-              className={`player-item ${player.id === playerId ? "is-me" : ""} ${player.isBot ? "is-bot" : ""}`}
+              className={`player-item ${player.id === playerId ? "is-me" : ""} ${player.isBot ? "is-bot" : ""} ${!player.connected ? "is-disconnected" : ""} ${player.kicked ? "is-kicked" : ""}`}
             >
               <span className="player-name">
                 <span className="player-number">{idx + 1}</span>
@@ -67,6 +80,10 @@ export function LobbyScreen() {
                 {player.isBot && <span className="bot-badge">BOT</span>}
                 {player.name}
                 {player.id === playerId && <span className="me-badge">(вы)</span>}
+                {player.kicked && <span className="player-presence-badge is-kicked">Удалён</span>}
+                {!player.kicked && !player.connected && !player.isBot && (
+                  <span className="player-presence-badge">Отключён</span>
+                )}
               </span>
               <span className="player-item-right">
                 <span className={`ready-status ${player.ready || player.isHost ? "ready" : ""}`}>
@@ -86,6 +103,12 @@ export function LobbyScreen() {
           {!isSpectator && isHost && canAddBot && (
             <button className="btn btn-bot" onClick={addBot}>
               + Добавить бота
+            </button>
+          )}
+          {!isSpectator && isHost && (
+            <button className="btn btn-secondary" onClick={() => setManagementOpen(true)}>
+              Управление комнатой
+              {hostSeatClaims.length > 0 && ` · ${hostSeatClaims.length}`}
             </button>
           )}
           {!isSpectator && !isHost && (
@@ -116,6 +139,34 @@ export function LobbyScreen() {
 
         {error && <div className="error-toast">{error}</div>}
       </div>
+
+      {isHost && managementOpen && (
+        <AccessibleModal
+          labelledBy="lobby-management-title"
+          onClose={() => setManagementOpen(false)}
+          overlayClassName="lobby-management-modal"
+          panelClassName="lobby-management-panel"
+        >
+          <div className="lobby-management-header">
+            <h2 id="lobby-management-title">Управление комнатой</h2>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setManagementOpen(false)}
+            >
+              Закрыть
+            </button>
+          </div>
+          <ReconnectHostControls
+            compact
+            players={gameState.players}
+            claims={hostSeatClaims}
+            onResolveClaim={resolveSeatClaim}
+            onKickPlayer={kickPlayer}
+            onTransferHost={transferHost}
+          />
+        </AccessibleModal>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import React, { StrictMode } from "react";
-import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { act, create, type ReactTestInstance, type ReactTestRenderer } from "react-test-renderer";
 import type { Character, PublicGameState } from "../../../shared/types";
 import type { Socket } from "socket.io-client";
 import {
@@ -194,7 +194,9 @@ function loadRuntime() {
   return runtimePromise;
 }
 
-async function mountProvider(options: { connected?: boolean; socketId?: string } = {}) {
+async function mountProvider(
+  options: { connected?: boolean; socketId?: string; children?: React.ReactNode } = {},
+) {
   const { GameProvider, useGame, socket } = await loadRuntime();
   const fake = new FakeSocketHarness(socket as unknown as AnySocket);
   fake.connected = options.connected ?? false;
@@ -206,12 +208,13 @@ async function mountProvider(options: { connected?: boolean; socketId?: string }
     latest = useGame();
     return null;
   };
-  let renderer: ReactTestRenderer;
+  let renderer!: ReactTestRenderer;
   await act(async () => {
     renderer = create(
       <StrictMode>
         <GameProvider>
           <Probe />
+          {options.children}
         </GameProvider>
       </StrictMode>,
     );
@@ -219,6 +222,7 @@ async function mountProvider(options: { connected?: boolean; socketId?: string }
 
   return {
     fake,
+    renderer,
     snapshot: () => {
       assert.ok(latest);
       return latest;
@@ -228,6 +232,20 @@ async function mountProvider(options: { connected?: boolean; socketId?: string }
       fake.restore();
     },
   };
+}
+
+function renderedText(node: ReactTestInstance): string {
+  return node.children
+    .map((child) => (typeof child === "string" ? child : renderedText(child)))
+    .join("");
+}
+
+function findButton(renderer: ReactTestRenderer, label: string): ReactTestInstance {
+  const button = renderer.root
+    .findAllByType("button")
+    .find((candidate) => renderedText(candidate).includes(label));
+  assert.ok(button, `Expected button containing "${label}"`);
+  return button;
 }
 
 const otherPlayerId = `p_${"2".repeat(24)}`;
@@ -1125,4 +1143,251 @@ test("clearing an in-flight lookup hides its result without releasing serializat
   } finally {
     await mounted.cleanup();
   }
+});
+
+test("Home exposes the recovery entry point without requiring a player name", async () => {
+  const { HomeScreen } = await import("../../src/screens/HomeScreen");
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({ children: <HomeScreen /> });
+
+  try {
+    const recoveryButton = findButton(mounted.renderer, "Вернуться в игру");
+    assert.equal(recoveryButton.props.disabled, undefined);
+    await act(async () => recoveryButton.props.onClick());
+    assert.match(renderedText(mounted.renderer.root), /Восстановление места/);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("requester moves from lookup to seat selection and waits without receiving game state", async () => {
+  const { ReconnectScreen } = await import("../../src/screens/ReconnectScreen");
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({
+    children: <ReconnectScreen onBack={() => undefined} />,
+  });
+
+  try {
+    const codeInput = mounted.renderer.root.findByProps({ "aria-label": "Код комнаты" });
+    await act(async () => codeInput.props.onChange({ target: { value: roomCode } }));
+    await act(async () => findButton(mounted.renderer, "Найти места").props.onClick());
+    assert.deepEqual(mounted.fake.emittedFor("room:listReconnectableSeats").at(-1)?.args, [
+      { roomCode },
+    ]);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode,
+        seats: [{ playerId: otherPlayerId, playerName: "Михаил" }],
+      });
+    });
+    assert.match(renderedText(mounted.renderer.root), /Михаил/);
+
+    await act(async () => codeInput.props.onChange({ target: { value: "WXYZ" } }));
+    assert.doesNotMatch(renderedText(mounted.renderer.root), /Михаил/);
+    assert.equal(mounted.renderer.root.findAllByProps({ "aria-label": "Ваше имя" }).length, 0);
+
+    await act(async () => codeInput.props.onChange({ target: { value: roomCode } }));
+    await act(async () => findButton(mounted.renderer, "Найти места").props.onClick());
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode,
+        seats: [{ playerId: otherPlayerId, playerName: "Михаил" }],
+      });
+    });
+    await act(async () => findButton(mounted.renderer, "Выбрать место Михаил").props.onClick());
+
+    const nameInput = mounted.renderer.root.findByProps({ "aria-label": "Ваше имя" });
+    await act(async () => nameInput.props.onChange({ target: { value: "Новый игрок" } }));
+    await act(async () => findButton(mounted.renderer, "Отправить заявку").props.onClick());
+    assert.equal(mounted.snapshot().pendingSeatClaim?.status, "submitting");
+    assert.equal(mounted.snapshot().roomCode, null);
+    assert.equal(mounted.snapshot().gameState, null);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:seatClaimSubmitted", { requestId: "claim-ui" });
+    });
+    assert.match(renderedText(mounted.renderer.root), /Ждём решения хоста/);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:seatClaimResolved", {
+        requestId: "claim-ui",
+        approved: true,
+        message: "Заявка одобрена",
+      });
+    });
+    assert.equal(mounted.snapshot().pendingSeatClaim?.status, "approved");
+    assert.equal(mounted.snapshot().roomCode, null);
+    assert.equal(mounted.snapshot().gameState, null);
+    assert.match(renderedText(mounted.renderer.root), /Заявка одобрена/);
+    assert.equal(findButton(mounted.renderer, "Назад").props.disabled, true);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("terminal requester state resets when leaving and reopening recovery", async () => {
+  const { HomeScreen } = await import("../../src/screens/HomeScreen");
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({ children: <HomeScreen /> });
+
+  try {
+    await act(async () => findButton(mounted.renderer, "Вернуться в игру").props.onClick());
+    const codeInput = mounted.renderer.root.findByProps({ "aria-label": "Код комнаты" });
+    await act(async () => codeInput.props.onChange({ target: { value: roomCode } }));
+    await act(async () => findButton(mounted.renderer, "Найти места").props.onClick());
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode,
+        seats: [{ playerId: otherPlayerId, playerName: "Михаил" }],
+      });
+    });
+    await act(async () => findButton(mounted.renderer, "Выбрать место Михаил").props.onClick());
+    const nameInput = mounted.renderer.root.findByProps({ "aria-label": "Ваше имя" });
+    await act(async () => nameInput.props.onChange({ target: { value: "Новый игрок" } }));
+    await act(async () => findButton(mounted.renderer, "Отправить заявку").props.onClick());
+    await act(async () => {
+      mounted.fake.serverEmit("room:seatClaimSubmitted", { requestId: "claim-rejected" });
+      mounted.fake.serverEmit("room:seatClaimResolved", {
+        requestId: "claim-rejected",
+        approved: false,
+        message: "Заявка отклонена",
+      });
+    });
+    assert.match(renderedText(mounted.renderer.root), /Заявка отклонена/);
+
+    await act(async () => findButton(mounted.renderer, "Назад").props.onClick());
+    await act(async () => findButton(mounted.renderer, "Вернуться в игру").props.onClick());
+    assert.equal(mounted.snapshot().pendingSeatClaim, null);
+    assert.equal(mounted.renderer.root.findAllByProps({ "aria-label": "Код комнаты" }).length, 1);
+    assert.doesNotMatch(renderedText(mounted.renderer.root), /Заявка отклонена/);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("reconnect pause blocks ordinary players and spectators but not the current host", async () => {
+  const { ReconnectPauseOverlay } = await import("../../src/components/ReconnectPauseOverlay");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const pausedState = makeGameState("ROUND_DISCUSSION", { isHost: false });
+  pausedState.paused = true;
+  pausedState.pauseKind = "reconnect";
+  pausedState.players.push({
+    ...pausedState.players[0]!,
+    id: otherPlayerId,
+    name: "Михаил",
+    connected: false,
+    isHost: false,
+  });
+  pausedState.disconnectedPlayerIds = [otherPlayerId];
+
+  const playerHtml = renderToStaticMarkup(
+    <ReconnectPauseOverlay gameState={pausedState} playerId={participantId} isSpectator={false} />,
+  );
+  assert.match(playerHtml, /role="dialog"/);
+  assert.match(playerHtml, /Пауза — ждём переподключение/);
+  assert.match(playerHtml, /Михаил/);
+  assert.match(playerHtml, /1 игрок/);
+
+  const spectatorHtml = renderToStaticMarkup(
+    <ReconnectPauseOverlay gameState={pausedState} playerId={null} isSpectator />,
+  );
+  assert.match(spectatorHtml, /Михаил/);
+
+  const hostState = {
+    ...pausedState,
+    players: pausedState.players.map((player) => ({
+      ...player,
+      isHost: player.id === participantId,
+    })),
+  };
+  assert.equal(
+    renderToStaticMarkup(
+      <ReconnectPauseOverlay gameState={hostState} playerId={participantId} isSpectator={false} />,
+    ),
+    "",
+  );
+});
+
+test("lobby host management closes on authority loss and stays closed if authority returns", async () => {
+  const { LobbyScreen } = await import("../../src/screens/LobbyScreen");
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({ children: <LobbyScreen /> });
+  const baseState = makeGameState("LOBBY", { isHost: true });
+  const lobbyState: PublicGameState = {
+    ...baseState,
+    players: [
+      baseState.players[0]!,
+      {
+        ...baseState.players[0]!,
+        id: otherPlayerId,
+        name: "Михаил",
+        isHost: false,
+      },
+      {
+        ...baseState.players[0]!,
+        id: `p_${"3".repeat(24)}`,
+        name: "Ольга",
+        connected: false,
+        isHost: false,
+      },
+      {
+        ...baseState.players[0]!,
+        id: `p_${"4".repeat(24)}`,
+        name: "Игорь",
+        isHost: false,
+      },
+    ],
+    startedPlayerCount: 4,
+    disconnectedPlayerIds: [`p_${"3".repeat(24)}`],
+  };
+
+  try {
+    await acceptPlayerSession(mounted);
+    await act(async () => {
+      mounted.fake.serverEmit("game:state", lobbyState);
+      mounted.fake.serverEmit("admin:seatClaimsUpdated", {
+        claims: [
+          {
+            requestId: "claim-lobby",
+            playerId: `p_${"3".repeat(24)}`,
+            playerName: "Ольга",
+            claimantName: "Новая Ольга",
+          },
+        ],
+      });
+    });
+
+    await act(async () => findButton(mounted.renderer, "Управление комнатой").props.onClick());
+    assert.match(renderedText(mounted.renderer.root), /Новая Ольга/);
+    assert.equal(mounted.renderer.root.findAllByProps({ role: "dialog" }).length, 1);
+
+    const formerHostState = {
+      ...lobbyState,
+      players: lobbyState.players.map((player) => ({
+        ...player,
+        isHost: player.id === otherPlayerId,
+      })),
+    };
+    await act(async () => mounted.fake.serverEmit("game:state", formerHostState));
+    assert.equal(mounted.renderer.root.findAllByProps({ role: "dialog" }).length, 0);
+
+    await act(async () => mounted.fake.serverEmit("game:state", lobbyState));
+    assert.equal(mounted.renderer.root.findAllByProps({ role: "dialog" }).length, 0);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("App keeps claimants on Home until approved membership also has authoritative state", () => {
+  const appSource = readFileSync(new URL("../../src/App.tsx", import.meta.url), "utf8");
+  const reconnectSource = readFileSync(
+    new URL("../../src/screens/ReconnectScreen.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(appSource, /if \(!roomCode \|\| !gameState\)[\s\S]*<HomeScreen/);
+  assert.doesNotMatch(reconnectSource, /GameScreen/);
+  assert.match(appSource, /Вам переданы права хоста/);
+  assert.match(appSource, /clearHostChangeNotice/);
 });

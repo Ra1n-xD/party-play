@@ -2,12 +2,13 @@ import { useState } from "react";
 import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
 import { BiDonateHeart } from "react-icons/bi";
 import { useGame } from "../context/GameContext";
+import { ReconnectScreen } from "./ReconnectScreen";
 
 export function HomeScreen() {
   const { createRoom, joinRoom, joinAsSpectator, error } = useGame();
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
-  const [mode, setMode] = useState<"menu" | "create" | "join" | "spectate">("menu");
+  const [mode, setMode] = useState<"menu" | "create" | "join" | "spectate" | "reconnect">("menu");
 
   const handleCreate = () => {
     if (name.trim()) createRoom(name.trim());
@@ -22,7 +23,7 @@ export function HomeScreen() {
   };
 
   return (
-    <div className="screen home-screen">
+    <div className={`screen home-screen ${mode === "reconnect" ? "has-reconnect" : ""}`}>
       <div className="home-container">
         <div className="logo">
           <h1>БУНКЕР</h1>
@@ -66,8 +67,13 @@ export function HomeScreen() {
             >
               Наблюдать
             </button>
+            <button className="btn btn-reconnect" onClick={() => setMode("reconnect")}>
+              Вернуться в игру
+            </button>
           </div>
         )}
+
+        {mode === "reconnect" && <ReconnectScreen onBack={() => setMode("menu")} />}
 
         {mode === "join" && (
           <div className="home-actions">
