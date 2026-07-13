@@ -48,10 +48,17 @@ export function AccessibleModal({
     const previousBodyOverflow = document.body.style.overflow;
     const siblingInertStates = new Map<HTMLElement, boolean>();
 
-    for (const sibling of Array.from(overlay.parentElement?.children ?? [])) {
-      if (!(sibling instanceof HTMLElement) || sibling === overlay) continue;
-      siblingInertStates.set(sibling, sibling.hasAttribute("inert"));
-      sibling.setAttribute("inert", "");
+    let currentLayer: HTMLElement | null = overlay;
+    while (currentLayer && currentLayer !== document.body) {
+      const parent: HTMLElement | null = currentLayer.parentElement;
+      if (!parent) break;
+
+      for (const sibling of Array.from(parent.children)) {
+        if (!(sibling instanceof HTMLElement) || sibling === currentLayer) continue;
+        siblingInertStates.set(sibling, sibling.hasAttribute("inert"));
+        sibling.setAttribute("inert", "");
+      }
+      currentLayer = parent;
     }
     document.body.style.overflow = "hidden";
 

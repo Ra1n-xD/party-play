@@ -754,6 +754,41 @@ test("votes are emitted only while the socket has an accepted room membership", 
   }
 });
 
+test("private voter status is scoped to the exact ballot across reconnects", async () => {
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({ connected: true });
+
+  try {
+    await acceptPlayerSession(mounted);
+    const firstBallot = makeGameState("ROUND_VOTE");
+    firstBallot.roundNumber = 2;
+    firstBallot.currentVotingInRound = 0;
+    await act(async () => mounted.fake.serverEmit("game:state", firstBallot));
+    assert.equal(mounted.snapshot().myHasVoted, false);
+
+    await act(async () => {
+      mounted.fake.serverEmit("game:voterStatus", {
+        phase: "ROUND_VOTE",
+        roundNumber: 2,
+        currentVotingInRound: 0,
+        hasVoted: true,
+      });
+    });
+    assert.equal(mounted.snapshot().myHasVoted, true);
+
+    const nextBallot = makeGameState("ROUND_VOTE");
+    nextBallot.roundNumber = 2;
+    nextBallot.currentVotingInRound = 1;
+    await act(async () => mounted.fake.serverEmit("game:state", nextBallot));
+    assert.equal(mounted.snapshot().myHasVoted, false);
+
+    await act(async () => mounted.fake.serverEmit("disconnect"));
+    assert.equal(mounted.snapshot().myHasVoted, false);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
 test("an approved seat claim becomes recoverable when the socket drops before membership acceptance", async () => {
   const { ReconnectScreen } = await import("../../src/screens/ReconnectScreen");
   setBrowserStorage(new MemoryStorage());

@@ -285,6 +285,15 @@ function emitReconnectError(
   socket.emit("room:reconnectError", { code, message, terminal });
 }
 
+function emitPrivateVoterStatus(socket: IOSocket, room: Room, hasVoted: boolean): void {
+  socket.emit("game:voterStatus", {
+    phase: room.gameState?.phase ?? "LOBBY",
+    roundNumber: room.gameState?.roundNumber ?? 0,
+    currentVotingInRound: room.gameState?.currentVotingInRound ?? 0,
+    hasVoted,
+  });
+}
+
 function clearSpectatorGraceTimer(spectatorId: string): void {
   const timer = spectatorGraceTimers.get(spectatorId);
   if (timer) clearTimeout(timer);
@@ -597,6 +606,7 @@ export function registerHandlers(io: IOServer): void {
 
       removeDisconnectPause(room, player.id, io, false);
       if (!ensureConnectedHost(room, io)) broadcastState(room, io);
+      emitPrivateVoterStatus(socket, room, player.hasVoted);
     });
 
     socket.on("room:listReconnectableSeats", (data) => {
@@ -919,7 +929,10 @@ export function registerHandlers(io: IOServer): void {
       const success = castVote(ctx.room, ctx.info.playerId, targetPlayerId, io);
       if (!success) {
         socket.emit("room:error", { message: "Невозможно проголосовать" });
+        return;
       }
+      const voter = ctx.room.players.get(ctx.info.playerId);
+      if (voter) emitPrivateVoterStatus(socket, ctx.room, voter.hasVoted);
     });
 
     socket.on("game:endGame", () => {
@@ -1053,6 +1066,7 @@ export function registerHandlers(io: IOServer): void {
 
       removeDisconnectPause(ctx.room, player.id, io, false);
       if (!ensureConnectedHost(ctx.room, io)) broadcastState(ctx.room, io);
+      emitPrivateVoterStatus(claimantSocket, ctx.room, player.hasVoted);
     });
 
     socket.on("admin:transferHost", (data) => {

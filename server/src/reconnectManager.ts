@@ -534,6 +534,9 @@ export function markPlayerDisconnected(
   if (activePhase) {
     addDisconnectPause(room, player.id, io, false);
   }
+  if (wasHost) {
+    setAdminPause(room, false, io, false);
+  }
   if (wasHost && ensureConnectedHost(room, io, player.id)) {
     return true;
   }

@@ -208,6 +208,12 @@ export interface ServerEvents {
   "admin:seatClaimsUpdated": (data: { claims: SeatClaimInfo[] }) => void;
   "game:state": (data: PublicGameState) => void;
   "game:character": (data: Character) => void;
+  "game:voterStatus": (data: {
+    phase: GamePhase;
+    roundNumber: number;
+    currentVotingInRound: number;
+    hasVoted: boolean;
+  }) => void;
   "game:eliminated": (data: { playerId: string; playerName: string }) => void;
   "game:actionCardRevealed": (data: { playerName: string; actionCard: ActionCard }) => void;
   "game:attributeRevealed": (data: { playerName: string; attribute: Attribute }) => void;

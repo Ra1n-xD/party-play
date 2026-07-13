@@ -1824,41 +1824,6 @@ body {
   backdrop-filter: blur(12px);
 }
 
-.vote-admin-panel {
-  position: fixed;
-  z-index: 90;
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(12px, env(safe-area-inset-bottom));
-  width: min(240px, calc(100vw - 24px));
-  max-height: calc(100dvh - 24px);
-  margin: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.46);
-}
-
-.vote-admin-panel.is-open {
-  width: min(520px, calc(100vw - 24px));
-}
-
-.btn-admin-toggle {
-  width: 100%;
-  min-height: 44px;
-  background: rgba(239, 189, 88, 0.08);
-  color: var(--accent);
-  border: none;
-  padding: 10px 16px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: center;
-  transition: background 0.2s;
-}
-
-.btn-admin-toggle:hover {
-  background: rgba(239, 189, 88, 0.14);
-}
-
 .admin-panel-body {
   padding: 12px 16px;
 }
@@ -2611,6 +2576,19 @@ body {
   border: 1px solid rgba(118, 198, 158, 0.22);
   border-radius: var(--radius-sm);
   background: rgba(7, 16, 12, 0.5);
+}
+
+.reconnect-host-controls.is-compact {
+  gap: 12px;
+  padding: 12px;
+}
+
+.reconnect-host-controls.is-compact .reconnect-host-section {
+  gap: 6px;
+}
+
+.reconnect-host-controls.is-compact .reconnect-host-row {
+  padding: 8px 10px;
 }
 
 .reconnect-host-banner {

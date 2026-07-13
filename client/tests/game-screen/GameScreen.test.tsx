@@ -393,18 +393,16 @@ test("vote screen keeps host controls in the common render path", () => {
 
   assert.doesNotMatch(source, /if \(!canVote\) \{\s*return \(/);
   assert.doesNotMatch(source, /if \(voted\) \{\s*return \(/);
-  assert.match(source, /className=\{`admin-panel vote-admin-panel/);
+  assert.match(source, /<HostControlDialog/);
+  assert.match(source, /<GameRoomHeader/);
   assert.match(source, /const adminPauseActiveRef = useRef\(false\);/);
   assert.match(source, /const closeAdminPanel = useCallback/);
   assert.match(
     source,
     /useEffect\(\(\) => \{\s*return \(\) => \{[^}]*adminPauseActiveRef\.current = false;\s*adminUnpause\(\);/s,
   );
-  assert.match(source, /if \(!confirmTarget \|\| adminPauseActiveRef\.current\) return;/);
-  assert.match(
-    source,
-    /<\/div>\s*\{error && <div className="error-toast">\{error\}<\/div>\}\s*\{\/\* Host Admin Panel \*\//,
-  );
+  assert.match(source, /if \(!confirmTarget \|\| voteLocked\) return;/);
+  assert.match(source, /if \(!castVote\(confirmTarget\)\) return;/);
 });
 
 test("scenario summary keeps its description visible while bunker details are collapsed", () => {
@@ -711,14 +709,16 @@ test("mobile info and actions stay compact while desktop host controls use two c
   );
 });
 
-test("vote admin panel remains fixed above responsive content", () => {
-  const css = readFileSync(new URL("../../src/styles/global.css", import.meta.url), "utf8");
-
-  assert.match(
-    css,
-    /\.vote-admin-panel \{[^}]*position: fixed;[^}]*z-index: 90;[^}]*max-height: calc\(100dvh - 24px\);/s,
+test("vote admin uses the shared modal above responsive content", () => {
+  const globalCss = readFileSync(new URL("../../src/styles/global.css", import.meta.url), "utf8");
+  const gameCss = readFileSync(
+    new URL("../../src/styles/game-screen.css", import.meta.url),
+    "utf8",
   );
-  assert.match(css, /\.modal-overlay \{[^}]*z-index: 100;/s);
+
+  assert.match(gameCss, /\.command-game-screen \.gs-host-dialog \{[^}]*z-index: 120;/s);
+  assert.match(globalCss, /\.modal-overlay \{[^}]*z-index: 100;/s);
+  assert.doesNotMatch(globalCss, /\.vote-admin-panel/);
 });
 
 test("desktop status strip uses the Codex reference geometry", () => {
@@ -922,6 +922,8 @@ test("reconnect host controls expose claim decisions, permanent kick, and host t
   await clickByLabel("Одобрить заявку Новая Ольга");
   await clickByLabel("Отклонить заявку Новая Ольга");
   await clickByLabel("Удалить игрока Ольга");
+  assert.deepEqual(calls, ["claim:claim-1:true", "claim:claim-1:false"]);
+  await clickByLabel("Подтвердить удаление Ольга");
   await clickByLabel("Передать права игроку Михаил");
   assert.deepEqual(calls, [
     "claim:claim-1:true",
@@ -977,6 +979,10 @@ test("active-game leave requires confirmation before preserving the seat", async
 });
 
 test("kicked player cards use the permanent administrator label", () => {
+  const gameSource = readFileSync(
+    new URL("../../src/screens/GameScreen.tsx", import.meta.url),
+    "utf8",
+  );
   const html = renderToStaticMarkup(
     <PlayerBoard
       players={[{ ...player, connected: false, alive: false, kicked: true }]}
@@ -990,6 +996,7 @@ test("kicked player cards use the permanent administrator label", () => {
   assert.match(html, /Удалён администратором/);
   assert.doesNotMatch(html, />Изгнан</);
   assert.doesNotMatch(html, />Отключён</);
+  assert.match(gameSource, /player\.kicked \? "УДАЛЁН АДМИНИСТРАТОРОМ" : "ИЗГНАН"/);
 });
 
 test("reconnect moderation is reused in game, vote, and compact lobby host surfaces", () => {
@@ -1012,14 +1019,54 @@ test("reconnect moderation is reused in game, vote, and compact lobby host surfa
 
   assert.match(dialogSource, /<ReconnectHostControls/);
   assert.match(lobbySource, /<ReconnectHostControls[\s\S]*compact/);
-  assert.match(voteSource, /<ReconnectHostControls/);
+  assert.match(voteSource, /<HostControlDialog/);
+  assert.match(voteSource, /<GameRoomHeader/);
+  assert.match(voteSource, /confirmActiveLeave/);
+  assert.match(voteSource, /onEndGame=/);
   assert.match(gameSource, /hostSeatClaims/);
   assert.match(gameSource, /if \(!isCurrentHost\)[\s\S]*setHostControlsOpen\(false\)/);
   assert.match(voteSource, /if \(!isCurrentHost\)[\s\S]*setAdminOpen\(false\)/);
-  assert.match(voteSource, /if \(!isCurrentHost\)[\s\S]*setAdminBunkerCardIndex\(null\)/);
   assert.match(gameSource, /confirmActiveLeave=\{!isSpectator\}/);
   assert.match(gameSource, /<ReconnectHostBanner/);
   assert.match(voteSource, /<ReconnectHostBanner/);
+});
+
+test("voting recovery remains server-authoritative and blocks pre-membership ballots", () => {
+  const voteSource = readFileSync(
+    new URL("../../src/screens/VoteScreen.tsx", import.meta.url),
+    "utf8",
+  );
+  const sharedSource = readFileSync(new URL("../../../shared/types.ts", import.meta.url), "utf8");
+  const engineSource = readFileSync(
+    new URL("../../../server/src/gameEngine.ts", import.meta.url),
+    "utf8",
+  );
+  const socketSource = readFileSync(
+    new URL("../../../server/src/socketHandlers.ts", import.meta.url),
+    "utf8",
+  );
+  const contextSource = readFileSync(
+    new URL("../../src/context/GameContext.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(sharedSource, /"game:voterStatus"/);
+  assert.doesNotMatch(engineSource, /hasVoted: p\.hasVoted/);
+  assert.match(socketSource, /emitPrivateVoterStatus/);
+  assert.match(contextSource, /myHasVoted/);
+  assert.match(voteSource, /const voted = myHasVoted/);
+  assert.match(voteSource, /reconnectState !== "connected"/);
+  assert.match(voteSource, /voteSubmitting/);
+  assert.match(voteSource, /if \(!castVote\(confirmTarget\)\) return/);
+});
+
+test("accessible modal inerts every outside ancestor layer", () => {
+  const source = readFileSync(
+    new URL("../../src/screens/game/AccessibleModal.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /while \(currentLayer && currentLayer !== document\.body\)/);
+  assert.match(source, /currentLayer = parent/);
 });
 
 test("host recovery banner names missing players and opens moderation", async () => {
@@ -1070,7 +1117,7 @@ test("reconnect controls and room actions retain 44px mobile touch targets", () 
   );
 
   assert.match(globalCss, /\.reconnect-host-action \{[^}]*min-height: 44px;/s);
-  assert.match(globalCss, /\.btn-admin-toggle \{[^}]*min-height: 44px;/s);
+  assert.match(globalCss, /\.reconnect-host-controls\.is-compact \{[^}]*padding: 12px;/s);
   assert.match(globalCss, /\.btn-admin \{[^}]*min-height: 44px;/s);
   assert.match(globalCss, /\.admin-chip \{[^}]*min-height: 44px;/s);
   assert.match(globalCss, /\.player-item \{[^}]*min-width: 0;/s);
