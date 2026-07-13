@@ -116,15 +116,17 @@ export function WeddingProvider({
     const onJoined = (data: WeddingSession) => saveWeddingSession(data);
     const onGuestState = (state: GuestWeddingState) => setGuestState(state);
     const onHostState = (state: HostWeddingState) => setHostState(state);
-    const onError = (data: { message: string }) => {
-      setError(data.message);
-      if (/участник не найден/i.test(data.message)) clearWeddingSession();
-    };
-    const onContestReset = () => {
+    const clearGuestSeat = () => {
       clearWeddingSession();
+      if (role !== "guest") return;
       setGuestState(null);
       setParticipants([]);
     };
+    const onError = (data: { message: string }) => {
+      setError(data.message);
+      if (/участник не найден/i.test(data.message)) clearGuestSeat();
+    };
+    const onContestReset = () => clearGuestSeat();
     const onExpired = () => {
       setRoomExists(false);
       setGuestState(null);

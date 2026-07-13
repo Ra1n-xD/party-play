@@ -7,6 +7,20 @@ import { WeddingProvider, useWedding, type WeddingSession } from "../../src/wedd
 import { weddingSocket } from "../../src/wedding/weddingSocket";
 
 const SESSION_KEY = "partyplay:wedding-participant";
+const session: WeddingSession = {
+  participantId: "w_vera_old",
+  participantName: "Вера",
+};
+const guestState: GuestWeddingState = {
+  phase: "FINISHED",
+  questionNumber: 3,
+  optionStyle: null,
+  expiresAt: Date.now() + 1_000,
+  participantId: session.participantId,
+  participantName: session.participantName,
+  hasAnswered: true,
+  selectedOption: 1,
+};
 
 class MemorySessionStorage {
   private readonly values = new Map<string, string>();
@@ -24,7 +38,7 @@ class MemorySessionStorage {
   }
 }
 
-test("contest reset clears the saved guest session and current seat", async () => {
+async function mountGuestContext() {
   const storage = new MemorySessionStorage();
   const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
   Object.defineProperty(globalThis, "window", {
@@ -52,51 +66,66 @@ test("contest reset clears the saved guest session and current seat", async () =
     ).emitEvent(args);
   };
 
-  const session: WeddingSession = {
-    participantId: "w_vera_old",
-    participantName: "Вера",
-  };
-  const guestState: GuestWeddingState = {
-    phase: "FINISHED",
-    questionNumber: 3,
-    optionStyle: null,
-    expiresAt: Date.now() + 1_000,
-    participantId: session.participantId,
-    participantName: session.participantName,
-    hasAnswered: true,
-    selectedOption: 1,
-  };
+  await act(async () => {
+    renderer = create(
+      <WeddingProvider role="guest">
+        <Probe />
+      </WeddingProvider>,
+    );
+  });
 
-  try {
-    await act(async () => {
-      renderer = create(
-        <WeddingProvider role="guest">
-          <Probe />
-        </WeddingProvider>,
-      );
-    });
-    await act(async () => {
-      serverEmit("wedding:joined", session);
-      serverEmit("wedding:guestState", guestState);
-      serverEmit("wedding:participants", {
-        participants: [{ id: session.participantId, name: "Вера", connected: true }],
+  return {
+    storage,
+    serverEmit,
+    snapshot: () => latest,
+    primeSeat: async () => {
+      await act(async () => {
+        serverEmit("wedding:joined", session);
+        serverEmit("wedding:guestState", guestState);
+        serverEmit("wedding:participants", {
+          participants: [{ id: session.participantId, name: "Вера", connected: true }],
+        });
       });
-    });
+    },
+    cleanup: async () => {
+      if (renderer) await act(async () => renderer?.unmount());
+      weddingSocket.connect = originalConnect;
+      weddingSocket.disconnect = originalDisconnect;
+      if (windowDescriptor) Object.defineProperty(globalThis, "window", windowDescriptor);
+      else delete (globalThis as { window?: unknown }).window;
+    },
+  };
+}
 
-    assert.equal(storage.getItem(SESSION_KEY) !== null, true);
-    assert.equal(latest?.guestState?.participantId, session.participantId);
-    assert.equal(latest?.participants.length, 1);
+test("contest reset clears the saved guest session and current seat", async () => {
+  const mounted = await mountGuestContext();
+  try {
+    await mounted.primeSeat();
+    assert.equal(mounted.storage.getItem(SESSION_KEY) !== null, true);
+    assert.equal(mounted.snapshot()?.guestState?.participantId, session.participantId);
+    assert.equal(mounted.snapshot()?.participants.length, 1);
 
-    await act(async () => serverEmit("wedding:contestReset"));
+    await act(async () => mounted.serverEmit("wedding:contestReset"));
 
-    assert.equal(storage.getItem(SESSION_KEY), null);
-    assert.equal(latest?.guestState, null);
-    assert.deepEqual(latest?.participants, []);
+    assert.equal(mounted.storage.getItem(SESSION_KEY), null);
+    assert.equal(mounted.snapshot()?.guestState, null);
+    assert.deepEqual(mounted.snapshot()?.participants, []);
   } finally {
-    if (renderer) await act(async () => renderer?.unmount());
-    weddingSocket.connect = originalConnect;
-    weddingSocket.disconnect = originalDisconnect;
-    if (windowDescriptor) Object.defineProperty(globalThis, "window", windowDescriptor);
-    else delete (globalThis as { window?: unknown }).window;
+    await mounted.cleanup();
+  }
+});
+
+test("a stale rejoin error clears an offline guest's finished state", async () => {
+  const mounted = await mountGuestContext();
+  try {
+    await mounted.primeSeat();
+
+    await act(async () => mounted.serverEmit("wedding:error", { message: "Участник не найден" }));
+
+    assert.equal(mounted.storage.getItem(SESSION_KEY), null);
+    assert.equal(mounted.snapshot()?.guestState, null);
+    assert.deepEqual(mounted.snapshot()?.participants, []);
+  } finally {
+    await mounted.cleanup();
   }
 });
