@@ -5,6 +5,7 @@ import { VoteProgressBar } from "../components/VoteProgressBar";
 import { AttributeType } from "../../../shared/types";
 import { ATTR_TYPES } from "../utils/constants";
 import { toggleInSet } from "../utils/setUtils";
+import { ReconnectHostBanner, ReconnectHostControls } from "./game/ReconnectHostControls";
 
 export function VoteScreen() {
   const {
@@ -26,6 +27,10 @@ export function VoteScreen() {
     adminUnpause,
     pendingAdminOpen,
     consumePendingAdminOpen,
+    hostSeatClaims,
+    resolveSeatClaim,
+    kickPlayer,
+    transferHost,
   } = useGame();
   const [voted, setVoted] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
@@ -50,6 +55,8 @@ export function VoteScreen() {
   const [adminPlayers, setAdminPlayers] = useState<Set<string>>(new Set());
   const [adminBunkerCardIndex, setAdminBunkerCardIndex] = useState<number | null>(null);
   const adminPauseActiveRef = useRef(false);
+  const isCurrentHost =
+    !isSpectator && Boolean(gameState?.players.find((player) => player.id === playerId)?.isHost);
 
   const openAdminPanel = useCallback(() => {
     if (adminOpen || adminPauseActiveRef.current) return;
@@ -84,6 +91,20 @@ export function VoteScreen() {
       adminUnpause();
     };
   }, [adminUnpause, gameState?.phase]);
+
+  useEffect(() => {
+    if (!isCurrentHost) {
+      setAdminOpen(false);
+      setAdminAction(null);
+      setAdminAttrType("profession");
+      setAdminAttrTypes(new Set());
+      setAdminPlayer1("");
+      setAdminPlayer2("");
+      setAdminPlayers(new Set());
+      setAdminBunkerCardIndex(null);
+      adminPauseActiveRef.current = false;
+    }
+  }, [isCurrentHost]);
 
   // Auto-open admin panel after action card reveal overlay
   useEffect(() => {
@@ -237,6 +258,14 @@ export function VoteScreen() {
         </div>
       </div>
 
+      {isCurrentHost && (
+        <ReconnectHostBanner
+          players={gameState.players}
+          claimsCount={hostSeatClaims.length}
+          onOpen={openAdminPanel}
+        />
+      )}
+
       <div className="vote-container">
         {!canVote ? (
           <>
@@ -353,7 +382,7 @@ export function VoteScreen() {
       {error && <div className="error-toast">{error}</div>}
 
       {/* Host Admin Panel */}
-      {me?.isHost && (
+      {isCurrentHost && (
         <div className={`admin-panel vote-admin-panel${adminOpen ? " is-open" : ""}`}>
           <button
             className="btn btn-admin-toggle"
@@ -364,6 +393,13 @@ export function VoteScreen() {
 
           {adminOpen && (
             <div className="admin-panel-body">
+              <ReconnectHostControls
+                players={gameState.players}
+                claims={hostSeatClaims}
+                onResolveClaim={resolveSeatClaim}
+                onKickPlayer={kickPlayer}
+                onTransferHost={transferHost}
+              />
               {!adminAction && (
                 <div className="admin-actions-list">
                   <label className="admin-group-label">Карты игроков</label>

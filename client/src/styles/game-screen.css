@@ -117,7 +117,7 @@
 
 .command-game-screen .gs-room-host-action {
   min-width: 0;
-  min-height: 40px;
+  min-height: 44px;
   justify-content: center;
   gap: 7px;
   padding: 7px 11px;
@@ -828,6 +828,12 @@
   box-shadow: inset 3px 0 0 rgba(217, 120, 108, 0.58);
 }
 
+.command-game-screen .gs-player-card.is-kicked {
+  background: #080d0a;
+  border-color: rgba(239, 189, 88, 0.32);
+  box-shadow: inset 3px 0 0 rgba(239, 189, 88, 0.58);
+}
+
 .command-game-screen .gs-player-card.is-me.is-eliminated {
   border-color: rgba(239, 189, 88, 0.38);
   box-shadow:
@@ -1526,7 +1532,7 @@
 
   .command-game-screen .gs-room-host-action {
     flex: 1 1 0;
-    min-height: 40px;
+    min-height: 44px;
     padding: 6px 8px;
     font-size: 0.72rem;
     white-space: normal;

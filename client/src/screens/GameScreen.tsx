@@ -8,6 +8,7 @@ import { CharacterDossier } from "./game/CharacterDossier";
 import { GameStatusHeader } from "./game/GameStatusHeader";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { HostControlDialog } from "./game/HostControlDialog";
+import { ReconnectHostBanner } from "./game/ReconnectHostControls";
 import { MobileGameTabs } from "./game/MobileGameTabs";
 import { PlayerBoard } from "./game/PlayerBoard";
 import { ScenarioSummary } from "./game/ScenarioSummary";
@@ -44,6 +45,10 @@ export function GameScreen() {
     adminEliminatePlayer,
     pendingAdminOpen,
     consumePendingAdminOpen,
+    hostSeatClaims,
+    resolveSeatClaim,
+    kickPlayer,
+    transferHost,
   } = useGame();
   const [showAttrPicker, setShowAttrPicker] = useState(false);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
@@ -51,6 +56,8 @@ export function GameScreen() {
   const [activeMobileTab, setActiveMobileTab] = useState<MobileGameTab>("players");
   const [hostControlsOpen, setHostControlsOpen] = useState(false);
   const hostPauseActiveRef = useRef(false);
+  const isCurrentHost =
+    !isSpectator && Boolean(gameState?.players.find((player) => player.id === playerId)?.isHost);
 
   const closeLocalModals = useCallback(() => {
     setShowAttrPicker(false);
@@ -80,12 +87,13 @@ export function GameScreen() {
   }, [closeLocalModals, hostControlsOpen]);
 
   const openHostControls = useCallback(() => {
+    if (!isCurrentHost) return;
     if (hostControlsOpen || hostPauseActiveRef.current) return;
     closeLocalModals();
     hostPauseActiveRef.current = true;
     setHostControlsOpen(true);
     adminPause();
-  }, [adminPause, closeLocalModals, hostControlsOpen]);
+  }, [adminPause, closeLocalModals, hostControlsOpen, isCurrentHost]);
 
   const closeHostControls = useCallback(() => {
     if (!hostControlsOpen && !hostPauseActiveRef.current) return;
@@ -119,6 +127,13 @@ export function GameScreen() {
     pendingAdminOpen,
     playerId,
   ]);
+
+  useEffect(() => {
+    if (!isCurrentHost) {
+      setHostControlsOpen(false);
+      hostPauseActiveRef.current = false;
+    }
+  }, [isCurrentHost]);
 
   if (!gameState) return null;
   if (!isSpectator && !myCharacter) {
@@ -164,7 +179,15 @@ export function GameScreen() {
         onOpenHostControls={openHostControls}
         onSkipDiscussion={adminSkipDiscussion}
         onLeaveRoom={leaveRoom}
+        confirmActiveLeave={!isSpectator}
       />
+      {isCurrentHost && (
+        <ReconnectHostBanner
+          players={gameState.players}
+          claimsCount={hostSeatClaims.length}
+          onOpen={openHostControls}
+        />
+      )}
       <GameStatusHeader
         gameState={gameState}
         phaseLabel={view.phaseLabel}
@@ -233,7 +256,7 @@ export function GameScreen() {
         </div>
       )}
 
-      {view.me?.isHost && (
+      {isCurrentHost && (
         <HostControlDialog
           open={hostControlsOpen}
           gameState={gameState}
@@ -248,6 +271,10 @@ export function GameScreen() {
           onRevivePlayer={adminRevivePlayer}
           onEliminatePlayer={adminEliminatePlayer}
           onEndGame={endGameFromHostControls}
+          seatClaims={hostSeatClaims}
+          onResolveSeatClaim={resolveSeatClaim}
+          onKickPlayer={kickPlayer}
+          onTransferHost={transferHost}
         />
       )}
 

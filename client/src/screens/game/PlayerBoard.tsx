@@ -36,6 +36,7 @@ export function PlayerCard({
     isCurrentTurn && "is-current-turn",
     !player.alive && "is-eliminated",
     !player.connected && "is-disconnected",
+    player.kicked && "is-kicked",
   ]
     .filter(Boolean)
     .join(" ");
@@ -54,8 +55,14 @@ export function PlayerCard({
         {player.isBot && <span className="gs-status-pill">BOT</span>}
       </span>
       <span className="gs-player-states">
-        {!player.alive && <span>Изгнан</span>}
-        {!player.connected && !player.isBot && <span>Отключён</span>}
+        {player.kicked ? (
+          <span>Удалён администратором</span>
+        ) : (
+          <>
+            {!player.alive && <span>Изгнан</span>}
+            {!player.connected && !player.isBot && <span>Отключён</span>}
+          </>
+        )}
         {isCurrentTurn && <span>Сейчас ходит</span>}
         {isLastEliminated && <span>Голосует в этом раунде</span>}
       </span>
