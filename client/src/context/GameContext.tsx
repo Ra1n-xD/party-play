@@ -94,6 +94,7 @@ interface GameContextType {
   error: string | null;
   reconnectState: ReconnectState;
   reconnectableSeats: ReconnectableSeat[];
+  reconnectableSeatsRoomCode: string | null;
   pendingSeatClaim: PendingSeatClaimState | null;
   hostSeatClaims: SeatClaimInfo[];
   hostChangeNotice: HostChangeNotice | null;
@@ -129,6 +130,8 @@ interface GameContextType {
   adminRevivePlayer: (targetPlayerId: string) => void;
   adminEliminatePlayer: (targetPlayerId: string) => void;
   listReconnectableSeats: (roomCode: string) => void;
+  clearReconnectableSeats: () => void;
+  resetSeatRecovery: () => void;
   requestSeatClaim: (roomCode: string, playerId: string, claimantName: string) => void;
   cancelSeatClaim: () => void;
   resolveSeatClaim: (requestId: string, approved: boolean) => void;
@@ -152,6 +155,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [reconnectState, setReconnectState] = useState<ReconnectState>("idle");
   const [reconnectableSeats, setReconnectableSeats] = useState<ReconnectableSeat[]>([]);
+  const [reconnectableSeatsRoomCode, setReconnectableSeatsRoomCode] = useState<string | null>(null);
   const [pendingSeatClaim, setPendingSeatClaim] = useState<PendingSeatClaimState | null>(null);
   const [hostSeatClaims, setHostSeatClaims] = useState<SeatClaimInfo[]>([]);
   const [hostChangeNotice, setHostChangeNotice] = useState<HostChangeNotice | null>(null);
@@ -170,6 +174,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const pendingSeatClaimTargetRef = useRef<PendingSeatClaimTarget | null>(null);
   const membershipRequestPendingRef = useRef(false);
   const seatLookupPendingRoomRef = useRef<string | null>(null);
+  const completedSeatLookupRoomRef = useRef<string | null>(null);
   const lastRejoinSocketIdRef = useRef<string | null>(null);
   const explicitLeaveSuppressedRef = useRef(false);
   const ignoreRoomEventsRef = useRef(true);
@@ -218,6 +223,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       pendingSeatClaimTargetRef.current = null;
       membershipRequestPendingRef.current = false;
       seatLookupPendingRoomRef.current = null;
+      completedSeatLookupRoomRef.current = null;
       playerIdRef.current = null;
       setRoomCode(null);
       setPlayerId(null);
@@ -226,6 +232,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setMyCharacter(null);
       setReconnectState("idle");
       setReconnectableSeats([]);
+      setReconnectableSeatsRoomCode(null);
       setPendingSeatClaim(null);
       setHostSeatClaims([]);
       setHostChangeNotice(null);
@@ -296,6 +303,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       pendingSeatClaimTargetRef.current = null;
       membershipRequestPendingRef.current = false;
       seatLookupPendingRoomRef.current = null;
+      completedSeatLookupRoomRef.current = null;
+      setReconnectableSeats([]);
+      setReconnectableSeatsRoomCode(null);
       if (
         !reconnectSessionTombstonedRef.current &&
         (acceptedSessionRef.current ?? readReconnectSession())
@@ -330,6 +340,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       pendingSeatClaimTargetRef.current = null;
       membershipRequestPendingRef.current = false;
       seatLookupPendingRoomRef.current = null;
+      completedSeatLookupRoomRef.current = null;
       ignoreRoomEventsRef.current = false;
       ignoreRecoveryEventsRef.current = true;
       explicitLeaveSuppressedRef.current = false;
@@ -339,6 +350,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setIsSpectator(role === "spectator");
       setReconnectState("connected");
       setReconnectableSeats([]);
+      setReconnectableSeatsRoomCode(null);
       setPendingSeatClaim(null);
       saveReconnectSession(acceptedSession);
     };
@@ -403,6 +415,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (seatLookupPendingRoomRef.current) {
         seatLookupPendingRoomRef.current = null;
       }
+      completedSeatLookupRoomRef.current = null;
+      setReconnectableSeats([]);
+      setReconnectableSeatsRoomCode(null);
       if (pendingSeatClaimTargetRef.current?.requestId === null) {
         pendingSeatClaimTargetRef.current = null;
       }
@@ -445,7 +460,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (ignoreRecoveryEventsRef.current) return;
       if (seatLookupPendingRoomRef.current !== roomCode) return;
       seatLookupPendingRoomRef.current = null;
+      completedSeatLookupRoomRef.current = roomCode;
       setReconnectableSeats(seats);
+      setReconnectableSeatsRoomCode(roomCode);
     };
 
     const handleSeatClaimSubmitted: ServerEvents["room:seatClaimSubmitted"] = ({ requestId }) => {
@@ -783,6 +800,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     pendingSeatClaimTargetRef.current = null;
     membershipRequestPendingRef.current = false;
     seatLookupPendingRoomRef.current = null;
+    completedSeatLookupRoomRef.current = null;
     socket.emit("room:leave");
     if (!retainOwnership) {
       reconnectSessionTombstonedRef.current = true;
@@ -797,6 +815,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setMyCharacter(null);
     setReconnectState("idle");
     setReconnectableSeats([]);
+    setReconnectableSeatsRoomCode(null);
     setPendingSeatClaim(null);
     setHostSeatClaims([]);
     setHostChangeNotice(null);
@@ -889,10 +908,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
     const normalizedRoomCode = code.trim().toUpperCase();
     seatLookupPendingRoomRef.current = normalizedRoomCode;
+    completedSeatLookupRoomRef.current = null;
     ignoreRecoveryEventsRef.current = false;
     sessionAcceptanceExpectationRef.current = null;
     pendingSeatClaimTargetRef.current = null;
     setReconnectableSeats([]);
+    setReconnectableSeatsRoomCode(null);
     setPendingSeatClaim(null);
     socket.emit("room:listReconnectableSeats", { roomCode: normalizedRoomCode });
   }, []);
@@ -905,6 +926,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         membershipRequestPendingRef.current ||
         seatLookupPendingRoomRef.current ||
         pendingSeatClaimTargetRef.current ||
+        completedSeatLookupRoomRef.current !== normalizedRoomCode ||
         !selectedSeat
       ) {
         return;
@@ -916,6 +938,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         roomCode: normalizedRoomCode,
         playerId: targetPlayerId,
       };
+      completedSeatLookupRoomRef.current = null;
+      setReconnectableSeats([]);
+      setReconnectableSeatsRoomCode(null);
       setPendingSeatClaim({
         requestId: null,
         roomCode: normalizedRoomCode,
@@ -933,6 +958,27 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     },
     [reconnectableSeats],
   );
+
+  const clearReconnectableSeats = useCallback(() => {
+    seatLookupPendingRoomRef.current = null;
+    completedSeatLookupRoomRef.current = null;
+    setReconnectableSeats([]);
+    setReconnectableSeatsRoomCode(null);
+  }, []);
+
+  const resetSeatRecovery = useCallback(() => {
+    seatLookupPendingRoomRef.current = null;
+    completedSeatLookupRoomRef.current = null;
+    setReconnectableSeats([]);
+    setReconnectableSeatsRoomCode(null);
+    if (pendingSeatClaimTargetRef.current) return;
+    if (sessionAcceptanceExpectationRef.current?.source === "claim") {
+      sessionAcceptanceExpectationRef.current = null;
+    }
+    setPendingSeatClaim((current) =>
+      current && (current.status === "rejected" || current.status === "cancelled") ? null : current,
+    );
+  }, []);
 
   const cancelSeatClaim = useCallback(() => {
     if (!pendingSeatClaim?.requestId) return;
@@ -972,6 +1018,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         error,
         reconnectState,
         reconnectableSeats,
+        reconnectableSeatsRoomCode,
         pendingSeatClaim,
         hostSeatClaims,
         hostChangeNotice,
@@ -1003,6 +1050,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         adminRevivePlayer: adminRevivePlayerFn,
         adminEliminatePlayer: adminEliminatePlayerFn,
         listReconnectableSeats,
+        clearReconnectableSeats,
+        resetSeatRecovery,
         requestSeatClaim,
         cancelSeatClaim,
         resolveSeatClaim,

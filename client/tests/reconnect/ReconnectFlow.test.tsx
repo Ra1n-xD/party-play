@@ -879,7 +879,7 @@ test("claim cancellation is explicit and does not depend on localized server cop
   setBrowserStorage(new MemoryStorage());
   const mounted = await mountProvider();
 
-  try {
+  const loadSeat = async () => {
     await act(async () => mounted.snapshot().listReconnectableSeats(roomCode));
     await act(async () => {
       mounted.fake.serverEmit("room:reconnectableSeats", {
@@ -887,6 +887,10 @@ test("claim cancellation is explicit and does not depend on localized server cop
         seats: [{ playerId: otherPlayerId, playerName: "Seat owner" }],
       });
     });
+  };
+
+  try {
+    await loadSeat();
     await act(async () => mounted.snapshot().requestSeatClaim(roomCode, otherPlayerId, "Claimant"));
     await act(async () => {
       mounted.fake.serverEmit("room:seatClaimSubmitted", { requestId: "claim-1" });
@@ -911,6 +915,7 @@ test("claim cancellation is explicit and does not depend on localized server cop
     });
     assert.equal(mounted.snapshot().pendingSeatClaim?.status, "cancelled");
 
+    await loadSeat();
     await act(async () => mounted.snapshot().requestSeatClaim(roomCode, otherPlayerId, "Claimant"));
     await act(async () => {
       mounted.fake.serverEmit("room:seatClaimSubmitted", { requestId: "claim-2" });
@@ -931,12 +936,15 @@ test("claim cancellation is explicit and does not depend on localized server cop
     });
     assert.equal(mounted.snapshot().pendingSeatClaim?.status, "rejected");
 
+    await loadSeat();
     await act(async () => mounted.snapshot().requestSeatClaim(roomCode, otherPlayerId, "Claimant"));
     await act(async () =>
       mounted.fake.serverEmit("room:error", { message: "Некорректная заявка" }),
     );
     assert.equal(mounted.snapshot().pendingSeatClaim?.status, "rejected");
     assert.equal(mounted.snapshot().pendingSeatClaim?.message, "Некорректная заявка");
+    await act(async () => mounted.snapshot().resetSeatRecovery());
+    assert.equal(mounted.snapshot().pendingSeatClaim, null);
   } finally {
     await mounted.cleanup();
   }
@@ -1014,12 +1022,60 @@ test("seat lookup and claim submission serialize recovery operations", async () 
 
     await act(async () => {
       mounted.fake.serverEmit("room:error", { message: "Первая заявка отклонена" });
-      mounted.snapshot().requestSeatClaim("BBBB", thirdPlayerId, "Second claimant");
     });
+    await act(async () => mounted.snapshot().listReconnectableSeats("BBBB"));
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode: "BBBB",
+        seats: [{ playerId: thirdPlayerId, playerName: "Ольга" }],
+      });
+    });
+    await act(async () =>
+      mounted.snapshot().requestSeatClaim("BBBB", thirdPlayerId, "Second claimant"),
+    );
     assert.equal(mounted.fake.emittedFor("room:requestSeatClaim").length, 2);
     assert.deepEqual(mounted.fake.emittedFor("room:requestSeatClaim").at(-1)?.args, [
       { roomCode: "BBBB", playerId: thirdPlayerId, claimantName: "Second claimant" },
     ]);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("completed seat lookup stays bound to its room and clears before claim", async () => {
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider();
+
+  try {
+    await act(async () => mounted.snapshot().listReconnectableSeats("AAAA"));
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode: "AAAA",
+        seats: [{ playerId: otherPlayerId, playerName: "Seat A" }],
+      });
+    });
+    assert.equal(mounted.snapshot().reconnectableSeatsRoomCode, "AAAA");
+
+    await act(async () => mounted.snapshot().requestSeatClaim("BBBB", otherPlayerId, "Wrong room"));
+    assert.equal(mounted.fake.emittedFor("room:requestSeatClaim").length, 0);
+
+    await act(async () => mounted.snapshot().clearReconnectableSeats());
+    assert.deepEqual(mounted.snapshot().reconnectableSeats, []);
+    assert.equal(mounted.snapshot().reconnectableSeatsRoomCode, null);
+
+    await act(async () => mounted.snapshot().listReconnectableSeats("BBBB"));
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode: "BBBB",
+        seats: [{ playerId: otherPlayerId, playerName: "Seat B" }],
+      });
+    });
+    await act(async () =>
+      mounted.snapshot().requestSeatClaim("BBBB", otherPlayerId, "Correct room"),
+    );
+    assert.equal(mounted.fake.emittedFor("room:requestSeatClaim").length, 1);
+    assert.deepEqual(mounted.snapshot().reconnectableSeats, []);
+    assert.equal(mounted.snapshot().reconnectableSeatsRoomCode, null);
   } finally {
     await mounted.cleanup();
   }
