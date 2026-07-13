@@ -11,6 +11,8 @@ import {
   removeBotFromRoom,
   getAllRooms,
   resetRoomManagerStateForTests,
+  setRoomDisposalHandler,
+  touchRoom,
   Room,
   Spectator,
 } from "./roomManager.js";
@@ -38,7 +40,7 @@ import {
 } from "./gameEngine.js";
 import { CONFIG } from "./config.js";
 import { generateSessionToken } from "./utils.js";
-import { resetBotManagerStateForTests } from "./botManager.js";
+import { clearBotActions, resetBotManagerStateForTests } from "./botManager.js";
 import { resetGameLifecycleHooksForTests, setBeforeGameOverHook } from "./gameLifecycle.js";
 import {
   bindPlayerSocket,
@@ -54,12 +56,14 @@ import {
   kickPlayerPermanently,
   listReconnectableSeats,
   markPlayerDisconnected,
-  removeLobbyPlayerWithHostFailover,
+  removePlayerWithHostFailover,
   removeClaimsForSocket,
   resetSeatClaimStateForTests,
   resolveSeatClaim,
   transferHost,
 } from "./reconnectManager.js";
+import { getSocketClientIdentity } from "./clientIdentity.js";
+import { RejoinThrottle } from "./rejoinThrottle.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 type IOSocket = Socket<ClientEvents, ServerEvents>;
@@ -139,7 +143,7 @@ function isIpRateLimited(socket: IOSocket, action: string): boolean {
     }
   }
 
-  const ip = getSocketIp(socket);
+  const ip = getSocketClientIdentity(socket);
   let actions = ipActionCounts.get(ip);
   if (!actions) {
     actions = new Map();
@@ -169,43 +173,44 @@ function cleanupRateLimitEntry(socketId: string): void {
   socketActionCounts.delete(socketId);
 }
 
-// --- Progressive backoff for failed rejoin attempts (per IP) ---
-const rejoinFailures = new Map<string, { count: number; blockedUntil: number }>();
-
-function getSocketIp(socket: IOSocket): string {
-  // Use socket.handshake.address — do not parse X-Forwarded-For manually,
-  // as it can be spoofed to bypass rate limiting
-  return socket.handshake.address;
-}
+// --- Progressive backoff for failed rejoin attempts (per client network identity) ---
+const rejoinThrottle = new RejoinThrottle();
 
 function isRejoinBlocked(socket: IOSocket): boolean {
-  const ip = getSocketIp(socket);
-  const entry = rejoinFailures.get(ip);
-  if (!entry) return false;
-  if (Date.now() < entry.blockedUntil) return true;
-  // Block expired — reset
-  rejoinFailures.delete(ip);
-  return false;
+  return rejoinThrottle.isBlocked(getSocketClientIdentity(socket));
 }
 
 function recordRejoinFailure(socket: IOSocket): void {
-  const ip = getSocketIp(socket);
-  const entry = rejoinFailures.get(ip) || { count: 0, blockedUntil: 0 };
-  entry.count++;
-  // Exponential backoff: 2s, 4s, 8s, 16s, max 60s
-  const delaySec = Math.min(60, 2 ** entry.count);
-  entry.blockedUntil = Date.now() + delaySec * 1000;
-  rejoinFailures.set(ip, entry);
+  rejoinThrottle.recordFailure(getSocketClientIdentity(socket));
 }
 
 function clearRejoinFailures(socket: IOSocket): void {
-  const ip = getSocketIp(socket);
-  rejoinFailures.delete(ip);
+  rejoinThrottle.clear(getSocketClientIdentity(socket));
 }
 
 function installGameLifecycleHooks(): void {
   setBeforeGameOverHook((room, io) => {
     cancelAllSeatClaims(room, io, "Игра завершена");
+  });
+}
+
+function attachRoomDisposalHandler(room: Room, io: IOServer): void {
+  setRoomDisposalHandler(room, (disposedRoom, reason) => {
+    clearBotActions(disposedRoom.code);
+    cancelAllSeatClaims(
+      disposedRoom,
+      io,
+      reason === "inactive" ? "Комната закрыта из-за неактивности" : "Комната закрыта",
+    );
+    for (const spectator of disposedRoom.spectators.values()) {
+      clearSpectatorGraceTimer(spectator.id);
+    }
+    for (const [socketId, membership] of Array.from(socketRoomMap.entries())) {
+      if (membership.roomCode !== disposedRoom.code) continue;
+      socketRoomMap.delete(socketId);
+      cleanupRateLimitEntry(socketId);
+      io.sockets.sockets.get(socketId)?.leave(disposedRoom.code);
+    }
   });
 }
 
@@ -216,7 +221,7 @@ export function resetSocketHandlerStateForTests(): void {
   socketActionCounts.clear();
   ipActionCounts.clear();
   nextIpActionPruneAt = 0;
-  rejoinFailures.clear();
+  rejoinThrottle.reset();
   resetGameLifecycleHooksForTests();
   installGameLifecycleHooks();
   resetBotManagerStateForTests();
@@ -347,6 +352,7 @@ function getSocketRoom(
   if (info.role === "spectator") return null;
   const room = getRoom(info.roomCode);
   if (!room) return null;
+  touchRoom(room.code);
   return { room, info };
 }
 
@@ -423,6 +429,7 @@ export function registerHandlers(io: IOServer): void {
 
       removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       const { room, player } = createRoom(socket.id, sanitizePlayerName(playerName));
+      attachRoomDisposalHandler(room, io);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -469,6 +476,7 @@ export function registerHandlers(io: IOServer): void {
       }
 
       const { room, player } = result;
+      attachRoomDisposalHandler(room, io);
       removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
@@ -567,6 +575,7 @@ export function registerHandlers(io: IOServer): void {
       }
 
       clearRejoinFailures(socket);
+      touchRoom(room.code);
       removeClaimsForSocket(socket.id, io, "Владелец места вернулся", true);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
@@ -610,6 +619,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
+      touchRoom(room.code);
       expireSeatClaims(room, io);
       socket.leave(room.code);
       socket.emit("room:reconnectableSeats", {
@@ -646,6 +656,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
+      touchRoom(room.code);
       expireSeatClaims(room, io);
       socket.leave(room.code);
       const result = createSeatClaim(
@@ -791,6 +802,7 @@ export function registerHandlers(io: IOServer): void {
 
       clearRejoinFailures(socket);
       clearSpectatorGraceTimer(spectator.id);
+      touchRoom(room.code);
       removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       const newToken = generateSessionToken();
       spectator.sessionToken = newToken;
@@ -1043,9 +1055,10 @@ export function registerHandlers(io: IOServer): void {
       if (!ensureConnectedHost(ctx.room, io)) broadcastState(ctx.room, io);
     });
 
-    socket.on("admin:transferHost", ({ targetPlayerId }) => {
+    socket.on("admin:transferHost", (data) => {
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
+      const targetPlayerId = data?.targetPlayerId;
       if (!isValidId(targetPlayerId)) {
         socket.emit("room:error", { message: "Игрок не найден" });
         return;
@@ -1293,8 +1306,8 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
-      if (!room.gameState) {
-        removeLobbyPlayerWithHostFailover(room, player.id, io);
+      if (!room.gameState || room.gameState.phase === "GAME_OVER") {
+        removePlayerWithHostFailover(room, player.id, io);
         socketRoomMap.delete(socket.id);
         cleanupRateLimitEntry(socket.id);
         socket.leave(info.roomCode);

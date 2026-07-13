@@ -32,8 +32,12 @@ export interface SocketTestClient {
 export interface SocketTestServer {
   url: string;
   io: Server<ClientEvents, ServerEvents>;
-  connectClient(): Promise<SocketTestClient>;
+  connectClient(options?: SocketTestClientOptions): Promise<SocketTestClient>;
   close(): Promise<void>;
+}
+
+export interface SocketTestClientOptions {
+  forwardedFor?: string;
 }
 
 const EVENT_TIMEOUT_MS = 5_000;
@@ -127,11 +131,13 @@ function wrapClient(socket: ClientSocket<ServerEvents, ClientEvents>): SocketTes
 async function connectSocket(
   url: string,
   clients: Set<SocketTestClient & { dispose: () => void }>,
+  options: SocketTestClientOptions = {},
 ): Promise<SocketTestClient> {
   const socket: ClientSocket<ServerEvents, ClientEvents> = createClient(url, {
     autoConnect: false,
     forceNew: true,
     reconnection: false,
+    ...(options.forwardedFor ? { extraHeaders: { "x-forwarded-for": options.forwardedFor } } : {}),
   });
   const client = wrapClient(socket);
   clients.add(client);
@@ -177,7 +183,7 @@ export async function createSocketTestServer(): Promise<SocketTestServer> {
   return {
     url,
     io,
-    connectClient: () => connectSocket(url, clients),
+    connectClient: (options) => connectSocket(url, clients, options),
     async close() {
       if (closed) return;
       closed = true;
