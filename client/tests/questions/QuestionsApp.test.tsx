@@ -30,8 +30,8 @@ test("role picker offers exactly the two editors and observer", () => {
   assert.match(html, /ДанИИл/);
 });
 
-test("editor renders only the selected participant's fields with author-based labels", () => {
-  const state: QuestionsEditorState = {
+test("both editors show Daniil's variant first and Shasha's variant second", () => {
+  const daniilState: QuestionsEditorState = {
     role: "daniil",
     questions: [
       {
@@ -41,18 +41,33 @@ test("editor renders only the selected participant's fields with author-based la
         partnerGuess: "Розовый",
         updatedAt: 1_000,
       },
+    ],
+  };
+  const shashaState: QuestionsEditorState = {
+    role: "shasha",
+    questions: [
       {
-        id: 2,
-        number: 2,
-        ownAnswer: "Лето",
-        partnerGuess: "Весна",
-        updatedAt: 2_000,
+        id: 1,
+        number: 1,
+        ownAnswer: "Красный",
+        partnerGuess: "Голубой",
+        updatedAt: 1_000,
       },
     ],
   };
-  const html = renderToStaticMarkup(
+  const daniilHtml = renderToStaticMarkup(
     <QuestionsEditorScreen
-      state={state}
+      state={daniilState}
+      connected
+      error={null}
+      onExit={noop}
+      onAddQuestion={noop}
+      onUpdate={noop}
+    />,
+  );
+  const shashaHtml = renderToStaticMarkup(
+    <QuestionsEditorScreen
+      state={shashaState}
       connected
       error={null}
       onExit={noop}
@@ -61,12 +76,13 @@ test("editor renders only the selected participant's fields with author-based la
     />,
   );
 
-  assert.match(html, /Вопрос 01/);
-  assert.match(html, /Вопрос 02/);
-  assert.match(html, /Вариант ДанИИла/);
-  assert.match(html, /Вариант Шаши/);
-  assert.doesNotMatch(html, /Мой ответ|Как ответит/);
-  assert.doesNotMatch(html, /Красный|Зелёный/);
+  assert.match(daniilHtml, /Вариант ДанИИла[\s\S]*Синий[\s\S]*Вариант Шаши[\s\S]*Розовый/);
+  assert.match(shashaHtml, /Вариант ДанИИла[\s\S]*Голубой[\s\S]*Вариант Шаши[\s\S]*Красный/);
+  assert.match(daniilHtml, /Экран Даниила/);
+  assert.match(shashaHtml, /Экран Шаши/);
+  assert.match(daniilHtml, /Ну что, удачи вам\)\)\)/);
+  assert.match(shashaHtml, /Ну что, удачи вам\)\)\)/);
+  assert.doesNotMatch(`${daniilHtml}${shashaHtml}`, /Всё, что вы вводите|Мой ответ|Как ответит/);
 });
 
 test("observer shows every question and all four live fields", () => {
@@ -99,6 +115,14 @@ test("observer shows every question and all four live fields", () => {
   assert.match(html, /Красный/);
   assert.match(html, /Голубой/);
   assert.match(html, /Ждём ответ/);
+  assert.match(
+    html,
+    /<h2>Даниил<\/h2>[\s\S]*Вариант ДанИИла[\s\S]*Синий[\s\S]*Вариант Шаши[\s\S]*Розовый/,
+  );
+  assert.match(
+    html,
+    /<h2>Шаша<\/h2>[\s\S]*Вариант ДанИИла[\s\S]*Голубой[\s\S]*Вариант Шаши[\s\S]*Красный/,
+  );
   assert.equal((html.match(/Вариант ДанИИла/g) ?? []).length, 4);
   assert.equal((html.match(/Вариант Шаши/g) ?? []).length, 4);
   assert.doesNotMatch(html, /Мой ответ|Как ответит/);
