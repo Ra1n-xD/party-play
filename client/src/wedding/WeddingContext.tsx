@@ -120,6 +120,11 @@ export function WeddingProvider({
       setError(data.message);
       if (/участник не найден/i.test(data.message)) clearWeddingSession();
     };
+    const onContestReset = () => {
+      clearWeddingSession();
+      setGuestState(null);
+      setParticipants([]);
+    };
     const onExpired = () => {
       setRoomExists(false);
       setGuestState(null);
@@ -135,6 +140,7 @@ export function WeddingProvider({
     weddingSocket.on("wedding:guestState", onGuestState);
     weddingSocket.on("wedding:hostState", onHostState);
     weddingSocket.on("wedding:error", onError);
+    weddingSocket.on("wedding:contestReset", onContestReset);
     weddingSocket.on("wedding:expired", onExpired);
     if (!weddingSocket.connected) weddingSocket.connect();
     else onConnect();
@@ -148,6 +154,7 @@ export function WeddingProvider({
       weddingSocket.off("wedding:guestState", onGuestState);
       weddingSocket.off("wedding:hostState", onHostState);
       weddingSocket.off("wedding:error", onError);
+      weddingSocket.off("wedding:contestReset", onContestReset);
       weddingSocket.off("wedding:expired", onExpired);
       weddingSocket.disconnect();
     };

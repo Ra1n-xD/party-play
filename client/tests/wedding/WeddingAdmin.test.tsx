@@ -199,7 +199,10 @@ test("a finished contest requires confirmation before resetting every result", a
   await act(async () => findButton(renderer, "Показать итоговый счёт").props.onClick());
   await act(async () => findButton(renderer, "Начать новый конкурс").props.onClick());
   assert.deepEqual(calls, []);
-  assert.match(JSON.stringify(renderer.toJSON()), /Все очки и ответы будут обнулены/);
+  assert.match(
+    JSON.stringify(renderer.toJSON()),
+    /Все участники, очки и ответы будут удалены.*подключиться заново/,
+  );
 
   await act(async () => findButton(renderer, "Да, начать новый конкурс").props.onClick());
   assert.deepEqual(calls, ["restart"]);
