@@ -413,6 +413,24 @@ export class WeddingRoomService {
     });
   }
 
+  restartContest(): HostWeddingState {
+    const room = this.requireRoom();
+    if (room.phase !== "FINISHED") throw new Error("Сначала завершите текущий конкурс");
+    return this.mutate((draft) => {
+      draft.phase = "PREPARING";
+      draft.questionNumber = 0;
+      draft.optionStyle = "letters";
+      draft.correctOption = null;
+      draft.answers = [];
+      for (const participant of draft.participants) {
+        participant.correctAnswers = 0;
+        participant.answerOption = null;
+        participant.answerSubmittedAt = null;
+      }
+      return this.serializeHost(draft);
+    });
+  }
+
   private getRoom(): WeddingRoomSnapshot | null {
     this.expireIfNeeded();
     return this.room;
