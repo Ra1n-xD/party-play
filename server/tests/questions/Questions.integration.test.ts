@@ -180,3 +180,46 @@ test("keeps observers read-only and editor payloads private", async () => {
     await harness.close();
   }
 });
+
+test("lets either editor delete only the latest question for every screen", async () => {
+  const harness = await createHarness();
+  try {
+    const daniil = await harness.connect();
+    const shasha = await harness.connect();
+    const observer = await harness.connect();
+    daniil.emit("questions:selectRole", { role: "daniil" });
+    shasha.emit("questions:selectRole", { role: "shasha" });
+    observer.emit("questions:selectRole", { role: "observer" });
+    await daniil.waitFor("questions:editorState");
+    await shasha.waitFor("questions:editorState");
+    await observer.waitFor("questions:observerState");
+
+    daniil.emit("questions:addQuestion");
+    await observer.waitFor("questions:observerState", (state) => state.questions.length === 1);
+    shasha.emit("questions:addQuestion");
+    await observer.waitFor("questions:observerState", (state) => state.questions.length === 2);
+
+    shasha.emit("questions:deleteLatestQuestion");
+    const observerAfterDelete = await observer.waitFor(
+      "questions:observerState",
+      (state) => state.questions.length === 1,
+    );
+    const daniilAfterDelete = await daniil.waitFor(
+      "questions:editorState",
+      (state) => state.questions.length === 1,
+    );
+    assert.deepEqual(
+      observerAfterDelete.questions.map((question) => question.number),
+      [1],
+    );
+    assert.deepEqual(
+      daniilAfterDelete.questions.map((question) => question.number),
+      [1],
+    );
+
+    observer.emit("questions:deleteLatestQuestion");
+    assert.match((await observer.waitFor("questions:error")).message, /наблюдател/i);
+  } finally {
+    await harness.close();
+  }
+});

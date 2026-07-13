@@ -145,6 +145,16 @@ export class QuestionsSessionService {
     });
   }
 
+  deleteLatestQuestion(): QuestionsObserverState {
+    if (this.snapshot.questions.length === 0) {
+      throw new Error("Нет вопросов для удаления");
+    }
+    return this.mutate((snapshot) => {
+      snapshot.questions.pop();
+      return this.getObserverStateFrom(snapshot);
+    });
+  }
+
   updateAnswer(
     role: QuestionsEditorRole,
     questionId: number,

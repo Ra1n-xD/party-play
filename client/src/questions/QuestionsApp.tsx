@@ -5,6 +5,7 @@ import type {
   QuestionsObserverState,
   QuestionsRole,
 } from "../../../shared/types";
+import { AccessibleModal } from "../screens/game/AccessibleModal";
 import { useQuestions } from "./QuestionsContext";
 import { questionsUpdateKey, type QuestionsSaveStatus } from "./QuestionsUpdateQueue";
 
@@ -117,12 +118,55 @@ export function mergeEditorDrafts(
   return authoritative;
 }
 
+export function QuestionsDeleteDialog({
+  questionNumber,
+  confirmDisabled = false,
+  onCancel,
+  onConfirm,
+}: {
+  questionNumber: number;
+  confirmDisabled?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AccessibleModal
+      labelledBy="questions-delete-dialog-title"
+      onClose={onCancel}
+      overlayClassName="questions-delete-overlay"
+      panelClassName="questions-delete-dialog"
+    >
+      <span className="questions-delete-dialog-icon" aria-hidden="true">
+        −
+      </span>
+      <h2 id="questions-delete-dialog-title">
+        Удалить вопрос {formatQuestionNumber(questionNumber)}?
+      </h2>
+      <p>Последний блок и все ответы в нём исчезнут у участников и наблюдателей.</p>
+      <div className="questions-delete-dialog-actions">
+        <button type="button" className="questions-delete-cancel" onClick={onCancel}>
+          Отмена
+        </button>
+        <button
+          type="button"
+          className="questions-delete-confirm"
+          onClick={onConfirm}
+          disabled={confirmDisabled}
+        >
+          Удалить последний вопрос
+        </button>
+      </div>
+    </AccessibleModal>
+  );
+}
+
 export function QuestionsEditorScreen({
   state,
   connected,
   error,
   onExit,
   onAddQuestion,
+  onDeleteLatestQuestion,
   onUpdate,
   onFlush = () => undefined,
   saveStatuses = {},
@@ -132,11 +176,14 @@ export function QuestionsEditorScreen({
   error: string | null;
   onExit: () => void;
   onAddQuestion: () => void;
+  onDeleteLatestQuestion: () => void;
   onUpdate: (questionId: number, field: QuestionsAnswerField, value: string) => void;
   onFlush?: (questionId: number, field: QuestionsAnswerField) => void;
   saveStatuses?: Record<string, QuestionsSaveStatus>;
 }) {
   const [drafts, setDrafts] = useState<DraftMap>(() => createDraftMap(state));
+  const [deleteQuestionNumber, setDeleteQuestionNumber] = useState<number | null>(null);
+  const latestQuestion = state.questions.at(-1);
   const partnerName = state.role === "daniil" ? "Шаша" : "Даниил";
   const ownName = state.role === "daniil" ? "Даниил" : "Шаша";
   const screenLabel = state.role === "daniil" ? "Экран Даниила" : "Экран Шаши";
@@ -172,6 +219,12 @@ export function QuestionsEditorScreen({
     setDrafts((current) => mergeEditorDrafts(current, state, dirtyKeys));
   }, [state, saveStatuses]);
 
+  useEffect(() => {
+    if (deleteQuestionNumber !== null && latestQuestion?.number !== deleteQuestionNumber) {
+      setDeleteQuestionNumber(null);
+    }
+  }, [deleteQuestionNumber, latestQuestion?.number]);
+
   const update = (questionId: number, field: QuestionsAnswerField, value: string) => {
     setDrafts((current) => ({ ...current, [`${questionId}:${field}`]: value }));
     onUpdate(questionId, field, value);
@@ -195,15 +248,41 @@ export function QuestionsEditorScreen({
           Выйти
         </button>
         <QuestionBrand eyebrow={`Отвечает ${ownName}`} />
-        <button
-          type="button"
-          className="questions-add-button"
-          onClick={onAddQuestion}
-          disabled={!connected}
-        >
-          <span aria-hidden="true">＋</span> Добавить вопрос
-        </button>
+        <div className="questions-header-actions">
+          <button
+            type="button"
+            className="questions-delete-button"
+            onClick={() => {
+              if (latestQuestion) setDeleteQuestionNumber(latestQuestion.number);
+            }}
+            disabled={!connected || state.questions.length === 0}
+          >
+            Удалить вопрос
+          </button>
+          <button
+            type="button"
+            className="questions-add-button"
+            onClick={onAddQuestion}
+            disabled={!connected}
+          >
+            <span aria-hidden="true">＋</span> Добавить вопрос
+          </button>
+        </div>
       </header>
+
+      {deleteQuestionNumber !== null && (
+        <QuestionsDeleteDialog
+          questionNumber={deleteQuestionNumber}
+          confirmDisabled={!connected}
+          onCancel={() => setDeleteQuestionNumber(null)}
+          onConfirm={() => {
+            if (latestQuestion?.number === deleteQuestionNumber && connected) {
+              onDeleteLatestQuestion();
+            }
+            setDeleteQuestionNumber(null);
+          }}
+        />
+      )}
 
       <section className="questions-editor-intro">
         <div>
@@ -407,6 +486,7 @@ export function QuestionsApp() {
     selectRole,
     exitRole,
     addQuestion,
+    deleteLatestQuestion,
     updateAnswer,
     flushAnswer,
   } = useQuestions();
@@ -431,6 +511,7 @@ export function QuestionsApp() {
           error={error}
           onExit={exitRole}
           onAddQuestion={addQuestion}
+          onDeleteLatestQuestion={deleteLatestQuestion}
           onUpdate={updateAnswer}
           onFlush={flushAnswer}
           saveStatuses={saveStatuses}
@@ -448,6 +529,7 @@ export function QuestionsApp() {
     selectRole,
     exitRole,
     addQuestion,
+    deleteLatestQuestion,
     updateAnswer,
     flushAnswer,
   ]);

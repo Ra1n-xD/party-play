@@ -71,7 +71,12 @@ export class QuestionsUpdateQueue {
   acknowledge(state: QuestionsEditorState): void {
     for (const [key, entry] of this.pending) {
       const question = state.questions.find((item) => item.id === entry.update.questionId);
-      if (!question || question[entry.update.field] !== entry.update.value) continue;
+      if (!question) {
+        if (entry.timer !== null) this.clearTimer(entry.timer);
+        this.pending.delete(key);
+        continue;
+      }
+      if (question[entry.update.field] !== entry.update.value) continue;
       if (entry.timer !== null) this.clearTimer(entry.timer);
       this.pending.delete(key);
       this.options.onStatus(key, "saved");
