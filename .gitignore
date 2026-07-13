@@ -4,6 +4,7 @@ cards
 .claude
 .worktrees/
 .superpowers/
+server/.data/
 .env
 .env.*
 .env.local

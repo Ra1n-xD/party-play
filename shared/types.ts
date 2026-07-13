@@ -218,3 +218,78 @@ export interface ServerEvents {
   "game:actionCardRevealed": (data: { playerName: string; actionCard: ActionCard }) => void;
   "game:attributeRevealed": (data: { playerName: string; attribute: Attribute }) => void;
 }
+
+// ============ Wedding Quiz ============
+
+export type WeddingPhase = "PREPARING" | "OPEN" | "FINISHED";
+export type WeddingOptionStyle = "letters" | "numbers";
+
+export interface WeddingParticipantSummary {
+  id: string;
+  name: string;
+  connected: boolean;
+}
+
+export interface WeddingHostParticipant extends WeddingParticipantSummary {
+  correctAnswers: number;
+  hasAnswered: boolean;
+}
+
+export interface WeddingHostAnswer {
+  sequence: number;
+  participantId: string;
+  participantName: string;
+  optionIndex: number;
+  submittedAt: number;
+  firstCorrect: boolean;
+}
+
+export interface GuestWeddingState {
+  phase: WeddingPhase;
+  questionNumber: number;
+  optionStyle: WeddingOptionStyle | null;
+  expiresAt: number;
+  participantId: string;
+  participantName: string;
+  hasAnswered: boolean;
+  selectedOption: number | null;
+}
+
+export interface HostWeddingState {
+  phase: WeddingPhase;
+  questionNumber: number;
+  optionStyle: WeddingOptionStyle;
+  correctOption: number;
+  expiresAt: number;
+  connectedCount: number;
+  answeredCount: number;
+  participants: WeddingHostParticipant[];
+  answers: WeddingHostAnswer[];
+}
+
+export interface WeddingClientEvents {
+  "wedding:hostConnect": () => void;
+  "wedding:createRoom": () => void;
+  "wedding:listParticipants": () => void;
+  "wedding:joinNew": (data: { name: string }) => void;
+  "wedding:rejoin": (data: { participantId: string; name: string }) => void;
+  "wedding:answer": (data: { optionIndex: number }) => void;
+  "wedding:setDraft": (data: {
+    optionStyle: WeddingOptionStyle;
+    correctOption: number;
+  }) => void;
+  "wedding:startQuestion": () => void;
+  "wedding:prepareNext": () => void;
+  "wedding:adjustScore": (data: { participantId: string; delta: -1 | 1 }) => void;
+  "wedding:endContest": () => void;
+}
+
+export interface WeddingServerEvents {
+  "wedding:availability": (data: { exists: boolean; expiresAt: number | null }) => void;
+  "wedding:participants": (data: { participants: WeddingParticipantSummary[] }) => void;
+  "wedding:joined": (data: { participantId: string; participantName: string }) => void;
+  "wedding:guestState": (data: GuestWeddingState) => void;
+  "wedding:hostState": (data: HostWeddingState) => void;
+  "wedding:error": (data: { message: string }) => void;
+  "wedding:expired": () => void;
+}
