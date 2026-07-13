@@ -175,6 +175,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const membershipRequestPendingRef = useRef(false);
   const seatLookupPendingRoomRef = useRef<string | null>(null);
   const completedSeatLookupRoomRef = useRef<string | null>(null);
+  const discardPendingSeatLookupRef = useRef(false);
   const lastRejoinSocketIdRef = useRef<string | null>(null);
   const explicitLeaveSuppressedRef = useRef(false);
   const ignoreRoomEventsRef = useRef(true);
@@ -224,6 +225,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       membershipRequestPendingRef.current = false;
       seatLookupPendingRoomRef.current = null;
       completedSeatLookupRoomRef.current = null;
+      discardPendingSeatLookupRef.current = false;
       playerIdRef.current = null;
       setRoomCode(null);
       setPlayerId(null);
@@ -304,6 +306,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       membershipRequestPendingRef.current = false;
       seatLookupPendingRoomRef.current = null;
       completedSeatLookupRoomRef.current = null;
+      discardPendingSeatLookupRef.current = false;
       setReconnectableSeats([]);
       setReconnectableSeatsRoomCode(null);
       if (
@@ -341,6 +344,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       membershipRequestPendingRef.current = false;
       seatLookupPendingRoomRef.current = null;
       completedSeatLookupRoomRef.current = null;
+      discardPendingSeatLookupRef.current = false;
       ignoreRoomEventsRef.current = false;
       ignoreRecoveryEventsRef.current = true;
       explicitLeaveSuppressedRef.current = false;
@@ -415,6 +419,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (seatLookupPendingRoomRef.current) {
         seatLookupPendingRoomRef.current = null;
       }
+      discardPendingSeatLookupRef.current = false;
       completedSeatLookupRoomRef.current = null;
       setReconnectableSeats([]);
       setReconnectableSeatsRoomCode(null);
@@ -460,6 +465,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (ignoreRecoveryEventsRef.current) return;
       if (seatLookupPendingRoomRef.current !== roomCode) return;
       seatLookupPendingRoomRef.current = null;
+      const discardResult = discardPendingSeatLookupRef.current;
+      discardPendingSeatLookupRef.current = false;
+      if (discardResult) return;
       completedSeatLookupRoomRef.current = roomCode;
       setReconnectableSeats(seats);
       setReconnectableSeatsRoomCode(roomCode);
@@ -801,6 +809,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     membershipRequestPendingRef.current = false;
     seatLookupPendingRoomRef.current = null;
     completedSeatLookupRoomRef.current = null;
+    discardPendingSeatLookupRef.current = false;
     socket.emit("room:leave");
     if (!retainOwnership) {
       reconnectSessionTombstonedRef.current = true;
@@ -909,6 +918,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const normalizedRoomCode = code.trim().toUpperCase();
     seatLookupPendingRoomRef.current = normalizedRoomCode;
     completedSeatLookupRoomRef.current = null;
+    discardPendingSeatLookupRef.current = false;
     ignoreRecoveryEventsRef.current = false;
     sessionAcceptanceExpectationRef.current = null;
     pendingSeatClaimTargetRef.current = null;
@@ -960,14 +970,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   );
 
   const clearReconnectableSeats = useCallback(() => {
-    seatLookupPendingRoomRef.current = null;
+    if (seatLookupPendingRoomRef.current) {
+      discardPendingSeatLookupRef.current = true;
+    }
     completedSeatLookupRoomRef.current = null;
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
   }, []);
 
   const resetSeatRecovery = useCallback(() => {
-    seatLookupPendingRoomRef.current = null;
+    if (seatLookupPendingRoomRef.current) {
+      discardPendingSeatLookupRef.current = true;
+    }
     completedSeatLookupRoomRef.current = null;
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
