@@ -17,6 +17,21 @@ export interface Player {
   votedFor: string | null;
   immuneThisRound: boolean;
   actionCardRevealed: boolean;
+  kicked: boolean;
+}
+
+export interface PendingSeatClaim {
+  id: string;
+  socketId: string;
+  playerId: string;
+  claimantName: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface PauseReasons {
+  admin: boolean;
+  disconnectedPlayerIds: Set<string>;
 }
 
 export interface GameState {
@@ -41,6 +56,7 @@ export interface GameState {
   paused: boolean;
   pausedTimeRemaining: number | null;
   pausedCallback: (() => void) | null;
+  pauseReasons: PauseReasons;
 }
 
 export interface Spectator {
@@ -58,29 +74,62 @@ export interface Room {
   spectators: Map<string, Spectator>;
   gameState: GameState | null;
   allPlayerIds: string[]; // Original player order (for round rotation)
+  startedPlayerCount: number | null;
+  pendingSeatClaims: Map<string, PendingSeatClaim>;
 }
 
 const rooms = new Map<string, Room>();
 const roomLastActivity = new Map<string, number>();
+export type RoomDisposalReason = "empty" | "inactive" | "reset";
+type RoomDisposalHandler = (room: Room, reason: RoomDisposalReason) => void;
+const roomDisposalHandlers = new WeakMap<Room, RoomDisposalHandler>();
+
+export function setRoomDisposalHandler(room: Room, handler: RoomDisposalHandler): void {
+  roomDisposalHandlers.set(room, handler);
+}
+
+function disposeRoom(room: Room, reason: RoomDisposalReason): boolean {
+  if (rooms.get(room.code) !== room) return false;
+  if (room.gameState?.phaseTimer) {
+    clearTimeout(room.gameState.phaseTimer);
+    room.gameState.phaseTimer = null;
+  }
+  roomDisposalHandlers.get(room)?.(room, reason);
+  roomDisposalHandlers.delete(room);
+  rooms.delete(room.code);
+  roomLastActivity.delete(room.code);
+  return true;
+}
+
+export function disposeInactiveRooms(now = Date.now()): number {
+  let disposed = 0;
+  for (const [code, lastActivity] of roomLastActivity.entries()) {
+    if (now - lastActivity <= CONFIG.ROOM_INACTIVE_TTL) continue;
+    const room = rooms.get(code);
+    if (!room) {
+      roomLastActivity.delete(code);
+      continue;
+    }
+    if (disposeRoom(room, "inactive")) disposed++;
+  }
+  return disposed;
+}
 
 // Auto-cleanup inactive rooms every 5 minutes
-setInterval(
+const roomCleanupTimer = setInterval(
   () => {
-    const now = Date.now();
-    for (const [code, lastActivity] of roomLastActivity.entries()) {
-      if (now - lastActivity > CONFIG.ROOM_INACTIVE_TTL) {
-        const room = rooms.get(code);
-        if (room?.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
-        rooms.delete(code);
-        roomLastActivity.delete(code);
-      }
-    }
+    disposeInactiveRooms();
   },
   5 * 60 * 1000,
 );
+roomCleanupTimer.unref();
 
 export function touchRoom(code: string): void {
   roomLastActivity.set(code, Date.now());
+}
+
+export function getRoomLastActivityForTests(code: string): number | undefined {
+  return roomLastActivity.get(code);
 }
 
 export function createRoom(socketId: string, playerName: string): { room: Room; player: Player } {
@@ -105,6 +154,7 @@ export function createRoom(socketId: string, playerName: string): { room: Room; 
     votedFor: null,
     immuneThisRound: false,
     actionCardRevealed: false,
+    kicked: false,
   };
 
   const room: Room = {
@@ -114,6 +164,8 @@ export function createRoom(socketId: string, playerName: string): { room: Room; 
     spectators: new Map(),
     gameState: null,
     allPlayerIds: [playerId],
+    startedPlayerCount: null,
+    pendingSeatClaims: new Map(),
   };
 
   rooms.set(code, room);
@@ -147,6 +199,7 @@ export function joinRoom(
     votedFor: null,
     immuneThisRound: false,
     actionCardRevealed: false,
+    kicked: false,
   };
 
   room.players.set(playerId, player);
@@ -170,13 +223,12 @@ export function removePlayer(room: Room, playerId: string): void {
   room.players.delete(playerId);
   room.allPlayerIds = room.allPlayerIds.filter((id) => id !== playerId);
   if (room.players.size === 0) {
-    if (room.gameState?.phaseTimer) clearTimeout(room.gameState.phaseTimer);
-    rooms.delete(room.code);
-    roomLastActivity.delete(room.code);
+    disposeRoom(room, "empty");
   } else if (room.hostId === playerId) {
     const firstPlayer = room.players.values().next().value;
     if (firstPlayer) room.hostId = firstPlayer.id;
   }
+  if (room.players.size > 0) touchRoom(room.code);
 }
 
 export function getAlivePlayers(room: Room): Player[] {
@@ -185,6 +237,11 @@ export function getAlivePlayers(room: Room): Player[] {
 
 export function getAllRooms(): Map<string, Room> {
   return rooms;
+}
+
+export function resetRoomManagerStateForTests(): void {
+  for (const room of Array.from(rooms.values())) disposeRoom(room, "reset");
+  roomLastActivity.clear();
 }
 
 const BOT_NAMES = [
@@ -225,10 +282,7 @@ export function addBotToRoom(room: Room): Player | null {
   // Pick unused bot name
   const usedNames = new Set(Array.from(room.players.values()).map((p) => p.name));
   const available = BOT_NAMES.filter((n) => !usedNames.has(n));
-  const name =
-    available.length > 0
-      ? randomPick(available)
-      : `Бот ${room.players.size + 1}`;
+  const name = available.length > 0 ? randomPick(available) : `Бот ${room.players.size + 1}`;
 
   const playerId = generatePlayerId();
   const player: Player = {
@@ -246,10 +300,12 @@ export function addBotToRoom(room: Room): Player | null {
     votedFor: null,
     immuneThisRound: false,
     actionCardRevealed: false,
+    kicked: false,
   };
 
   room.players.set(playerId, player);
   room.allPlayerIds.push(playerId);
+  touchRoom(room.code);
   return player;
 }
 
@@ -260,6 +316,7 @@ export function removeBotFromRoom(room: Room, playerId: string): boolean {
 
   room.players.delete(playerId);
   room.allPlayerIds = room.allPlayerIds.filter((id) => id !== playerId);
+  touchRoom(room.code);
   return true;
 }
 
@@ -270,7 +327,8 @@ export function joinRoomAsSpectator(
 ): { room: Room; spectator: Spectator } | { error: string } {
   const room = rooms.get(roomCode);
   if (!room) return { error: "Комната не найдена" };
-  if (room.spectators.size >= CONFIG.MAX_SPECTATORS_PER_ROOM) return { error: "Слишком много зрителей" };
+  if (room.spectators.size >= CONFIG.MAX_SPECTATORS_PER_ROOM)
+    return { error: "Слишком много зрителей" };
 
   const spectatorId = generatePlayerId();
   const spectator: Spectator = {
@@ -287,7 +345,7 @@ export function joinRoomAsSpectator(
 }
 
 export function removeSpectator(room: Room, spectatorId: string): void {
-  room.spectators.delete(spectatorId);
+  if (room.spectators.delete(spectatorId)) touchRoom(room.code);
 }
 
 export function getRoomBySpectatorId(spectatorId: string): Room | undefined {

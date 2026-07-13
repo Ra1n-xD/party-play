@@ -48,6 +48,28 @@ export type GamePhase =
   | "ROUND_RESULT"
   | "GAME_OVER";
 
+export type PauseKind = "none" | "admin" | "reconnect" | "mixed";
+
+export type HostChangeReason = "disconnect" | "manual" | "recovery";
+
+export type ReconnectErrorCode =
+  | "ROOM_NOT_FOUND"
+  | "SEAT_CLOSED"
+  | "INVALID_SESSION"
+  | "SEAT_ALREADY_CONNECTED";
+
+export interface ReconnectableSeat {
+  playerId: string;
+  playerName: string;
+}
+
+export interface SeatClaimInfo {
+  requestId: string;
+  playerId: string;
+  playerName: string;
+  claimantName: string;
+}
+
 export interface Catastrophe {
   title: string;
   description: string;
@@ -70,6 +92,7 @@ export interface PlayerInfo {
   actionCardRevealed: boolean;
   isHost: boolean;
   isBot: boolean;
+  kicked: boolean;
 }
 
 export interface PublicGameState {
@@ -81,6 +104,7 @@ export interface PublicGameState {
   totalBunkerCards: number;
   threatCard: ThreatCard | null;
   bunkerCapacity: number;
+  startedPlayerCount: number;
   players: PlayerInfo[];
   currentTurnPlayerId: string | null;
   votesCount: number;
@@ -94,6 +118,8 @@ export interface PublicGameState {
   tiebreakCandidateIds: string[] | null;
   phaseRemainingMs: number | null;
   paused: boolean;
+  pauseKind: PauseKind;
+  disconnectedPlayerIds: string[];
   spectatorCount: number;
 }
 
@@ -106,7 +132,18 @@ export interface ClientEvents {
   "room:joinSpectator": (data: { roomCode: string; spectatorName: string }) => void;
   "room:leave": () => void;
   "room:rejoin": (data: { roomCode: string; playerId: string; sessionToken: string }) => void;
-  "room:rejoinSpectator": (data: { roomCode: string; spectatorId: string; sessionToken: string }) => void;
+  "room:rejoinSpectator": (data: {
+    roomCode: string;
+    spectatorId: string;
+    sessionToken: string;
+  }) => void;
+  "room:listReconnectableSeats": (data: { roomCode: string }) => void;
+  "room:requestSeatClaim": (data: {
+    roomCode: string;
+    playerId: string;
+    claimantName: string;
+  }) => void;
+  "room:cancelSeatClaim": (data: { requestId: string }) => void;
   "player:ready": (data: { ready: boolean }) => void;
   "game:start": () => void;
   "game:revealAttribute": (data: { attributeIndex?: number }) => void;
@@ -130,6 +167,9 @@ export interface ClientEvents {
   "admin:skipDiscussion": () => void;
   "admin:revivePlayer": (data: { targetPlayerId: string }) => void;
   "admin:eliminatePlayer": (data: { targetPlayerId: string }) => void;
+  "admin:resolveSeatClaim": (data: { requestId: string; approved: boolean }) => void;
+  "admin:kickPlayer": (data: { targetPlayerId: string }) => void;
+  "admin:transferHost": (data: { targetPlayerId: string }) => void;
   "vote:cast": (data: { targetPlayerId: string }) => void;
   "game:endGame": () => void;
   "game:playAgain": () => void;
@@ -141,10 +181,39 @@ export interface ClientEvents {
 export interface ServerEvents {
   "room:created": (data: { roomCode: string; playerId: string; sessionToken: string }) => void;
   "room:joined": (data: { roomCode: string; playerId: string; sessionToken: string }) => void;
-  "room:spectatorJoined": (data: { roomCode: string; spectatorId: string; sessionToken: string }) => void;
+  "room:spectatorJoined": (data: {
+    roomCode: string;
+    spectatorId: string;
+    sessionToken: string;
+  }) => void;
   "room:error": (data: { message: string }) => void;
+  "room:reconnectableSeats": (data: { roomCode: string; seats: ReconnectableSeat[] }) => void;
+  "room:seatClaimSubmitted": (data: { requestId: string }) => void;
+  "room:seatClaimResolved": (data: {
+    requestId: string;
+    approved: boolean;
+    message: string;
+  }) => void;
+  "room:hostChanged": (data: {
+    hostId: string;
+    hostName: string;
+    reason: HostChangeReason;
+  }) => void;
+  "room:reconnectError": (data: {
+    message: string;
+    code: ReconnectErrorCode;
+    terminal: boolean;
+  }) => void;
+  "room:kicked": (data: { message: string }) => void;
+  "admin:seatClaimsUpdated": (data: { claims: SeatClaimInfo[] }) => void;
   "game:state": (data: PublicGameState) => void;
   "game:character": (data: Character) => void;
+  "game:voterStatus": (data: {
+    phase: GamePhase;
+    roundNumber: number;
+    currentVotingInRound: number;
+    hasVoted: boolean;
+  }) => void;
   "game:eliminated": (data: { playerId: string; playerName: string }) => void;
   "game:actionCardRevealed": (data: { playerName: string; actionCard: ActionCard }) => void;
   "game:attributeRevealed": (data: { playerName: string; attribute: Attribute }) => void;

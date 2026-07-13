@@ -9,6 +9,7 @@ import { GameCommandBar } from "./game/GameCommandBar";
 import { GameStatusHeader } from "./game/GameStatusHeader";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { HostControlDialog } from "./game/HostControlDialog";
+import { ReconnectHostBanner } from "./game/ReconnectHostControls";
 import { MobileGameTabs } from "./game/MobileGameTabs";
 import { PlayerBoard } from "./game/PlayerBoard";
 import { ScenarioSummary } from "./game/ScenarioSummary";
@@ -25,6 +26,7 @@ export function GameScreen() {
     isSpectator,
     myCharacter,
     connected,
+    reconnectState,
     roomCode,
     revealAttribute,
     revealActionCard,
@@ -45,6 +47,10 @@ export function GameScreen() {
     adminEliminatePlayer,
     pendingAdminOpen,
     consumePendingAdminOpen,
+    hostSeatClaims,
+    resolveSeatClaim,
+    kickPlayer,
+    transferHost,
   } = useGame();
   const [showAttrPicker, setShowAttrPicker] = useState(false);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
@@ -52,6 +58,9 @@ export function GameScreen() {
   const [activeMobileTab, setActiveMobileTab] = useState<MobileGameTab>("players");
   const [hostControlsOpen, setHostControlsOpen] = useState(false);
   const hostPauseActiveRef = useRef(false);
+  const isCurrentHost =
+    !isSpectator && Boolean(gameState?.players.find((player) => player.id === playerId)?.isHost);
+  const canUseRoomActions = connected && reconnectState === "connected";
 
   const closeLocalModals = useCallback(() => {
     setShowAttrPicker(false);
@@ -60,10 +69,10 @@ export function GameScreen() {
   }, []);
 
   const openAttributePicker = useCallback(() => {
-    if (hostControlsOpen || hostPauseActiveRef.current) return;
+    if (!canUseRoomActions || hostControlsOpen || hostPauseActiveRef.current) return;
     closeLocalModals();
     setShowAttrPicker(true);
-  }, [closeLocalModals, hostControlsOpen]);
+  }, [canUseRoomActions, closeLocalModals, hostControlsOpen]);
 
   const openExpandedPlayer = useCallback(
     (nextPlayerId: string) => {
@@ -75,18 +84,19 @@ export function GameScreen() {
   );
 
   const openRevealActionConfirmation = useCallback(() => {
-    if (hostControlsOpen || hostPauseActiveRef.current) return;
+    if (!canUseRoomActions || hostControlsOpen || hostPauseActiveRef.current) return;
     closeLocalModals();
     setConfirmRevealAction(true);
-  }, [closeLocalModals, hostControlsOpen]);
+  }, [canUseRoomActions, closeLocalModals, hostControlsOpen]);
 
   const openHostControls = useCallback(() => {
+    if (!isCurrentHost || !canUseRoomActions) return;
     if (hostControlsOpen || hostPauseActiveRef.current) return;
     closeLocalModals();
     hostPauseActiveRef.current = true;
     setHostControlsOpen(true);
     adminPause();
-  }, [adminPause, closeLocalModals, hostControlsOpen]);
+  }, [adminPause, canUseRoomActions, closeLocalModals, hostControlsOpen, isCurrentHost]);
 
   const closeHostControls = useCallback(() => {
     if (!hostControlsOpen && !hostPauseActiveRef.current) return;
@@ -120,6 +130,13 @@ export function GameScreen() {
     pendingAdminOpen,
     playerId,
   ]);
+
+  useEffect(() => {
+    if (!isCurrentHost || !canUseRoomActions) {
+      setHostControlsOpen(false);
+      hostPauseActiveRef.current = false;
+    }
+  }, [canUseRoomActions, isCurrentHost]);
 
   if (!gameState) return null;
   if (!isSpectator && !myCharacter) {
@@ -155,7 +172,19 @@ export function GameScreen() {
 
   return (
     <main className="screen command-game-screen has-game-command-bar">
-      <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
+      <GameRoomHeader
+        roomCode={roomCode}
+        connected={connected}
+        onLeaveRoom={leaveRoom}
+        confirmActiveLeave={!isSpectator}
+      />
+      {isCurrentHost && canUseRoomActions && (
+        <ReconnectHostBanner
+          players={gameState.players}
+          claimsCount={hostSeatClaims.length}
+          onOpen={openHostControls}
+        />
+      )}
       <GameStatusHeader
         gameState={gameState}
         phaseLabel={view.phaseLabel}
@@ -200,10 +229,10 @@ export function GameScreen() {
         isMyTurn={view.isMyTurn}
         phaseLabel={view.phaseLabel}
         phaseDescription={view.phaseDescription}
-        canReveal={view.canReveal}
-        canRevealAction={view.canRevealAction}
-        canManageGame={Boolean(view.me?.isHost)}
-        canSkipDiscussion={gameState.phase === "ROUND_DISCUSSION"}
+        canReveal={canUseRoomActions && view.canReveal}
+        canRevealAction={canUseRoomActions && view.canRevealAction}
+        canManageGame={canUseRoomActions && Boolean(view.me?.isHost)}
+        canSkipDiscussion={canUseRoomActions && view.canSkipDiscussion}
         hostControlsOpen={hostControlsOpen}
         onReveal={() => {
           if (gameState.roundNumber === 1) {
@@ -217,7 +246,7 @@ export function GameScreen() {
         onSkipDiscussion={adminSkipDiscussion}
       />
 
-      {view.me?.isHost && (
+      {isCurrentHost && canUseRoomActions && (
         <HostControlDialog
           open={hostControlsOpen}
           gameState={gameState}
@@ -232,6 +261,10 @@ export function GameScreen() {
           onRevivePlayer={adminRevivePlayer}
           onEliminatePlayer={adminEliminatePlayer}
           onEndGame={endGameFromHostControls}
+          seatClaims={hostSeatClaims}
+          onResolveSeatClaim={resolveSeatClaim}
+          onKickPlayer={kickPlayer}
+          onTransferHost={transferHost}
         />
       )}
 
@@ -292,7 +325,11 @@ export function GameScreen() {
                   {player.name}
                   {isMe && <span className="me-badge">ВЫ</span>}
                 </h3>
-                {!player.alive && <span className="eliminated-badge">ИЗГНАН</span>}
+                {!player.alive && (
+                  <span className="eliminated-badge">
+                    {player.kicked ? "УДАЛЁН АДМИНИСТРАТОРОМ" : "ИЗГНАН"}
+                  </span>
+                )}
               </div>
               <div className="attributes-grid">
                 {isMe ? (
