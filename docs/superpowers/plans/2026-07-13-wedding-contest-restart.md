@@ -2,23 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let the wedding host reset a finished contest while preserving the four-day room and every guest seat.
+**Goal:** Reset a finished wedding contest by deleting every participant and requiring guests to join again, while preserving the four-day room.
 
-**Architecture:** Add one typed, host-only Socket.IO command backed by an atomic `WeddingRoomService.restartContest()` mutation. Expose it through the existing React wedding context and a confirmed admin action; existing full-state broadcasts move connected guests back to waiting automatically.
+**Architecture:** Keep the existing host-only `wedding:restartContest` command, but make the domain transition replace the participant list with an empty list. Add a typed `wedding:contestReset` broadcast so connected guest clients clear stale session storage and return to the existing join screen; the host keeps the room and returns to question 01 preparation.
 
 **Tech Stack:** TypeScript, Socket.IO, React 18, Node test runner, react-test-renderer
 
 ## Global Constraints
 
 - Work directly on branch `main`.
-- Preserve participant IDs, names, connection state, `createdAt`, and `expiresAt`.
-- Reset question number, answers, current selections, and every score.
+- Preserve `createdAt`, `expiresAt`, and the existing room.
+- Delete all participant IDs, names, scores, answers, and socket bindings when a new contest starts.
+- Preserve finished results until the host explicitly confirms `Начать новый конкурс`.
 - Allow restart only from `FINISHED`.
 - Use Russian UI and error copy.
 
 ---
 
-### Task 1: Server-authoritative restart transition
+### Task 1: Server reset and stale-binding invalidation
 
 **Files:**
 
@@ -30,33 +31,33 @@
 
 **Interfaces:**
 
-- Produces: `WeddingClientEvents["wedding:restartContest"]: () => void`
-- Produces: `WeddingRoomService.restartContest(): HostWeddingState`
+- Produces: `WeddingServerEvents["wedding:contestReset"]: () => void`
+- Changes: `WeddingRoomService.restartContest(): HostWeddingState` returns `PREPARING` with `participants: []`
 
-- [ ] **Step 1: Write failing domain and integration tests**
+- [ ] **Step 1: Change domain and integration expectations to the new behavior**
 
 ```ts
+const oldId = vera.participantId;
+const expiresAt = service.getHostState()!.expiresAt;
 service.finishContest();
-const before = service.getHostState()!;
 const restarted = service.restartContest();
 assert.equal(restarted.phase, "PREPARING");
 assert.equal(restarted.questionNumber, 0);
-assert.equal(restarted.correctOption, null);
 assert.deepEqual(restarted.answers, []);
-assert.equal(restarted.participants[0].correctAnswers, 0);
-assert.equal(restarted.participants[0].id, before.participants[0].id);
-assert.equal(restarted.expiresAt, before.expiresAt);
+assert.deepEqual(restarted.participants, []);
+assert.equal(restarted.expiresAt, expiresAt);
+assert.equal(service.getGuestState(oldId), null);
 ```
 
-The socket test must emit `wedding:restartContest` from the host after `FINISHED`, assert the guest receives `PREPARING` with the same participant ID, and assert a guest emitter receives the existing host-only error.
+The integration test must wait for `wedding:contestReset`, assert the old socket receives an error when it attempts to answer, then call `wedding:joinNew` with the previous name and assert the returned participant ID differs from the old ID.
 
-- [ ] **Step 2: Run the focused server tests and verify RED**
+- [ ] **Step 2: Run focused server tests and verify RED**
 
 Run: `npm run test:wedding-server`
 
-Expected: TypeScript/runtime failure because `restartContest` and `wedding:restartContest` do not exist.
+Expected: failure because participants and socket bindings are still preserved and `wedding:contestReset` is not emitted.
 
-- [ ] **Step 3: Implement the minimal atomic transition**
+- [ ] **Step 3: Implement the atomic participant deletion and reset broadcast**
 
 ```ts
 restartContest(): HostWeddingState {
@@ -68,78 +69,81 @@ restartContest(): HostWeddingState {
     draft.optionStyle = "letters";
     draft.correctOption = null;
     draft.answers = [];
-    for (const participant of draft.participants) {
-      participant.correctAnswers = 0;
-      participant.answerOption = null;
-      participant.answerSubmittedAt = null;
-    }
+    draft.participants = [];
     return this.serializeHost(draft);
   });
 }
 ```
 
-Register the typed event beside `wedding:endContest`, enforce `requireHost()`, call the service, and use `broadcastAll()`.
+After a successful restart, call `participantBySocket.clear()`, emit `wedding:contestReset`, and call `broadcastAll()`.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [ ] **Step 4: Run focused server tests and verify GREEN**
 
 Run: `npm run test:wedding-server`
 
-Expected: all wedding server tests pass.
+Expected: every wedding server test passes.
 
-- [ ] **Step 5: Commit the server transition**
+- [ ] **Step 5: Commit server behavior**
 
 ```bash
 git add shared/types.ts server/src/wedding server/tests/wedding
-git commit -m "feat: restart finished wedding contests"
+git commit -m "feat: remove guests when restarting wedding contest"
 ```
 
-### Task 2: Confirmed admin restart action
+### Task 2: Guest session clearing and confirmation copy
 
 **Files:**
 
 - Modify: `client/src/wedding/WeddingContext.tsx`
 - Modify: `client/src/wedding/AdminWeddingApp.tsx`
 - Test: `client/tests/wedding/WeddingAdmin.test.tsx`
+- Test: `client/tests/wedding/WeddingContext.test.tsx`
 
 **Interfaces:**
 
-- Consumes: `WeddingClientEvents["wedding:restartContest"]`
-- Produces: `WeddingContextValue.restartContest(): void`
-- Produces: `AdminWeddingActions.restartContest(): void`
+- Consumes: `WeddingServerEvents["wedding:contestReset"]`
+- Changes: restart dialog copy explicitly warns that participants must join again.
 
-- [ ] **Step 1: Write a failing client interaction test**
+- [ ] **Step 1: Write failing client tests**
 
 ```tsx
-const finished = { ...hostState, phase: "FINISHED" as const };
-const { calls, actions } = createActions();
-const renderer = create(<AdminWeddingScreen {...propsFor(finished, actions)} />);
-await act(async () => findButton(renderer, "Начать новый конкурс").props.onClick());
-assert.deepEqual(calls, []);
-await act(async () => findButton(renderer, "Да, начать новый конкурс").props.onClick());
-assert.deepEqual(calls, ["restart"]);
+assert.match(
+  JSON.stringify(renderer.toJSON()),
+  /Все участники, очки и ответы будут удалены.*подключиться заново/,
+);
 ```
 
-- [ ] **Step 2: Run the focused client test and verify RED**
+Add a context test that seeds `partyplay:wedding-participant`, dispatches `wedding:contestReset`, and asserts the saved session and rendered guest state are cleared.
+
+- [ ] **Step 2: Run focused client tests and verify RED**
 
 Run: `npm run test:wedding-client`
 
-Expected: failure because the restart action and button are missing.
+Expected: the copy assertion fails and the context does not handle `wedding:contestReset`.
 
-- [ ] **Step 3: Add the context event and confirmed UI action**
+- [ ] **Step 3: Handle the reset event and update the dialog**
 
-Add `restartContest` to the context and emit `wedding:restartContest`. Extend `ConfirmationKind` with `restart`, add dialog copy explaining that scores and answers are erased, invoke the action in `confirmAction`, and render `Начать новый конкурс` on the finished card and final score screen. Disable it while disconnected.
+```ts
+const onContestReset = () => {
+  clearWeddingSession();
+  setGuestState(null);
+  setParticipants([]);
+};
+```
+
+Register and unregister `wedding:contestReset` alongside the existing wedding socket listeners. Change the dialog description to `Все участники, очки и ответы будут удалены. Гостям потребуется подключиться заново.`
 
 - [ ] **Step 4: Run focused client tests and verify GREEN**
 
 Run: `npm run test:wedding-client`
 
-Expected: all wedding client tests pass.
+Expected: every wedding client test passes.
 
-- [ ] **Step 5: Commit the client action**
+- [ ] **Step 5: Commit client behavior**
 
 ```bash
-git add client/src/wedding client/tests/wedding/WeddingAdmin.test.tsx
-git commit -m "feat: add wedding contest restart control"
+git add client/src/wedding client/tests/wedding
+git commit -m "feat: require guests to rejoin wedding contests"
 ```
 
 ### Task 3: Full verification
@@ -150,7 +154,7 @@ git commit -m "feat: add wedding contest restart control"
 
 **Interfaces:**
 
-- Consumes the completed server and client restart flow.
+- Consumes the finished restart flow.
 - Produces verification evidence.
 
 - [ ] **Step 1: Run all automated checks**
@@ -161,10 +165,10 @@ Expected: every command exits with code 0.
 
 - [ ] **Step 2: Run browser end-to-end verification**
 
-Create a room, join a guest, score one answer, finish the contest, confirm `Начать новый конкурс`, and verify admin preparation question 01 plus guest waiting state with the same name.
+Join a guest, score an answer, finish the contest, inspect final results, confirm `Начать новый конкурс`, verify the guest sees the join screen, and rejoin with the same name as a new participant with score zero.
 
 - [ ] **Step 3: Confirm repository cleanliness**
 
-Run: `git diff --check && git status --short`
+Run: `git diff --check` and `git status --short`.
 
 Expected: no whitespace errors and no uncommitted source changes.
