@@ -139,8 +139,29 @@ export function QuestionsEditorScreen({
   const [drafts, setDrafts] = useState<DraftMap>(() => createDraftMap(state));
   const partnerName = state.role === "daniil" ? "Шаша" : "Даниил";
   const ownName = state.role === "daniil" ? "Даниил" : "Шаша";
-  const ownVariantLabel = state.role === "daniil" ? "Вариант ДанИИла" : "Вариант Шаши";
-  const partnerVariantLabel = state.role === "daniil" ? "Вариант Шаши" : "Вариант ДанИИла";
+  const screenLabel = state.role === "daniil" ? "Экран Даниила" : "Экран Шаши";
+  const orderedFields: Array<{
+    field: QuestionsAnswerField;
+    label: string;
+    placeholder: string;
+  }> =
+    state.role === "daniil"
+      ? [
+          { field: "ownAnswer", label: "Вариант ДанИИла", placeholder: "Начните печатать…" },
+          {
+            field: "partnerGuess",
+            label: "Вариант Шаши",
+            placeholder: `Как вам кажется, что напишет ${partnerName}?`,
+          },
+        ]
+      : [
+          {
+            field: "partnerGuess",
+            label: "Вариант ДанИИла",
+            placeholder: `Как вам кажется, что напишет ${partnerName}?`,
+          },
+          { field: "ownAnswer", label: "Вариант Шаши", placeholder: "Начните печатать…" },
+        ];
 
   useEffect(() => {
     const dirtyKeys = new Set(
@@ -186,9 +207,8 @@ export function QuestionsEditorScreen({
 
       <section className="questions-editor-intro">
         <div>
-          <span className="questions-kicker">Ваши ответы</span>
-          <h1>Пишите первое, что приходит в голову</h1>
-          <p>Всё, что вы вводите, сразу появляется на экране у гостей.</p>
+          <span className="questions-kicker">{screenLabel}</span>
+          <h1>Ну что, удачи вам)))</h1>
         </div>
         <ConnectionStatus connected={connected} />
       </section>
@@ -213,28 +233,22 @@ export function QuestionsEditorScreen({
               <div className="questions-card-number">
                 Вопрос {formatQuestionNumber(question.number)}
               </div>
-              <label className="questions-answer-field">
-                <span>{ownVariantLabel}</span>
-                <textarea
-                  value={drafts[`${question.id}:ownAnswer`] ?? question.ownAnswer}
-                  maxLength={240}
-                  rows={2}
-                  placeholder="Начните печатать…"
-                  onChange={(event) => update(question.id, "ownAnswer", event.target.value)}
-                  onBlur={() => onFlush(question.id, "ownAnswer")}
-                />
-              </label>
-              <label className="questions-answer-field questions-guess-field">
-                <span>{partnerVariantLabel}</span>
-                <textarea
-                  value={drafts[`${question.id}:partnerGuess`] ?? question.partnerGuess}
-                  maxLength={240}
-                  rows={2}
-                  placeholder={`Как вам кажется, что напишет ${partnerName}?`}
-                  onChange={(event) => update(question.id, "partnerGuess", event.target.value)}
-                  onBlur={() => onFlush(question.id, "partnerGuess")}
-                />
-              </label>
+              {orderedFields.map(({ field, label, placeholder }) => (
+                <label
+                  className={`questions-answer-field ${field === "partnerGuess" ? "questions-guess-field" : ""}`}
+                  key={field}
+                >
+                  <span>{label}</span>
+                  <textarea
+                    value={drafts[`${question.id}:${field}`] ?? question[field]}
+                    maxLength={240}
+                    rows={2}
+                    placeholder={placeholder}
+                    onChange={(event) => update(question.id, field, event.target.value)}
+                    onBlur={() => onFlush(question.id, field)}
+                  />
+                </label>
+              ))}
               <div className="questions-save-note">{saveNote(question.id)}</div>
             </article>
           ))
@@ -354,8 +368,8 @@ export function QuestionsObserverScreen({
                 </div>
                 <section className="questions-person-column">
                   <h2>Шаша</h2>
-                  <ObserverValue value={question.shasha.ownAnswer} label="Вариант Шаши" />
                   <ObserverValue value={question.shasha.partnerGuess} label="Вариант ДанИИла" />
+                  <ObserverValue value={question.shasha.ownAnswer} label="Вариант Шаши" />
                 </section>
               </div>
             </article>
