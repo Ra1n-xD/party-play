@@ -240,6 +240,7 @@ export interface WeddingHostAnswer {
   participantId: string;
   participantName: string;
   optionIndex: number;
+  optionStyle: WeddingOptionStyle;
   submittedAt: number;
   firstCorrect: boolean;
 }
@@ -259,7 +260,7 @@ export interface HostWeddingState {
   phase: WeddingPhase;
   questionNumber: number;
   optionStyle: WeddingOptionStyle;
-  correctOption: number;
+  correctOption: number | null;
   expiresAt: number;
   connectedCount: number;
   answeredCount: number;
@@ -276,7 +277,7 @@ export interface WeddingClientEvents {
   "wedding:answer": (data: { optionIndex: number }) => void;
   "wedding:setDraft": (data: {
     optionStyle: WeddingOptionStyle;
-    correctOption: number;
+    correctOption: number | null;
   }) => void;
   "wedding:startQuestion": () => void;
   "wedding:prepareNext": () => void;

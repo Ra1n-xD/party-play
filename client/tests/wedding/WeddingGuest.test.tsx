@@ -37,16 +37,14 @@ test("routes wedding guests and admins without changing the bunker fallback", ()
 });
 
 test("maps stored participant names to the server rejoin contract", () => {
-  assert.deepEqual(
-    toWeddingRejoinPayload({ participantId: "w_vera", participantName: "Вера" }),
-    { participantId: "w_vera", name: "Вера" },
-  );
+  assert.deepEqual(toWeddingRejoinPayload({ participantId: "w_vera", participantName: "Вера" }), {
+    participantId: "w_vera",
+    name: "Вера",
+  });
 });
 
 test("guest buttons match letter and number formats without revealing correctness", () => {
-  const letters = renderToStaticMarkup(
-    <GuestWeddingScreen {...baseProps} state={openState} />,
-  );
+  const letters = renderToStaticMarkup(<GuestWeddingScreen {...baseProps} state={openState} />);
   assert.match(letters, />А<.*>Б<.*>В<.*>Г</s);
 
   const numbers = renderToStaticMarkup(

@@ -7,12 +7,27 @@ import { join } from "node:path";
 import test from "node:test";
 import { Server } from "socket.io";
 import { io as createClient, type Socket as ClientSocket } from "socket.io-client";
-import type {
-  WeddingClientEvents,
-  WeddingServerEvents,
-} from "../../../shared/types.js";
-import { registerWeddingHandlers } from "../../src/wedding/socketHandlers.js";
+import type { WeddingClientEvents, WeddingServerEvents } from "../../../shared/types.js";
+import {
+  registerWeddingHandlers,
+  resolveWeddingRoomFilePath,
+} from "../../src/wedding/socketHandlers.js";
 import { FileWeddingRoomStore, WeddingRoomService } from "../../src/wedding/weddingRoom.js";
+
+test("resolves one runtime snapshot path from root and workspace launches", () => {
+  assert.equal(
+    resolveWeddingRoomFilePath("/project", undefined),
+    join("/project", "server/.data/wedding-room.json"),
+  );
+  assert.equal(
+    resolveWeddingRoomFilePath("/project/server", undefined),
+    join("/project/server", ".data/wedding-room.json"),
+  );
+  assert.equal(
+    resolveWeddingRoomFilePath("/project/server", "/tmp/custom-room.json"),
+    "/tmp/custom-room.json",
+  );
+});
 
 type ServerEvent = keyof WeddingServerEvents;
 type ServerPayload<Event extends ServerEvent> = WeddingServerEvents[Event] extends (
@@ -33,12 +48,14 @@ interface TestClient {
   ): Promise<ServerPayload<Event>>;
 }
 
-async function createHarness() {
+async function createHarness(roomTtlMs?: number) {
   const directory = mkdtempSync(join(tmpdir(), "party-play-wedding-socket-"));
   const httpServer = createServer();
   const io = new Server(httpServer);
   const service = new WeddingRoomService(
     new FileWeddingRoomStore(join(directory, "room.json")),
+    Date.now,
+    roomTtlMs,
   );
   registerWeddingHandlers(io.of("/wedding"), service);
 
@@ -117,6 +134,25 @@ async function createHarness() {
   };
 }
 
+test("broadcasts terminal expiration to already connected clients", async () => {
+  const harness = await createHarness(40);
+  try {
+    const host = await harness.connect();
+    host.emit("wedding:hostConnect");
+    host.emit("wedding:createRoom");
+    await host.waitFor("wedding:hostState");
+
+    await host.waitFor("wedding:expired");
+    const availability = await host.waitFor(
+      "wedding:availability",
+      (state) => state.exists === false,
+    );
+    assert.equal(availability.expiresAt, null);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("keeps host details private while broadcasting an accepted guest vote", async () => {
   const harness = await createHarness();
   try {
@@ -134,10 +170,7 @@ test("keeps host details private while broadcasting an accepted guest vote", asy
     await guest.waitFor("wedding:guestState", (state) => state.phase === "OPEN");
 
     guest.emit("wedding:answer", { optionIndex: 1 });
-    const guestState = await guest.waitFor(
-      "wedding:guestState",
-      (state) => state.hasAnswered,
-    );
+    const guestState = await guest.waitFor("wedding:guestState", (state) => state.hasAnswered);
     assert.equal(JSON.stringify(guestState).includes("correctOption"), false);
     assert.equal(JSON.stringify(guestState).includes("correctAnswers"), false);
 
