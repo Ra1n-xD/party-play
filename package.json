@@ -19,6 +19,7 @@
     "test:game-screen": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/game-screen/GameScreen.test.tsx",
     "test:server": "TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx --test server/tests/*.test.ts server/tests/reconnect/*.test.ts",
     "test:theme": "TSX_TSCONFIG_PATH=client/tsconfig.json node --import tsx --test client/tests/theme/GlobalTheme.test.ts"
+    ,"test:wedding-server": "TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx --test server/tests/wedding/*.test.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
