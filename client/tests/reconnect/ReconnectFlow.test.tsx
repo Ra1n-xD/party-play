@@ -1248,6 +1248,10 @@ test("clearing an in-flight lookup hides its result without releasing serializat
       mounted.snapshot().listReconnectableSeats("BBBB");
       mounted.snapshot().joinRoom("CCCC", "Player");
     });
+    assert.deepEqual(mounted.snapshot().seatLookupState, {
+      status: "pending",
+      roomCode: "AAAA",
+    });
     assert.deepEqual(
       mounted.fake.emittedFor("room:listReconnectableSeats").map((entry) => entry.args),
       [[{ roomCode: "AAAA" }]],
@@ -1260,6 +1264,7 @@ test("clearing an in-flight lookup hides its result without releasing serializat
         seats: [{ playerId: otherPlayerId, playerName: "Stale seat" }],
       });
     });
+    assert.deepEqual(mounted.snapshot().seatLookupState, { status: "idle", roomCode: null });
     assert.deepEqual(mounted.snapshot().reconnectableSeats, []);
     assert.equal(mounted.snapshot().reconnectableSeatsRoomCode, null);
 

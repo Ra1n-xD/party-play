@@ -513,7 +513,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       seatLookupPendingRoomRef.current = null;
       const discardResult = discardPendingSeatLookupRef.current;
       discardPendingSeatLookupRef.current = false;
-      if (discardResult) return;
+      if (discardResult) {
+        setSeatLookupState({ status: "idle", roomCode: null });
+        return;
+      }
       completedSeatLookupRoomRef.current = roomCode;
       setReconnectableSeats(seats);
       setReconnectableSeatsRoomCode(roomCode);
@@ -1033,21 +1036,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const clearReconnectableSeats = useCallback(() => {
     if (seatLookupPendingRoomRef.current) {
       discardPendingSeatLookupRef.current = true;
+    } else {
+      setSeatLookupState({ status: "idle", roomCode: null });
     }
     completedSeatLookupRoomRef.current = null;
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
-    setSeatLookupState({ status: "idle", roomCode: null });
   }, []);
 
   const resetSeatRecovery = useCallback(() => {
     if (seatLookupPendingRoomRef.current) {
       discardPendingSeatLookupRef.current = true;
+    } else {
+      setSeatLookupState({ status: "idle", roomCode: null });
     }
     completedSeatLookupRoomRef.current = null;
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
-    setSeatLookupState({ status: "idle", roomCode: null });
     if (pendingSeatClaimTargetRef.current) return;
     if (sessionAcceptanceExpectationRef.current?.source === "claim") {
       sessionAcceptanceExpectationRef.current = null;

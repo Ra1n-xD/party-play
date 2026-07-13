@@ -32,7 +32,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
   const claimTransitionLocked = claimInProgress || pendingSeatClaim?.status === "approved";
   const seatsMatchRoom = reconnectableSeatsRoomCode === normalizedRoomCode;
   const lookupMatchesRoom = seatLookupState.roomCode === normalizedRoomCode;
-  const lookupPending = lookupMatchesRoom && seatLookupState.status === "pending";
+  const lookupPending = seatLookupState.status === "pending";
   const lookupCompletedEmpty =
     lookupMatchesRoom && seatLookupState.status === "complete" && reconnectableSeats.length === 0;
 
