@@ -9,7 +9,10 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
   const {
     reconnectableSeats,
     reconnectableSeatsRoomCode,
+    seatLookupState,
+    retainedReconnectSession,
     pendingSeatClaim,
+    resumeRetainedSession,
     listReconnectableSeats,
     clearReconnectableSeats,
     resetSeatRecovery,
@@ -28,6 +31,10 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
     pendingSeatClaim?.status === "cancelling";
   const claimTransitionLocked = claimInProgress || pendingSeatClaim?.status === "approved";
   const seatsMatchRoom = reconnectableSeatsRoomCode === normalizedRoomCode;
+  const lookupMatchesRoom = seatLookupState.roomCode === normalizedRoomCode;
+  const lookupPending = lookupMatchesRoom && seatLookupState.status === "pending";
+  const lookupCompletedEmpty =
+    lookupMatchesRoom && seatLookupState.status === "complete" && reconnectableSeats.length === 0;
 
   const findSeats = () => {
     if (normalizedRoomCode.length < 4) return;
@@ -60,6 +67,16 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
         <p>Найдите своё прежнее место и отправьте заявку текущему хосту.</p>
       </div>
 
+      {retainedReconnectSession && !pendingSeatClaim && (
+        <div className="reconnect-claim-status is-approved">
+          <strong>Сохранённое место · {retainedReconnectSession.roomCode}</strong>
+          <p>Можно вернуться напрямую в этом браузере без подтверждения хоста.</p>
+          <button type="button" className="btn btn-primary" onClick={resumeRetainedSession}>
+            Продолжить игру · {retainedReconnectSession.roomCode}
+          </button>
+        </div>
+      )}
+
       {!pendingSeatClaim && (
         <>
           <label className="reconnect-field">
@@ -78,10 +95,17 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
             type="button"
             className="btn btn-primary"
             onClick={findSeats}
-            disabled={normalizedRoomCode.length < 4}
+            disabled={normalizedRoomCode.length < 4 || lookupPending}
           >
-            Найти места
+            {lookupPending ? "Ищем места…" : "Найти места"}
           </button>
+
+          {lookupCompletedEmpty && (
+            <div className="reconnect-claim-status is-cancelled" role="status">
+              <strong>Нет доступных мест</strong>
+              <p>Проверьте код комнаты или дождитесь отключения нужного игрока.</p>
+            </div>
+          )}
 
           {seatsMatchRoom && reconnectableSeats.length > 0 && (
             <div className="reconnect-seat-list" aria-label="Доступные места">

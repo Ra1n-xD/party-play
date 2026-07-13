@@ -717,6 +717,144 @@ test("active leave retains in-memory ownership until a real disconnect while lob
   }
 });
 
+test("votes are emitted only while the socket has an accepted room membership", async () => {
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({ connected: true });
+
+  try {
+    assert.equal(mounted.snapshot().castVote(otherPlayerId), false);
+    assert.equal(mounted.fake.emittedFor("vote:cast").length, 0);
+
+    await acceptPlayerSession(mounted);
+    assert.equal(mounted.snapshot().castVote(otherPlayerId), true);
+    assert.deepEqual(mounted.fake.emittedFor("vote:cast").at(-1)?.args, [
+      { targetPlayerId: otherPlayerId },
+    ]);
+
+    mounted.fake.connected = false;
+    await act(async () => mounted.fake.serverEmit("disconnect"));
+    assert.equal(mounted.snapshot().castVote(otherPlayerId), false);
+    assert.equal(mounted.fake.emittedFor("vote:cast").length, 1);
+
+    mounted.fake.connected = true;
+    mounted.fake.id = "fake-socket-2";
+    await act(async () => mounted.fake.serverEmit("connect"));
+    assert.equal(mounted.snapshot().castVote(otherPlayerId), false);
+    assert.equal(mounted.fake.emittedFor("vote:cast").length, 1);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:joined", { roomCode, playerId: participantId, sessionToken });
+    });
+    assert.equal(mounted.snapshot().castVote(otherPlayerId), true);
+    await act(async () => mounted.snapshot().leaveRoom());
+    assert.equal(mounted.snapshot().castVote(otherPlayerId), false);
+    assert.equal(mounted.fake.emittedFor("vote:cast").length, 2);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("an approved seat claim becomes recoverable when the socket drops before membership acceptance", async () => {
+  const { ReconnectScreen } = await import("../../src/screens/ReconnectScreen");
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({
+    connected: true,
+    children: <ReconnectScreen onBack={() => undefined} />,
+  });
+
+  try {
+    await act(async () => mounted.snapshot().listReconnectableSeats(roomCode));
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", {
+        roomCode,
+        seats: [{ playerId: otherPlayerId, playerName: "Михаил" }],
+      });
+    });
+    await act(async () =>
+      mounted.snapshot().requestSeatClaim(roomCode, otherPlayerId, "Новый игрок"),
+    );
+    await act(async () => {
+      mounted.fake.serverEmit("room:seatClaimSubmitted", { requestId: "claim-drop" });
+      mounted.fake.serverEmit("room:seatClaimResolved", {
+        requestId: "claim-drop",
+        approved: true,
+        message: "Заявка одобрена",
+      });
+      mounted.fake.connected = false;
+      mounted.fake.serverEmit("disconnect");
+      mounted.fake.serverEmit("room:seatClaimResolved", {
+        requestId: "claim-drop",
+        approved: true,
+        message: "Позднее одобрение",
+      });
+      mounted.fake.serverEmit("room:joined", {
+        roomCode,
+        playerId: otherPlayerId,
+        sessionToken: "d".repeat(64),
+      });
+    });
+
+    assert.equal(mounted.snapshot().pendingSeatClaim?.status, "cancelled");
+    assert.equal(mounted.snapshot().roomCode, null);
+    assert.equal(findButton(mounted.renderer, "Назад").props.disabled, false);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("active same-tab ownership is exposed safely and resumes directly from Home", async () => {
+  const { HomeScreen } = await import("../../src/screens/HomeScreen");
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({ connected: true, children: <HomeScreen /> });
+
+  try {
+    await acceptPlayerSession(mounted);
+    await act(async () => mounted.fake.serverEmit("game:state", makeGameState()));
+    await act(async () => mounted.snapshot().leaveRoom());
+
+    assert.deepEqual(mounted.snapshot().retainedReconnectSession, {
+      role: "player",
+      roomCode,
+      participantId,
+    });
+    assert.equal("sessionToken" in mounted.snapshot().retainedReconnectSession!, false);
+    assert.match(renderedText(mounted.renderer.root), new RegExp(`Продолжить игру.*${roomCode}`));
+
+    await act(async () => findButton(mounted.renderer, "Продолжить игру").props.onClick());
+    assert.deepEqual(mounted.fake.emittedFor("room:rejoin").at(-1)?.args, [
+      { roomCode, playerId: participantId, sessionToken },
+    ]);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectError", {
+        message: "Сессия недействительна",
+        code: "INVALID_SESSION",
+        terminal: true,
+      });
+    });
+    assert.equal(mounted.snapshot().retainedReconnectSession, null);
+    assert.doesNotMatch(renderedText(mounted.renderer.root), /Продолжить игру/);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("lobby leave removes the direct saved-seat return", async () => {
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({ connected: true });
+
+  try {
+    await acceptPlayerSession(mounted);
+    await act(async () => mounted.fake.serverEmit("game:state", makeGameState("LOBBY")));
+    await act(async () => mounted.snapshot().leaveRoom());
+    assert.equal(mounted.snapshot().retainedReconnectSession, null);
+    assert.equal(mounted.snapshot().resumeRetainedSession(), false);
+    assert.equal(mounted.fake.emittedFor("room:rejoin").length, 0);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
 test("late recovery events stay ignored while Home recovery actions deliberately reopen them", async () => {
   setBrowserStorage(new MemoryStorage());
   const mounted = await mountProvider();
@@ -1155,6 +1293,63 @@ test("Home exposes the recovery entry point without requiring a player name", as
     assert.equal(recoveryButton.props.disabled, undefined);
     await act(async () => recoveryButton.props.onClick());
     assert.match(renderedText(mounted.renderer.root), /Восстановление места/);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("Home renders a recovery failure only once", async () => {
+  const { HomeScreen } = await import("../../src/screens/HomeScreen");
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({ children: <HomeScreen /> });
+
+  try {
+    await act(async () => findButton(mounted.renderer, "Вернуться в игру").props.onClick());
+    const codeInput = mounted.renderer.root.findByProps({ "aria-label": "Код комнаты" });
+    await act(async () => codeInput.props.onChange({ target: { value: "NOPE" } }));
+    await act(async () => findButton(mounted.renderer, "Найти места").props.onClick());
+    await act(async () => {
+      mounted.fake.serverEmit("room:error", { message: "Комната не найдена" });
+    });
+
+    const occurrences = renderedText(mounted.renderer.root).split("Комната не найдена").length - 1;
+    assert.equal(occurrences, 1);
+  } finally {
+    await mounted.cleanup();
+  }
+});
+
+test("seat lookup exposes pending and completed-empty states for the exact room", async () => {
+  const { ReconnectScreen } = await import("../../src/screens/ReconnectScreen");
+  setBrowserStorage(new MemoryStorage());
+  const mounted = await mountProvider({
+    children: <ReconnectScreen onBack={() => undefined} />,
+  });
+
+  try {
+    const codeInput = mounted.renderer.root.findByProps({ "aria-label": "Код комнаты" });
+    await act(async () => codeInput.props.onChange({ target: { value: roomCode } }));
+    await act(async () => findButton(mounted.renderer, "Найти места").props.onClick());
+
+    assert.deepEqual(mounted.snapshot().seatLookupState, {
+      status: "pending",
+      roomCode,
+    });
+    assert.equal(findButton(mounted.renderer, "Ищем места").props.disabled, true);
+    assert.doesNotMatch(renderedText(mounted.renderer.root), /Нет доступных мест/);
+
+    await act(async () => {
+      mounted.fake.serverEmit("room:reconnectableSeats", { roomCode, seats: [] });
+    });
+    assert.deepEqual(mounted.snapshot().seatLookupState, {
+      status: "complete",
+      roomCode,
+    });
+    assert.match(renderedText(mounted.renderer.root), /Нет доступных мест/);
+
+    await act(async () => codeInput.props.onChange({ target: { value: "WXYZ" } }));
+    assert.deepEqual(mounted.snapshot().seatLookupState, { status: "idle", roomCode: null });
+    assert.doesNotMatch(renderedText(mounted.renderer.root), /Нет доступных мест/);
   } finally {
     await mounted.cleanup();
   }
