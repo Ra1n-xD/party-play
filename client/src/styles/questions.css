@@ -257,11 +257,19 @@
 
 .questions-text-button,
 .questions-add-button,
+.questions-delete-button,
 .questions-empty-state button {
   min-height: 44px;
   border: 0;
   border-radius: 0.8rem;
   cursor: pointer;
+}
+
+.questions-header-actions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 0.45rem;
 }
 
 .questions-text-button {
@@ -280,8 +288,95 @@
   font-weight: 700;
 }
 
+.questions-delete-button {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(140, 31, 74, 0.22);
+  color: var(--questions-wine-bright);
+  background: rgba(255, 253, 249, 0.9);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 .questions-add-button:disabled,
+.questions-delete-button:disabled,
 .questions-empty-state button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.questions-delete-overlay {
+  z-index: 1000;
+  align-items: flex-end;
+  padding: 1rem;
+  background: rgba(62, 40, 48, 0.58);
+  backdrop-filter: blur(5px);
+}
+
+.questions-delete-dialog {
+  width: min(100%, 27rem);
+  max-width: 27rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(91, 12, 42, 0.12);
+  border-radius: 1.5rem;
+  color: var(--questions-ink);
+  background: var(--questions-paper);
+  box-shadow: 0 1.5rem 4rem rgba(62, 40, 48, 0.24);
+  text-align: center;
+  backdrop-filter: none;
+}
+
+.questions-delete-dialog-icon {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 0.8rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--questions-wine-bright);
+  background: var(--questions-rose);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.questions-delete-dialog h2 {
+  margin: 0;
+  color: var(--questions-wine);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.7rem;
+  font-weight: 500;
+}
+
+.questions-delete-dialog p {
+  margin: 0.7rem 0 1.2rem;
+  color: var(--questions-muted);
+  line-height: 1.5;
+}
+
+.questions-delete-dialog-actions {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.questions-delete-dialog-actions button {
+  min-height: 46px;
+  border-radius: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.questions-delete-cancel {
+  border: 1px solid rgba(91, 12, 42, 0.14);
+  color: var(--questions-wine);
+  background: #fff;
+}
+
+.questions-delete-confirm {
+  border: 1px solid var(--questions-wine-bright);
+  color: #fff;
+  background: var(--questions-wine-bright);
+}
+
+.questions-delete-confirm:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
@@ -658,6 +753,12 @@
 
   .questions-column-heart {
     margin: -0.2rem auto;
+  }
+}
+
+@media (min-width: 700px) {
+  .questions-delete-overlay {
+    align-items: center;
   }
 }
 

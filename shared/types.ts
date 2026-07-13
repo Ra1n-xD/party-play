@@ -333,6 +333,7 @@ export interface QuestionsObserverState {
 export interface QuestionsClientEvents {
   "questions:selectRole": (data: { role: QuestionsRole }) => void;
   "questions:addQuestion": () => void;
+  "questions:deleteLatestQuestion": () => void;
   "questions:updateAnswer": (data: {
     questionId: number;
     field: QuestionsAnswerField;

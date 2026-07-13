@@ -47,6 +47,40 @@ test("adds persistent questions with monotonically increasing numbers", () => {
   }
 });
 
+test("deletes only the latest question and persists the shortened history", () => {
+  const directory = mkdtempSync(join(tmpdir(), "party-play-questions-delete-"));
+  const file = join(directory, "session.json");
+
+  try {
+    const service = new QuestionsSessionService(new FileQuestionsSessionStore(file), () => 10_000);
+    service.addQuestion();
+    service.addQuestion();
+
+    assert.deepEqual(
+      service.deleteLatestQuestion().questions.map((question) => question.number),
+      [1],
+    );
+
+    const restored = new QuestionsSessionService(new FileQuestionsSessionStore(file), () => 11_000);
+    assert.deepEqual(
+      restored.getObserverState().questions.map((question) => question.number),
+      [1],
+    );
+    assert.deepEqual(
+      restored.addQuestion().questions.map((question) => question.number),
+      [1, 2],
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("rejects deleting a question when the history is empty", () => {
+  withService((service) => {
+    assert.throws(() => service.deleteLatestQuestion(), /нет вопросов/i);
+  });
+});
+
 test("updates only the selected participant fields and keeps editor state private", () => {
   withService((service, setNow) => {
     const question = service.addQuestion().questions[0];

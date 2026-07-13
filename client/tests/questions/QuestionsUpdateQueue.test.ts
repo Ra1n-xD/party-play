@@ -76,3 +76,24 @@ test("flush sends a pending value immediately instead of waiting for debounce", 
   assert.equal(timers.size, 0);
   queue.clear();
 });
+
+test("drops pending updates when their question was deleted", () => {
+  const sent: string[] = [];
+  const timers = new Map<number, () => void>();
+  const queue = new QuestionsUpdateQueue({
+    send: (update) => sent.push(update.value),
+    onStatus: () => undefined,
+    setTimer: (callback) => {
+      timers.set(1, callback);
+      return 1;
+    },
+    clearTimer: (id) => timers.delete(id as number),
+  });
+
+  queue.enqueue({ questionId: 2, field: "ownAnswer", value: "Лишний ответ" }, true);
+  queue.acknowledge({ role: "daniil", questions: [] });
+  queue.reconnect();
+
+  assert.equal(timers.size, 0);
+  assert.deepEqual(sent, []);
+});

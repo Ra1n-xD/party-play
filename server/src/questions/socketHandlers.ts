@@ -101,6 +101,23 @@ export function registerQuestionsHandlers(
       }
     });
 
+    socket.on("questions:deleteLatestQuestion", () => {
+      const role = roles.get(socket.id);
+      if (!isEditorRole(role)) {
+        socket.emit("questions:error", {
+          message:
+            role === "observer" ? "Наблюдатели могут только смотреть" : "Сначала выберите роль",
+        });
+        return;
+      }
+      try {
+        service.deleteLatestQuestion();
+        broadcastAll();
+      } catch (error) {
+        emitError(socket.id, error);
+      }
+    });
+
     socket.on("questions:updateAnswer", (data) => {
       const role = roles.get(socket.id);
       if (!isEditorRole(role)) {

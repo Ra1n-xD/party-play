@@ -47,6 +47,7 @@ interface QuestionsContextValue {
   selectRole: (role: QuestionsRole) => void;
   exitRole: () => void;
   addQuestion: () => void;
+  deleteLatestQuestion: () => void;
   updateAnswer: (questionId: number, field: QuestionsAnswerField, value: string) => void;
   flushAnswer: (questionId: number, field: QuestionsAnswerField) => void;
 }
@@ -143,6 +144,10 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
     if (questionsSocket.connected) questionsSocket.emit("questions:addQuestion");
   }, []);
 
+  const deleteLatestQuestion = useCallback(() => {
+    if (questionsSocket.connected) questionsSocket.emit("questions:deleteLatestQuestion");
+  }, []);
+
   const updateAnswer = useCallback(
     (questionId: number, field: QuestionsAnswerField, value: string) => {
       const update = { questionId, field, value };
@@ -166,6 +171,7 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
       selectRole,
       exitRole,
       addQuestion,
+      deleteLatestQuestion,
       updateAnswer,
       flushAnswer,
     }),
@@ -179,6 +185,7 @@ export function QuestionsProvider({ children }: { children: React.ReactNode }) {
       selectRole,
       exitRole,
       addQuestion,
+      deleteLatestQuestion,
       updateAnswer,
       flushAnswer,
     ],

@@ -6,6 +6,7 @@ import type { QuestionsEditorState, QuestionsObserverState } from "../../../shar
 import {
   isNearPageBottom,
   mergeEditorDrafts,
+  QuestionsDeleteDialog,
   QuestionsEditorScreen,
   QuestionsObserverScreen,
   QuestionsRolePicker,
@@ -62,6 +63,7 @@ test("both editors show Daniil's variant first and Shasha's variant second", () 
       error={null}
       onExit={noop}
       onAddQuestion={noop}
+      onDeleteLatestQuestion={noop}
       onUpdate={noop}
     />,
   );
@@ -72,6 +74,7 @@ test("both editors show Daniil's variant first and Shasha's variant second", () 
       error={null}
       onExit={noop}
       onAddQuestion={noop}
+      onDeleteLatestQuestion={noop}
       onUpdate={noop}
     />,
   );
@@ -82,7 +85,21 @@ test("both editors show Daniil's variant first and Shasha's variant second", () 
   assert.match(shashaHtml, /Экран Шаши/);
   assert.match(daniilHtml, /Ну что, удачи вам\)\)\)/);
   assert.match(shashaHtml, /Ну что, удачи вам\)\)\)/);
+  assert.match(daniilHtml, /Удалить вопрос/);
+  assert.match(shashaHtml, /Удалить вопрос/);
   assert.doesNotMatch(`${daniilHtml}${shashaHtml}`, /Всё, что вы вводите|Мой ответ|Как ответит/);
+});
+
+test("delete confirmation names the latest question and exposes safe actions", () => {
+  const html = renderToStaticMarkup(
+    <QuestionsDeleteDialog questionNumber={2} onCancel={noop} onConfirm={noop} />,
+  );
+
+  assert.match(html, /role="dialog"/);
+  assert.match(html, /aria-modal="true"/);
+  assert.match(html, /Удалить вопрос 02/);
+  assert.match(html, /Удалить последний вопрос/);
+  assert.match(html, />Отмена</);
 });
 
 test("observer shows every question and all four live fields", () => {
