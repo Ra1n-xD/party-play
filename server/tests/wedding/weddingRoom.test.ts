@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -26,6 +26,35 @@ function withService(run: (service: WeddingRoomService, setNow: (value: number) 
   }
 }
 
+test("discards malformed persisted participant records instead of crashing", () => {
+  const directory = mkdtempSync(join(tmpdir(), "party-play-wedding-malformed-"));
+  const file = join(directory, "room.json");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      version: 1,
+      createdAt: 1_000,
+      expiresAt: Date.now() + WEDDING_ROOM_TTL_MS,
+      phase: "PREPARING",
+      questionNumber: 0,
+      optionStyle: "letters",
+      correctOption: null,
+      participants: [null],
+      answers: [],
+    }),
+  );
+
+  try {
+    let service: WeddingRoomService | null = null;
+    assert.doesNotThrow(() => {
+      service = new WeddingRoomService(new FileWeddingRoomStore(file));
+    });
+    assert.equal(service?.getHostState(), null);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("creates one persisted room for exactly 96 hours", () => {
   const directory = mkdtempSync(join(tmpdir(), "party-play-wedding-"));
   const file = join(directory, "room.json");
@@ -37,6 +66,8 @@ test("creates one persisted room for exactly 96 hours", () => {
 
     assert.equal(room.expiresAt, now + WEDDING_ROOM_TTL_MS);
     assert.equal(room.phase, "PREPARING");
+    assert.equal(room.correctOption, null);
+    assert.throws(() => first.startQuestion(), /правильный ответ/i);
     assert.throws(() => first.createRoom(), /уже создана/i);
 
     now += 1;
@@ -84,10 +115,7 @@ test("accepts one final answer and automatically scores the first correct respon
     setNow(2_100);
     service.submitAnswer(vera.participantId, "socket-vera", 1);
 
-    assert.throws(
-      () => service.submitAnswer(vera.participantId, "socket-vera", 0),
-      /уже принят/i,
-    );
+    assert.throws(() => service.submitAnswer(vera.participantId, "socket-vera", 0), /уже принят/i);
 
     const host = service.getHostState();
     assert.ok(host);
@@ -100,6 +128,7 @@ test("accepts one final answer and automatically scores the first correct respon
     );
     assert.equal(host.answers[0].firstCorrect, false);
     assert.equal(host.answers[1].firstCorrect, true);
+    assert.equal(host.answers[1].optionStyle, "letters");
     assert.equal(
       host.participants.find((participant) => participant.id === vera.participantId)
         ?.correctAnswers,
@@ -131,6 +160,8 @@ test("keeps guests waiting until the host explicitly starts the next question", 
     const waiting = service.getGuestState(vera.participantId);
     assert.equal(waiting?.phase, "PREPARING");
     assert.equal(waiting?.hasAnswered, true);
+    assert.equal(service.getHostState()?.correctOption, null);
+    assert.throws(() => service.startQuestion(), /правильный ответ/i);
     assert.throws(() => service.submitAnswer(vera.participantId, "socket-vera", 0), /не открыт/i);
 
     service.setDraft("letters", 0);

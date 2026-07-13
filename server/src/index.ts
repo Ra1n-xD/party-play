@@ -8,6 +8,7 @@ import helmet from "helmet";
 import { CONFIG } from "./config.js";
 import { registerHandlers } from "./socketHandlers.js";
 import { getSocketClientIdentity } from "./clientIdentity.js";
+import { registerWeddingHandlers } from "./wedding/socketHandlers.js";
 
 const app = express();
 
@@ -89,6 +90,7 @@ io.use((socket, next) => {
 });
 
 registerHandlers(io);
+registerWeddingHandlers(io.of("/wedding"));
 
 const bindHost =
   process.env.HOST || (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");

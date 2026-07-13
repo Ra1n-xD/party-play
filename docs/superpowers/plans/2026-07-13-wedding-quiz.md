@@ -25,12 +25,14 @@
 ### Task 1: Shared Contract and Persisted Wedding Domain
 
 **Files:**
+
 - Modify: `shared/types.ts`
 - Create: `server/src/wedding/weddingRoom.ts`
 - Create: `server/tests/wedding/weddingRoom.test.ts`
 - Modify: `.gitignore`
 
 **Interfaces:**
+
 - Produces: `WeddingPhase`, `WeddingOptionStyle`, `GuestWeddingState`, `HostWeddingState`, `WeddingClientEvents`, and `WeddingServerEvents` in `shared/types.ts`.
 - Produces: `WeddingRoomService` with `createRoom`, `getGuestState`, `getHostState`, `joinNew`, `rejoin`, `disconnectSocket`, `setDraft`, `startQuestion`, `prepareNextQuestion`, `submitAnswer`, `adjustScore`, and `finishContest`.
 - Persists: `WeddingRoomSnapshot` through `FileWeddingRoomStore` at a configurable path.
@@ -116,12 +118,14 @@ git commit -m "feat: add persisted wedding quiz domain"
 ### Task 2: Wedding Socket.IO Namespace
 
 **Files:**
+
 - Create: `server/src/wedding/socketHandlers.ts`
 - Create: `server/tests/wedding/Wedding.integration.test.ts`
 - Modify: `server/src/index.ts`
 - Modify: `package.json`
 
 **Interfaces:**
+
 - Consumes: `WeddingRoomService` and the wedding event maps from Task 1.
 - Produces: `registerWeddingHandlers(namespace, service)` and `createWeddingRoomService()`.
 - Adds script: `test:wedding-server`.
@@ -180,6 +184,7 @@ git commit -m "feat: add wedding quiz socket namespace"
 ### Task 3: Client Routing, Session, and Guest Flow
 
 **Files:**
+
 - Create: `client/src/wedding/weddingSocket.ts`
 - Create: `client/src/wedding/WeddingContext.tsx`
 - Create: `client/src/wedding/GuestWeddingApp.tsx`
@@ -189,6 +194,7 @@ git commit -m "feat: add wedding quiz socket namespace"
 - Modify: `package.json`
 
 **Interfaces:**
+
 - Consumes: `GuestWeddingState`, `WeddingParticipantSummary`, and wedding event maps.
 - Produces: `WeddingProvider`, `useWedding`, `GuestWeddingApp`, and pathname-based application selection.
 - Adds script: `test:wedding-client`.
@@ -198,7 +204,10 @@ git commit -m "feat: add wedding quiz socket namespace"
 ```tsx
 test("guest buttons match the server-selected option style and hide correctness", () => {
   const html = renderToStaticMarkup(
-    <GuestWeddingScreen state={{ ...openState, optionStyle: "numbers" }} onAnswer={() => undefined} />,
+    <GuestWeddingScreen
+      state={{ ...openState, optionStyle: "numbers" }}
+      onAnswer={() => undefined}
+    />,
   );
   assert.match(html, />1<.*>2<.*>3<.*>4</s);
   assert.doesNotMatch(html, /правильн|неверн/i);
@@ -241,6 +250,7 @@ git commit -m "feat: add wedding guest voting flow"
 ### Task 4: Mobile Admin Flow and Wedding Styling
 
 **Files:**
+
 - Create: `client/src/wedding/AdminWeddingApp.tsx`
 - Create: `client/src/wedding/WeddingConfirmDialog.tsx`
 - Create: `client/src/styles/wedding.css`
@@ -249,6 +259,7 @@ git commit -m "feat: add wedding guest voting flow"
 - Modify: `client/src/main.tsx`
 
 **Interfaces:**
+
 - Consumes: `HostWeddingState` and context host actions.
 - Produces: two-tab mobile admin, draft controls, chronological answer feed, score steppers, and confirmation dialogs.
 
@@ -299,9 +310,11 @@ git commit -m "feat: add mobile wedding host controls"
 ### Task 5: Full Verification and Operational Polish
 
 **Files:**
+
 - Modify if required by verification: only files already listed above.
 
 **Interfaces:**
+
 - Consumes: the complete wedding feature.
 - Produces: a clean build, formatting, and regression result.
 
