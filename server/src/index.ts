@@ -7,11 +7,12 @@ import cors from "cors";
 import helmet from "helmet";
 import { CONFIG } from "./config.js";
 import { registerHandlers } from "./socketHandlers.js";
+import { getSocketClientIdentity } from "./clientIdentity.js";
 
 const app = express();
 
-// Trust reverse proxy (Caddy/Nginx) — correct client IP in req.ip
-app.set("trust proxy", 1);
+// Production exposes Node only through the loopback nginx proxy.
+app.set("trust proxy", "loopback");
 
 // Security headers with CSP
 app.use(
@@ -50,10 +51,7 @@ const sslKey = process.env.SSL_KEY;
 const useHttps = sslCert && sslKey;
 
 const httpServer = useHttps
-  ? createHttpsServer(
-      { cert: readFileSync(sslCert), key: readFileSync(sslKey) },
-      app,
-    )
+  ? createHttpsServer({ cert: readFileSync(sslCert), key: readFileSync(sslKey) }, app)
   : createServer(app);
 
 const io = new Server(httpServer, {
@@ -73,9 +71,7 @@ app.get("/", (_req, res) => {
 const ipConnectionCounts = new Map<string, number>();
 
 io.use((socket, next) => {
-  // Use socket.handshake.address which respects the proxy chain,
-  // not raw X-Forwarded-For header which can be spoofed
-  const ip = socket.handshake.address;
+  const ip = getSocketClientIdentity(socket);
 
   const count = ipConnectionCounts.get(ip) || 0;
   if (count >= CONFIG.MAX_CONNECTIONS_PER_IP) {
@@ -94,10 +90,15 @@ io.use((socket, next) => {
 
 registerHandlers(io);
 
-httpServer.listen(CONFIG.PORT, "127.0.0.1", () => {
+const bindHost =
+  process.env.HOST || (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");
+
+httpServer.listen(CONFIG.PORT, bindHost, () => {
   const proto = useHttps ? "https" : "http";
-  console.log(`PartyPlay server running on ${proto}://0.0.0.0:${CONFIG.PORT}`);
+  console.log(`PartyPlay server running on ${proto}://${bindHost}:${CONFIG.PORT}`);
   if (!useHttps) {
-    console.log("WARNING: Running without HTTPS. Set SSL_CERT and SSL_KEY env vars for production.");
+    console.log(
+      "WARNING: Running without HTTPS. Set SSL_CERT and SSL_KEY env vars for production.",
+    );
   }
 });

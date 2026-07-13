@@ -2,7 +2,7 @@ import { randomInt } from "crypto";
 import { Server } from "socket.io";
 import { ServerEvents, ClientEvents } from "../../shared/types.js";
 import { Room, Player, getAlivePlayers } from "./roomManager.js";
-import { revealAttribute, castVote } from "./gameEngine.js";
+import { revealAttribute, castVote, isGameplayPaused } from "./gameEngine.js";
 import { CONFIG } from "./config.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
@@ -10,12 +10,19 @@ type IOServer = Server<ClientEvents, ServerEvents>;
 // Track pending bot timers per room to avoid duplicate actions
 const pendingBotTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
 
-function clearBotTimers(roomCode: string): void {
+export function clearBotActions(roomCode: string): void {
   const timers = pendingBotTimers.get(roomCode);
   if (timers) {
     for (const t of timers) clearTimeout(t);
   }
-  pendingBotTimers.set(roomCode, []);
+  pendingBotTimers.delete(roomCode);
+}
+
+export function resetBotManagerStateForTests(): void {
+  for (const timers of pendingBotTimers.values()) {
+    for (const timer of timers) clearTimeout(timer);
+  }
+  pendingBotTimers.clear();
 }
 
 function addBotTimer(roomCode: string, timer: ReturnType<typeof setTimeout>): void {
@@ -31,9 +38,10 @@ function randomDelay(): number {
 
 export function scheduleBotActions(room: Room, io: IOServer): void {
   if (!room.gameState) return;
+  if (isGameplayPaused(room)) return;
 
   // Clear any pending timers for this room
-  clearBotTimers(room.code);
+  clearBotActions(room.code);
 
   const phase = room.gameState.phase;
 
@@ -58,7 +66,8 @@ function scheduleBotReveal(room: Room, io: IOServer): void {
   if (!player || !player.isBot || !player.alive) return;
 
   const timer = setTimeout(() => {
-    if (!room.gameState || room.gameState.phase !== "ROUND_REVEAL") return;
+    if (!room.gameState || isGameplayPaused(room) || room.gameState.phase !== "ROUND_REVEAL")
+      return;
 
     // Pick a random unrevealed attribute (not the last one)
     const totalAttrs = player.character?.attributes.length || 0;
@@ -105,6 +114,7 @@ function scheduleBotVotes(room: Room, io: IOServer): void {
 
     const timer = setTimeout(() => {
       if (!room.gameState) return;
+      if (isGameplayPaused(room)) return;
       if (room.gameState.phase !== "ROUND_VOTE" && room.gameState.phase !== "ROUND_VOTE_TIEBREAK")
         return;
       if (bot.hasVoted) return;

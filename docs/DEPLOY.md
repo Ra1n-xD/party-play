@@ -1,6 +1,6 @@
 # Деплой PartyPlay на VPS
 
-## 1. Купить VPS 
+## 1. Купить VPS
 
 Любой провайдер (Timeweb, Aeza, Selectel, Hetzner). Минимум: **1 vCPU, 1 GB RAM, Ubuntu 22.04/24.04**.
 
@@ -91,6 +91,7 @@ su - partyplay -c "cd ~/party-play && npm run build"
 cat > /home/partyplay/party-play/.env << 'EOF'
 PORT=3001
 NODE_ENV=production
+HOST=127.0.0.1
 CORS_ORIGINS=http://185.100.50.25
 EOF
 
@@ -109,7 +110,7 @@ cd ~/party-play
 node --env-file=.env server/dist/server/src/index.js
 ```
 
-Должно вывести `PartyPlay server running on http://0.0.0.0:3001`. Останови через `Ctrl+C`:
+Должно вывести `PartyPlay server running on http://127.0.0.1:3001`. Останови через `Ctrl+C`:
 
 ```bash
 exit
@@ -182,7 +183,8 @@ server {
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Replace any client-supplied forwarding chain with nginx's observed peer.
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import type { AttributeType } from "../../../../shared/types";
+import type { AttributeType, SeatClaimInfo } from "../../../../shared/types";
 import type { ClientGameState } from "../../context/GameContext";
 import { ATTR_TYPES } from "../../utils/constants";
 import { toggleInSet } from "../../utils/setUtils";
 import { AccessibleModal } from "./AccessibleModal";
+import { ReconnectHostControls } from "./ReconnectHostControls";
 import {
   getAdminActionReadiness,
   type AdminAction,
@@ -24,6 +25,10 @@ interface HostControlDialogProps {
   onRevivePlayer: (playerId: string) => void;
   onEliminatePlayer: (playerId: string) => void;
   onEndGame: () => void;
+  seatClaims?: SeatClaimInfo[];
+  onResolveSeatClaim?: (requestId: string, approved: boolean) => void;
+  onKickPlayer?: (playerId: string) => void;
+  onTransferHost?: (playerId: string) => void;
 }
 
 const ACTION_TITLES: Record<AdminAction, string> = {
@@ -52,6 +57,10 @@ export function HostControlDialog({
   onRevivePlayer,
   onEliminatePlayer,
   onEndGame,
+  seatClaims = [],
+  onResolveSeatClaim = () => undefined,
+  onKickPlayer = () => undefined,
+  onTransferHost = () => undefined,
 }: HostControlDialogProps) {
   const [action, setAction] = useState<AdminAction | null>(null);
   const [attributeType, setAttributeType] = useState<AttributeType | "action">("profession");
@@ -140,6 +149,14 @@ export function HostControlDialog({
           Закрыть
         </button>
       </header>
+
+      <ReconnectHostControls
+        players={gameState.players}
+        claims={seatClaims}
+        onResolveClaim={onResolveSeatClaim}
+        onKickPlayer={onKickPlayer}
+        onTransferHost={onTransferHost}
+      />
 
       {!action ? (
         <div className="gs-host-control-groups">
@@ -235,7 +252,9 @@ export function HostControlDialog({
               <label>Игрок:</label>
               <div className="admin-chips">
                 {gameState.players
-                  .filter((player) => (action === "revive" ? !player.alive : player.alive))
+                  .filter((player) =>
+                    action === "revive" ? !player.alive && !player.kicked : player.alive,
+                  )
                   .map((player) => (
                     <button
                       type="button"

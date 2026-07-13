@@ -6,6 +6,7 @@ import { GameScreen } from "./screens/GameScreen";
 import { VoteScreen } from "./screens/VoteScreen";
 import { ResultsScreen } from "./screens/ResultsScreen";
 import BackgroundParticles from "./components/BackgroundParticles";
+import { ReconnectPauseOverlay } from "./components/ReconnectPauseOverlay";
 import { CardImage } from "./components/CardImage";
 import { AttributeType } from "../../shared/types";
 
@@ -51,6 +52,11 @@ function AppContent() {
 function PauseOverlay() {
   const { gameState, playerId, isSpectator } = useGame();
   if (!gameState?.paused) return null;
+  if (gameState.pauseKind === "reconnect" || gameState.pauseKind === "mixed") {
+    return (
+      <ReconnectPauseOverlay gameState={gameState} playerId={playerId} isSpectator={isSpectator} />
+    );
+  }
   if (!isSpectator) {
     const me = gameState.players.find((p) => p.id === playerId);
     if (me?.isHost) return null;
@@ -63,6 +69,23 @@ function PauseOverlay() {
         <h2>Пауза</h2>
         <p>Хост приостановил игру</p>
       </div>
+    </div>
+  );
+}
+
+function HostChangeNotice() {
+  const { hostChangeNotice, playerId, clearHostChangeNotice } = useGame();
+  if (!hostChangeNotice || hostChangeNotice.hostId !== playerId) return null;
+
+  return (
+    <div className="host-change-notice" role="status">
+      <div>
+        <strong>Вам переданы права хоста</strong>
+        <span>Теперь вы управляете восстановлением комнаты.</span>
+      </div>
+      <button type="button" onClick={clearHostChangeNotice} aria-label="Закрыть уведомление">
+        ×
+      </button>
     </div>
   );
 }
@@ -134,6 +157,7 @@ export default function App() {
       <BackgroundParticles />
       <AppContent />
       <PauseOverlay />
+      <HostChangeNotice />
       <CurrentOverlay />
       <div className="app-version">v{__APP_VERSION__}</div>
     </>

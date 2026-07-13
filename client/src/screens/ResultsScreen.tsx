@@ -8,8 +8,9 @@ export function ResultsScreen() {
 
   const me = isSpectator ? undefined : gameState.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
-  const survivors = gameState.players.filter((p) => p.alive);
-  const eliminated = gameState.players.filter((p) => !p.alive);
+  const survivors = gameState.players.filter((p) => p.alive && !p.kicked);
+  const eliminated = gameState.players.filter((p) => !p.alive && !p.kicked);
+  const kicked = gameState.players.filter((p) => p.kicked);
 
   const renderPlayerCard = (player: (typeof gameState.players)[0]) => {
     const attrs =
@@ -19,12 +20,13 @@ export function ResultsScreen() {
     return (
       <div
         key={player.id}
-        className={`result-player ${!isSpectator && player.id === playerId ? "is-me" : ""}`}
+        className={`result-player ${!isSpectator && player.id === playerId ? "is-me" : ""} ${player.kicked ? "is-kicked" : ""}`}
       >
         <div className="result-player-name">
           <span className="player-number">{playerNumber}</span>
           {player.isBot && <span className="bot-badge">BOT</span>}
           {player.name} {!isSpectator && player.id === playerId && "(вы)"}
+          {player.kicked && <span className="result-kicked-label">Удалён администратором</span>}
         </div>
         {/* Desktop: card grid */}
         <div className="result-desktop attributes-grid">
@@ -131,6 +133,13 @@ export function ResultsScreen() {
             <h3>Изгнанные ({eliminated.length})</h3>
             {eliminated.map(renderPlayerCard)}
           </div>
+
+          {kicked.length > 0 && (
+            <div className="results-group kicked-group">
+              <h3>Удалённые администратором ({kicked.length})</h3>
+              {kicked.map(renderPlayerCard)}
+            </div>
+          )}
         </div>
 
         {/* Vote Results */}

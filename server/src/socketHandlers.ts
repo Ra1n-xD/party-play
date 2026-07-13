@@ -1,19 +1,21 @@
 import { timingSafeEqual } from "crypto";
 import { Server, Socket } from "socket.io";
 import { normalizeRoomCode } from "../../shared/roomCode.js";
-import { ClientEvents, ServerEvents } from "../../shared/types.js";
+import { ClientEvents, ReconnectErrorCode, ServerEvents } from "../../shared/types.js";
 import {
   createRoom,
   joinRoom,
   joinRoomAsSpectator,
   getRoom,
-  removePlayer,
   removeSpectator,
   addBotToRoom,
   removeBotFromRoom,
   getAllRooms,
+  resetRoomManagerStateForTests,
+  setRoomDisposalHandler,
+  touchRoom,
   Room,
-  Player,
+  Spectator,
 } from "./roomManager.js";
 import {
   startGame,
@@ -31,6 +33,7 @@ import {
   adminDeleteAttribute,
   adminForceRevealType,
   pauseGame,
+  removeDisconnectPause,
   unpauseGame,
   skipDiscussion,
   adminRevivePlayer,
@@ -38,15 +41,43 @@ import {
 } from "./gameEngine.js";
 import { CONFIG } from "./config.js";
 import { generateSessionToken } from "./utils.js";
+import { clearBotActions, resetBotManagerStateForTests } from "./botManager.js";
+import { resetGameLifecycleHooksForTests, setBeforeGameOverHook } from "./gameLifecycle.js";
+import {
+  bindPlayerSocket,
+  bindSpectatorSocket,
+  cancelAllSeatClaims,
+  cancelSeatClaim,
+  cancelClaimsForPlayer,
+  createSeatClaim,
+  ensureConnectedHost,
+  expireSeatClaims,
+  finalizeApprovedSeatClaim,
+  isCurrentSocketOwner,
+  kickPlayerPermanently,
+  listReconnectableSeats,
+  markPlayerDisconnected,
+  removePlayerWithHostFailover,
+  removeClaimsForSocket,
+  resetSeatClaimStateForTests,
+  resolveSeatClaim,
+  transferHost,
+} from "./reconnectManager.js";
+import { getSocketClientIdentity } from "./clientIdentity.js";
+import { RejoinThrottle } from "./rejoinThrottle.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 type IOSocket = Socket<ClientEvents, ServerEvents>;
 
+type SocketMembership = {
+  roomCode: string;
+  playerId: string;
+  role: "player" | "spectator";
+};
+
 // Map socketId -> { roomCode, playerId, role }
-const socketRoomMap = new Map<
-  string,
-  { roomCode: string; playerId: string; role: "player" | "spectator" }
->();
+const socketRoomMap = new Map<string, SocketMembership>();
+const spectatorGraceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // --- Per-action rate limiting ---
 const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
@@ -55,14 +86,27 @@ const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
   "room:joinSpectator": { max: 3, windowMs: 10000 },
   "room:rejoin": { max: 3, windowMs: 10000 },
   "room:rejoinSpectator": { max: 3, windowMs: 10000 },
+  "room:listReconnectableSeats": { max: 5, windowMs: 10000 },
+  "room:requestSeatClaim": { max: 3, windowMs: 10000 },
+  "room:cancelSeatClaim": { max: 5, windowMs: 10000 },
+  "admin:resolveSeatClaim": { max: 5, windowMs: 10000 },
+  "admin:kickPlayer": { max: 5, windowMs: 10000 },
   "vote:cast": { max: 2, windowMs: 5000 },
   "game:revealAttribute": { max: 2, windowMs: 2000 },
   "game:revealActionCard": { max: 2, windowMs: 2000 },
   default: { max: 20, windowMs: 10000 },
 };
 
+const CLAIM_IP_ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
+  "room:listReconnectableSeats": { max: 12, windowMs: 10000 },
+  "room:requestSeatClaim": { max: 12, windowMs: 10000 },
+  "admin:resolveSeatClaim": { max: 12, windowMs: 10000 },
+};
+
 // socketId -> (action -> { count, resetAt })
 const socketActionCounts = new Map<string, Map<string, { count: number; resetAt: number }>>();
+const ipActionCounts = new Map<string, Map<string, { count: number; resetAt: number }>>();
+let nextIpActionPruneAt = 0;
 
 function isRateLimited(socketId: string, action: string = "default"): boolean {
   const now = Date.now();
@@ -85,42 +129,105 @@ function isRateLimited(socketId: string, action: string = "default"): boolean {
   return entry.count > limit.max;
 }
 
+function isIpRateLimited(socket: IOSocket, action: string): boolean {
+  const limit = CLAIM_IP_ACTION_LIMITS[action];
+  if (!limit) return false;
+
+  const now = Date.now();
+  if (now >= nextIpActionPruneAt) {
+    nextIpActionPruneAt = now + limit.windowMs;
+    for (const [storedIp, storedActions] of ipActionCounts) {
+      for (const [storedAction, entry] of storedActions) {
+        if (now >= entry.resetAt) storedActions.delete(storedAction);
+      }
+      if (storedActions.size === 0) ipActionCounts.delete(storedIp);
+    }
+  }
+
+  const ip = getSocketClientIdentity(socket);
+  let actions = ipActionCounts.get(ip);
+  if (!actions) {
+    actions = new Map();
+    ipActionCounts.set(ip, actions);
+  }
+
+  let entry = actions.get(action);
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 1, resetAt: now + limit.windowMs };
+    actions.set(action, entry);
+    return false;
+  }
+
+  entry.count++;
+  return entry.count > limit.max;
+}
+
+function rejectRateLimitedClaimAction(socket: IOSocket, action: string): boolean {
+  const socketLimited = isRateLimited(socket.id, action);
+  const ipLimited = isIpRateLimited(socket, action);
+  if (!socketLimited && !ipLimited) return false;
+  socket.emit("room:error", { message: "Слишком много запросов, подождите" });
+  return true;
+}
+
 function cleanupRateLimitEntry(socketId: string): void {
   socketActionCounts.delete(socketId);
 }
 
-// --- Progressive backoff for failed rejoin attempts (per IP) ---
-const rejoinFailures = new Map<string, { count: number; blockedUntil: number }>();
-
-function getSocketIp(socket: IOSocket): string {
-  // Use socket.handshake.address — do not parse X-Forwarded-For manually,
-  // as it can be spoofed to bypass rate limiting
-  return socket.handshake.address;
-}
+// --- Progressive backoff for failed rejoin attempts (per client network identity) ---
+const rejoinThrottle = new RejoinThrottle();
 
 function isRejoinBlocked(socket: IOSocket): boolean {
-  const ip = getSocketIp(socket);
-  const entry = rejoinFailures.get(ip);
-  if (!entry) return false;
-  if (Date.now() < entry.blockedUntil) return true;
-  // Block expired — reset
-  rejoinFailures.delete(ip);
-  return false;
+  return rejoinThrottle.isBlocked(getSocketClientIdentity(socket));
 }
 
 function recordRejoinFailure(socket: IOSocket): void {
-  const ip = getSocketIp(socket);
-  const entry = rejoinFailures.get(ip) || { count: 0, blockedUntil: 0 };
-  entry.count++;
-  // Exponential backoff: 2s, 4s, 8s, 16s, max 60s
-  const delaySec = Math.min(60, 2 ** entry.count);
-  entry.blockedUntil = Date.now() + delaySec * 1000;
-  rejoinFailures.set(ip, entry);
+  rejoinThrottle.recordFailure(getSocketClientIdentity(socket));
 }
 
 function clearRejoinFailures(socket: IOSocket): void {
-  const ip = getSocketIp(socket);
-  rejoinFailures.delete(ip);
+  rejoinThrottle.clear(getSocketClientIdentity(socket));
+}
+
+function installGameLifecycleHooks(): void {
+  setBeforeGameOverHook((room, io) => {
+    cancelAllSeatClaims(room, io, "Игра завершена");
+  });
+}
+
+function attachRoomDisposalHandler(room: Room, io: IOServer): void {
+  setRoomDisposalHandler(room, (disposedRoom, reason) => {
+    clearBotActions(disposedRoom.code);
+    cancelAllSeatClaims(
+      disposedRoom,
+      io,
+      reason === "inactive" ? "Комната закрыта из-за неактивности" : "Комната закрыта",
+    );
+    for (const spectator of disposedRoom.spectators.values()) {
+      clearSpectatorGraceTimer(spectator.id);
+    }
+    for (const [socketId, membership] of Array.from(socketRoomMap.entries())) {
+      if (membership.roomCode !== disposedRoom.code) continue;
+      socketRoomMap.delete(socketId);
+      cleanupRateLimitEntry(socketId);
+      io.sockets.sockets.get(socketId)?.leave(disposedRoom.code);
+    }
+  });
+}
+
+export function resetSocketHandlerStateForTests(): void {
+  for (const timer of spectatorGraceTimers.values()) clearTimeout(timer);
+  spectatorGraceTimers.clear();
+  socketRoomMap.clear();
+  socketActionCounts.clear();
+  ipActionCounts.clear();
+  nextIpActionPruneAt = 0;
+  rejoinThrottle.reset();
+  resetGameLifecycleHooksForTests();
+  installGameLifecycleHooks();
+  resetBotManagerStateForTests();
+  resetSeatClaimStateForTests();
+  resetRoomManagerStateForTests();
 }
 
 // --- Input validation helpers ---
@@ -155,6 +262,10 @@ function isValidSessionToken(token: unknown): token is string {
   return typeof token === "string" && /^[a-f0-9]{64}$/.test(token);
 }
 
+function isValidSeatClaimId(id: unknown): id is string {
+  return typeof id === "string" && /^[a-f0-9]{32}$/.test(id);
+}
+
 function tokensEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "hex");
   const bufB = Buffer.from(b, "hex");
@@ -162,16 +273,76 @@ function tokensEqual(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
-// --- Helper: get room info with rate limit check ---
-function getSocketInfo(
+function emitReconnectError(
   socket: IOSocket,
-  action: string = "default",
-): { roomCode: string; playerId: string; role: "player" | "spectator" } | null {
+  code: ReconnectErrorCode,
+  message: string,
+  terminal: boolean,
+): void {
+  socket.emit("room:reconnectError", { code, message, terminal });
+}
+
+function emitPrivateVoterStatus(socket: IOSocket, room: Room, hasVoted: boolean): void {
+  socket.emit("game:voterStatus", {
+    phase: room.gameState?.phase ?? "LOBBY",
+    roundNumber: room.gameState?.roundNumber ?? 0,
+    currentVotingInRound: room.gameState?.currentVotingInRound ?? 0,
+    hasVoted,
+  });
+}
+
+function clearSpectatorGraceTimer(spectatorId: string): void {
+  const timer = spectatorGraceTimers.get(spectatorId);
+  if (timer) clearTimeout(timer);
+  spectatorGraceTimers.delete(spectatorId);
+}
+
+function getCurrentSocketMembership(socket: IOSocket): SocketMembership | null {
+  const membership = socketRoomMap.get(socket.id);
+  if (!membership) return null;
+
+  const room = getRoom(membership.roomCode);
+  let ownsMembership = false;
+  if (membership.role === "player") {
+    const player = room?.players.get(membership.playerId);
+    ownsMembership =
+      !!player && player.connected && !player.kicked && isCurrentSocketOwner(player, socket.id);
+  } else {
+    const spectator = room?.spectators.get(membership.playerId);
+    ownsMembership = !!spectator && spectator.connected && spectator.socketId === socket.id;
+  }
+
+  if (ownsMembership) return membership;
+  socketRoomMap.delete(socket.id);
+  socket.leave(membership.roomCode);
+  return null;
+}
+
+function rejectExistingSocketMembership(
+  socket: IOSocket,
+  allowedMembership?: SocketMembership,
+): boolean {
+  const existingMembership = getCurrentSocketMembership(socket);
+  if (!existingMembership) return false;
+  if (
+    allowedMembership &&
+    existingMembership.roomCode === allowedMembership.roomCode &&
+    existingMembership.playerId === allowedMembership.playerId &&
+    existingMembership.role === allowedMembership.role
+  ) {
+    return false;
+  }
+  socket.emit("room:error", { message: "Сокет уже привязан к комнате" });
+  return true;
+}
+
+// --- Helper: get room info with rate limit check ---
+function getSocketInfo(socket: IOSocket, action: string = "default"): SocketMembership | null {
   if (isRateLimited(socket.id, action)) {
     socket.emit("room:error", { message: "Слишком много запросов, подождите" });
     return null;
   }
-  return socketRoomMap.get(socket.id) || null;
+  return getCurrentSocketMembership(socket);
 }
 
 function getSocketRoom(
@@ -187,7 +358,38 @@ function getSocketRoom(
   if (info.role === "spectator") return null;
   const room = getRoom(info.roomCode);
   if (!room) return null;
+  touchRoom(room.code);
   return { room, info };
+}
+
+function scheduleSpectatorGraceRemoval(
+  room: Room,
+  spectator: Spectator,
+  disconnectedSocketId: string,
+  io: IOServer,
+): void {
+  clearSpectatorGraceTimer(spectator.id);
+  const timer = setTimeout(() => {
+    if (spectatorGraceTimers.get(spectator.id) !== timer) return;
+    spectatorGraceTimers.delete(spectator.id);
+
+    const staleMembership = socketRoomMap.get(disconnectedSocketId);
+    if (
+      staleMembership?.roomCode === room.code &&
+      staleMembership.playerId === spectator.id &&
+      staleMembership.role === "spectator"
+    ) {
+      socketRoomMap.delete(disconnectedSocketId);
+    }
+
+    if (getRoom(room.code) !== room) return;
+    if (room.spectators.get(spectator.id) !== spectator) return;
+    if (spectator.connected || spectator.socketId !== disconnectedSocketId) return;
+
+    removeSpectator(room, spectator.id);
+    if (room.players.size > 0) broadcastState(room, io);
+  }, CONFIG.RECONNECT_GRACE_PERIOD);
+  spectatorGraceTimers.set(spectator.id, timer);
 }
 
 function requireHost(socket: IOSocket, room: Room, playerId: string): boolean {
@@ -201,12 +403,15 @@ function requireHost(socket: IOSocket, room: Room, playerId: string): boolean {
 }
 
 export function registerHandlers(io: IOServer): void {
+  installGameLifecycleHooks();
   io.on("connection", (socket: IOSocket) => {
     if (process.env.NODE_ENV !== "production") {
       console.log(`Connected: ${socket.id}`);
     }
 
-    socket.on("room:create", ({ playerName }) => {
+    socket.on("room:create", (data) => {
+      const playerName = data?.playerName;
+      if (rejectExistingSocketMembership(socket)) return;
       if (isRateLimited(socket.id, "room:create")) {
         socket.emit("room:error", {
           message: "Слишком много запросов, подождите",
@@ -229,7 +434,9 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
+      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       const { room, player } = createRoom(socket.id, sanitizePlayerName(playerName));
+      attachRoomDisposalHandler(room, io);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -245,7 +452,10 @@ export function registerHandlers(io: IOServer): void {
       broadcastState(room, io);
     });
 
-    socket.on("room:join", ({ roomCode, playerName }) => {
+    socket.on("room:join", (data) => {
+      const roomCode = data?.roomCode;
+      const playerName = data?.playerName;
+      if (rejectExistingSocketMembership(socket)) return;
       if (isRateLimited(socket.id, "room:join")) {
         socket.emit("room:error", {
           message: "Слишком много запросов, подождите",
@@ -272,6 +482,8 @@ export function registerHandlers(io: IOServer): void {
       }
 
       const { room, player } = result;
+      attachRoomDisposalHandler(room, io);
+      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -284,10 +496,13 @@ export function registerHandlers(io: IOServer): void {
         playerId: player.id,
         sessionToken: player.sessionToken,
       });
-      broadcastState(room, io);
+      if (!ensureConnectedHost(room, io)) broadcastState(room, io);
     });
 
-    socket.on("room:rejoin", ({ roomCode, playerId, sessionToken }) => {
+    socket.on("room:rejoin", (data) => {
+      const roomCode = data?.roomCode;
+      const playerId = data?.playerId;
+      const sessionToken = data?.sessionToken;
       if (isRateLimited(socket.id, "room:rejoin")) return;
       if (isRejoinBlocked(socket)) {
         socket.emit("room:error", { message: "Слишком много неудачных попыток, подождите" });
@@ -297,63 +512,189 @@ export function registerHandlers(io: IOServer): void {
       const normalizedRoomCode = normalizeRoomCode(roomCode);
       if (!normalizedRoomCode || !isValidId(playerId) || !isValidSessionToken(sessionToken)) {
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
 
       const room = getRoom(normalizedRoomCode);
       if (!room) {
+        getCurrentSocketMembership(socket);
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "ROOM_NOT_FOUND", "Комната не найдена", true);
         return;
       }
 
       const player = room.players.get(playerId);
       if (!player) {
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
 
-      // Validate session token
+      if (player.kicked) {
+        emitReconnectError(socket, "SEAT_CLOSED", "Место закрыто", true);
+        return;
+      }
+
       if (!sessionToken || !tokensEqual(player.sessionToken, sessionToken)) {
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
 
-      // Success — clear failure counter
+      const existingSocketInfo = getCurrentSocketMembership(socket);
+      if (
+        existingSocketInfo &&
+        (existingSocketInfo.roomCode !== room.code ||
+          existingSocketInfo.playerId !== player.id ||
+          existingSocketInfo.role !== "player")
+      ) {
+        emitReconnectError(
+          socket,
+          "SEAT_ALREADY_CONNECTED",
+          "Сокет уже привязан к другому месту",
+          false,
+        );
+        return;
+      }
+
+      const bindResult = bindPlayerSocket(player, socket.id, (previousSocketId) => {
+        const previousInfo = socketRoomMap.get(previousSocketId);
+        if (
+          previousInfo?.roomCode === room.code &&
+          previousInfo.playerId === player.id &&
+          previousInfo.role === "player"
+        ) {
+          socketRoomMap.delete(previousSocketId);
+        }
+        io.sockets.sockets.get(previousSocketId)?.leave(room.code);
+      });
+      if (!bindResult.ok) {
+        emitReconnectError(
+          socket,
+          bindResult.code,
+          bindResult.error,
+          bindResult.code !== "SEAT_ALREADY_CONNECTED",
+        );
+        return;
+      }
+
       clearRejoinFailures(socket);
-
-      // Rotate session token on successful rejoin
-      const newToken = generateSessionToken();
-      player.sessionToken = newToken;
-
-      // Reconnect
-      player.socketId = socket.id;
-      player.connected = true;
+      touchRoom(room.code);
+      removeClaimsForSocket(socket.id, io, "Владелец места вернулся", true);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
         playerId: player.id,
         role: "player",
       });
+      cancelClaimsForPlayer(room, player.id, io);
 
       socket.emit("room:joined", {
         roomCode: room.code,
         playerId: player.id,
-        sessionToken: newToken,
+        sessionToken: player.sessionToken,
       });
 
-      // Re-send character if game is in progress
       if (player.character) {
         socket.emit("game:character", player.character);
       }
 
-      broadcastState(room, io);
+      removeDisconnectPause(room, player.id, io, false);
+      if (!ensureConnectedHost(room, io)) broadcastState(room, io);
+      emitPrivateVoterStatus(socket, room, player.hasVoted);
     });
 
-    socket.on("room:joinSpectator", ({ roomCode, spectatorName }) => {
+    socket.on("room:listReconnectableSeats", (data) => {
+      if (rejectExistingSocketMembership(socket)) return;
+      if (rejectRateLimitedClaimAction(socket, "room:listReconnectableSeats")) return;
+
+      const recoveryRoomCode = normalizeRoomCode(data?.roomCode);
+      if (!recoveryRoomCode) {
+        socket.emit("room:error", { message: "Код комнаты должен состоять из 4 букв" });
+        return;
+      }
+      const room = getRoom(recoveryRoomCode);
+      if (!room) {
+        socket.emit("room:error", { message: "Комната не найдена" });
+        return;
+      }
+      if (room.gameState?.phase === "GAME_OVER") {
+        socket.emit("room:error", { message: "Игра завершена" });
+        return;
+      }
+
+      touchRoom(room.code);
+      expireSeatClaims(room, io);
+      socket.leave(room.code);
+      socket.emit("room:reconnectableSeats", {
+        roomCode: room.code,
+        seats: listReconnectableSeats(room),
+      });
+    });
+
+    socket.on("room:requestSeatClaim", (data) => {
+      if (rejectExistingSocketMembership(socket)) return;
+      if (rejectRateLimitedClaimAction(socket, "room:requestSeatClaim")) return;
+
+      const playerId = data?.playerId;
+      const claimantName = data?.claimantName;
+      const recoveryRoomCode = normalizeRoomCode(data?.roomCode);
+      if (!recoveryRoomCode) {
+        socket.emit("room:error", { message: "Код комнаты должен состоять из 4 букв" });
+        return;
+      }
+      const room = getRoom(recoveryRoomCode);
+      if (!room) {
+        socket.emit("room:error", { message: "Комната не найдена" });
+        return;
+      }
+      if (!isValidId(playerId)) {
+        socket.emit("room:error", { message: "Место недоступно для восстановления" });
+        return;
+      }
+      if (!isValidPlayerName(claimantName)) {
+        socket.emit("room:error", {
+          message: `Имя должно быть от 1 до ${CONFIG.MAX_PLAYER_NAME_LENGTH} символов`,
+        });
+        return;
+      }
+
+      touchRoom(room.code);
+      expireSeatClaims(room, io);
+      socket.leave(room.code);
+      const result = createSeatClaim(
+        room,
+        socket.id,
+        playerId,
+        sanitizePlayerName(claimantName),
+        io,
+      );
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+        return;
+      }
+      socket.emit("room:seatClaimSubmitted", { requestId: result.claim.id });
+    });
+
+    socket.on("room:cancelSeatClaim", (data) => {
+      if (isRateLimited(socket.id, "room:cancelSeatClaim")) {
+        socket.emit("room:error", { message: "Слишком много запросов, подождите" });
+        return;
+      }
+      const requestId = data?.requestId;
+      if (!isValidSeatClaimId(requestId)) {
+        socket.emit("room:error", { message: "Заявка не найдена" });
+        return;
+      }
+      const result = cancelSeatClaim(socket.id, requestId, io);
+      if (!result.success) socket.emit("room:error", { message: result.error });
+    });
+
+    socket.on("room:joinSpectator", (data) => {
+      const roomCode = data?.roomCode;
+      const spectatorName = data?.spectatorName;
+      if (rejectExistingSocketMembership(socket)) return;
       if (isRateLimited(socket.id, "room:joinSpectator")) {
         socket.emit("room:error", {
           message: "Слишком много запросов, подождите",
@@ -384,6 +725,7 @@ export function registerHandlers(io: IOServer): void {
       }
 
       const { room, spectator } = result;
+      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -399,7 +741,10 @@ export function registerHandlers(io: IOServer): void {
       broadcastState(room, io);
     });
 
-    socket.on("room:rejoinSpectator", ({ roomCode, spectatorId, sessionToken }) => {
+    socket.on("room:rejoinSpectator", (data) => {
+      const roomCode = data?.roomCode;
+      const spectatorId = data?.spectatorId;
+      const sessionToken = data?.sessionToken;
       if (isRateLimited(socket.id, "room:rejoinSpectator")) return;
       if (isRejoinBlocked(socket)) {
         socket.emit("room:error", { message: "Слишком много неудачных попыток, подождите" });
@@ -409,40 +754,65 @@ export function registerHandlers(io: IOServer): void {
       const normalizedRoomCode = normalizeRoomCode(roomCode);
       if (!normalizedRoomCode || !isValidId(spectatorId) || !isValidSessionToken(sessionToken)) {
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
 
       const room = getRoom(normalizedRoomCode);
       if (!room) {
+        getCurrentSocketMembership(socket);
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "ROOM_NOT_FOUND", "Комната не найдена", true);
         return;
       }
 
       const spectator = room.spectators.get(spectatorId);
       if (!spectator) {
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
 
       // Validate session token
       if (!sessionToken || !tokensEqual(spectator.sessionToken, sessionToken)) {
         recordRejoinFailure(socket);
-        socket.emit("room:error", { message: "Не удалось переподключиться" });
+        emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
 
-      // Success — clear failure counter
-      clearRejoinFailures(socket);
+      if (
+        rejectExistingSocketMembership(socket, {
+          roomCode: room.code,
+          playerId: spectator.id,
+          role: "spectator",
+        })
+      ) {
+        return;
+      }
 
-      // Rotate session token on successful rejoin
+      const bindResult = bindSpectatorSocket(spectator, socket.id, (previousSocketId) => {
+        const previousInfo = socketRoomMap.get(previousSocketId);
+        if (
+          previousInfo?.roomCode === room.code &&
+          previousInfo.playerId === spectator.id &&
+          previousInfo.role === "spectator"
+        ) {
+          socketRoomMap.delete(previousSocketId);
+        }
+        io.sockets.sockets.get(previousSocketId)?.leave(room.code);
+      });
+      if (!bindResult.ok) {
+        emitReconnectError(socket, "SEAT_ALREADY_CONNECTED", bindResult.error, false);
+        return;
+      }
+
+      clearRejoinFailures(socket);
+      clearSpectatorGraceTimer(spectator.id);
+      touchRoom(room.code);
+      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       const newToken = generateSessionToken();
       spectator.sessionToken = newToken;
 
-      spectator.socketId = socket.id;
-      spectator.connected = true;
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -458,11 +828,17 @@ export function registerHandlers(io: IOServer): void {
       broadcastState(room, io);
     });
 
-    socket.on("player:ready", ({ ready }) => {
+    socket.on("player:ready", (data) => {
+      const ready = data?.ready;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       const player = ctx.room.players.get(ctx.info.playerId);
       if (!player) return;
+
+      if (typeof ready !== "boolean") {
+        socket.emit("room:error", { message: "Некорректный статус готовности" });
+        return;
+      }
 
       player.ready = ready;
       broadcastState(ctx.room, io);
@@ -472,11 +848,23 @@ export function registerHandlers(io: IOServer): void {
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
+      if (ctx.room.gameState) {
+        socket.emit("room:error", { message: "Игра уже началась" });
+        return;
+      }
 
       if (ctx.room.players.size < CONFIG.MIN_PLAYERS) {
         socket.emit("room:error", {
           message: `Нужно минимум ${CONFIG.MIN_PLAYERS} игрока`,
         });
+        return;
+      }
+
+      const allConnected = Array.from(ctx.room.players.values()).every(
+        (player) => player.isBot || player.connected,
+      );
+      if (!allConnected) {
+        socket.emit("room:error", { message: "Не все игроки подключены" });
         return;
       }
 
@@ -491,7 +879,8 @@ export function registerHandlers(io: IOServer): void {
       startGame(ctx.room, io);
     });
 
-    socket.on("game:revealAttribute", ({ attributeIndex }) => {
+    socket.on("game:revealAttribute", (data) => {
+      const attributeIndex = data?.attributeIndex;
       const ctx = getSocketRoom(socket, "game:revealAttribute");
       if (!ctx) return;
 
@@ -525,7 +914,8 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
-    socket.on("vote:cast", ({ targetPlayerId }) => {
+    socket.on("vote:cast", (data) => {
+      const targetPlayerId = data?.targetPlayerId;
       const ctx = getSocketRoom(socket, "vote:cast");
       if (!ctx) return;
 
@@ -543,7 +933,10 @@ export function registerHandlers(io: IOServer): void {
       const success = castVote(ctx.room, ctx.info.playerId, targetPlayerId, io);
       if (!success) {
         socket.emit("room:error", { message: "Невозможно проголосовать" });
+        return;
       }
+      const voter = ctx.room.players.get(ctx.info.playerId);
+      if (voter) emitPrivateVoterStatus(socket, ctx.room, voter.hasVoted);
     });
 
     socket.on("game:endGame", () => {
@@ -559,6 +952,7 @@ export function registerHandlers(io: IOServer): void {
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
 
+      cancelAllSeatClaims(ctx.room, io, "Игра сброшена");
       resetGame(ctx.room, io);
     });
 
@@ -576,7 +970,8 @@ export function registerHandlers(io: IOServer): void {
       broadcastState(ctx.room, io);
     });
 
-    socket.on("room:removeBot", ({ playerId: botId }) => {
+    socket.on("room:removeBot", (data) => {
+      const botId = data?.playerId;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -594,7 +989,141 @@ export function registerHandlers(io: IOServer): void {
 
     // --- Admin panel events ---
 
-    socket.on("admin:shuffleAll", ({ attributeType }) => {
+    socket.on("admin:resolveSeatClaim", (data) => {
+      const ctx = getSocketRoom(socket);
+      if (!ctx) return;
+      if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
+      if (rejectRateLimitedClaimAction(socket, "admin:resolveSeatClaim")) return;
+
+      const requestId = data?.requestId;
+      const approved = data?.approved;
+      if (!isValidSeatClaimId(requestId)) {
+        socket.emit("room:error", { message: "Некорректный ID заявки" });
+        return;
+      }
+      if (typeof approved !== "boolean") {
+        socket.emit("room:error", { message: "Некорректное решение по заявке" });
+        return;
+      }
+
+      const resolutionNow = Date.now();
+      const resolution = resolveSeatClaim(
+        ctx.room,
+        ctx.info.playerId,
+        requestId,
+        approved,
+        io,
+        resolutionNow,
+      );
+      if (!resolution.success) {
+        socket.emit("room:error", { message: resolution.error });
+        return;
+      }
+      if (!resolution.approved) return;
+
+      const { claim, player } = resolution;
+      const claimantSocket = io.sockets.sockets.get(claim.socketId);
+      const claimantMembership = claimantSocket ? getCurrentSocketMembership(claimantSocket) : null;
+      if (
+        !claimantSocket?.connected ||
+        claimantMembership !== null ||
+        claimantSocket.rooms.size > 1
+      ) {
+        removeClaimsForSocket(claim.socketId, io, "Заявитель больше недоступен", true);
+        socket.emit("room:error", { message: "Заявитель больше недоступен" });
+        return;
+      }
+
+      const bindResult = bindPlayerSocket(player, claimantSocket.id, (previousSocketId) => {
+        const previousInfo = socketRoomMap.get(previousSocketId);
+        if (
+          previousInfo?.roomCode === ctx.room.code &&
+          previousInfo.playerId === player.id &&
+          previousInfo.role === "player"
+        ) {
+          socketRoomMap.delete(previousSocketId);
+        }
+        io.sockets.sockets.get(previousSocketId)?.leave(ctx.room.code);
+      });
+      if (!bindResult.ok) {
+        removeClaimsForSocket(claim.socketId, io, bindResult.error, true);
+        socket.emit("room:error", { message: bindResult.error });
+        return;
+      }
+
+      player.name = sanitizePlayerName(claim.claimantName);
+      player.sessionToken = generateSessionToken();
+      claimantSocket.join(ctx.room.code);
+      socketRoomMap.set(claimantSocket.id, {
+        roomCode: ctx.room.code,
+        playerId: player.id,
+        role: "player",
+      });
+
+      finalizeApprovedSeatClaim(ctx.room, requestId, io, resolutionNow);
+      removeClaimsForSocket(claimantSocket.id, io, "Вы уже восстановили другое место", true);
+      claimantSocket.emit("room:joined", {
+        roomCode: ctx.room.code,
+        playerId: player.id,
+        sessionToken: player.sessionToken,
+      });
+      if (player.character) claimantSocket.emit("game:character", player.character);
+
+      removeDisconnectPause(ctx.room, player.id, io, false);
+      if (!ensureConnectedHost(ctx.room, io)) broadcastState(ctx.room, io);
+      emitPrivateVoterStatus(claimantSocket, ctx.room, player.hasVoted);
+    });
+
+    socket.on("admin:transferHost", (data) => {
+      const ctx = getSocketRoom(socket);
+      if (!ctx) return;
+      const targetPlayerId = data?.targetPlayerId;
+      if (!isValidId(targetPlayerId)) {
+        socket.emit("room:error", { message: "Игрок не найден" });
+        return;
+      }
+
+      const result = transferHost(ctx.room, ctx.info.playerId, targetPlayerId, io);
+      if (!result.success) socket.emit("room:error", { message: result.error });
+    });
+
+    socket.on("admin:kickPlayer", (data) => {
+      const ctx = getSocketRoom(socket, "admin:kickPlayer");
+      if (!ctx) return;
+      const targetPlayerId = data?.targetPlayerId;
+      if (!isValidId(targetPlayerId)) {
+        socket.emit("room:error", { message: "Игрок не найден" });
+        return;
+      }
+
+      const result = kickPlayerPermanently(ctx.room, ctx.info.playerId, targetPlayerId, io);
+      if (!result.success) {
+        socket.emit("room:error", { message: result.error });
+        return;
+      }
+
+      const releasedSocketId = result.releasedSocketId;
+      if (!releasedSocketId) return;
+      const releasedMembership = socketRoomMap.get(releasedSocketId);
+      if (
+        !releasedMembership ||
+        releasedMembership.roomCode !== ctx.room.code ||
+        releasedMembership.playerId !== targetPlayerId ||
+        releasedMembership.role !== "player"
+      ) {
+        return;
+      }
+      socketRoomMap.delete(releasedSocketId);
+
+      const releasedSocket = io.sockets.sockets.get(releasedSocketId);
+      if (!releasedSocket) return;
+      releasedSocket.emit("room:kicked", { message: "Вы удалены из комнаты хостом" });
+      releasedSocket.leave(ctx.room.code);
+      releasedSocket.disconnect(true);
+    });
+
+    socket.on("admin:shuffleAll", (data) => {
+      const attributeType = data?.attributeType;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -608,7 +1137,10 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
-    socket.on("admin:swapAttribute", ({ player1Id, player2Id, attributeType }) => {
+    socket.on("admin:swapAttribute", (data) => {
+      const player1Id = data?.player1Id;
+      const player2Id = data?.player2Id;
+      const attributeType = data?.attributeType;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -631,7 +1163,9 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
-    socket.on("admin:replaceAttribute", ({ targetPlayerId, attributeType }) => {
+    socket.on("admin:replaceAttribute", (data) => {
+      const targetPlayerId = data?.targetPlayerId;
+      const attributeType = data?.attributeType;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -649,7 +1183,8 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
-    socket.on("admin:removeBunkerCard", ({ cardIndex }) => {
+    socket.on("admin:removeBunkerCard", (data) => {
+      const cardIndex = data?.cardIndex;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -663,7 +1198,8 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
-    socket.on("admin:replaceBunkerCard", ({ cardIndex }) => {
+    socket.on("admin:replaceBunkerCard", (data) => {
+      const cardIndex = data?.cardIndex;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -677,7 +1213,9 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
-    socket.on("admin:deleteAttribute", ({ targetPlayerId, attributeType }) => {
+    socket.on("admin:deleteAttribute", (data) => {
+      const targetPlayerId = data?.targetPlayerId;
+      const attributeType = data?.attributeType;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -695,7 +1233,8 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
-    socket.on("admin:forceRevealType", ({ attributeType }) => {
+    socket.on("admin:forceRevealType", (data) => {
+      const attributeType = data?.attributeType;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -739,7 +1278,8 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
-    socket.on("admin:revivePlayer", ({ targetPlayerId }) => {
+    socket.on("admin:revivePlayer", (data) => {
+      const targetPlayerId = data?.targetPlayerId;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -753,7 +1293,8 @@ export function registerHandlers(io: IOServer): void {
       }
     });
 
-    socket.on("admin:eliminatePlayer", ({ targetPlayerId }) => {
+    socket.on("admin:eliminatePlayer", (data) => {
+      const targetPlayerId = data?.targetPlayerId;
       const ctx = getSocketRoom(socket);
       if (!ctx) return;
       if (!requireHost(socket, ctx.room, ctx.info.playerId)) return;
@@ -768,94 +1309,74 @@ export function registerHandlers(io: IOServer): void {
     });
 
     socket.on("room:leave", () => {
+      removeClaimsForSocket(socket.id, io, "Заявка отменена", true);
       const info = socketRoomMap.get(socket.id);
       if (info?.role === "spectator") {
         const room = getRoom(info.roomCode);
-        if (room) {
-          removeSpectator(room, info.playerId);
-          if (room.players.size > 0) {
-            broadcastState(room, io);
-          }
+        const spectator = room?.spectators.get(info.playerId);
+        const ownsSpectator = spectator?.socketId === socket.id;
+        if (room && spectator && ownsSpectator) {
+          clearSpectatorGraceTimer(spectator.id);
+          removeSpectator(room, spectator.id);
         }
+        socketRoomMap.delete(socket.id);
+        cleanupRateLimitEntry(socket.id);
+        socket.leave(info.roomCode);
+        if (room && ownsSpectator && room.players.size > 0) {
+          broadcastState(room, io);
+        }
+        return;
+      }
+
+      if (!info) return;
+      const room = getRoom(info.roomCode);
+      const player = room?.players.get(info.playerId);
+      if (!room || !player || !isCurrentSocketOwner(player, socket.id)) {
         socketRoomMap.delete(socket.id);
         cleanupRateLimitEntry(socket.id);
         socket.leave(info.roomCode);
         return;
       }
-      handleDisconnect(socket, io);
+
+      if (!room.gameState || room.gameState.phase === "GAME_OVER") {
+        removePlayerWithHostFailover(room, player.id, io);
+        socketRoomMap.delete(socket.id);
+        cleanupRateLimitEntry(socket.id);
+        socket.leave(info.roomCode);
+        return;
+      }
+
+      markPlayerDisconnected(room, player.id, socket.id, io);
+      socketRoomMap.delete(socket.id);
+      cleanupRateLimitEntry(socket.id);
+      socket.leave(info.roomCode);
     });
 
     socket.on("disconnect", () => {
       if (process.env.NODE_ENV !== "production") {
         console.log(`Disconnected: ${socket.id}`);
       }
+      removeClaimsForSocket(socket.id, io);
       const info = socketRoomMap.get(socket.id);
+      cleanupRateLimitEntry(socket.id);
       if (!info) return;
       const room = getRoom(info.roomCode);
-      if (!room) return;
-
-      if (info.role === "spectator") {
-        const spectator = room.spectators.get(info.playerId);
-        if (spectator) {
-          spectator.connected = false;
-          setTimeout(() => {
-            if (!spectator.connected) {
-              removeSpectator(room, info.playerId);
-              socketRoomMap.delete(socket.id);
-              socket.leave(info.roomCode);
-              if (room.players.size > 0) {
-                broadcastState(room, io);
-              }
-            }
-          }, CONFIG.RECONNECT_GRACE_PERIOD);
-        }
-        cleanupRateLimitEntry(socket.id);
+      if (!room) {
+        socketRoomMap.delete(socket.id);
         return;
       }
 
-      const player = room.players.get(info.playerId);
-      if (!player) return;
-
-      // Mark as disconnected, give grace period
-      player.connected = false;
-      broadcastState(room, io);
-
-      setTimeout(() => {
-        if (!player.connected) {
-          handleDisconnect(socket, io);
+      if (info.role === "spectator") {
+        const spectator = room.spectators.get(info.playerId);
+        if (spectator && spectator.socketId === socket.id) {
+          spectator.connected = false;
+          scheduleSpectatorGraceRemoval(room, spectator, socket.id, io);
         }
-      }, CONFIG.RECONNECT_GRACE_PERIOD);
+        return;
+      }
 
-      // Cleanup rate limit entry
-      cleanupRateLimitEntry(socket.id);
+      markPlayerDisconnected(room, info.playerId, socket.id, io);
+      socketRoomMap.delete(socket.id);
     });
   });
-}
-
-function handleDisconnect(socket: IOSocket, io: IOServer): void {
-  const info = socketRoomMap.get(socket.id);
-  if (!info) return;
-
-  const room = getRoom(info.roomCode);
-  if (room) {
-    const player = room.players.get(info.playerId);
-
-    // If game is in progress and it's this player's turn, skip them
-    if (room.gameState?.phase === "ROUND_REVEAL" && player) {
-      const currentTurnPlayerId = room.gameState.turnOrder[room.gameState.currentTurnIndex];
-      if (currentTurnPlayerId === info.playerId) {
-        // Auto-reveal for disconnected player
-        revealAttribute(room, info.playerId, undefined, io);
-      }
-    }
-
-    removePlayer(room, info.playerId);
-    if (room.players.size > 0) {
-      broadcastState(room, io);
-    }
-  }
-
-  socketRoomMap.delete(socket.id);
-  cleanupRateLimitEntry(socket.id);
-  socket.leave(info.roomCode);
 }
