@@ -5,7 +5,14 @@ import { useGame } from "../context/GameContext";
 import { ReconnectScreen } from "./ReconnectScreen";
 
 export function HomeScreen() {
-  const { createRoom, joinRoom, joinAsSpectator, error } = useGame();
+  const {
+    createRoom,
+    joinRoom,
+    joinAsSpectator,
+    retainedReconnectSession,
+    resumeRetainedSession,
+    error,
+  } = useGame();
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [mode, setMode] = useState<"menu" | "create" | "join" | "spectate" | "reconnect">("menu");
@@ -67,6 +74,11 @@ export function HomeScreen() {
             >
               Наблюдать
             </button>
+            {retainedReconnectSession && (
+              <button className="btn btn-primary" onClick={resumeRetainedSession}>
+                Продолжить игру · {retainedReconnectSession.roomCode}
+              </button>
+            )}
             <button className="btn btn-reconnect" onClick={() => setMode("reconnect")}>
               Вернуться в игру
             </button>
@@ -125,7 +137,7 @@ export function HomeScreen() {
           </div>
         )}
 
-        {error && <div className="error-toast">{error}</div>}
+        {error && mode !== "reconnect" && <div className="error-toast">{error}</div>}
       </div>
 
       <footer className="home-footer">

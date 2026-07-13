@@ -48,6 +48,28 @@ export interface HostChangeNotice {
   reason: HostChangeReason;
 }
 
+export interface RetainedReconnectSessionSummary {
+  role: "player";
+  roomCode: string;
+  participantId: string;
+}
+
+export interface SeatLookupState {
+  status: "idle" | "pending" | "complete";
+  roomCode: string | null;
+}
+
+function summarizeRetainedSession(
+  session: ReconnectSession | null,
+): RetainedReconnectSessionSummary | null {
+  if (!session || session.role !== "player") return null;
+  return {
+    role: "player",
+    roomCode: session.roomCode,
+    participantId: session.participantId,
+  };
+}
+
 type SessionAcceptanceExpectation = {
   event: "room:created" | "room:joined" | "room:spectatorJoined";
   source: "create" | "join" | "spectator" | "rejoin" | "claim";
@@ -95,18 +117,21 @@ interface GameContextType {
   reconnectState: ReconnectState;
   reconnectableSeats: ReconnectableSeat[];
   reconnectableSeatsRoomCode: string | null;
+  seatLookupState: SeatLookupState;
+  retainedReconnectSession: RetainedReconnectSessionSummary | null;
   pendingSeatClaim: PendingSeatClaimState | null;
   hostSeatClaims: SeatClaimInfo[];
   hostChangeNotice: HostChangeNotice | null;
   createRoom: (name: string) => void;
   joinRoom: (code: string, name: string) => void;
   joinAsSpectator: (code: string, name: string) => void;
-  rejoinRoom: (code: string, pid: string) => void;
+  rejoinRoom: (code: string, pid: string) => boolean;
+  resumeRetainedSession: () => boolean;
   setReady: (ready: boolean) => void;
   startGame: () => void;
   revealAttribute: (attributeIndex?: number) => void;
   revealActionCard: () => void;
-  castVote: (targetId: string) => void;
+  castVote: (targetId: string) => boolean;
   endGame: () => void;
   playAgain: () => void;
   leaveRoom: () => void;
@@ -156,6 +181,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [reconnectState, setReconnectState] = useState<ReconnectState>("idle");
   const [reconnectableSeats, setReconnectableSeats] = useState<ReconnectableSeat[]>([]);
   const [reconnectableSeatsRoomCode, setReconnectableSeatsRoomCode] = useState<string | null>(null);
+  const [seatLookupState, setSeatLookupState] = useState<SeatLookupState>({
+    status: "idle",
+    roomCode: null,
+  });
+  const [retainedReconnectSession, setRetainedReconnectSession] =
+    useState<RetainedReconnectSessionSummary | null>(() =>
+      summarizeRetainedSession(readReconnectSession()),
+    );
   const [pendingSeatClaim, setPendingSeatClaim] = useState<PendingSeatClaimState | null>(null);
   const [hostSeatClaims, setHostSeatClaims] = useState<SeatClaimInfo[]>([]);
   const [hostChangeNotice, setHostChangeNotice] = useState<HostChangeNotice | null>(null);
@@ -173,6 +206,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const sessionAcceptanceExpectationRef = useRef<SessionAcceptanceExpectation | null>(null);
   const pendingSeatClaimTargetRef = useRef<PendingSeatClaimTarget | null>(null);
   const membershipRequestPendingRef = useRef(false);
+  const membershipReadyRef = useRef(false);
   const seatLookupPendingRoomRef = useRef<string | null>(null);
   const completedSeatLookupRoomRef = useRef<string | null>(null);
   const discardPendingSeatLookupRef = useRef(false);
@@ -223,6 +257,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       sessionAcceptanceExpectationRef.current = null;
       pendingSeatClaimTargetRef.current = null;
       membershipRequestPendingRef.current = false;
+      membershipReadyRef.current = false;
       seatLookupPendingRoomRef.current = null;
       completedSeatLookupRoomRef.current = null;
       discardPendingSeatLookupRef.current = false;
@@ -235,6 +270,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setReconnectState("idle");
       setReconnectableSeats([]);
       setReconnectableSeatsRoomCode(null);
+      setSeatLookupState({ status: "idle", roomCode: null });
+      setRetainedReconnectSession(null);
       setPendingSeatClaim(null);
       setHostSeatClaims([]);
       setHostChangeNotice(null);
@@ -262,6 +299,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (!savedSession) return false;
 
       acceptedSessionRef.current = savedSession;
+      setRetainedReconnectSession(summarizeRetainedSession(savedSession));
       membershipRequestPendingRef.current = true;
       sessionAcceptanceExpectationRef.current = {
         event: savedSession.role === "spectator" ? "room:spectatorJoined" : "room:joined",
@@ -299,6 +337,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     const handleDisconnect = () => {
       setConnected(false);
+      membershipReadyRef.current = false;
       lastRejoinSocketIdRef.current = null;
       explicitLeaveSuppressedRef.current = false;
       sessionAcceptanceExpectationRef.current = null;
@@ -309,6 +348,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       discardPendingSeatLookupRef.current = false;
       setReconnectableSeats([]);
       setReconnectableSeatsRoomCode(null);
+      setSeatLookupState({ status: "idle", roomCode: null });
+      ignoreRecoveryEventsRef.current = true;
       if (
         !reconnectSessionTombstonedRef.current &&
         (acceptedSessionRef.current ?? readReconnectSession())
@@ -319,7 +360,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         current &&
         (current.status === "submitting" ||
           current.status === "waiting" ||
-          current.status === "cancelling")
+          current.status === "cancelling" ||
+          current.status === "approved")
           ? { ...current, status: "cancelled", message: "Соединение потеряно" }
           : current,
       );
@@ -338,6 +380,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         sessionToken: token,
       };
       acceptedSessionRef.current = acceptedSession;
+      membershipReadyRef.current = true;
       reconnectSessionTombstonedRef.current = false;
       sessionAcceptanceExpectationRef.current = null;
       pendingSeatClaimTargetRef.current = null;
@@ -355,6 +398,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setReconnectState("connected");
       setReconnectableSeats([]);
       setReconnectableSeatsRoomCode(null);
+      setSeatLookupState({ status: "idle", roomCode: null });
+      setRetainedReconnectSession(summarizeRetainedSession(acceptedSession));
       setPendingSeatClaim(null);
       saveReconnectSession(acceptedSession);
     };
@@ -419,6 +464,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (seatLookupPendingRoomRef.current) {
         seatLookupPendingRoomRef.current = null;
       }
+      setSeatLookupState({ status: "idle", roomCode: null });
       discardPendingSeatLookupRef.current = false;
       completedSeatLookupRoomRef.current = null;
       setReconnectableSeats([]);
@@ -471,6 +517,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       completedSeatLookupRoomRef.current = roomCode;
       setReconnectableSeats(seats);
       setReconnectableSeatsRoomCode(roomCode);
+      setSeatLookupState({ status: "complete", roomCode });
     };
 
     const handleSeatClaimSubmitted: ServerEvents["room:seatClaimSubmitted"] = ({ requestId }) => {
@@ -735,17 +782,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const rejoinRoom = useCallback((code: string, pid: string) => {
     if (
+      membershipReadyRef.current ||
       membershipRequestPendingRef.current ||
       seatLookupPendingRoomRef.current ||
       pendingSeatClaimTargetRef.current
     ) {
-      return;
+      return false;
     }
-    if (reconnectSessionTombstonedRef.current) return;
+    if (reconnectSessionTombstonedRef.current) return false;
     const savedSession = acceptedSessionRef.current ?? readReconnectSession();
-    if (!savedSession || savedSession.role !== "player") return;
+    if (!savedSession || savedSession.role !== "player") return false;
     if (savedSession.roomCode !== code.trim().toUpperCase() || savedSession.participantId !== pid) {
-      return;
+      return false;
     }
     membershipRequestPendingRef.current = true;
     explicitLeaveSuppressedRef.current = false;
@@ -761,7 +809,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       playerId: savedSession.participantId,
       sessionToken: savedSession.sessionToken,
     });
+    return true;
   }, []);
+
+  const resumeRetainedSession = useCallback(() => {
+    if (!retainedReconnectSession) return false;
+    return rejoinRoom(retainedReconnectSession.roomCode, retainedReconnectSession.participantId);
+  }, [rejoinRoom, retainedReconnectSession]);
 
   const setReady = useCallback((ready: boolean) => {
     socket.emit("player:ready", { ready });
@@ -780,7 +834,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const castVoteFn = useCallback((targetId: string) => {
+    if (!membershipReadyRef.current || !socket.connected) return false;
     socket.emit("vote:cast", { targetPlayerId: targetId });
+    return true;
   }, []);
 
   const endGame = useCallback(() => {
@@ -804,6 +860,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
     ignoreRoomEventsRef.current = true;
     ignoreRecoveryEventsRef.current = true;
+    membershipReadyRef.current = false;
     sessionAcceptanceExpectationRef.current = null;
     pendingSeatClaimTargetRef.current = null;
     membershipRequestPendingRef.current = false;
@@ -825,6 +882,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setReconnectState("idle");
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
+    setSeatLookupState({ status: "idle", roomCode: null });
     setPendingSeatClaim(null);
     setHostSeatClaims([]);
     setHostChangeNotice(null);
@@ -834,6 +892,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     overlayActiveRef.current = false;
     setCurrentOverlay(null);
     if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current);
+    if (!retainOwnership) setRetainedReconnectSession(null);
   }, [gameState?.phase, isSpectator]);
 
   const clearError = useCallback(() => setError(null), []);
@@ -924,6 +983,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     pendingSeatClaimTargetRef.current = null;
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
+    setSeatLookupState({ status: "pending", roomCode: normalizedRoomCode });
     setPendingSeatClaim(null);
     socket.emit("room:listReconnectableSeats", { roomCode: normalizedRoomCode });
   }, []);
@@ -951,6 +1011,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       completedSeatLookupRoomRef.current = null;
       setReconnectableSeats([]);
       setReconnectableSeatsRoomCode(null);
+      setSeatLookupState({ status: "idle", roomCode: null });
       setPendingSeatClaim({
         requestId: null,
         roomCode: normalizedRoomCode,
@@ -976,6 +1037,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     completedSeatLookupRoomRef.current = null;
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
+    setSeatLookupState({ status: "idle", roomCode: null });
   }, []);
 
   const resetSeatRecovery = useCallback(() => {
@@ -985,6 +1047,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     completedSeatLookupRoomRef.current = null;
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
+    setSeatLookupState({ status: "idle", roomCode: null });
     if (pendingSeatClaimTargetRef.current) return;
     if (sessionAcceptanceExpectationRef.current?.source === "claim") {
       sessionAcceptanceExpectationRef.current = null;
@@ -1033,6 +1096,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         reconnectState,
         reconnectableSeats,
         reconnectableSeatsRoomCode,
+        seatLookupState,
+        retainedReconnectSession,
         pendingSeatClaim,
         hostSeatClaims,
         hostChangeNotice,
@@ -1040,6 +1105,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         joinRoom,
         joinAsSpectator,
         rejoinRoom,
+        resumeRetainedSession,
         setReady,
         startGame: startGameFn,
         revealAttribute: revealAttributeFn,
