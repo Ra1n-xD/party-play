@@ -139,6 +139,8 @@ export function QuestionsEditorScreen({
   const [drafts, setDrafts] = useState<DraftMap>(() => createDraftMap(state));
   const partnerName = state.role === "daniil" ? "Шаша" : "Даниил";
   const ownName = state.role === "daniil" ? "Даниил" : "Шаша";
+  const ownVariantLabel = state.role === "daniil" ? "Вариант ДанИИла" : "Вариант Шаши";
+  const partnerVariantLabel = state.role === "daniil" ? "Вариант Шаши" : "Вариант ДанИИла";
 
   useEffect(() => {
     const dirtyKeys = new Set(
@@ -212,7 +214,7 @@ export function QuestionsEditorScreen({
                 Вопрос {formatQuestionNumber(question.number)}
               </div>
               <label className="questions-answer-field">
-                <span>Мой ответ</span>
+                <span>{ownVariantLabel}</span>
                 <textarea
                   value={drafts[`${question.id}:ownAnswer`] ?? question.ownAnswer}
                   maxLength={240}
@@ -223,7 +225,7 @@ export function QuestionsEditorScreen({
                 />
               </label>
               <label className="questions-answer-field questions-guess-field">
-                <span>Как ответит {partnerName}</span>
+                <span>{partnerVariantLabel}</span>
                 <textarea
                   value={drafts[`${question.id}:partnerGuess`] ?? question.partnerGuess}
                   maxLength={240}
@@ -344,16 +346,16 @@ export function QuestionsObserverScreen({
               <div className="questions-couple-columns">
                 <section className="questions-person-column">
                   <h2>Даниил</h2>
-                  <ObserverValue value={question.daniil.ownAnswer} label="Мой ответ" />
-                  <ObserverValue value={question.daniil.partnerGuess} label="Как ответит Шаша" />
+                  <ObserverValue value={question.daniil.ownAnswer} label="Вариант ДанИИла" />
+                  <ObserverValue value={question.daniil.partnerGuess} label="Вариант Шаши" />
                 </section>
                 <div className="questions-column-heart" aria-hidden="true">
                   ♥
                 </div>
                 <section className="questions-person-column">
                   <h2>Шаша</h2>
-                  <ObserverValue value={question.shasha.ownAnswer} label="Мой ответ" />
-                  <ObserverValue value={question.shasha.partnerGuess} label="Как ответит Даниил" />
+                  <ObserverValue value={question.shasha.ownAnswer} label="Вариант Шаши" />
+                  <ObserverValue value={question.shasha.partnerGuess} label="Вариант ДанИИла" />
                 </section>
               </div>
             </article>
