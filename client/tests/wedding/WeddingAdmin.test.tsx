@@ -55,6 +55,7 @@ function createActions() {
       adjustScore: (participantId: string, delta: -1 | 1) =>
         calls.push(`score:${participantId}:${delta}`),
       finishContest: () => calls.push("finish"),
+      restartContest: () => calls.push("restart"),
     },
   };
 }
@@ -187,6 +188,22 @@ test("contest completion uses a destructive confirmation dialog", async () => {
 
   await act(async () => findButton(renderer, "Да, закончить конкурс").props.onClick());
   assert.deepEqual(calls, ["finish"]);
+});
+
+test("a finished contest requires confirmation before resetting every result", async () => {
+  const { calls, actions } = createActions();
+  const renderer = create(
+    <AdminWeddingScreen {...propsFor({ ...hostState, phase: "FINISHED" }, actions)} />,
+  );
+
+  await act(async () => findButton(renderer, "Показать итоговый счёт").props.onClick());
+  await act(async () => findButton(renderer, "Начать новый конкурс").props.onClick());
+  assert.deepEqual(calls, []);
+  assert.match(JSON.stringify(renderer.toJSON()), /Все очки и ответы будут обнулены/);
+
+  await act(async () => findButton(renderer, "Да, начать новый конкурс").props.onClick());
+  assert.deepEqual(calls, ["restart"]);
+  assert.equal(findButton(renderer, "Текущий вопрос").props["aria-selected"], true);
 });
 
 test("wedding stylesheet keeps mobile touch targets and the approved palette", () => {

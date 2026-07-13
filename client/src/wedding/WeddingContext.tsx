@@ -70,6 +70,7 @@ interface WeddingContextValue {
   prepareNextQuestion: () => void;
   adjustScore: (participantId: string, delta: -1 | 1) => void;
   finishContest: () => void;
+  restartContest: () => void;
 }
 
 const WeddingContext = createContext<WeddingContextValue | null>(null);
@@ -179,6 +180,7 @@ export function WeddingProvider({
     [],
   );
   const finishContest = useCallback(() => weddingSocket.emit("wedding:endContest"), []);
+  const restartContest = useCallback(() => weddingSocket.emit("wedding:restartContest"), []);
 
   const value = useMemo<WeddingContextValue>(
     () => ({
@@ -199,6 +201,7 @@ export function WeddingProvider({
       prepareNextQuestion,
       adjustScore,
       finishContest,
+      restartContest,
     }),
     [
       role,
@@ -218,6 +221,7 @@ export function WeddingProvider({
       prepareNextQuestion,
       adjustScore,
       finishContest,
+      restartContest,
     ],
   );
 

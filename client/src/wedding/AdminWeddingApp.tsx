@@ -16,6 +16,7 @@ export interface AdminWeddingActions {
   prepareNextQuestion: () => void;
   adjustScore: (participantId: string, delta: -1 | 1) => void;
   finishContest: () => void;
+  restartContest: () => void;
 }
 
 interface AdminWeddingScreenProps {
@@ -26,7 +27,7 @@ interface AdminWeddingScreenProps {
   actions: AdminWeddingActions;
 }
 
-type ConfirmationKind = "next" | "start" | "finish" | null;
+type ConfirmationKind = "next" | "start" | "finish" | "restart" | null;
 
 function remainingHours(expiresAt: number): number {
   return Math.max(0, Math.ceil((expiresAt - Date.now()) / (60 * 60 * 1_000)));
@@ -100,6 +101,10 @@ export function AdminWeddingScreen({
     if (confirmation === "next") actions.prepareNextQuestion();
     if (confirmation === "start") actions.startQuestion();
     if (confirmation === "finish") actions.finishContest();
+    if (confirmation === "restart") {
+      setTab("question");
+      actions.restartContest();
+    }
     setConfirmation(null);
   };
 
@@ -120,6 +125,13 @@ export function AdminWeddingScreen({
       title: "Закончить конкурс?",
       description: "Конкурс будет завершён. Гости больше не смогут отправлять ответы.",
       label: "Да, закончить конкурс",
+      destructive: true,
+    },
+    restart: {
+      title: "Начать новый конкурс?",
+      description:
+        "Все очки и ответы будут обнулены. Гости останутся в комнате и увидят экран ожидания.",
+      label: "Да, начать новый конкурс",
       destructive: true,
     },
   } as const;
@@ -303,6 +315,14 @@ export function AdminWeddingScreen({
                 >
                   Показать итоговый счёт
                 </button>
+                <button
+                  className="wedding-button wedding-button-danger"
+                  type="button"
+                  disabled={!connected}
+                  onClick={() => setConfirmation("restart")}
+                >
+                  Начать новый конкурс
+                </button>
               </div>
             )}
           </section>
@@ -349,6 +369,16 @@ export function AdminWeddingScreen({
                 </div>
               ))}
             </div>
+            {state.phase === "FINISHED" && (
+              <button
+                className="wedding-button wedding-button-danger wedding-end-button"
+                type="button"
+                disabled={!connected}
+                onClick={() => setConfirmation("restart")}
+              >
+                Начать новый конкурс
+              </button>
+            )}
           </section>
         )}
 
@@ -397,6 +427,7 @@ export function AdminWeddingApp() {
         prepareNextQuestion: wedding.prepareNextQuestion,
         adjustScore: wedding.adjustScore,
         finishContest: wedding.finishContest,
+        restartContest: wedding.restartContest,
       }}
     />
   );
