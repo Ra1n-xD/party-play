@@ -18,6 +18,7 @@ import {
   getAllRooms,
   getRoom,
   removePlayer,
+  touchRoom,
   type PendingSeatClaim,
   type Player,
   type Room,
@@ -209,6 +210,7 @@ export function createSeatClaim(
     expiresAt: now + ttlMs,
   };
   room.pendingSeatClaims.set(requestId, claim);
+  touchRoom(room.code);
 
   const timer = setTimeout(() => {
     if (seatClaimExpiryTimers.get(requestId) !== timer) return;
@@ -241,6 +243,7 @@ export function resolveSeatClaim(
   if (room.hostId !== actorId || !isEligibleHost(actor)) {
     return { success: false, error: "Только хост может выполнить это действие" };
   }
+  touchRoom(room.code);
 
   if (room.gameState?.phase === "GAME_OVER") {
     cancelAllSeatClaims(room, io, "Игра завершена", now);
@@ -280,6 +283,7 @@ export function finalizeApprovedSeatClaim(
   expireSeatClaims(room, io, now);
   const winningClaim = deleteSeatClaim(room, requestId);
   if (!winningClaim) return false;
+  touchRoom(room.code);
 
   emitSeatClaimResolution(winningClaim, true, "Заявка одобрена", io);
   for (const [claimId, claim] of Array.from(room.pendingSeatClaims.entries())) {
@@ -309,7 +313,10 @@ export function cancelSeatClaim(
     const claim = room.pendingSeatClaims.get(requestId);
     const ownedExpiredClaim = !!claim && claim.socketId === socketId && claim.expiresAt <= now;
     expireSeatClaims(room, io, now);
-    if (ownedExpiredClaim) return { success: true };
+    if (ownedExpiredClaim) {
+      touchRoom(room.code);
+      return { success: true };
+    }
     if (!claim) continue;
     if (!room.pendingSeatClaims.has(requestId)) {
       return { success: false, error: "Заявка не найдена" };
@@ -317,6 +324,7 @@ export function cancelSeatClaim(
     if (claim.socketId !== socketId) {
       return { success: false, error: "Заявка не найдена" };
     }
+    touchRoom(room.code);
     deleteSeatClaim(room, requestId);
     emitSeatClaimResolution(claim, false, "Заявка отменена", io);
     emitClaimsToHost(room, io);
@@ -385,6 +393,7 @@ function commitHostTransfer(
   reason: HostChangeReason,
 ): void {
   room.hostId = successor.id;
+  touchRoom(room.code);
   setAdminPause(room, false, io, false);
   broadcastState(room, io);
   io.to(room.code).emit("room:hostChanged", {
@@ -460,6 +469,7 @@ export function kickPlayerPermanently(
   if (!player) return { success: false, error: "Игрок не найден" };
   if (player.isBot) return { success: false, error: "Бота нельзя удалить этой командой" };
   if (player.kicked) return { success: false, error: "Место уже закрыто" };
+  touchRoom(room.code);
 
   const releasedSocketId = player.connected && player.socketId ? player.socketId : null;
   player.sessionToken = generateSessionToken();
@@ -477,11 +487,7 @@ export function kickPlayerPermanently(
   return { success: true, releasedSocketId };
 }
 
-export function removeLobbyPlayerWithHostFailover(
-  room: Room,
-  playerId: string,
-  io: IOServer,
-): void {
+export function removePlayerWithHostFailover(room: Room, playerId: string, io: IOServer): void {
   const player = room.players.get(playerId);
   if (!player) return;
   const wasHost = room.hostId === playerId;
@@ -522,6 +528,7 @@ export function markPlayerDisconnected(
 
   const wasHost = room.hostId === playerId;
   player.connected = false;
+  touchRoom(room.code);
   const activePhase =
     room.gameState && room.gameState.phase !== "LOBBY" && room.gameState.phase !== "GAME_OVER";
   if (activePhase) {

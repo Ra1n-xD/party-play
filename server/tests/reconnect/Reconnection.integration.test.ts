@@ -11,6 +11,7 @@ import type {
   ServerEvents,
 } from "../../../shared/types.js";
 import { clearBotActions, scheduleBotActions } from "../../src/botManager.js";
+import { getSocketClientIdentity } from "../../src/clientIdentity.js";
 import { CONFIG } from "../../src/config.js";
 import * as gameEngine from "../../src/gameEngine.js";
 import {
@@ -23,8 +24,10 @@ import {
 import {
   addBotToRoom,
   createRoom,
+  disposeInactiveRooms,
   getAllRooms,
   getRoom,
+  getRoomLastActivityForTests,
   joinRoom,
   removePlayer,
   type Player,
@@ -420,6 +423,19 @@ function isSocketInRoom(
   const socketId = client.socket.id;
   assert.ok(socketId);
   return server.io.sockets.adapter.rooms.get(roomCode)?.has(socketId) ?? false;
+}
+
+async function expectRoomActivityAdvance(roomCode: string, action: () => Promise<void>) {
+  const before = getRoomLastActivityForTests(roomCode);
+  assert.equal(typeof before, "number");
+  await delay(5);
+  await action();
+  const after = getRoomLastActivityForTests(roomCode);
+  assert.equal(typeof after, "number");
+  assert.ok(
+    after > before,
+    `Expected room ${roomCode} activity to advance (${before} -> ${after})`,
+  );
 }
 
 test("socket harness creates a typed lobby room", async (t) => {
@@ -1502,6 +1518,146 @@ test("seat claim submission rate limiting survives fresh socket churn from one I
   assert.equal(lobby.room.pendingSeatClaims.size, 12);
 });
 
+test("claim throttling separates clients behind the trusted proxy and ignores spoofed leftmost hops", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const claimant = await lobby.server.connectClient({
+      forwardedFor: `198.51.100.${attempt + 1}, 203.0.113.10`,
+    });
+    await submitSeatClaim(
+      claimant,
+      lobby.room.code,
+      lobby.credentials[1].playerId,
+      `Proxy A ${attempt}`,
+    );
+  }
+
+  const sameClientIp = await lobby.server.connectClient({
+    forwardedFor: "192.0.2.99, 203.0.113.10",
+  });
+  const limited = waitForRoomError(sameClientIp, "Слишком много запросов, подождите");
+  sameClientIp.emit("room:requestSeatClaim", {
+    roomCode: lobby.room.code,
+    playerId: lobby.credentials[1].playerId,
+    claimantName: "Still proxy A",
+  });
+  assert.deepEqual(await limited, { message: "Слишком много запросов, подождите" });
+
+  const differentClientIp = await lobby.server.connectClient({
+    forwardedFor: "198.51.100.200, 203.0.113.11",
+  });
+  const submitted = await submitSeatClaim(
+    differentClientIp,
+    lobby.room.code,
+    lobby.credentials[1].playerId,
+    "Proxy B",
+  );
+  assert.match(submitted.requestId, /^[a-f0-9]{32}$/);
+  assert.equal(lobby.room.pendingSeatClaims.size, 13);
+});
+
+test("client identity accepts forwarding only from the loopback proxy", () => {
+  const socketIdentity = (address: string, forwardedFor: string) =>
+    getSocketClientIdentity({
+      handshake: {
+        address,
+        headers: { "x-forwarded-for": forwardedFor },
+      },
+    } as unknown as Parameters<typeof getSocketClientIdentity>[0]);
+
+  assert.equal(socketIdentity("198.51.100.20", "203.0.113.99"), "198.51.100.20");
+  assert.equal(socketIdentity("::ffff:127.0.0.1", "192.0.2.40, 203.0.113.21"), "203.0.113.21");
+});
+
+test("recovery actions refresh the room inactivity TTL", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient({ forwardedFor: "203.0.113.70" });
+
+  await expectRoomActivityAdvance(lobby.room.code, async () => {
+    const listed = waitForSocketEvent(claimant, "room:reconnectableSeats");
+    claimant.emit("room:listReconnectableSeats", { roomCode: lobby.room.code });
+    await listed;
+  });
+
+  let requestId = "";
+  await expectRoomActivityAdvance(lobby.room.code, async () => {
+    requestId = (
+      await submitSeatClaim(claimant, lobby.room.code, lobby.credentials[1].playerId, "Replacement")
+    ).requestId;
+  });
+
+  await expectRoomActivityAdvance(lobby.room.code, async () => {
+    const cancelled = waitForSocketEvent(
+      claimant,
+      "room:seatClaimResolved",
+      (resolution) => resolution.requestId === requestId,
+    );
+    claimant.emit("room:cancelSeatClaim", { requestId });
+    await cancelled;
+  });
+
+  requestId = (
+    await submitSeatClaim(claimant, lobby.room.code, lobby.credentials[1].playerId, "Replacement")
+  ).requestId;
+  await expectRoomActivityAdvance(lobby.room.code, async () => {
+    const rejected = waitForSocketEvent(
+      claimant,
+      "room:seatClaimResolved",
+      (resolution) => resolution.requestId === requestId,
+    );
+    lobby.host.emit("admin:resolveSeatClaim", { requestId, approved: false });
+    await rejected;
+  });
+
+  const reconnecting = await lobby.server.connectClient({ forwardedFor: "203.0.113.71" });
+  await expectRoomActivityAdvance(lobby.room.code, async () => {
+    const joined = reconnecting.waitFor("room:joined");
+    reconnecting.emit("room:rejoin", lobby.credentials[1]);
+    await joined;
+  });
+
+  await expectRoomActivityAdvance(lobby.room.code, async () => {
+    await emitTransferAndWaitForServer(lobby.server, lobby.host, lobby.credentials[2].playerId);
+  });
+
+  await expectRoomActivityAdvance(lobby.room.code, async () => {
+    await emitKickAndWaitForServer(lobby.server, lobby.humans[2], lobby.credentials[3].playerId);
+  });
+});
+
+test("inactive room disposal cancels recovery resources and releases stale memberships", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const claimant = await lobby.server.connectClient({ forwardedFor: "203.0.113.80" });
+  const { requestId } = await submitSeatClaim(
+    claimant,
+    lobby.room.code,
+    lobby.credentials[1].playerId,
+    "Replacement",
+  );
+  const cancelled = waitForSocketEvent(
+    claimant,
+    "room:seatClaimResolved",
+    (resolution) => resolution.requestId === requestId,
+  );
+
+  assert.equal(disposeInactiveRooms(Date.now() + CONFIG.ROOM_INACTIVE_TTL + 1), 1);
+  assert.deepEqual(await cancelled, {
+    requestId,
+    approved: false,
+    message: "Комната закрыта из-за неактивности",
+  });
+  assert.equal(getRoom(lobby.room.code), undefined);
+  assert.equal(lobby.room.pendingSeatClaims.size, 0);
+
+  const created = lobby.host.waitFor("room:created");
+  lobby.host.emit("room:create", { playerName: "Fresh host" });
+  assert.match((await created).roomCode, /^[A-Z0-9]{8}$/);
+});
+
 test("a room-level pending claim cap bounds timers and host claim payloads", async (t) => {
   const lobby = await createFourHumanSocketLobby(t);
   await disconnectLobbyHuman(lobby, 1);
@@ -1840,6 +1996,39 @@ test("consecutive socket harnesses isolate failed rejoin state", async (t) => {
       terminal: true,
     },
   });
+});
+
+test("rejoin backoff keeps failure history after a block expires", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  await disconnectLobbyHuman(lobby, 1);
+  const reconnecting = await lobby.server.connectClient({ forwardedFor: "203.0.113.50" });
+  const invalidSession = {
+    ...lobby.credentials[1],
+    sessionToken: "0".repeat(64),
+  };
+  const originalNow = Date.now;
+  let now = originalNow();
+  Date.now = () => now;
+  t.after(() => {
+    Date.now = originalNow;
+  });
+
+  let outcome = waitForRejoinOutcome(reconnecting);
+  reconnecting.emit("room:rejoin", invalidSession);
+  assert.equal((await outcome).event, "reconnectError");
+
+  now += 2_001;
+  outcome = waitForRejoinOutcome(reconnecting);
+  reconnecting.emit("room:rejoin", invalidSession);
+  assert.equal((await outcome).event, "reconnectError");
+
+  now += 2_001;
+  const blockedOrJoined = Promise.race([
+    waitForRoomError(reconnecting).then(() => "blocked" as const),
+    reconnecting.waitFor("room:joined").then(() => "joined" as const),
+  ]);
+  reconnecting.emit("room:rejoin", lobby.credentials[1]);
+  assert.equal(await blockedOrJoined, "blocked");
 });
 
 test("invalid stored session returns a typed terminal reconnect error", async (t) => {
@@ -2622,6 +2811,30 @@ test("manual host transfer broadcasts once, sends pending claims, and revokes fo
   );
 });
 
+test("malformed unauthenticated host transfers cannot throw or mutate the room", async (t) => {
+  const lobby = await createFourHumanSocketLobby(t);
+  const attacker = await lobby.server.connectClient();
+  const originalHostId = lobby.room.hostId;
+  const malformedPayloads: unknown[] = [undefined, null, {}, "player", 42, []];
+
+  for (const payload of malformedPayloads) {
+    attacker.socket.emit("admin:transferHost", payload as never);
+    await delay(5);
+  }
+
+  const alive = waitForSocketEvent(attacker, "room:reconnectableSeats");
+  attacker.emit("room:listReconnectableSeats", { roomCode: lobby.room.code });
+  await alive;
+  assert.equal(lobby.room.hostId, originalHostId);
+
+  for (const payload of malformedPayloads) {
+    const rejected = waitForRoomError(lobby.host, "Игрок не найден");
+    lobby.host.socket.emit("admin:transferHost", payload as never);
+    assert.deepEqual(await rejected, { message: "Игрок не найден" });
+    assert.equal(lobby.room.hostId, originalHostId);
+  }
+});
+
 test("manual host transfer clears only admin pause during a reconnect pause", async (t) => {
   const game = await createFourHumanSocketGame(t);
   const missing = game.credentials[3];
@@ -2960,6 +3173,37 @@ test("GAME_OVER disconnect retains the fixed seat without pausing", async (t) =>
   assert.equal(game.room.players.size, 4);
   assert.equal(game.room.startedPlayerCount, 4);
   assert.equal(game.room.gameState?.phase, "GAME_OVER");
+});
+
+test("explicit GAME_OVER leave removes the seat before Play Again", async (t) => {
+  const game = await createFourHumanSocketGame(t);
+  const leaving = game.credentials[1];
+
+  game.host.emit("game:endGame");
+  await game.host.waitFor("game:state", (state) => state.phase === "GAME_OVER");
+  await emitLeaveAndWaitForServer(game.server, game.humans[1]);
+
+  const endedState = await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.phase === "GAME_OVER" &&
+      !state.players.some((player) => player.id === leaving.playerId),
+  );
+  assert.equal(endedState.players.length, 3);
+  assert.equal(game.room.players.has(leaving.playerId), false);
+  assert.equal(game.room.allPlayerIds.includes(leaving.playerId), false);
+
+  game.host.emit("game:playAgain");
+  const lobbyState = await game.host.waitFor(
+    "game:state",
+    (state) =>
+      state.phase === "LOBBY" && !state.players.some((player) => player.id === leaving.playerId),
+  );
+  assert.equal(lobbyState.players.length, 3);
+  assert.equal(
+    lobbyState.players.some((player) => !player.connected),
+    false,
+  );
 });
 
 test("explicit active-game leave reserves the seat, pauses, and keeps its credential", async (t) => {
