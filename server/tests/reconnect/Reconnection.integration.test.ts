@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test, { type TestContext } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { Server } from "socket.io";
@@ -10,6 +11,7 @@ import type {
   ReconnectErrorCode,
   ServerEvents,
 } from "../../../shared/types.js";
+import { ROOM_CODE_LENGTH } from "../../../shared/roomCode.js";
 import { clearBotActions, scheduleBotActions } from "../../src/botManager.js";
 import { getSocketClientIdentity } from "../../src/clientIdentity.js";
 import { CONFIG } from "../../src/config.js";
@@ -448,11 +450,61 @@ test("socket harness creates a typed lobby room", async (t) => {
   const created = await host.waitFor("room:created");
   const state = await host.waitFor("game:state");
 
-  assert.equal(created.roomCode.length, 8);
+  assert.equal(created.roomCode.length, ROOM_CODE_LENGTH);
   assert.equal(state.phase, "LOBBY");
   assert.equal(state.pauseKind, "none");
   assert.deepEqual(state.disconnectedPlayerIds, []);
   assert.equal(state.players[0]?.kicked, false);
+});
+
+test("socket handlers never destructure untrusted payloads in callback parameters", () => {
+  const source = readFileSync(new URL("../../src/socketHandlers.ts", import.meta.url), "utf8");
+
+  assert.doesNotMatch(
+    source,
+    /socket\.on\(\s*["'][^"']+["']\s*,\s*\(\s*\{/,
+    "Socket.IO payloads must be read with optional access after the callback starts",
+  );
+});
+
+test("malformed Socket.IO payloads cannot terminate the server", async (t) => {
+  const server = await createSocketTestServer();
+  t.after(() => server.close());
+
+  const attacker = await server.connectClient();
+  const rawSocket = attacker.socket as unknown as {
+    emit: (event: string, payload?: unknown) => void;
+  };
+  const payloadEvents = [
+    "room:create",
+    "room:join",
+    "room:rejoin",
+    "room:joinSpectator",
+    "room:rejoinSpectator",
+    "player:ready",
+    "game:revealAttribute",
+    "vote:cast",
+    "room:removeBot",
+    "admin:shuffleAll",
+    "admin:swapAttribute",
+    "admin:replaceAttribute",
+    "admin:removeBunkerCard",
+    "admin:replaceBunkerCard",
+    "admin:deleteAttribute",
+    "admin:forceRevealType",
+    "admin:revivePlayer",
+    "admin:eliminatePlayer",
+  ];
+
+  for (const payload of [undefined, null, {}]) {
+    for (const event of payloadEvents) rawSocket.emit(event, payload);
+    await delay(10);
+  }
+
+  const healthClient = await server.connectClient();
+  healthClient.emit("room:create", { playerName: "Health check" });
+  const created = await healthClient.waitFor("room:created");
+  assert.equal(created.roomCode.length, ROOM_CODE_LENGTH);
 });
 
 test("reconnectable seat listing exposes only disconnected open humans and keeps the requester private", async (t) => {
@@ -520,6 +572,7 @@ test("seat claim endpoints validate rooms, seats, names, and runtime payloads wi
   const bot = Array.from(lobby.room.players.values()).find((player) => player.isBot);
   assert.ok(bot);
   bot.connected = false;
+  const missingRoomCode = lobby.room.code === "ZZZZ" ? "YYYY" : "ZZZZ";
 
   const invalidCases: Array<{
     payload: unknown;
@@ -527,11 +580,11 @@ test("seat claim endpoints validate rooms, seats, names, and runtime payloads wi
   }> = [
     {
       payload: { roomCode: "?", playerId: lobby.credentials[1].playerId, claimantName: "A" },
-      message: "Введите код комнаты",
+      message: "Код комнаты должен состоять из 4 букв",
     },
     {
       payload: {
-        roomCode: "DEADBEEF",
+        roomCode: missingRoomCode,
         playerId: lobby.credentials[1].playerId,
         claimantName: "A",
       },
@@ -584,9 +637,12 @@ test("seat claim endpoints validate rooms, seats, names, and runtime payloads wi
   }
 
   const invalidListRequester = await lobby.server.connectClient();
-  const invalidListError = waitForRoomError(invalidListRequester, "Введите код комнаты");
+  const invalidListError = waitForRoomError(
+    invalidListRequester,
+    "Код комнаты должен состоять из 4 букв",
+  );
   invalidListRequester.socket.emit("room:listReconnectableSeats", { roomCode: null } as never);
-  assert.deepEqual(await invalidListError, { message: "Введите код комнаты" });
+  assert.deepEqual(await invalidListError, { message: "Код комнаты должен состоять из 4 букв" });
   assert.equal(lobby.room.pendingSeatClaims.size, 0);
 });
 
@@ -1655,7 +1711,7 @@ test("inactive room disposal cancels recovery resources and releases stale membe
 
   const created = lobby.host.waitFor("room:created");
   lobby.host.emit("room:create", { playerName: "Fresh host" });
-  assert.match((await created).roomCode, /^[A-Z0-9]{8}$/);
+  assert.match((await created).roomCode, /^[A-HJ-NP-Z]{4}$/);
 });
 
 test("a room-level pending claim cap bounds timers and host claim payloads", async (t) => {
@@ -1964,7 +2020,7 @@ test("consecutive socket harnesses isolate failed rejoin state", async (t) => {
   });
 
   const invalidSession = {
-    roomCode: "DEADBEEF",
+    roomCode: "ZZZZ",
     playerId: `p_${"a".repeat(24)}`,
     sessionToken: "b".repeat(64),
   };
@@ -2096,7 +2152,7 @@ test("stored spectator missing room returns a typed terminal reconnect error", a
   const reconnectingSpectator = await server.connectClient();
   const outcomePromise = waitForRejoinOutcome(reconnectingSpectator);
   reconnectingSpectator.emit("room:rejoinSpectator", {
-    roomCode: "DEADBEEF",
+    roomCode: "ZZZZ",
     spectatorId: `p_${"a".repeat(24)}`,
     sessionToken: "b".repeat(64),
   });
