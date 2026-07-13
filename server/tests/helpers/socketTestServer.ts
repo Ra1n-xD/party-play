@@ -4,10 +4,7 @@ import { Server } from "socket.io";
 import { io as createClient, type Socket as ClientSocket } from "socket.io-client";
 import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
 import { getAllRooms } from "../../src/roomManager.js";
-import {
-  registerHandlers,
-  resetSocketHandlerStateForTests,
-} from "../../src/socketHandlers.js";
+import { registerHandlers, resetSocketHandlerStateForTests } from "../../src/socketHandlers.js";
 
 type EventPayload<Event extends keyof ServerEvents> = ServerEvents[Event] extends (
   data: infer Payload,

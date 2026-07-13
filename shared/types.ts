@@ -132,7 +132,11 @@ export interface ClientEvents {
   "room:joinSpectator": (data: { roomCode: string; spectatorName: string }) => void;
   "room:leave": () => void;
   "room:rejoin": (data: { roomCode: string; playerId: string; sessionToken: string }) => void;
-  "room:rejoinSpectator": (data: { roomCode: string; spectatorId: string; sessionToken: string }) => void;
+  "room:rejoinSpectator": (data: {
+    roomCode: string;
+    spectatorId: string;
+    sessionToken: string;
+  }) => void;
   "room:listReconnectableSeats": (data: { roomCode: string }) => void;
   "room:requestSeatClaim": (data: {
     roomCode: string;
@@ -177,7 +181,11 @@ export interface ClientEvents {
 export interface ServerEvents {
   "room:created": (data: { roomCode: string; playerId: string; sessionToken: string }) => void;
   "room:joined": (data: { roomCode: string; playerId: string; sessionToken: string }) => void;
-  "room:spectatorJoined": (data: { roomCode: string; spectatorId: string; sessionToken: string }) => void;
+  "room:spectatorJoined": (data: {
+    roomCode: string;
+    spectatorId: string;
+    sessionToken: string;
+  }) => void;
   "room:error": (data: { message: string }) => void;
   "room:reconnectableSeats": (data: { roomCode: string; seats: ReconnectableSeat[] }) => void;
   "room:seatClaimSubmitted": (data: { requestId: string }) => void;
