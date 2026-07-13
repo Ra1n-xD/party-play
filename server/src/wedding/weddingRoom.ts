@@ -1,12 +1,5 @@
 import { randomBytes } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
   GuestWeddingState,
@@ -35,6 +28,7 @@ interface WeddingAnswerRecord {
   sequence: number;
   participantId: string;
   optionIndex: number;
+  optionStyle: WeddingOptionStyle;
   submittedAt: number;
   firstCorrect: boolean;
 }
@@ -46,7 +40,7 @@ export interface WeddingRoomSnapshot {
   phase: WeddingPhase;
   questionNumber: number;
   optionStyle: WeddingOptionStyle;
-  correctOption: number;
+  correctOption: number | null;
   participants: WeddingParticipantRecord[];
   answers: WeddingAnswerRecord[];
 }
@@ -57,19 +51,91 @@ export interface WeddingRoomStore {
   remove(): void;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isOptionIndex(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 3;
+}
+
+function isParticipantRecord(value: unknown): value is WeddingParticipantRecord {
+  if (!isRecord(value)) return false;
+  const answerOptionIsValid = value.answerOption === null || isOptionIndex(value.answerOption);
+  const answerTimeIsValid =
+    value.answerSubmittedAt === null ||
+    (typeof value.answerSubmittedAt === "number" && Number.isFinite(value.answerSubmittedAt));
+  return (
+    typeof value.id === "string" &&
+    value.id.length > 0 &&
+    typeof value.name === "string" &&
+    value.name.length > 0 &&
+    value.name.length <= MAX_NAME_LENGTH &&
+    typeof value.normalizedName === "string" &&
+    value.normalizedName.length > 0 &&
+    typeof value.connected === "boolean" &&
+    (value.socketId === null || typeof value.socketId === "string") &&
+    Number.isInteger(value.correctAnswers) &&
+    Number(value.correctAnswers) >= 0 &&
+    answerOptionIsValid &&
+    answerTimeIsValid &&
+    (value.answerOption === null) === (value.answerSubmittedAt === null)
+  );
+}
+
+function isAnswerRecord(value: unknown): value is WeddingAnswerRecord {
+  return (
+    isRecord(value) &&
+    Number.isInteger(value.sequence) &&
+    Number(value.sequence) > 0 &&
+    typeof value.participantId === "string" &&
+    value.participantId.length > 0 &&
+    isOptionIndex(value.optionIndex) &&
+    (value.optionStyle === "letters" || value.optionStyle === "numbers") &&
+    typeof value.submittedAt === "number" &&
+    Number.isFinite(value.submittedAt) &&
+    typeof value.firstCorrect === "boolean"
+  );
+}
+
 function isSnapshot(value: unknown): value is WeddingRoomSnapshot {
   if (!value || typeof value !== "object") return false;
   const room = value as Partial<WeddingRoomSnapshot>;
-  return (
-    room.version === 1 &&
-    typeof room.createdAt === "number" &&
-    typeof room.expiresAt === "number" &&
-    (room.phase === "PREPARING" || room.phase === "OPEN" || room.phase === "FINISHED") &&
-    typeof room.questionNumber === "number" &&
-    (room.optionStyle === "letters" || room.optionStyle === "numbers") &&
-    Number.isInteger(room.correctOption) &&
-    Array.isArray(room.participants) &&
-    Array.isArray(room.answers)
+  if (
+    !(
+      room.version === 1 &&
+      typeof room.createdAt === "number" &&
+      Number.isFinite(room.createdAt) &&
+      typeof room.expiresAt === "number" &&
+      Number.isFinite(room.expiresAt) &&
+      room.expiresAt > room.createdAt &&
+      (room.phase === "PREPARING" || room.phase === "OPEN" || room.phase === "FINISHED") &&
+      Number.isInteger(room.questionNumber) &&
+      Number(room.questionNumber) >= 0 &&
+      (room.optionStyle === "letters" || room.optionStyle === "numbers") &&
+      (room.correctOption === null || isOptionIndex(room.correctOption)) &&
+      Array.isArray(room.participants) &&
+      Array.isArray(room.answers)
+    )
+  ) {
+    return false;
+  }
+  if (!room.participants.every(isParticipantRecord) || !room.answers.every(isAnswerRecord)) {
+    return false;
+  }
+  if (room.phase === "OPEN" && room.correctOption === null) return false;
+  const participantIds = new Set(room.participants.map((participant) => participant.id));
+  const normalizedNames = new Set(
+    room.participants.map((participant) => participant.normalizedName),
+  );
+  if (
+    participantIds.size !== room.participants.length ||
+    normalizedNames.size !== room.participants.length
+  ) {
+    return false;
+  }
+  return room.answers.every(
+    (answer, index) => answer.sequence === index + 1 && participantIds.has(answer.participantId),
   );
 }
 
@@ -129,6 +195,7 @@ export class WeddingRoomService {
   constructor(
     private readonly store: WeddingRoomStore,
     private readonly now: () => number = Date.now,
+    private readonly roomTtlMs: number = WEDDING_ROOM_TTL_MS,
   ) {
     this.room = store.load();
     if (this.room) {
@@ -147,11 +214,11 @@ export class WeddingRoomService {
     this.room = {
       version: 1,
       createdAt,
-      expiresAt: createdAt + WEDDING_ROOM_TTL_MS,
+      expiresAt: createdAt + this.roomTtlMs,
       phase: "PREPARING",
       questionNumber: 0,
       optionStyle: "letters",
-      correctOption: 0,
+      correctOption: null,
       participants: [],
       answers: [],
     };
@@ -167,6 +234,11 @@ export class WeddingRoomService {
   getHostState(): HostWeddingState | null {
     this.expireIfNeeded();
     return this.room ? this.serializeHost(this.room) : null;
+  }
+
+  getExpirationDelay(): number | null {
+    this.expireIfNeeded();
+    return this.room ? Math.max(0, this.room.expiresAt - this.now()) : null;
   }
 
   getGuestState(participantId: string): GuestWeddingState | null {
@@ -227,9 +299,8 @@ export class WeddingRoomService {
       (item) => item.id === participantId && item.normalizedName === normalizedName,
     );
     if (!participant) throw new Error("Участник не найден");
-    const replacedSocketId = participant.socketId && participant.socketId !== socketId
-      ? participant.socketId
-      : null;
+    const replacedSocketId =
+      participant.socketId && participant.socketId !== socketId ? participant.socketId : null;
     return this.mutate((draft) => {
       const target = draft.participants.find((item) => item.id === participantId)!;
       target.connected = true;
@@ -254,13 +325,13 @@ export class WeddingRoomService {
     });
   }
 
-  setDraft(optionStyle: WeddingOptionStyle, correctOption: number): HostWeddingState {
+  setDraft(optionStyle: WeddingOptionStyle, correctOption: number | null): HostWeddingState {
     const room = this.requireRoom();
     if (room.phase !== "PREPARING") throw new Error("Сначала завершите текущий вопрос");
     if (optionStyle !== "letters" && optionStyle !== "numbers") {
       throw new Error("Неизвестный формат вариантов");
     }
-    validateOptionIndex(correctOption);
+    if (correctOption !== null) validateOptionIndex(correctOption);
     return this.mutate((draft) => {
       draft.optionStyle = optionStyle;
       draft.correctOption = correctOption;
@@ -271,6 +342,7 @@ export class WeddingRoomService {
   startQuestion(): HostWeddingState {
     const room = this.requireRoom();
     if (room.phase !== "PREPARING") throw new Error("Вопрос уже открыт");
+    if (room.correctOption === null) throw new Error("Сначала выберите правильный ответ");
     return this.mutate((draft) => {
       draft.phase = "OPEN";
       draft.questionNumber += 1;
@@ -288,6 +360,7 @@ export class WeddingRoomService {
     if (room.phase !== "OPEN") throw new Error("Нет открытого вопроса");
     return this.mutate((draft) => {
       draft.phase = "PREPARING";
+      draft.correctOption = null;
       return this.serializeHost(draft);
     });
   }
@@ -297,7 +370,8 @@ export class WeddingRoomService {
     if (room.phase !== "OPEN") throw new Error("Вопрос ещё не открыт");
     validateOptionIndex(optionIndex);
     const participant = room.participants.find((item) => item.id === participantId);
-    if (!participant || participant.socketId !== socketId) throw new Error("Сессия участника устарела");
+    if (!participant || participant.socketId !== socketId)
+      throw new Error("Сессия участника устарела");
     if (participant.answerOption !== null) throw new Error("Ваш ответ уже принят");
     return this.mutate((draft) => {
       const target = draft.participants.find((item) => item.id === participantId)!;
@@ -310,6 +384,7 @@ export class WeddingRoomService {
         sequence: draft.answers.length + 1,
         participantId,
         optionIndex,
+        optionStyle: draft.optionStyle,
         submittedAt: target.answerSubmittedAt,
         firstCorrect,
       });
@@ -369,12 +444,15 @@ export class WeddingRoomService {
   }
 
   private serializeHost(room: WeddingRoomSnapshot): HostWeddingState {
-    const names = new Map(room.participants.map((participant) => [participant.id, participant.name]));
+    const names = new Map(
+      room.participants.map((participant) => [participant.id, participant.name]),
+    );
     const answers: WeddingHostAnswer[] = room.answers.map((answer) => ({
       sequence: answer.sequence,
       participantId: answer.participantId,
       participantName: names.get(answer.participantId) ?? "Участник",
       optionIndex: answer.optionIndex,
+      optionStyle: answer.optionStyle,
       submittedAt: answer.submittedAt,
       firstCorrect: answer.firstCorrect,
     }));

@@ -132,7 +132,11 @@ export function GuestWeddingScreen({
               </button>
             </form>
           )}
-          {error && <p className="wedding-error" role="alert">{error}</p>}
+          {error && (
+            <p className="wedding-error" role="alert">
+              {error}
+            </p>
+          )}
         </section>
       </GuestShell>
     );
@@ -142,7 +146,9 @@ export function GuestWeddingScreen({
     return (
       <GuestShell>
         <section className="wedding-centered-state">
-          <span className="wedding-big-heart" aria-hidden="true">♥</span>
+          <span className="wedding-big-heart" aria-hidden="true">
+            ♥
+          </span>
           <span className="wedding-kicker">ДанИИл и Шаша</span>
           <h1>Спасибо за игру!</h1>
           <p>Правильные ответы и победителей объявит ведущий.</p>
@@ -158,7 +164,9 @@ export function GuestWeddingScreen({
           <span className="wedding-kicker">{state.participantName}</span>
           <h1>Ждём следующий вопрос</h1>
           <div className="wedding-wait-card">
-            <span className="wedding-big-heart" aria-hidden="true">♥</span>
+            <span className="wedding-big-heart" aria-hidden="true">
+              ♥
+            </span>
             <strong>Смотрите на проектор</strong>
             <p>Кнопки появятся после сигнала ведущего.</p>
           </div>
@@ -173,7 +181,9 @@ export function GuestWeddingScreen({
     <GuestShell>
       <section>
         <div className="wedding-question-meta">
-          <span className="wedding-kicker">Вопрос {String(state.questionNumber).padStart(2, "0")}</span>
+          <span className="wedding-kicker">
+            Вопрос {String(state.questionNumber).padStart(2, "0")}
+          </span>
           <span>{state.participantName}</span>
         </div>
         <h1>Выберите ответ</h1>
@@ -202,7 +212,11 @@ export function GuestWeddingScreen({
           </div>
         )}
         {!connected && <p className="wedding-error">Восстанавливаем соединение…</p>}
-        {error && <p className="wedding-error" role="alert">{error}</p>}
+        {error && (
+          <p className="wedding-error" role="alert">
+            {error}
+          </p>
+        )}
       </section>
     </GuestShell>
   );

@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import type { Namespace } from "socket.io";
 import type {
   WeddingClientEvents,
@@ -17,9 +17,20 @@ function isOptionStyle(value: unknown): value is WeddingOptionStyle {
   return value === "letters" || value === "numbers";
 }
 
+export function resolveWeddingRoomFilePath(
+  currentWorkingDirectory: string,
+  override: string | undefined,
+): string {
+  if (override) return override;
+  const serverDirectory =
+    basename(currentWorkingDirectory) === "server"
+      ? currentWorkingDirectory
+      : resolve(currentWorkingDirectory, "server");
+  return resolve(serverDirectory, ".data/wedding-room.json");
+}
+
 export function createWeddingRoomService(): WeddingRoomService {
-  const filePath =
-    process.env.WEDDING_ROOM_FILE ?? resolve(process.cwd(), "server/.data/wedding-room.json");
+  const filePath = resolveWeddingRoomFilePath(process.cwd(), process.env.WEDDING_ROOM_FILE);
   return new WeddingRoomService(new FileWeddingRoomStore(filePath));
 }
 
@@ -30,6 +41,7 @@ export function registerWeddingHandlers(
   const namespace = rawNamespace as WeddingNamespace;
   const hostSocketIds = new Set<string>();
   const participantBySocket = new Map<string, string>();
+  let expirationTimer: ReturnType<typeof setTimeout> | null = null;
 
   const emitError = (socketId: string, error: unknown) => {
     const message = error instanceof Error ? error.message : "Не удалось выполнить действие";
@@ -64,6 +76,28 @@ export function registerWeddingHandlers(
     }
   };
 
+  const scheduleExpiration = () => {
+    if (expirationTimer) clearTimeout(expirationTimer);
+    const delay = service.getExpirationDelay();
+    if (delay === null) {
+      expirationTimer = null;
+      return;
+    }
+    expirationTimer = setTimeout(() => {
+      expirationTimer = null;
+      if (service.getExpirationDelay() !== null) {
+        scheduleExpiration();
+        return;
+      }
+      participantBySocket.clear();
+      namespace.emit("wedding:expired");
+      broadcastAll();
+    }, delay);
+    expirationTimer.unref();
+  };
+
+  scheduleExpiration();
+
   namespace.on("connection", (socket) => {
     const emitInitialState = () => {
       const hostState = service.getHostState();
@@ -93,6 +127,7 @@ export function registerWeddingHandlers(
       if (!requireHost()) return;
       try {
         service.createRoom();
+        scheduleExpiration();
         broadcastAll();
       } catch (error) {
         emitError(socket.id, error);
@@ -167,7 +202,7 @@ export function registerWeddingHandlers(
       if (
         !isRecord(data) ||
         !isOptionStyle(data.optionStyle) ||
-        typeof data.correctOption !== "number"
+        (data.correctOption !== null && typeof data.correctOption !== "number")
       ) {
         socket.emit("wedding:error", { message: "Проверьте настройки вопроса" });
         return;

@@ -65,7 +65,7 @@ interface WeddingContextValue {
   rejoin: (participantId: string, name: string) => void;
   answer: (optionIndex: number) => void;
   createRoom: () => void;
-  setDraft: (optionStyle: WeddingOptionStyle, correctOption: number) => void;
+  setDraft: (optionStyle: WeddingOptionStyle, correctOption: number | null) => void;
   startQuestion: () => void;
   prepareNextQuestion: () => void;
   adjustScore: (participantId: string, delta: -1 | 1) => void;
@@ -152,7 +152,10 @@ export function WeddingProvider({
     };
   }, [role]);
 
-  const joinNew = useCallback((name: string) => weddingSocket.emit("wedding:joinNew", { name }), []);
+  const joinNew = useCallback(
+    (name: string) => weddingSocket.emit("wedding:joinNew", { name }),
+    [],
+  );
   const rejoin = useCallback(
     (participantId: string, name: string) =>
       weddingSocket.emit("wedding:rejoin", { participantId, name }),
@@ -164,15 +167,12 @@ export function WeddingProvider({
   );
   const createRoom = useCallback(() => weddingSocket.emit("wedding:createRoom"), []);
   const setDraft = useCallback(
-    (optionStyle: WeddingOptionStyle, correctOption: number) =>
+    (optionStyle: WeddingOptionStyle, correctOption: number | null) =>
       weddingSocket.emit("wedding:setDraft", { optionStyle, correctOption }),
     [],
   );
   const startQuestion = useCallback(() => weddingSocket.emit("wedding:startQuestion"), []);
-  const prepareNextQuestion = useCallback(
-    () => weddingSocket.emit("wedding:prepareNext"),
-    [],
-  );
+  const prepareNextQuestion = useCallback(() => weddingSocket.emit("wedding:prepareNext"), []);
   const adjustScore = useCallback(
     (participantId: string, delta: -1 | 1) =>
       weddingSocket.emit("wedding:adjustScore", { participantId, delta }),
