@@ -251,3 +251,45 @@ test("rejects host mutations from guests and broadcasts manual score changes", a
     await harness.close();
   }
 });
+
+test("host restarts a finished contest while guests keep their seats", async () => {
+  const harness = await createHarness();
+  try {
+    const host = await harness.connect();
+    host.emit("wedding:hostConnect");
+    host.emit("wedding:createRoom");
+    await host.waitFor("wedding:hostState");
+
+    const guest = await harness.connect();
+    guest.emit("wedding:joinNew", { name: "Вера" });
+    const joined = await guest.waitFor("wedding:joined");
+
+    guest.emit("wedding:restartContest");
+    assert.match((await guest.waitFor("wedding:error")).message, /ведущ/i);
+
+    host.emit("wedding:adjustScore", { participantId: joined.participantId, delta: 1 });
+    await host.waitFor(
+      "wedding:hostState",
+      (state) => state.participants[0]?.correctAnswers === 1,
+    );
+    host.emit("wedding:endContest");
+    await guest.waitFor("wedding:guestState", (state) => state.phase === "FINISHED");
+
+    host.emit("wedding:restartContest");
+    const restartedHost = await host.waitFor(
+      "wedding:hostState",
+      (state) => state.phase === "PREPARING" && state.questionNumber === 0,
+    );
+    const restartedGuest = await guest.waitFor(
+      "wedding:guestState",
+      (state) => state.phase === "PREPARING",
+    );
+
+    assert.equal(restartedHost.participants[0].id, joined.participantId);
+    assert.equal(restartedHost.participants[0].correctAnswers, 0);
+    assert.equal(restartedGuest.participantId, joined.participantId);
+    assert.equal(restartedGuest.participantName, "Вера");
+  } finally {
+    await harness.close();
+  }
+});

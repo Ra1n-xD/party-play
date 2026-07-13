@@ -283,6 +283,7 @@ export interface WeddingClientEvents {
   "wedding:prepareNext": () => void;
   "wedding:adjustScore": (data: { participantId: string; delta: -1 | 1 }) => void;
   "wedding:endContest": () => void;
+  "wedding:restartContest": () => void;
 }
 
 export interface WeddingServerEvents {

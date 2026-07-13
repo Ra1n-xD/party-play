@@ -263,6 +263,16 @@ export function registerWeddingHandlers(
       }
     });
 
+    socket.on("wedding:restartContest", () => {
+      if (!requireHost()) return;
+      try {
+        service.restartContest();
+        broadcastAll();
+      } catch (error) {
+        emitError(socket.id, error);
+      }
+    });
+
     socket.on("disconnect", () => {
       hostSocketIds.delete(socket.id);
       participantBySocket.delete(socket.id);

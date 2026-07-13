@@ -192,3 +192,28 @@ test("lets the host correct non-negative scores and finish the contest", () => {
     assert.equal(service.getGuestState(vera.participantId)?.phase, "FINISHED");
   });
 });
+
+test("restarts a finished contest without replacing the room or participant seats", () => {
+  withService((service) => {
+    const created = service.createRoom();
+    const vera = service.joinNew("Вера", "socket-vera");
+    service.setDraft("numbers", 2);
+    service.startQuestion();
+    service.submitAnswer(vera.participantId, "socket-vera", 2);
+    service.finishContest();
+
+    const restarted = service.restartContest();
+
+    assert.equal(restarted.phase, "PREPARING");
+    assert.equal(restarted.questionNumber, 0);
+    assert.equal(restarted.optionStyle, "letters");
+    assert.equal(restarted.correctOption, null);
+    assert.deepEqual(restarted.answers, []);
+    assert.equal(restarted.participants[0].id, vera.participantId);
+    assert.equal(restarted.participants[0].correctAnswers, 0);
+    assert.equal(restarted.participants[0].hasAnswered, false);
+    assert.equal(restarted.expiresAt, created.expiresAt);
+    assert.equal(service.getGuestState(vera.participantId)?.phase, "PREPARING");
+    assert.throws(() => service.restartContest(), /завершите текущий конкурс/i);
+  });
+});
