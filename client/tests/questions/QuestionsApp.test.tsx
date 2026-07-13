@@ -30,7 +30,7 @@ test("role picker offers exactly the two editors and observer", () => {
   assert.match(html, /ДанИИл/);
 });
 
-test("editor renders only the selected participant's fields for every question", () => {
+test("editor renders only the selected participant's fields with author-based labels", () => {
   const state: QuestionsEditorState = {
     role: "daniil",
     questions: [
@@ -63,8 +63,9 @@ test("editor renders only the selected participant's fields for every question",
 
   assert.match(html, /Вопрос 01/);
   assert.match(html, /Вопрос 02/);
-  assert.match(html, /Мой ответ/);
-  assert.match(html, /Как ответит Шаша/);
+  assert.match(html, /Вариант ДанИИла/);
+  assert.match(html, /Вариант Шаши/);
+  assert.doesNotMatch(html, /Мой ответ|Как ответит/);
   assert.doesNotMatch(html, /Красный|Зелёный/);
 });
 
@@ -98,6 +99,9 @@ test("observer shows every question and all four live fields", () => {
   assert.match(html, /Красный/);
   assert.match(html, /Голубой/);
   assert.match(html, /Ждём ответ/);
+  assert.equal((html.match(/Вариант ДанИИла/g) ?? []).length, 4);
+  assert.equal((html.match(/Вариант Шаши/g) ?? []).length, 4);
+  assert.doesNotMatch(html, /Мой ответ|Как ответит/);
 });
 
 test("authoritative editor state replaces clean drafts but preserves unsaved fields", () => {
