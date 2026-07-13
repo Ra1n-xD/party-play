@@ -268,10 +268,7 @@ test("host restarts a finished contest while guests keep their seats", async () 
     assert.match((await guest.waitFor("wedding:error")).message, /ведущ/i);
 
     host.emit("wedding:adjustScore", { participantId: joined.participantId, delta: 1 });
-    await host.waitFor(
-      "wedding:hostState",
-      (state) => state.participants[0]?.correctAnswers === 1,
-    );
+    await host.waitFor("wedding:hostState", (state) => state.participants[0]?.correctAnswers === 1);
     host.emit("wedding:endContest");
     await guest.waitFor("wedding:guestState", (state) => state.phase === "FINISHED");
 

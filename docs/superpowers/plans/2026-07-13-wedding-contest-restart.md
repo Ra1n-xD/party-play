@@ -21,6 +21,7 @@
 ### Task 1: Server-authoritative restart transition
 
 **Files:**
+
 - Modify: `shared/types.ts`
 - Modify: `server/src/wedding/weddingRoom.ts`
 - Modify: `server/src/wedding/socketHandlers.ts`
@@ -28,6 +29,7 @@
 - Test: `server/tests/wedding/Wedding.integration.test.ts`
 
 **Interfaces:**
+
 - Produces: `WeddingClientEvents["wedding:restartContest"]: () => void`
 - Produces: `WeddingRoomService.restartContest(): HostWeddingState`
 
@@ -94,11 +96,13 @@ git commit -m "feat: restart finished wedding contests"
 ### Task 2: Confirmed admin restart action
 
 **Files:**
+
 - Modify: `client/src/wedding/WeddingContext.tsx`
 - Modify: `client/src/wedding/AdminWeddingApp.tsx`
 - Test: `client/tests/wedding/WeddingAdmin.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `WeddingClientEvents["wedding:restartContest"]`
 - Produces: `WeddingContextValue.restartContest(): void`
 - Produces: `AdminWeddingActions.restartContest(): void`
@@ -141,9 +145,11 @@ git commit -m "feat: add wedding contest restart control"
 ### Task 3: Full verification
 
 **Files:**
+
 - Verify only; no planned source changes.
 
 **Interfaces:**
+
 - Consumes the completed server and client restart flow.
 - Produces verification evidence.
 
