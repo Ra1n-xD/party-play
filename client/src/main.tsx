@@ -6,12 +6,22 @@ import { AdminWeddingApp } from "./wedding/AdminWeddingApp";
 import { GuestWeddingApp } from "./wedding/GuestWeddingApp";
 import { getPartyPlayAppKind } from "./wedding/mainRouter";
 import { WeddingProvider } from "./wedding/WeddingContext";
+import { QuestionsApp } from "./questions/QuestionsApp";
+import { QuestionsProvider } from "./questions/QuestionsContext";
 import "./styles/global.css";
 import "./styles/wedding.css";
+import "./styles/questions.css";
 
 const appKind = getPartyPlayAppKind(window.location.pathname);
 
 function PartyPlayRoot() {
+  if (appKind === "questions") {
+    return (
+      <QuestionsProvider>
+        <QuestionsApp />
+      </QuestionsProvider>
+    );
+  }
   if (appKind === "wedding-guest") {
     return (
       <WeddingProvider role="guest">

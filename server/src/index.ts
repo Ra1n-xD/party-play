@@ -7,8 +7,9 @@ import cors from "cors";
 import helmet from "helmet";
 import { CONFIG } from "./config.js";
 import { registerHandlers } from "./socketHandlers.js";
-import { getSocketClientIdentity } from "./clientIdentity.js";
 import { registerWeddingHandlers } from "./wedding/socketHandlers.js";
+import { registerQuestionsHandlers } from "./questions/socketHandlers.js";
+import { createNamespaceConnectionLimiter } from "./namespaceConnectionLimiter.js";
 
 const app = express();
 
@@ -70,27 +71,18 @@ app.get("/", (_req, res) => {
 
 // Per-IP connection limiting
 const ipConnectionCounts = new Map<string, number>();
-
-io.use((socket, next) => {
-  const ip = getSocketClientIdentity(socket);
-
-  const count = ipConnectionCounts.get(ip) || 0;
-  if (count >= CONFIG.MAX_CONNECTIONS_PER_IP) {
-    return next(new Error("Too many connections from this IP"));
-  }
-
-  ipConnectionCounts.set(ip, count + 1);
-  socket.on("disconnect", () => {
-    const c = ipConnectionCounts.get(ip) || 1;
-    if (c <= 1) ipConnectionCounts.delete(ip);
-    else ipConnectionCounts.set(ip, c - 1);
-  });
-
-  next();
-});
+const connectionLimiter = createNamespaceConnectionLimiter(
+  CONFIG.MAX_CONNECTIONS_PER_IP,
+  ipConnectionCounts,
+);
+const weddingNamespace = io.of("/wedding");
+const questionsNamespace = io.of("/questions");
+io.use(connectionLimiter);
+questionsNamespace.use(connectionLimiter);
 
 registerHandlers(io);
-registerWeddingHandlers(io.of("/wedding"));
+registerWeddingHandlers(weddingNamespace);
+registerQuestionsHandlers(questionsNamespace);
 
 const bindHost =
   process.env.HOST || (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");

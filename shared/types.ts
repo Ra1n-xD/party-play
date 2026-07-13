@@ -294,3 +294,53 @@ export interface WeddingServerEvents {
   "wedding:error": (data: { message: string }) => void;
   "wedding:expired": () => void;
 }
+
+// ============ Live Wedding Questions ============
+
+export type QuestionsEditorRole = "daniil" | "shasha";
+export type QuestionsRole = QuestionsEditorRole | "observer";
+export type QuestionsAnswerField = "ownAnswer" | "partnerGuess";
+
+export interface QuestionsParticipantAnswers {
+  ownAnswer: string;
+  partnerGuess: string;
+  updatedAt: number;
+}
+
+export interface QuestionsEditorQuestion extends QuestionsParticipantAnswers {
+  id: number;
+  number: number;
+}
+
+export interface QuestionsObserverQuestion {
+  id: number;
+  number: number;
+  createdAt: number;
+  daniil: QuestionsParticipantAnswers;
+  shasha: QuestionsParticipantAnswers;
+}
+
+export interface QuestionsEditorState {
+  role: QuestionsEditorRole;
+  questions: QuestionsEditorQuestion[];
+}
+
+export interface QuestionsObserverState {
+  questions: QuestionsObserverQuestion[];
+}
+
+export interface QuestionsClientEvents {
+  "questions:selectRole": (data: { role: QuestionsRole }) => void;
+  "questions:addQuestion": () => void;
+  "questions:updateAnswer": (data: {
+    questionId: number;
+    field: QuestionsAnswerField;
+    value: string;
+  }) => void;
+}
+
+export interface QuestionsServerEvents {
+  "questions:editorState": (data: QuestionsEditorState) => void;
+  "questions:observerState": (data: QuestionsObserverState) => void;
+  "questions:error": (data: { message: string }) => void;
+}
