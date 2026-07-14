@@ -4,7 +4,7 @@ import test from "node:test";
 import React, { type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { act, create, type ReactTestInstance } from "react-test-renderer";
-import type { HostWeddingState } from "../../../shared/types";
+import type { HostWeddingState, WeddingOptionStyle } from "../../../shared/types";
 import { AdminWeddingScreen } from "../../src/wedding/AdminWeddingApp";
 
 const hostState: HostWeddingState = {
@@ -48,7 +48,7 @@ function createActions() {
     calls,
     actions: {
       createRoom: () => calls.push("create"),
-      setDraft: (style: "letters" | "numbers", option: number | null) =>
+      setDraft: (style: WeddingOptionStyle, option: number | null) =>
         calls.push(`draft:${style}:${option}`),
       startQuestion: () => calls.push("start"),
       prepareNextQuestion: () => calls.push("next"),
@@ -131,6 +131,22 @@ test("preparing state lets the host choose labels and explicitly start the quest
   assert.match(html, /1 · 2 · 3 · 4/);
   assert.match(html, /Правильный ответ/);
   assert.match(html, /Начать вопрос 05/);
+});
+
+test("preparing state supports latin answer labels", () => {
+  const html = renderToStaticMarkup(
+    <AdminWeddingScreen
+      {...propsFor({
+        ...hostState,
+        phase: "PREPARING",
+        optionStyle: "latin",
+        correctOption: 2,
+      })}
+    />,
+  );
+
+  assert.match(html, /A · B · C · D/);
+  assert.match(html, />A<.*>B<.*>C<.*>D</s);
 });
 
 test("a new question stays unstartable until the host chooses a fresh correct answer", () => {
@@ -219,4 +235,5 @@ test("wedding stylesheet keeps mobile touch targets and the approved palette", (
     /\.wedding-score-stepper button \{[\s\S]*?width: 44px;[\s\S]*?min-height: 44px;/,
   );
   assert.match(css, /@media \(max-width: 360px\)/);
+  assert.match(css, /\.wedding-option-mode \{[\s\S]*?grid-template-columns: repeat\(3, 1fr\)/);
 });

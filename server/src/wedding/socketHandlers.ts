@@ -14,7 +14,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isOptionStyle(value: unknown): value is WeddingOptionStyle {
-  return value === "letters" || value === "numbers";
+  return value === "letters" || value === "latin" || value === "numbers";
 }
 
 export function resolveWeddingRoomFilePath(

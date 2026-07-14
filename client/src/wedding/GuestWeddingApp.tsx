@@ -5,6 +5,7 @@ import { WeddingBrand } from "./WeddingBrand";
 
 const OPTION_LABELS = {
   letters: ["А", "Б", "В", "Г"],
+  latin: ["A", "B", "C", "D"],
   numbers: ["1", "2", "3", "4"],
 } as const;
 

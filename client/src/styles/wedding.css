@@ -354,6 +354,10 @@
   background: var(--wedding-rose);
 }
 
+.wedding-option-mode {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .wedding-admin-tabs button,
 .wedding-option-mode button {
   min-height: 44px;

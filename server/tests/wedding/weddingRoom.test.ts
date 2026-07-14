@@ -173,6 +173,29 @@ test("keeps guests waiting until the host explicitly starts the next question", 
   });
 });
 
+test("persists latin answer labels and keeps them in the answer chronology", () => {
+  const directory = mkdtempSync(join(tmpdir(), "party-play-wedding-latin-"));
+  const file = join(directory, "room.json");
+
+  try {
+    const service = new WeddingRoomService(new FileWeddingRoomStore(file), () => 1_000);
+    service.createRoom();
+    const vera = service.joinNew("Вера", "socket-vera");
+    service.setDraft("latin", 2);
+    service.startQuestion();
+    service.submitAnswer(vera.participantId, "socket-vera", 2);
+
+    assert.equal(service.getGuestState(vera.participantId)?.optionStyle, "latin");
+    assert.equal(service.getHostState()?.answers[0].optionStyle, "latin");
+
+    const restored = new WeddingRoomService(new FileWeddingRoomStore(file), () => 1_001);
+    assert.equal(restored.getHostState()?.optionStyle, "latin");
+    assert.equal(restored.getHostState()?.answers[0].optionStyle, "latin");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("lets the host correct non-negative scores and finish the contest", () => {
   withService((service) => {
     service.createRoom();
