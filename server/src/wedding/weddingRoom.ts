@@ -91,7 +91,9 @@ function isAnswerRecord(value: unknown): value is WeddingAnswerRecord {
     typeof value.participantId === "string" &&
     value.participantId.length > 0 &&
     isOptionIndex(value.optionIndex) &&
-    (value.optionStyle === "letters" || value.optionStyle === "numbers") &&
+    (value.optionStyle === "letters" ||
+      value.optionStyle === "latin" ||
+      value.optionStyle === "numbers") &&
     typeof value.submittedAt === "number" &&
     Number.isFinite(value.submittedAt) &&
     typeof value.firstCorrect === "boolean"
@@ -112,7 +114,9 @@ function isSnapshot(value: unknown): value is WeddingRoomSnapshot {
       (room.phase === "PREPARING" || room.phase === "OPEN" || room.phase === "FINISHED") &&
       Number.isInteger(room.questionNumber) &&
       Number(room.questionNumber) >= 0 &&
-      (room.optionStyle === "letters" || room.optionStyle === "numbers") &&
+      (room.optionStyle === "letters" ||
+        room.optionStyle === "latin" ||
+        room.optionStyle === "numbers") &&
       (room.correctOption === null || isOptionIndex(room.correctOption)) &&
       Array.isArray(room.participants) &&
       Array.isArray(room.answers)
@@ -328,7 +332,7 @@ export class WeddingRoomService {
   setDraft(optionStyle: WeddingOptionStyle, correctOption: number | null): HostWeddingState {
     const room = this.requireRoom();
     if (room.phase !== "PREPARING") throw new Error("Сначала завершите текущий вопрос");
-    if (optionStyle !== "letters" && optionStyle !== "numbers") {
+    if (optionStyle !== "letters" && optionStyle !== "latin" && optionStyle !== "numbers") {
       throw new Error("Неизвестный формат вариантов");
     }
     if (correctOption !== null) validateOptionIndex(correctOption);

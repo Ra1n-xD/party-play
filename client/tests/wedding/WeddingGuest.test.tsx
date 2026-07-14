@@ -43,18 +43,26 @@ test("maps stored participant names to the server rejoin contract", () => {
   });
 });
 
-test("guest buttons match letter and number formats without revealing correctness", () => {
+test("guest buttons match cyrillic, latin, and number formats without revealing correctness", () => {
   const letters = renderToStaticMarkup(<GuestWeddingScreen {...baseProps} state={openState} />);
   assert.match(letters, />А<.*>Б<.*>В<.*>Г</s);
+
+  const latin = renderToStaticMarkup(
+    <GuestWeddingScreen
+      {...baseProps}
+      state={{ ...openState, questionNumber: 6, optionStyle: "latin" }}
+    />,
+  );
+  assert.match(latin, />A<.*>B<.*>C<.*>D</s);
 
   const numbers = renderToStaticMarkup(
     <GuestWeddingScreen
       {...baseProps}
-      state={{ ...openState, questionNumber: 6, optionStyle: "numbers" }}
+      state={{ ...openState, questionNumber: 7, optionStyle: "numbers" }}
     />,
   );
   assert.match(numbers, />1<.*>2<.*>3<.*>4</s);
-  assert.doesNotMatch(`${letters}${numbers}`, /правильн|неверн/i);
+  assert.doesNotMatch(`${letters}${latin}${numbers}`, /правильн|неверн/i);
 });
 
 test("preparing guests see the waiting state and no active answer buttons", () => {

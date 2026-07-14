@@ -222,7 +222,7 @@ export interface ServerEvents {
 // ============ Wedding Quiz ============
 
 export type WeddingPhase = "PREPARING" | "OPEN" | "FINISHED";
-export type WeddingOptionStyle = "letters" | "numbers";
+export type WeddingOptionStyle = "letters" | "latin" | "numbers";
 
 export interface WeddingParticipantSummary {
   id: string;

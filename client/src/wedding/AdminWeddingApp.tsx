@@ -6,6 +6,7 @@ import { WeddingConfirmDialog } from "./WeddingConfirmDialog";
 
 const OPTION_LABELS = {
   letters: ["А", "Б", "В", "Г"],
+  latin: ["A", "B", "C", "D"],
   numbers: ["1", "2", "3", "4"],
 } as const;
 
@@ -230,6 +231,13 @@ export function AdminWeddingScreen({
                       onClick={() => actions.setDraft("letters", state.correctOption)}
                     >
                       А · Б · В · Г
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={state.optionStyle === "latin"}
+                      onClick={() => actions.setDraft("latin", state.correctOption)}
+                    >
+                      A · B · C · D
                     </button>
                     <button
                       type="button"
