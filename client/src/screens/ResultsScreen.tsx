@@ -170,7 +170,7 @@ export function ResultsScreen() {
 
         {isHost && (
           <button className="btn btn-primary" onClick={playAgain}>
-            Играть снова
+            Сыграть ещё
           </button>
         )}
       </div>

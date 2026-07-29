@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FiLogOut, FiWifi, FiWifiOff } from "react-icons/fi";
 import { GiFalloutShelter } from "react-icons/gi";
 import { AccessibleModal } from "./AccessibleModal";
@@ -8,6 +8,8 @@ interface GameRoomHeaderProps {
   connected: boolean;
   onLeaveRoom: () => void;
   confirmActiveLeave?: boolean;
+  gameTitle?: string;
+  brandIcon?: ReactNode;
 }
 
 export function GameRoomHeader({
@@ -15,6 +17,8 @@ export function GameRoomHeader({
   connected,
   onLeaveRoom,
   confirmActiveLeave = false,
+  gameTitle = "Бункер",
+  brandIcon,
 }: GameRoomHeaderProps) {
   const [leaveConfirmationOpen, setLeaveConfirmationOpen] = useState(false);
 
@@ -31,10 +35,10 @@ export function GameRoomHeader({
       <header className="gs-room-header" aria-label="Комната игры">
         <div className="gs-room-brand">
           <span className="gs-room-brand-icon" aria-hidden="true">
-            <GiFalloutShelter />
+            {brandIcon ?? <GiFalloutShelter />}
           </span>
           <span className="gs-room-brand-copy">
-            <strong>Бункер</strong>
+            <strong>{gameTitle}</strong>
           </span>
         </div>
 

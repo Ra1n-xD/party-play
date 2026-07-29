@@ -113,8 +113,7 @@ npm run build
 npm run format:check
 ```
 
-Run the smallest relevant test command available for the affected part of the
-project. There may be no single command covering every package or game.
+Do not create, modify, or run automated tests without a separate user request.
 
 Avoid repository-wide formatting when only a small set of files changed.
 
@@ -134,5 +133,4 @@ Avoid repository-wide formatting when only a small set of files changed.
 - Do not modify generated, runtime, or internal tooling artifacts unless the
   task explicitly targets them.
 - Do not initiate deployment unless the user explicitly requests it.
-- Validate changes proportionally with relevant tests, builds, and formatting
-  checks.
+- Validate changes proportionally with relevant builds and formatting checks.

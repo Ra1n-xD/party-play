@@ -27,6 +27,8 @@ interface HostControlDialogProps {
   onEndGame: () => void;
   seatClaims?: SeatClaimInfo[];
   onResolveSeatClaim?: (requestId: string, approved: boolean) => void;
+  onAssignTemporaryBot?: (playerId: string) => void;
+  onReturnHumanControl?: (playerId: string) => void;
   onKickPlayer?: (playerId: string) => void;
   onTransferHost?: (playerId: string) => void;
 }
@@ -59,6 +61,8 @@ export function HostControlDialog({
   onEndGame,
   seatClaims = [],
   onResolveSeatClaim = () => undefined,
+  onAssignTemporaryBot,
+  onReturnHumanControl,
   onKickPlayer = () => undefined,
   onTransferHost = () => undefined,
 }: HostControlDialogProps) {
@@ -154,6 +158,8 @@ export function HostControlDialog({
         players={gameState.players}
         claims={seatClaims}
         onResolveClaim={onResolveSeatClaim}
+        onAssignTemporaryBot={onAssignTemporaryBot}
+        onReturnHumanControl={onReturnHumanControl}
         onKickPlayer={onKickPlayer}
         onTransferHost={onTransferHost}
       />
