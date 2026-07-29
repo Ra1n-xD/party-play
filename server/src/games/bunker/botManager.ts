@@ -1,0 +1,160 @@
+import { randomInt } from "crypto";
+import { Server } from "socket.io";
+import { ServerEvents, ClientEvents } from "../../../../shared/types.js";
+import { Player, getAlivePlayers } from "../../platform/roomManager.js";
+import type { BunkerRoom as Room } from "./runtime.js";
+import { revealAttribute, castVote, isGameplayPaused } from "./engine.js";
+import { CONFIG } from "./config.js";
+import { executeInRoom } from "../../platform/roomExecutor.js";
+
+type IOServer = Server<ClientEvents, ServerEvents>;
+
+// Track pending bot timers per room to avoid duplicate actions
+const pendingBotTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
+
+export function clearBotActions(roomCode: string): void {
+  const timers = pendingBotTimers.get(roomCode);
+  if (timers) {
+    for (const t of timers) clearTimeout(t);
+  }
+  pendingBotTimers.delete(roomCode);
+}
+
+export function resetBotManagerStateForTests(): void {
+  for (const timers of pendingBotTimers.values()) {
+    for (const timer of timers) clearTimeout(timer);
+  }
+  pendingBotTimers.clear();
+}
+
+function addBotTimer(roomCode: string, timer: ReturnType<typeof setTimeout>): void {
+  if (!pendingBotTimers.has(roomCode)) {
+    pendingBotTimers.set(roomCode, []);
+  }
+  pendingBotTimers.get(roomCode)!.push(timer);
+}
+
+function randomDelay(): number {
+  return randomInt(CONFIG.BOT_ACTION_DELAY_MIN, CONFIG.BOT_ACTION_DELAY_MAX + 1);
+}
+
+export function scheduleBotActions(room: Room, io: IOServer): void {
+  if (!room.gameState) return;
+  if (isGameplayPaused(room)) return;
+
+  // Clear any pending timers for this room
+  clearBotActions(room.code);
+
+  const phase = room.gameState.phase;
+
+  switch (phase) {
+    case "ROUND_REVEAL":
+      scheduleBotReveal(room, io);
+      break;
+    case "ROUND_VOTE":
+    case "ROUND_VOTE_TIEBREAK":
+      scheduleBotVotes(room, io);
+      break;
+  }
+}
+
+function scheduleBotReveal(room: Room, io: IOServer): void {
+  if (!room.gameState) return;
+
+  const currentPlayerId = room.gameState.turnOrder[room.gameState.currentTurnIndex];
+  if (!currentPlayerId) return;
+
+  const player = room.players.get(currentPlayerId);
+  if (!player || !player.isBot || !player.alive) return;
+  const expectedRevision = room.revision;
+  const expectedControllerEpoch = player.controller.epoch;
+
+  const timer = setTimeout(() => {
+    void executeInRoom(room.code, () => {
+      if (
+        !room.gameState ||
+        isGameplayPaused(room) ||
+        room.gameState.phase !== "ROUND_REVEAL" ||
+        room.revision !== expectedRevision ||
+        player.controller.kind !== "bot" ||
+        player.controller.epoch !== expectedControllerEpoch
+      )
+        return;
+
+      // Pick a random unrevealed attribute (not the last one)
+      const totalAttrs = player.character?.attributes.length || 0;
+      const unrevealed: number[] = [];
+      for (let i = 0; i < totalAttrs; i++) {
+        if (!player.revealedIndices.includes(i)) unrevealed.push(i);
+      }
+
+      if (unrevealed.length <= 1) {
+        // Can't reveal last card — skip by revealing with undefined
+        revealAttribute(room, player.id, undefined, io);
+        return;
+      }
+
+      const idx = unrevealed[randomInt(unrevealed.length)];
+      revealAttribute(room, player.id, idx, io);
+    });
+  }, randomDelay());
+
+  addBotTimer(room.code, timer);
+}
+
+function scheduleBotVotes(room: Room, io: IOServer): void {
+  if (!room.gameState) return;
+
+  const isTiebreak = room.gameState.phase === "ROUND_VOTE_TIEBREAK";
+
+  // Collect bot voters: alive bots + last eliminated bot
+  const botVoters: Player[] = [];
+  for (const player of room.players.values()) {
+    if (!player.isBot) continue;
+    if (player.hasVoted) continue;
+
+    if (player.alive) {
+      botVoters.push(player);
+    } else if (player.id === room.gameState.lastEliminatedId) {
+      botVoters.push(player);
+    }
+  }
+
+  // Schedule staggered votes
+  for (let i = 0; i < botVoters.length; i++) {
+    const bot = botVoters[i];
+    const delay = randomDelay() + i * 500; // Stagger by 500ms each
+    const expectedRevision = room.revision;
+    const expectedControllerEpoch = bot.controller.epoch;
+
+    const timer = setTimeout(() => {
+      void executeInRoom(room.code, () => {
+        if (!room.gameState) return;
+        if (isGameplayPaused(room)) return;
+        if (room.revision !== expectedRevision) return;
+        if (bot.controller.kind !== "bot" || bot.controller.epoch !== expectedControllerEpoch)
+          return;
+        if (room.gameState.phase !== "ROUND_VOTE" && room.gameState.phase !== "ROUND_VOTE_TIEBREAK")
+          return;
+        if (bot.hasVoted) return;
+
+        // Pick target
+        let candidates: Player[];
+        if (isTiebreak && room.gameState.tiebreakCandidateIds.length > 0) {
+          candidates = room.gameState.tiebreakCandidateIds
+            .map((id) => room.players.get(id))
+            .filter((p): p is Player => !!p && p.alive && p.id !== bot.id);
+        } else {
+          candidates = getAlivePlayers(room).filter((p) => p.id !== bot.id);
+        }
+
+        if (candidates.length === 0) return;
+
+        const target = candidates[randomInt(candidates.length)];
+        castVote(room, bot.id, target.id, io);
+      });
+    }, delay);
+
+    addBotTimer(room.code, timer);
+  }
+}

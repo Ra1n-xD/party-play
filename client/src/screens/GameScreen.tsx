@@ -49,6 +49,7 @@ export function GameScreen() {
     consumePendingAdminOpen,
     hostSeatClaims,
     resolveSeatClaim,
+    assignTemporaryBot,
     kickPlayer,
     transferHost,
   } = useGame();
@@ -263,6 +264,7 @@ export function GameScreen() {
           onEndGame={endGameFromHostControls}
           seatClaims={hostSeatClaims}
           onResolveSeatClaim={resolveSeatClaim}
+          onAssignTemporaryBot={assignTemporaryBot}
           onKickPlayer={kickPlayer}
           onTransferHost={transferHost}
         />

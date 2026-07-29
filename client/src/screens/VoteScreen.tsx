@@ -39,6 +39,7 @@ export function VoteScreen() {
     consumePendingAdminOpen,
     hostSeatClaims,
     resolveSeatClaim,
+    assignTemporaryBot,
     kickPlayer,
     transferHost,
   } = useGame();
@@ -353,6 +354,7 @@ export function VoteScreen() {
           onEndGame={endGameFromHostControls}
           seatClaims={hostSeatClaims}
           onResolveSeatClaim={resolveSeatClaim}
+          onAssignTemporaryBot={assignTemporaryBot}
           onKickPlayer={kickPlayer}
           onTransferHost={transferHost}
         />
