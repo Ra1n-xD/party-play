@@ -7,8 +7,6 @@ import cors from "cors";
 import helmet from "helmet";
 import { CONFIG } from "./config.js";
 import { registerHandlers } from "./socketHandlers.js";
-import { registerWeddingHandlers } from "./wedding/socketHandlers.js";
-import { registerQuestionsHandlers } from "./questions/socketHandlers.js";
 import { createNamespaceConnectionLimiter } from "./namespaceConnectionLimiter.js";
 
 const app = express();
@@ -75,14 +73,9 @@ const connectionLimiter = createNamespaceConnectionLimiter(
   CONFIG.MAX_CONNECTIONS_PER_IP,
   ipConnectionCounts,
 );
-const weddingNamespace = io.of("/wedding");
-const questionsNamespace = io.of("/questions");
 io.use(connectionLimiter);
-questionsNamespace.use(connectionLimiter);
 
 registerHandlers(io);
-registerWeddingHandlers(weddingNamespace);
-registerQuestionsHandlers(questionsNamespace);
 
 const bindHost =
   process.env.HOST || (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");

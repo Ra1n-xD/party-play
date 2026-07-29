@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import test from "node:test";
 import type { Socket } from "socket.io";
-import { createNamespaceConnectionLimiter } from "../../src/namespaceConnectionLimiter.js";
+import { createNamespaceConnectionLimiter } from "../src/namespaceConnectionLimiter.js";
 
 function createSocket(address: string): Socket {
   const socket = new EventEmitter() as EventEmitter & { handshake: Socket["handshake"] };
@@ -36,10 +34,4 @@ test("shares one per-IP connection budget across namespaces", () => {
 
   first.emit("disconnect");
   assert.equal(counts.has("198.51.100.10"), false);
-});
-
-test("production limits questions without changing the existing wedding namespace", () => {
-  const source = readFileSync(join(process.cwd(), "server/src/index.ts"), "utf8");
-  assert.match(source, /questionsNamespace\.use\(connectionLimiter\)/);
-  assert.doesNotMatch(source, /weddingNamespace\.use\(connectionLimiter\)/);
 });

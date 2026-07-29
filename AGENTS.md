@@ -1,92 +1,138 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file defines repository-specific rules for Codex and other coding agents.
 
 ## Project Overview
 
-PartyPlay — a real-time multiplayer party games platform built as a web app. Currently features "Бункер" (Bunker), a social deduction game where players argue over who deserves a spot in a fallout bunker during a catastrophe. Planned to expand into a collection of party mini-games with a shared lobby and room system. See `ARCHITECTURE.md` for the platform migration plan.
+PartyPlay is a real-time multiplayer platform for a collection of independent
+party games.
 
-## Commands
+The platform provides shared infrastructure such as rooms, sessions,
+real-time communication, and common UI. Each game is a separate module and
+must not define the architecture of the whole platform.
+
+## Repository Structure
+
+The project is an npm-workspaces monorepo:
+
+- `shared/` — common types, contracts, and utilities.
+- `server/` — backend, real-time communication, platform services, and
+  server-side game logic.
+- `client/` — frontend, shared UI, platform flows, and client-side game
+  interfaces.
+- `docs/` — architecture and project documentation.
+
+Keep platform-wide code separate from game-specific code. Place functionality
+in the narrowest appropriate scope and move it into shared infrastructure only
+when it is genuinely reusable.
+
+## Non-Negotiable Git Rules
+
+- **Never stage, commit, or push changes.** Never run `git add`, `git commit`,
+  or `git push`, and do not use equivalent commands or tools. The user performs
+  all staging, committing, and pushing personally.
+- Leave every agent change unstaged and never alter changes that the user has
+  already staged.
+- Check the worktree before editing and preserve all pre-existing or unrelated
+  changes.
+- Do not create, rename, switch, or delete branches unless the user explicitly
+  requests that exact operation. Such a request never authorizes staging,
+  committing, or pushing.
+- Never run `merge` or `rebase`.
+- Do not run `reset`, `restore`, `stash`, or `clean` unless the user explicitly
+  requests that exact operation. Never use them as cleanup or as a workaround
+  for these rules.
+- Read-only Git commands such as `git status`, `git diff`, `git log`, and
+  `git branch` are allowed.
+- After every completed task, provide one suggested commit message in English.
+  Never execute that commit.
+
+## Branch and Commit Conventions
+
+Use short, descriptive, kebab-case branch names:
+
+```text
+feature/<topic>
+fix/<topic>
+```
+
+Use `docs/`, `chore/`, or `refactor/` when they describe the branch better.
+Avoid personal names, tool names, vague abbreviations, and spelling errors.
+
+Suggested commit messages must follow Conventional Commits:
+
+```text
+<type>(<optional-scope>): <imperative English summary>
+```
+
+Allowed types:
+
+- `feat`
+- `fix`
+- `docs`
+- `style`
+- `refactor`
+- `test`
+- `ci`
+- `chore`
+
+Use a scope such as `client`, `server`, `shared`, `platform`, or a game name
+only when it adds useful precision.
+
+Examples:
+
+```text
+feat(client): add room invitation flow
+fix(server): preserve player session
+docs: simplify repository guidelines
+```
+
+End the final response for every completed task with one task-specific line:
+
+```text
+Commit message: <type>(<optional-scope>): <imperative English summary>
+```
+
+## Common Commands
 
 ```bash
-# Install all dependencies (root + workspaces)
+# Install dependencies
 npm install
 
-# Run both server and client in dev mode (concurrent)
+# Run the complete development environment
 npm run dev
 
-# Run server only (tsx watch, hot-reload, port 3001)
+# Run one side only
 npm run dev:server
-
-# Run client only (Vite dev server, port 5173)
 npm run dev:client
 
-# Build client
-npm -w client run build
+# Build the project
+npm run build
 
-# Build server
-npm -w server run build
-
-# Format all files with Prettier
-npm run format
-
-# Check formatting without writing
+# Check formatting without modifying files
 npm run format:check
 ```
 
-No test framework is configured.
+Run the smallest relevant test command available for the affected part of the
+project. There may be no single command covering every package or game.
 
-## Workflow Rules
+Avoid repository-wide formatting when only a small set of files changed.
 
-- **After every completed task**, provide a commit message in English using [Conventional Commits](https://www.conventionalcommits.org/) format (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `style:`, `docs:`).
+## Working Principles
 
-## Architecture
-
-**Monorepo** using npm workspaces with three packages: `shared`, `server`, `client`.
-
-### shared/
-
-Single file `types.ts` — all TypeScript interfaces and Socket.IO event type maps used by both server and client. Contains `GamePhase` (9 phases), `PublicGameState`, `Character`, `ClientEvents`/`ServerEvents`.
-
-### server/ (Express + Socket.IO)
-
-- **`src/index.ts`** — Express app + Socket.IO server on port 3001, calls `registerHandlers(io)`
-- **`src/config.ts`** — All tunable constants (timers, player limits, round counts). Has switchable `TEST_TIMERS` / `PROD_TIMERS` sets
-- **`src/socketHandlers.ts`** — Socket event registration; maintains `socketRoomMap` for O(1) socket→room/player lookup. Routes events to roomManager and gameEngine
-- **`src/roomManager.ts`** — In-memory `Map<string, Room>` holding all rooms/players/game state. No database
-- **`src/gameEngine.ts`** — Core game logic: phase transitions via `setTimeout` chains, voting/tiebreak, attribute reveals, admin panel functions (shuffle/swap/replace), pause/unpause, bot action scheduling. `broadcastState()` pushes full `PublicGameState` to all clients after every change
-- **`src/characterGenerator.ts`** — Random character generation (6 attributes + 1 action card)
-- **`src/botManager.ts`** — AI bot scheduling (random reveals, staggered votes)
-- **`src/data/`** — Static game content arrays (professions, health, hobbies, baggage, facts, catastrophes, bunkers, actions) all in Russian
-
-### client/ (React 18 + Vite + TypeScript)
-
-- **`src/socket.ts`** — Typed Socket.IO client singleton, `autoConnect: false`. In dev connects to `http://<hostname>:3001` (LAN-friendly)
-- **`src/context/GameContext.tsx`** — Single React context provider managing all state. Listens to server events, stores `gameState`, `myCharacter` (private), handles reconnection via `sessionStorage`
-- **`src/App.tsx`** — Phase-based screen router (switch on `gameState.phase`) + global `PauseOverlay` component
-- **`src/screens/`** — One screen per game phase group: HomeScreen, LobbyScreen, GameScreen (covers reveal/discussion/result phases), VoteScreen, ResultsScreen
-
-### Key Patterns
-
-- **State flow is server-authoritative**: every mutation triggers `broadcastState()` which serializes and pushes the full public game state to all clients. Clients never maintain local game logic.
-- **Private data** (full character) is sent only via `game:character` to the owning socket, never in the public broadcast.
-- **Phase timers** are server-side `setTimeout`s. `phaseEndTime` (epoch ms) is included in public state so clients render countdowns via `endTime - Date.now()`.
-- **Reconnection**: client auto-emits `room:rejoin` on socket reconnect using `sessionStorage` credentials. Server restores socket mapping and resends character + state.
-- **All game content is in Russian** — UI text, data arrays, action card descriptions.
-- **Action cards** ("Особые условия") are display-only: each player gets a random card visible only to them. Players can reveal it publicly via a button (any phase except voting). The host applies card effects manually via the admin panel.
-- **Admin panel** (host only): shuffle attributes, swap between players, replace with random. Opening the panel pauses the game (server clears phase timer, saves remaining time). Closing resumes. All non-host players see a fullscreen "Пауза" overlay while paused.
-
-### Game Flow
-
-```
-LOBBY → CATASTROPHE_REVEAL (8s) → [Rounds 1-5]:
-  BUNKER_EXPLORE (5s, reveals next bunker card)
-  → ROUND_REVEAL (turn-based attribute reveals; Round 1 auto-reveals professions)
-  → ROUND_DISCUSSION (60s) → ROUND_VOTE (60s, or early when all voted)
-    → tie? ROUND_VOTE_TIEBREAK (30s defense + 60s vote, second tie = random elimination)
-  → ROUND_RESULT (6s)
-  → (repeat discussion/vote if multiple eliminations scheduled this round)
-→ GAME_OVER (when round 5 ends or alive ≤ bunkerCapacity)
-```
-
-Voting schedule distributes `playerCount - floor(playerCount/2)` eliminations across 5 rounds. Last-eliminated player votes alongside alive players each round.
+- Keep every change focused on the requested task.
+- Do not perform unrelated refactors, dependency upgrades, formatting sweeps,
+  or generated-file updates.
+- Follow existing patterns before introducing new abstractions.
+- Keep multiplayer state and validation server-authoritative unless the task
+  explicitly changes that architecture.
+- When a shared contract changes, update all affected producers and consumers.
+- Keep game-specific rules, state, content, and UI isolated from other games
+  and from shared platform infrastructure.
+- Follow the language and style of the existing user-facing surface.
+- Never expose secrets or log credential values.
+- Do not modify generated, runtime, or internal tooling artifacts unless the
+  task explicitly targets them.
+- Do not initiate deployment unless the user explicitly requests it.
+- Validate changes proportionally with relevant tests, builds, and formatting
+  checks.
