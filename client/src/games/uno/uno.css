@@ -6,6 +6,10 @@
   --uno-line: rgba(220, 233, 255, 0.16);
   --uno-muted: rgba(238, 244, 255, 0.62);
   --uno-gold: #e6c05c;
+  --uno-red: #d94f45;
+  --uno-yellow: #e7b93f;
+  --uno-green: #2f9d68;
+  --uno-blue: #357ac8;
   gap: 15px;
   padding-bottom: 108px;
   background:
@@ -48,10 +52,14 @@
 }
 
 .uno-lobby-settings {
+  --uno-line: rgba(220, 233, 255, 0.16);
+  --uno-muted: rgba(238, 244, 255, 0.62);
+  --uno-gold: #e6c05c;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, auto);
-  gap: 20px;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(400px, 1.25fr);
+  gap: 24px 32px;
   align-items: center;
+  margin-bottom: 16px;
   padding: 18px;
   border-radius: 16px;
   background: rgba(18, 30, 49, 0.84);
@@ -82,6 +90,7 @@
   color: var(--uno-muted);
   font-size: 0.72rem;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 }
 .uno-timer-options button.is-active {
@@ -288,6 +297,34 @@ button.uno-pile:disabled {
 button.uno-pile:not(:disabled):hover .uno-card {
   transform: translateY(-5px) rotate(-2deg);
 }
+.uno-draw-pile {
+  position: relative;
+  isolation: isolate;
+}
+.uno-draw-pile::before,
+.uno-draw-pile::after {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  z-index: 0;
+  width: 68px;
+  height: 96px;
+  border: 2px solid rgba(247, 238, 219, 0.58);
+  border-radius: 12px;
+  background: #111a2a;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.22);
+  content: "";
+}
+.uno-draw-pile::before {
+  transform: translateX(-50%) translate(6px, 4px) rotate(3deg);
+}
+.uno-draw-pile::after {
+  transform: translateX(-50%) translate(3px, 2px) rotate(1.5deg);
+}
+.uno-draw-pile > * {
+  position: relative;
+  z-index: 1;
+}
 .uno-empty-card {
   display: flex;
   width: 68px;
@@ -330,44 +367,46 @@ button.uno-pile:not(:disabled):hover .uno-card {
   border-radius: 8px;
 }
 .uno-card.is-red {
-  background: #ca534f;
+  background: var(--uno-red, #d94f45);
 }
 .uno-card.is-yellow {
-  background: #d7aa3e;
-  color: #192135;
+  background: var(--uno-yellow, #e7b93f);
 }
 .uno-card.is-green {
-  background: #3e9a70;
+  background: var(--uno-green, #2f9d68);
 }
 .uno-card.is-blue {
-  background: #497fbe;
+  background: var(--uno-blue, #357ac8);
 }
 .uno-card.is-wild {
-  background: #1e2a3b;
+  background: #172033;
 }
 .uno-card::before {
   position: absolute;
-  top: 23%;
-  left: -26%;
-  width: 152%;
-  height: 29%;
-  transform: rotate(-27deg);
-  clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%);
-  background: rgba(255, 255, 255, 0.18);
+  top: 50%;
+  left: 50%;
+  width: 63%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border: 2px solid rgba(23, 32, 51, 0.13);
+  border-radius: 28%;
+  background: #f7eedb;
+  box-shadow: 0 3px 8px rgba(23, 32, 51, 0.18);
   content: "";
 }
 .uno-card.is-wild::before {
-  background: linear-gradient(90deg, #d75a55 0 25%, #e3bd4d 25% 50%, #4ea478 50% 75%, #5a92d0 75%);
-  opacity: 0.78;
+  background: #f7eedb;
 }
 .uno-card-corner {
   position: absolute;
   z-index: 1;
   top: 5px;
   left: 6px;
+  color: #fff9ed;
   font-size: 0.65rem;
   font-weight: 900;
   line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
 }
 .uno-card-corner.is-bottom {
   inset: auto 6px 5px auto;
@@ -380,16 +419,19 @@ button.uno-pile:not(:disabled):hover .uno-card {
   width: 48px;
   height: 48px;
   place-items: center;
+  color: #172033;
   font-size: 1.65rem;
   font-weight: 900;
 }
 .uno-card-core img {
+  display: block;
   width: 42px;
   height: 42px;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
 }
-.uno-card.is-yellow .uno-card-core img {
-  filter: invert(1) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+.uno-card.is-yellow .uno-card-corner {
+  color: #172033;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 .uno-card.is-mini .uno-card-core {
   width: 28px;
@@ -429,6 +471,12 @@ button.uno-card {
 button.uno-card.is-playable:hover,
 button.uno-card.is-bluffable:hover {
   z-index: 2;
+  transform: translateY(-8px);
+}
+button.uno-card:focus-visible {
+  z-index: 3;
+  outline: 3px solid #f7eedb;
+  outline-offset: 3px;
   transform: translateY(-8px);
 }
 .uno-card-back {
@@ -782,6 +830,7 @@ button.uno-card.is-bluffable:hover {
   }
   .uno-lobby-settings {
     grid-template-columns: 1fr;
+    padding: 15px;
   }
   .uno-piles {
     min-height: 194px;

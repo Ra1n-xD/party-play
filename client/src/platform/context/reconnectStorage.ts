@@ -29,6 +29,7 @@ export interface ReconnectSession {
   roomCode: string;
   participantId: string;
   sessionToken: string;
+  autoRejoin: boolean;
 }
 
 function getBrowserStorage(): StorageLike | null {
@@ -67,6 +68,7 @@ function normalizeSession(value: unknown): ReconnectSession | null {
     roomCode,
     participantId,
     sessionToken,
+    autoRejoin: session.autoRejoin !== false,
   };
 }
 

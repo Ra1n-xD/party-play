@@ -3,6 +3,7 @@ import { BiDonateHeart } from "react-icons/bi";
 import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
 import { ROOM_CODE_LENGTH, sanitizeRoomCodeInput } from "../../../../shared/roomCode";
 import { AccessibleModal } from "../components/AccessibleModal";
+import { GameRulesModal } from "../components/GameRulesModal";
 import { usePlatform } from "../context/PlatformContext";
 import {
   clientGameRegistry,
@@ -18,20 +19,13 @@ type CatalogSlot = {
 };
 
 export function HomeScreen() {
-  const {
-    createRoom,
-    joinRoom,
-    joinAsSpectator,
-    retainedReconnectSession,
-    resumeRetainedSession,
-    sessionPending,
-    error,
-  } = usePlatform();
+  const { createRoom, joinRoom, joinAsSpectator, sessionPending, error } = usePlatform();
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(null);
   const [createName, setCreateName] = useState("");
   const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [rulesGameId, setRulesGameId] = useState<RegisteredClientGameId | null>(null);
 
   const catalogSlots = useMemo(() => {
     const slots: Array<CatalogSlot | null> = Array.from({ length: CATALOG_SLOT_COUNT }, () => null);
@@ -44,6 +38,7 @@ export function HomeScreen() {
     return slots;
   }, []);
   const selectedGame = selectedGameId ? clientGameRegistry[selectedGameId] : null;
+  const rulesGame = rulesGameId ? clientGameRegistry[rulesGameId] : null;
   const availableGameCount = Object.keys(clientGameRegistry).length;
 
   const canEnterRoom =
@@ -61,8 +56,22 @@ export function HomeScreen() {
   };
 
   const openCreateModal = (gameId: RegisteredClientGameId) => {
+    setRulesGameId(null);
+    setRecoveryOpen(false);
     setCreateName(name);
     setSelectedGameId(gameId);
+  };
+
+  const openRulesModal = (gameId: RegisteredClientGameId) => {
+    setSelectedGameId(null);
+    setRecoveryOpen(false);
+    setRulesGameId(gameId);
+  };
+
+  const openRecoveryModal = () => {
+    setSelectedGameId(null);
+    setRulesGameId(null);
+    setRecoveryOpen(true);
   };
 
   const handleCreate = (event: FormEvent) => {
@@ -157,27 +166,15 @@ export function HomeScreen() {
             >
               Наблюдать
             </button>
-          </form>
-
-          <div className="platform-home-session-actions">
-            {retainedReconnectSession && (
-              <button
-                type="button"
-                className="btn btn-primary platform-home-resume"
-                onClick={resumeRetainedSession}
-                disabled={sessionPending}
-              >
-                Продолжить игру · {retainedReconnectSession.roomCode}
-              </button>
-            )}
             <button
               type="button"
-              className="btn btn-reconnect"
-              onClick={() => setRecoveryOpen(true)}
+              className="btn btn-reconnect platform-home-return"
+              onClick={openRecoveryModal}
+              disabled={sessionPending}
             >
-              Восстановить место
+              Вернуться в игру
             </button>
-          </div>
+          </form>
           {error && (
             <div className="platform-home-error" role="alert">
               {error}
@@ -199,24 +196,36 @@ export function HomeScreen() {
           <div className="platform-game-grid">
             {catalogSlots.map((game, index) =>
               game ? (
-                <button
-                  type="button"
-                  className="platform-game-card is-active"
-                  key={game.id}
-                  onClick={() => openCreateModal(game.id)}
-                  aria-haspopup="dialog"
-                >
+                <article className="platform-game-card is-active" key={game.id}>
                   <span className="platform-game-cover">
                     <img src={game.metadata.coverImage} alt={game.metadata.coverAlt} />
                   </span>
-                  <span className="platform-game-copy">
-                    <span className="platform-game-name-row">
-                      <strong>{game.metadata.title}</strong>
-                      <span>Играть</span>
-                    </span>
-                    <span>{game.metadata.playerSummary}</span>
-                  </span>
-                </button>
+                  <div className="platform-game-copy">
+                    <strong>{game.metadata.title}</strong>
+                    <span>{game.metadata.description}</span>
+                    <small>{game.metadata.playerSummary}</small>
+                  </div>
+                  <div className="platform-game-actions">
+                    <button
+                      type="button"
+                      className="platform-game-play"
+                      onClick={() => openCreateModal(game.id)}
+                      aria-haspopup="dialog"
+                      aria-label={`Играть в ${game.metadata.title}`}
+                    >
+                      Играть
+                    </button>
+                    <button
+                      type="button"
+                      className="platform-game-rules"
+                      onClick={() => openRulesModal(game.id)}
+                      aria-haspopup="dialog"
+                      aria-label={`Правила игры ${game.metadata.title}`}
+                    >
+                      Правила
+                    </button>
+                  </div>
+                </article>
               ) : (
                 <article className="platform-game-card is-placeholder" key={`placeholder-${index}`}>
                   <div className="platform-game-cover" aria-hidden="true" />
@@ -280,6 +289,15 @@ export function HomeScreen() {
             </button>
           </form>
         </AccessibleModal>
+      )}
+
+      {rulesGame && (
+        <GameRulesModal
+          gameId={rulesGame.id}
+          gameTitle={rulesGame.metadata.title}
+          rules={rulesGame.rules}
+          onClose={() => setRulesGameId(null)}
+        />
       )}
 
       {recoveryOpen && (

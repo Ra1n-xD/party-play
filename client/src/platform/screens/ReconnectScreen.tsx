@@ -72,7 +72,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
           <strong>Сохранённое место · {retainedReconnectSession.roomCode}</strong>
           <p>Можно вернуться напрямую в этом браузере без подтверждения хоста.</p>
           <button type="button" className="btn btn-primary" onClick={resumeRetainedSession}>
-            Продолжить игру · {retainedReconnectSession.roomCode}
+            Вернуться в игру · {retainedReconnectSession.roomCode}
           </button>
         </div>
       )}

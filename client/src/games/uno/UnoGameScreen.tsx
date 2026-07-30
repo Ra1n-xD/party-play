@@ -245,6 +245,7 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
   return (
     <main className="screen command-game-screen uno-screen">
       <GameRoomHeader
+        gameId="uno"
         roomCode={snapshot.roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}

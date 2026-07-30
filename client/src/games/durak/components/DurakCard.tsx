@@ -63,12 +63,13 @@ interface DurakCardProps {
 export function DurakCard({
   card,
   size = "table",
-  selected = false,
+  selected,
   playable = false,
   disabled = false,
   onClick,
   ariaLabel,
 }: DurakCardProps) {
+  const accessibleName = ariaLabel ?? getCardName(card);
   const className = [
     "durak-card",
     `is-${size}`,
@@ -103,7 +104,8 @@ export function DurakCard({
         onClick={onClick}
         disabled={disabled}
         aria-pressed={selected}
-        aria-label={ariaLabel ?? getCardName(card)}
+        aria-label={accessibleName}
+        title={accessibleName}
       >
         {content}
       </button>
@@ -111,7 +113,7 @@ export function DurakCard({
   }
 
   return (
-    <div className={className} aria-label={ariaLabel ?? getCardName(card)} role="img">
+    <div className={className} aria-label={accessibleName} role="img" title={accessibleName}>
       {content}
     </div>
   );

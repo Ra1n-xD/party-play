@@ -14,7 +14,7 @@ import {
 } from "../../platform/components/ReconnectHostControls";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
-import { DurakCard, DurakCardBack, getSuitSymbol } from "./components/DurakCard";
+import { DurakCard, DurakCardBack, getCardName, getSuitSymbol } from "./components/DurakCard";
 
 interface DurakGameScreenProps {
   snapshot: RoomSnapshot<"durak">;
@@ -241,6 +241,7 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
   return (
     <main className="screen command-game-screen durak-screen">
       <GameRoomHeader
+        gameId="durak"
         roomCode={snapshot.roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
@@ -368,9 +369,6 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
               <span className="durak-section-eyebrow">Стол</span>
               <h2 id="durak-table-title">Бой</h2>
             </div>
-            <span>
-              {game.table.length}/{game.maxAttackCards || "—"} атак
-            </span>
           </div>
 
           {game.table.length === 0 ? (
@@ -381,38 +379,40 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
             </div>
           ) : (
             <div className="durak-table-grid">
-              {game.table.map((pair, index) => {
+              {game.table.map((pair) => {
                 const canTarget =
                   !pair.defense && canAct && selectedDefenseTargets.has(pair.attack.id);
+                const attackerName = playersById.get(pair.attackPlayedBySeatId)?.name ?? "Игрок";
+                const defenderName = pair.defensePlayedBySeatId
+                  ? (playersById.get(pair.defensePlayedBySeatId)?.name ?? "Игрок")
+                  : "Защита";
                 return (
-                  <article className="durak-table-pair" key={pair.attack.id}>
-                    <span className="durak-pair-number">Атака {index + 1}</span>
+                  <article
+                    className={`durak-table-pair ${pair.defense ? "is-covered" : ""}`}
+                    key={pair.attack.id}
+                  >
                     <div className="durak-pair-cards">
-                      <div>
-                        <DurakCard card={pair.attack} size="table" />
-                        <span>{playersById.get(pair.attackPlayedBySeatId)?.name ?? "Игрок"}</span>
+                      <div className="durak-pair-card is-attack">
+                        <DurakCard
+                          card={pair.attack}
+                          size="table"
+                          playable={canTarget}
+                          onClick={canTarget ? () => defendAttack(pair.attack.id) : undefined}
+                          ariaLabel={
+                            canTarget
+                              ? `Побить карту: ${getCardName(pair.attack)} — атаковал ${attackerName}`
+                              : `${attackerName} атаковал: ${getCardName(pair.attack)}`
+                          }
+                        />
                       </div>
-                      <span className="durak-pair-arrow" aria-hidden="true">
-                        →
-                      </span>
-                      {pair.defense ? (
-                        <div>
-                          <DurakCard card={pair.defense} size="table" />
-                          <span>
-                            {pair.defensePlayedBySeatId
-                              ? (playersById.get(pair.defensePlayedBySeatId)?.name ?? "Игрок")
-                              : "Защита"}
-                          </span>
+                      {pair.defense && (
+                        <div className="durak-pair-card is-defense">
+                          <DurakCard
+                            card={pair.defense}
+                            size="table"
+                            ariaLabel={`${defenderName} побил: ${getCardName(pair.defense)}`}
+                          />
                         </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className={`durak-defense-target ${canTarget ? "is-available" : ""}`}
-                          disabled={!canTarget}
-                          onClick={() => defendAttack(pair.attack.id)}
-                        >
-                          {canTarget ? "Побить эту карту" : "Не покрыта"}
-                        </button>
                       )}
                     </div>
                   </article>

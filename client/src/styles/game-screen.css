@@ -100,7 +100,10 @@
 .command-game-screen .gs-room-brand,
 .command-game-screen .gs-room-controls,
 .command-game-screen .gs-room-connection,
-.command-game-screen .gs-room-action {
+.command-game-screen .gs-room-action,
+.command-game-screen .gs-room-tool,
+.command-game-screen .room-reactions,
+.command-game-screen .room-reactions-trigger {
   display: flex;
   align-items: center;
 }
@@ -142,6 +145,203 @@
   min-width: 0;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.command-game-screen .gs-room-tool,
+.command-game-screen .room-reactions-trigger {
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--gs-border);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--gs-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    color 0.2s,
+    transform 0.2s;
+}
+
+.command-game-screen .gs-room-tool:hover,
+.command-game-screen .gs-room-tool:focus-visible,
+.command-game-screen .room-reactions-trigger:hover:not(:disabled),
+.command-game-screen .room-reactions-trigger:focus-visible {
+  border-color: rgba(239, 189, 88, 0.38);
+  background: var(--gs-accent-soft);
+  color: var(--gs-gold);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.command-game-screen .room-reactions {
+  position: relative;
+  min-width: 0;
+}
+
+.command-game-screen .room-reactions-trigger {
+  width: 44px;
+  flex: 0 0 44px;
+  padding: 0;
+  font-size: 1.05rem;
+}
+
+.command-game-screen .room-reactions-trigger[aria-disabled="true"] {
+  opacity: 0.48;
+  cursor: wait;
+}
+
+.command-game-screen .room-reactions-popover {
+  position: absolute;
+  z-index: 110;
+  top: calc(100% + 9px);
+  right: 0;
+  display: grid;
+  width: min(286px, calc(100vw - 24px));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(239, 189, 88, 0.24);
+  border-radius: 14px;
+  background: rgba(12, 19, 15, 0.98);
+  box-shadow: 0 18px 48px rgba(1, 7, 4, 0.52);
+  animation: room-reaction-popover-in 0.16s ease-out both;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.command-game-screen .room-reactions-option {
+  display: grid;
+  min-width: 0;
+  min-height: 58px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 8px 9px;
+  border: 1px solid var(--gs-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--gs-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.16s,
+    background 0.16s,
+    transform 0.16s;
+}
+
+.command-game-screen .room-reactions-option:hover,
+.command-game-screen .room-reactions-option:focus-visible {
+  border-color: rgba(118, 198, 158, 0.38);
+  background: rgba(118, 198, 158, 0.09);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.command-game-screen .room-reactions-option-emoji {
+  font-size: 1.35rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.command-game-screen .room-reactions-option-label {
+  min-width: 0;
+  color: var(--gs-text);
+  font-size: 0.7rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.command-game-screen .room-reactions-live {
+  position: fixed;
+  z-index: 88;
+  top: calc(64px + env(safe-area-inset-top));
+  right: 18px;
+  display: grid;
+  width: min(300px, calc(100vw - 36px));
+  gap: 7px;
+  pointer-events: none;
+}
+
+.command-game-screen .room-reaction-message {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid rgba(239, 189, 88, 0.23);
+  border-radius: 14px;
+  background: rgba(12, 19, 15, 0.94);
+  box-shadow: 0 12px 36px rgba(1, 7, 4, 0.42);
+  animation: room-reaction-message-in 0.24s ease-out both;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.command-game-screen .room-reaction-message-emoji {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(239, 189, 88, 0.22);
+  border-radius: 12px;
+  background: var(--gs-accent-soft);
+  font-size: 1.45rem;
+}
+
+.command-game-screen .room-reaction-message-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.command-game-screen .room-reaction-message-copy strong,
+.command-game-screen .room-reaction-message-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-game-screen .room-reaction-message-copy strong {
+  color: var(--gs-text);
+  font-size: 0.75rem;
+}
+
+.command-game-screen .room-reaction-message-copy span {
+  color: var(--gs-muted);
+  font-size: 0.68rem;
+}
+
+@keyframes room-reaction-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes room-reaction-message-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 .command-game-screen .gs-room-code {
@@ -1574,6 +1774,7 @@
 
   .command-game-screen .gs-room-header {
     min-height: 52px;
+    flex-wrap: nowrap;
     gap: 8px;
     margin-inline: -12px;
     padding: 4px 12px;
@@ -1601,6 +1802,8 @@
   }
 
   .command-game-screen .gs-room-brand {
+    flex: 1 1 0;
+    overflow: hidden;
     gap: 7px;
   }
 
@@ -1612,18 +1815,31 @@
   }
 
   .command-game-screen .gs-room-brand-copy strong {
+    display: block;
+    overflow: hidden;
     font-size: 0.8rem;
     letter-spacing: 0.12em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .command-game-screen .gs-room-code span,
-  .command-game-screen .gs-room-connection span {
+  .command-game-screen .gs-room-connection span,
+  .command-game-screen .gs-room-tool span {
     display: none;
   }
 
   .command-game-screen .gs-room-controls {
     order: 2;
+    flex: 0 0 auto;
     gap: 4px;
+  }
+
+  .command-game-screen .gs-room-tool {
+    width: 44px;
+    flex: 0 0 44px;
+    padding: 0;
+    font-size: 1.05rem;
   }
 
   .command-game-screen .gs-room-code {
@@ -1636,6 +1852,18 @@
     min-height: 44px;
     justify-content: center;
     padding: 0;
+  }
+
+  .command-game-screen .room-reactions-popover {
+    position: fixed;
+    top: calc(58px + env(safe-area-inset-top));
+    right: 12px;
+  }
+
+  .command-game-screen .room-reactions-live {
+    top: calc(60px + env(safe-area-inset-top));
+    right: 12px;
+    width: min(300px, calc(100vw - 24px));
   }
 
   .command-game-screen .gs-desktop-layout {
@@ -1897,6 +2125,12 @@
   }
 }
 
+@media (max-width: 520px) {
+  .command-game-screen .gs-room-connection {
+    display: none;
+  }
+}
+
 @media (max-width: 480px) {
   .command-game-screen .gs-status-actions {
     grid-template-columns: 1fr;
@@ -1950,10 +2184,6 @@
 }
 
 @media (max-width: 360px) {
-  .command-game-screen .gs-room-connection {
-    display: none;
-  }
-
   .command-game-screen .gs-room-brand-copy strong {
     font-size: 0.74rem;
     letter-spacing: 0.09em;

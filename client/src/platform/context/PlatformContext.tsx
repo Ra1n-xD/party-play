@@ -19,6 +19,7 @@ import type {
   SeatClaimInfo,
   ServerEvents,
 } from "../../../../shared/platform/protocol";
+import type { RoomReactionEvent, RoomReactionId } from "../../../../shared/platform/reactions";
 import type {
   AnyRoomCommandEnvelope,
   AnyRoomSnapshot,
@@ -122,6 +123,7 @@ interface PlatformContextValue {
   hostSeatClaims: SeatClaimInfo[];
   hostChangeNotice: HostChangeNotice | null;
   gameEvents: QueuedGameEvent[];
+  roomReactions: RoomReactionEvent[];
   createRoom: (gameId: GameId, name: string) => void;
   joinRoom: (code: string, name: string) => void;
   joinAsSpectator: (code: string, name: string) => void;
@@ -148,6 +150,7 @@ interface PlatformContextValue {
   requestSeatClaim: (roomCode: string, playerId: string, claimantName: string) => void;
   cancelSeatClaim: () => void;
   clearHostChangeNotice: () => void;
+  sendReaction: (reactionId: RoomReactionId) => boolean;
 }
 
 const PlatformContext = createContext<PlatformContextValue | null>(null);
@@ -207,6 +210,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   const [hostSeatClaims, setHostSeatClaims] = useState<SeatClaimInfo[]>([]);
   const [hostChangeNotice, setHostChangeNotice] = useState<HostChangeNotice | null>(null);
   const [gameEvents, setGameEvents] = useState<QueuedGameEvent[]>([]);
+  const [roomReactions, setRoomReactions] = useState<RoomReactionEvent[]>([]);
 
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const acceptedSessionRef = useRef<ReconnectSession | null>(null);
@@ -224,6 +228,8 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   const ignoreRecoveryEventsRef = useRef(true);
   const snapshotRef = useRef<AnyRoomSnapshot | null>(null);
   const gameEventSequenceRef = useRef(0);
+  const seenReactionIdsRef = useRef(new Set<string>());
+  const reactionTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const queuedCommandsRef = useRef<QueuedRoomCommand[]>([]);
   const inFlightCommandRef = useRef<QueuedRoomCommand | null>(null);
   const latestServerRevisionRef = useRef<number | null>(null);
@@ -233,6 +239,15 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     inFlightCommandRef.current = null;
     latestServerRevisionRef.current = null;
     setCommandPending(false);
+  }, []);
+
+  const clearRoomReactions = useCallback(() => {
+    for (const timer of reactionTimersRef.current.values()) {
+      clearTimeout(timer);
+    }
+    reactionTimersRef.current.clear();
+    seenReactionIdsRef.current.clear();
+    setRoomReactions([]);
   }, []);
 
   const flushCommandQueue = useCallback(() => {
@@ -325,6 +340,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       setHostSeatClaims([]);
       setHostChangeNotice(null);
       setGameEvents([]);
+      clearRoomReactions();
     };
 
     const clearStoredSession = () => {
@@ -343,8 +359,10 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       const savedSession = acceptedSessionRef.current ?? readReconnectSession();
       if (!savedSession) return false;
 
-      acceptedSessionRef.current = savedSession;
       setRetainedReconnectSession(summarizeRetainedSession(savedSession));
+      if (!savedSession.autoRejoin) return false;
+
+      acceptedSessionRef.current = savedSession;
       membershipRequestPendingRef.current = true;
       setSessionPending(true);
       sessionAcceptanceExpectationRef.current = {
@@ -400,11 +418,11 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       setSeatLookupState({ status: "idle", roomCode: null });
       ignoreRecoveryEventsRef.current = true;
 
-      if (
-        !reconnectSessionTombstonedRef.current &&
-        (acceptedSessionRef.current ?? readReconnectSession())
-      ) {
+      const reconnectSession = acceptedSessionRef.current ?? readReconnectSession();
+      if (!reconnectSessionTombstonedRef.current && reconnectSession?.autoRejoin) {
         setReconnectState("reconnecting");
+      } else {
+        setReconnectState("idle");
       }
       setPendingSeatClaim((current) =>
         current && ["submitting", "waiting", "cancelling", "approved"].includes(current.status)
@@ -427,6 +445,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         roomCode: code,
         participantId,
         sessionToken: token,
+        autoRejoin: true,
       };
       acceptedSessionRef.current = acceptedSession;
       membershipReadyRef.current = true;
@@ -455,6 +474,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       snapshotRef.current = null;
       resetCommandQueue();
       setGameEvents([]);
+      clearRoomReactions();
       saveReconnectSession(acceptedSession);
     };
 
@@ -639,6 +659,22 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       setGameEvents((current) => [...current.slice(-49), { sequence, payload }]);
     };
 
+    const handleRoomReaction: ServerEvents["room:reaction"] = (reaction) => {
+      if (ignoreRoomEventsRef.current) return;
+      if (reaction.roomCode !== acceptedSessionRef.current?.roomCode) return;
+      if (seenReactionIdsRef.current.has(reaction.eventId)) return;
+
+      seenReactionIdsRef.current.add(reaction.eventId);
+      setRoomReactions((current) => [...current, reaction].slice(-4));
+
+      const timer = setTimeout(() => {
+        reactionTimersRef.current.delete(reaction.eventId);
+        seenReactionIdsRef.current.delete(reaction.eventId);
+        setRoomReactions((current) => current.filter((item) => item.eventId !== reaction.eventId));
+      }, 3_600);
+      reactionTimersRef.current.set(reaction.eventId, timer);
+    };
+
     const handleReconnectableSeats: ServerEvents["room:reconnectableSeats"] = ({
       roomCode: recoveryRoomCode,
       seats,
@@ -735,6 +771,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     socket.on("room:snapshot", handleSnapshot);
     socket.on("room:commandResult", handleCommandResult);
     socket.on("game:event", handleGameEvent);
+    socket.on("room:reaction", handleRoomReaction);
     socket.on("room:reconnectableSeats", handleReconnectableSeats);
     socket.on("room:seatClaimSubmitted", handleSeatClaimSubmitted);
     socket.on("room:seatClaimResolved", handleSeatClaimResolved);
@@ -759,15 +796,17 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       socket.off("room:snapshot", handleSnapshot);
       socket.off("room:commandResult", handleCommandResult);
       socket.off("game:event", handleGameEvent);
+      socket.off("room:reaction", handleRoomReaction);
       socket.off("room:reconnectableSeats", handleReconnectableSeats);
       socket.off("room:seatClaimSubmitted", handleSeatClaimSubmitted);
       socket.off("room:seatClaimResolved", handleSeatClaimResolved);
       socket.off("admin:seatClaimsUpdated", handleSeatClaimsUpdated);
       socket.off("room:hostChanged", handleHostChanged);
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      clearRoomReactions();
       resetCommandQueue();
     };
-  }, [flushCommandQueue, resetCommandQueue]);
+  }, [clearRoomReactions, flushCommandQueue, resetCommandQueue]);
 
   const createRoom = useCallback((gameId: GameId, name: string) => {
     if (
@@ -853,32 +892,38 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
+    const automaticSession: ReconnectSession = {
+      ...savedSession,
+      autoRejoin: true,
+    };
+    acceptedSessionRef.current = automaticSession;
+    saveReconnectSession(automaticSession);
     membershipRequestPendingRef.current = true;
     setSessionPending(true);
     explicitLeaveSuppressedRef.current = false;
     sessionAcceptanceExpectationRef.current = {
-      event: savedSession.role === "spectator" ? "room:spectatorJoined" : "room:joined",
+      event: automaticSession.role === "spectator" ? "room:spectatorJoined" : "room:joined",
       source: "rejoin",
-      roomCode: savedSession.roomCode,
-      participantId: savedSession.participantId,
+      roomCode: automaticSession.roomCode,
+      participantId: automaticSession.participantId,
     };
-    setActiveGameId(savedSession.gameId);
-    setRoomCode(savedSession.roomCode);
-    setPlayerId(savedSession.participantId);
-    setIsSpectator(savedSession.role === "spectator");
+    setActiveGameId(automaticSession.gameId);
+    setRoomCode(automaticSession.roomCode);
+    setPlayerId(automaticSession.participantId);
+    setIsSpectator(automaticSession.role === "spectator");
     setReconnectState("reconnecting");
 
-    if (savedSession.role === "spectator") {
+    if (automaticSession.role === "spectator") {
       socket.emit("room:rejoinSpectator", {
-        roomCode: savedSession.roomCode,
-        spectatorId: savedSession.participantId,
-        sessionToken: savedSession.sessionToken,
+        roomCode: automaticSession.roomCode,
+        spectatorId: automaticSession.participantId,
+        sessionToken: automaticSession.sessionToken,
       });
     } else {
       socket.emit("room:rejoin", {
-        roomCode: savedSession.roomCode,
-        playerId: savedSession.participantId,
-        sessionToken: savedSession.sessionToken,
+        roomCode: automaticSession.roomCode,
+        playerId: automaticSession.participantId,
+        sessionToken: automaticSession.sessionToken,
       });
     }
     return true;
@@ -917,6 +962,28 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     [emitCommonCommand],
   );
 
+  const sendReaction = useCallback((reactionId: RoomReactionId): boolean => {
+    const current = snapshotRef.current;
+    const viewer = current?.viewer;
+    if (!socket.connected || !membershipReadyRef.current || !current || viewer?.role !== "player") {
+      return false;
+    }
+
+    const viewerSeat = current.seats.find((seat) => seat.seatId === viewer.seatId);
+    if (
+      !viewerSeat ||
+      viewerSeat.closed ||
+      !viewerSeat.connected ||
+      viewerSeat.occupantKind !== "human" ||
+      viewerSeat.controllerKind !== "human"
+    ) {
+      return false;
+    }
+
+    socket.emit("room:sendReaction", { reactionId });
+    return true;
+  }, []);
+
   const leaveRoom = useCallback(() => {
     const current = snapshotRef.current;
     const retainOwnership = shouldRetainReconnectSessionOnLeave(
@@ -939,6 +1006,19 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       reconnectSessionTombstonedRef.current = true;
       clearReconnectSession();
       acceptedSessionRef.current = null;
+    } else {
+      const retainedSession = acceptedSessionRef.current ?? readReconnectSession();
+      if (retainedSession) {
+        const manualSession: ReconnectSession = {
+          ...retainedSession,
+          autoRejoin: false,
+        };
+        acceptedSessionRef.current = manualSession;
+        if (!saveReconnectSession(manualSession)) {
+          clearReconnectSession();
+        }
+        setRetainedReconnectSession(summarizeRetainedSession(manualSession));
+      }
     }
     snapshotRef.current = null;
     resetCommandQueue();
@@ -956,8 +1036,9 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     setHostSeatClaims([]);
     setHostChangeNotice(null);
     setGameEvents([]);
+    clearRoomReactions();
     if (!retainOwnership) setRetainedReconnectSession(null);
-  }, [isSpectator, resetCommandQueue]);
+  }, [clearRoomReactions, isSpectator, resetCommandQueue]);
 
   const listReconnectableSeats = useCallback((code: string) => {
     if (
@@ -1086,6 +1167,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         hostSeatClaims,
         hostChangeNotice,
         gameEvents,
+        roomReactions,
         createRoom,
         joinRoom,
         joinAsSpectator,
@@ -1115,6 +1197,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         requestSeatClaim,
         cancelSeatClaim,
         clearHostChangeNotice,
+        sendReaction,
       }}
     >
       {children}

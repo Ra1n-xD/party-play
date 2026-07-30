@@ -1026,7 +1026,41 @@ export function normalizeGameAfterPermanentKick(
   player.alive = false;
   player.socketId = "";
   room.pauseReasons.disconnectedSeatIds.delete(playerId);
+
+  if (!wasAlive && gs.phase === "ROUND_RESULT") {
+    // Preserve the completed ballot and elimination history. This kick only
+    // closes room access for a participant who had already been eliminated.
+    repairLastEliminatedPlayer(room, playerId);
+    if (!isGameplayPaused(room)) {
+      resumeGameIfReady(room, io, false);
+    }
+    broadcastState(room, io);
+    return true;
+  }
+
   removePlayerFromRevealOrder(room, playerId);
+
+  if (!wasAlive) {
+    // The player has already lost their place in the game. Close room access
+    // without turning that historical elimination into a new game event.
+    removeVotesInvolvingPlayer(room, playerId);
+    gs.tiebreakCandidateIds = gs.tiebreakCandidateIds.filter((id) => id !== playerId);
+    repairLastEliminatedPlayer(room, playerId);
+
+    const revealFinished =
+      gs.phase === "ROUND_REVEAL" && gs.currentTurnIndex >= gs.turnOrder.length;
+    if (!isGameplayPaused(room)) {
+      const revealAdvancedOnResume = resumeGameIfReady(room, io, false);
+      if (revealAdvancedOnResume) return true;
+      if (revealFinished && room.gameState?.phase === "ROUND_REVEAL") {
+        afterRevealPhase(room, io);
+        return true;
+      }
+    }
+
+    broadcastState(room, io);
+    return true;
+  }
 
   if (ballotWasActive) {
     clearCurrentBallot(room);

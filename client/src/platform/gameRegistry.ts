@@ -3,6 +3,10 @@ import type { GameId } from "../../../shared/platform/gameContract";
 import bunkerCover from "../assets/game-covers/bunker.jpg";
 import durakCover from "../assets/game-covers/durak.jpg";
 import unoCover from "../assets/game-covers/uno.jpg";
+import { bunkerRules } from "../games/bunker/rules";
+import { durakRules } from "../games/durak/rules";
+import { unoRules } from "../games/uno/rules";
+import type { GameRules } from "./gameRules";
 
 export interface GameCatalogMetadata {
   title: string;
@@ -18,6 +22,7 @@ export interface GameCatalogMetadata {
 export interface ClientGameModule<G extends GameId> {
   id: G;
   metadata: GameCatalogMetadata;
+  rules: GameRules;
   load: () => Promise<{ default: ComponentType }>;
 }
 
@@ -33,6 +38,7 @@ const bunkerModule = {
     coverImage: bunkerCover,
     coverAlt: "Защищённый вход в подземный бункер",
   },
+  rules: bunkerRules,
   load: () => import("../games/bunker/BunkerModule"),
 } satisfies ClientGameModule<"bunker">;
 
@@ -48,6 +54,7 @@ const durakModule = {
     coverImage: durakCover,
     coverAlt: "Игральные карты на тёмном столе",
   },
+  rules: durakRules,
   load: () => import("../games/durak/DurakModule"),
 } satisfies ClientGameModule<"durak">;
 
@@ -61,8 +68,9 @@ const unoModule = {
     maxPlayers: 10,
     catalogSlot: 2,
     coverImage: unoCover,
-    coverAlt: "Абстрактные цветные карты на тёмном фоне",
+    coverAlt: "Веер из шести ярких игровых карт с цифрами и символами на тёмном столе",
   },
+  rules: unoRules,
   load: () => import("../games/uno/UnoModule"),
 } satisfies ClientGameModule<"uno">;
 

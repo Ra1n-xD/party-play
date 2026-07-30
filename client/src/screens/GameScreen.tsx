@@ -174,6 +174,7 @@ export function GameScreen() {
   return (
     <main className="screen command-game-screen has-game-command-bar">
       <GameRoomHeader
+        gameId="bunker"
         roomCode={roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}

@@ -36,6 +36,7 @@ export function UnoResultsScreen({ snapshot }: UnoResultsScreenProps) {
   return (
     <main className="screen command-game-screen uno-screen uno-results-screen">
       <GameRoomHeader
+        gameId="uno"
         roomCode={snapshot.roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}

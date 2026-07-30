@@ -36,10 +36,12 @@
 }
 
 .durak-lobby-settings {
+  --durak-gold: #e7b85c;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, auto);
-  gap: 20px;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(400px, 1.25fr);
+  gap: 24px 32px;
   align-items: center;
+  margin-bottom: 16px;
   padding: 18px;
   background: rgba(11, 38, 29, 0.76);
   border: 1px solid rgba(231, 184, 92, 0.24);
@@ -75,6 +77,7 @@
   color: rgba(248, 242, 230, 0.76);
   font-size: 0.73rem;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -359,11 +362,6 @@
   font-size: 1rem;
 }
 
-.durak-table-heading > span {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.7rem;
-}
-
 .durak-empty-table {
   display: flex;
   min-height: 230px;
@@ -377,74 +375,56 @@
 
 .durak-table-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(182px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, 124px);
+  gap: 18px;
+  align-items: center;
+  justify-content: center;
   margin-top: 16px;
 }
 
 .durak-table-pair {
+  display: flex;
   min-width: 0;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 12px;
-}
-
-.durak-pair-number {
-  display: block;
-  margin-bottom: 8px;
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 0.62rem;
+  min-height: 136px;
+  align-items: center;
+  justify-content: center;
 }
 
 .durak-pair-cards {
-  display: grid;
-  grid-template-columns: minmax(62px, 1fr) auto minmax(62px, 1fr);
-  gap: 6px;
+  position: relative;
+  display: flex;
+  width: 124px;
+  min-height: 124px;
   align-items: center;
-  justify-items: center;
+  justify-content: center;
 }
 
-.durak-pair-cards > div {
+.durak-pair-card {
   display: flex;
   min-width: 0;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
 }
 
-.durak-pair-cards > div > span {
-  width: 100%;
-  overflow: hidden;
-  color: rgba(255, 255, 255, 0.43);
-  font-size: 0.56rem;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.durak-table-pair.is-covered .durak-pair-cards {
+  display: block;
 }
 
-.durak-pair-arrow {
-  color: rgba(231, 184, 92, 0.55);
-  font-size: 0.8rem;
+.durak-table-pair.is-covered .durak-pair-card {
+  position: absolute;
+  top: 6px;
+  left: 14px;
+  transform-origin: center;
 }
 
-.durak-defense-target {
-  width: 68px;
-  min-height: 96px;
-  padding: 6px;
-  background: rgba(0, 0, 0, 0.12);
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 9px;
-  color: rgba(255, 255, 255, 0.36);
-  font-size: 0.62rem;
+.durak-table-pair.is-covered .durak-pair-card.is-attack {
+  transform: translate(-15px, 10px) rotate(-4deg);
 }
 
-.durak-defense-target.is-available {
-  background: rgba(231, 184, 92, 0.12);
-  border-color: var(--durak-gold);
-  box-shadow: 0 0 0 3px rgba(231, 184, 92, 0.08);
-  color: #ffe2a7;
-  cursor: pointer;
+.durak-table-pair.is-covered .durak-pair-card.is-defense {
+  z-index: 2;
+  transform: translate(23px, -3px) rotate(7deg);
+  filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.28));
 }
 
 .durak-card {
@@ -616,6 +596,14 @@ button.durak-card.is-playable:hover {
   padding: 10px 4px 14px;
   overflow-x: auto;
   scrollbar-color: rgba(231, 184, 92, 0.28) transparent;
+}
+
+.durak-hand > .durak-card:first-child {
+  margin-left: auto;
+}
+
+.durak-hand > .durak-card:last-child {
+  margin-right: auto;
 }
 
 .durak-action-bar {
@@ -808,10 +796,6 @@ button.durak-card.is-playable:hover {
   .durak-board {
     grid-template-columns: 146px minmax(0, 1fr);
   }
-
-  .durak-lobby-settings {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 680px) {
@@ -899,7 +883,7 @@ button.durak-card.is-playable:hover {
   }
 
   .durak-table-grid {
-    grid-template-columns: repeat(auto-fit, minmax(164px, 1fr));
+    gap: 14px;
   }
 
   .durak-hand-heading {
@@ -932,6 +916,13 @@ button.durak-card.is-playable:hover {
   }
 }
 
+@media (max-width: 760px) {
+  .durak-lobby-settings {
+    grid-template-columns: 1fr;
+    padding: 15px;
+  }
+}
+
 @media (max-width: 420px) {
   .durak-screen {
     padding-inline: 10px;
@@ -953,25 +944,12 @@ button.durak-card.is-playable:hover {
   }
 
   .durak-table-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .durak-table-pair {
-    padding: 12px;
-  }
-
-  .durak-pair-cards {
-    grid-template-columns: 78px auto 78px;
+    gap: 10px;
   }
 
   .durak-card.is-table {
     width: 74px;
     height: 104px;
-  }
-
-  .durak-defense-target {
-    width: 74px;
-    min-height: 104px;
   }
 
   .durak-hand-section {
