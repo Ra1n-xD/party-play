@@ -39,6 +39,7 @@ export function VoteScreen() {
     consumePendingAdminOpen,
     hostSeatClaims,
     resolveSeatClaim,
+    assignTemporaryBot,
     kickPlayer,
     transferHost,
   } = useGame();
@@ -121,7 +122,12 @@ export function VoteScreen() {
   if (isSpectator) {
     return (
       <main className="screen command-game-screen vote-screen">
-        <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
+        <GameRoomHeader
+          gameId="bunker"
+          roomCode={roomCode}
+          connected={connected}
+          onLeaveRoom={leaveRoom}
+        />
         <div className="sticky-top-bar">
           <div className="top-bar-content">
             <div className="top-bar-left">
@@ -175,6 +181,7 @@ export function VoteScreen() {
   return (
     <main className="screen command-game-screen vote-screen">
       <GameRoomHeader
+        gameId="bunker"
         roomCode={roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
@@ -353,6 +360,7 @@ export function VoteScreen() {
           onEndGame={endGameFromHostControls}
           seatClaims={hostSeatClaims}
           onResolveSeatClaim={resolveSeatClaim}
+          onAssignTemporaryBot={assignTemporaryBot}
           onKickPlayer={kickPlayer}
           onTransferHost={transferHost}
         />

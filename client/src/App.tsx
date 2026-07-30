@@ -1,164 +1,61 @@
-import { useGame } from "./context/GameContext";
-import { OverlayItem } from "./context/GameContext";
-import { HomeScreen } from "./screens/HomeScreen";
-import { LobbyScreen } from "./screens/LobbyScreen";
-import { GameScreen } from "./screens/GameScreen";
-import { VoteScreen } from "./screens/VoteScreen";
-import { ResultsScreen } from "./screens/ResultsScreen";
-import BackgroundParticles from "./components/BackgroundParticles";
-import { ReconnectPauseOverlay } from "./components/ReconnectPauseOverlay";
-import { CardImage } from "./components/CardImage";
-import { AttributeType } from "../../shared/types";
+import { Suspense } from "react";
+import { PlatformOverlays } from "./platform/components/PlatformOverlays";
+import { usePlatform } from "./platform/context/PlatformContext";
+import { getLazyGameComponent } from "./platform/gameRegistry";
+import { HomeScreen } from "./platform/screens/HomeScreen";
 
-const ATTR_LABELS: Record<AttributeType, string> = {
-  profession: "раскрывает профессию",
-  bio: "раскрывает биологию",
-  health: "раскрывает здоровье",
-  hobby: "раскрывает хобби",
-  baggage: "раскрывает багаж",
-  fact: "раскрывает доп. факт",
-};
+function RoomLoading({ message = "Загружаем комнату…" }: { message?: string }) {
+  return (
+    <div className="screen platform-room-loading" role="status">
+      <span className="platform-loading-mark" aria-hidden="true">
+        ◆
+      </span>
+      <p>{message}</p>
+    </div>
+  );
+}
 
 function AppContent() {
-  const { roomCode, gameState } = useGame();
+  const { roomCode, activeGameId, snapshot, sessionPending, leaveRoom } = usePlatform();
 
-  // Not in a room
-  if (!roomCode || !gameState) {
-    return <HomeScreen />;
+  if (!roomCode) return <HomeScreen />;
+  if (sessionPending && !snapshot) {
+    return <RoomLoading message="Возвращаемся в комнату…" />;
   }
 
-  const phase = gameState.phase;
+  const serverGameId = snapshot?.gameId ?? activeGameId;
+  if (!serverGameId) return <RoomLoading />;
 
-  switch (phase) {
-    case "LOBBY":
-      return <LobbyScreen />;
-    case "CATASTROPHE_REVEAL":
-    case "BUNKER_EXPLORE":
-    case "ROUND_REVEAL":
-    case "ROUND_DISCUSSION":
-      return <GameScreen />;
-    case "ROUND_VOTE":
-    case "ROUND_VOTE_TIEBREAK":
-      return <VoteScreen />;
-    case "ROUND_RESULT":
-      return <GameScreen />;
-    case "GAME_OVER":
-      return <ResultsScreen />;
-    default:
-      return <HomeScreen />;
-  }
-}
-
-function PauseOverlay() {
-  const { gameState, playerId, isSpectator } = useGame();
-  if (!gameState?.paused) return null;
-  if (gameState.pauseKind === "reconnect" || gameState.pauseKind === "mixed") {
+  const GameModule = getLazyGameComponent(serverGameId);
+  if (!GameModule) {
     return (
-      <ReconnectPauseOverlay gameState={gameState} playerId={playerId} isSpectator={isSpectator} />
+      <div className="screen platform-room-loading">
+        <div className="platform-unsupported-game">
+          <span className="platform-loading-mark" aria-hidden="true">
+            ◆
+          </span>
+          <h1>Эта игра пока недоступна в клиенте</h1>
+          <p>Комната сохранена, но интерфейс игры ещё не подключён.</p>
+          <button type="button" className="btn btn-secondary" onClick={leaveRoom}>
+            Вернуться на главную
+          </button>
+        </div>
+      </div>
     );
-  }
-  if (!isSpectator) {
-    const me = gameState.players.find((p) => p.id === playerId);
-    if (me?.isHost) return null;
   }
 
   return (
-    <div className="pause-overlay">
-      <div className="pause-content">
-        <span className="pause-icon">⏸</span>
-        <h2>Пауза</h2>
-        <p>Хост приостановил игру</p>
-      </div>
-    </div>
+    <Suspense fallback={<RoomLoading message="Загружаем интерфейс игры…" />}>
+      <GameModule />
+    </Suspense>
   );
-}
-
-function HostChangeNotice() {
-  const { hostChangeNotice, playerId, clearHostChangeNotice } = useGame();
-  if (!hostChangeNotice || hostChangeNotice.hostId !== playerId) return null;
-
-  return (
-    <div className="host-change-notice" role="status">
-      <div>
-        <strong>Вам переданы права хоста</strong>
-        <span>Теперь вы управляете восстановлением комнаты.</span>
-      </div>
-      <button type="button" onClick={clearHostChangeNotice} aria-label="Закрыть уведомление">
-        ×
-      </button>
-    </div>
-  );
-}
-
-function OverlayRenderer({ item }: { item: OverlayItem }) {
-  if (item.kind === "announcement") {
-    return (
-      <div className="phase-announcement-overlay">
-        <div className="phase-announcement-content">
-          <div className="phase-announcement-title">{item.title}</div>
-          {item.subtitle && <div className="phase-announcement-subtitle">{item.subtitle}</div>}
-          {item.description && (
-            <div className="phase-announcement-description">{item.description}</div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (item.kind === "attribute") {
-    const cardType = item.attribute.type as AttributeType;
-    return (
-      <div className="action-card-reveal-overlay" data-card-type={cardType}>
-        <div className="action-card-reveal-content">
-          <div className="action-card-reveal-player">{item.playerName}</div>
-          <div className="action-card-reveal-label">
-            {ATTR_LABELS[cardType] || "раскрывает карту"}
-          </div>
-          <div className="action-card-reveal-card" data-card-type={cardType}>
-            <CardImage type={cardType} className="action-card-reveal-image" />
-            <div className="action-card-reveal-title">{item.attribute.value}</div>
-            {item.attribute.detail && (
-              <div className="action-card-reveal-description">{item.attribute.detail}</div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (item.kind === "actionCard") {
-    return (
-      <div className="action-card-reveal-overlay" data-card-type="action">
-        <div className="action-card-reveal-content">
-          <div className="action-card-reveal-player">{item.playerName}</div>
-          <div className="action-card-reveal-label">раскрывает особое условие</div>
-          <div className="action-card-reveal-card" data-card-type="action">
-            <CardImage type="action" className="action-card-reveal-image" />
-            <div className="action-card-reveal-title">{item.actionCard.title}</div>
-            <div className="action-card-reveal-description">{item.actionCard.description}</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
-
-function CurrentOverlay() {
-  const { currentOverlay } = useGame();
-  if (!currentOverlay) return null;
-  return <OverlayRenderer item={currentOverlay} />;
 }
 
 export default function App() {
   return (
     <>
-      <BackgroundParticles />
       <AppContent />
-      <PauseOverlay />
-      <HostChangeNotice />
-      <CurrentOverlay />
+      <PlatformOverlays />
       <div className="app-version">v{__APP_VERSION__}</div>
     </>
   );
