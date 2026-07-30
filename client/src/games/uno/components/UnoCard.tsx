@@ -53,6 +53,7 @@ interface UnoCardProps {
   disabled?: boolean;
   onClick?: () => void;
   ariaLabel?: string;
+  ariaDescribedBy?: string;
 }
 
 export function UnoCard({
@@ -64,6 +65,7 @@ export function UnoCard({
   disabled = false,
   onClick,
   ariaLabel,
+  ariaDescribedBy,
 }: UnoCardProps) {
   const className = [
     "uno-card",
@@ -101,6 +103,7 @@ export function UnoCard({
         onClick={onClick}
         aria-pressed={selected || undefined}
         aria-label={ariaLabel ?? getUnoCardName(card)}
+        aria-describedby={ariaDescribedBy}
       >
         {content}
       </button>

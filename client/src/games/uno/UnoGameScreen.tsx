@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
   UnoCard as UnoCardData,
   UnoColor,
@@ -14,6 +14,8 @@ import {
 } from "../../platform/components/ReconnectHostControls";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
+import { CardDragLayer } from "../shared/CardDragLayer";
+import { useCardDrag } from "../shared/useCardDrag";
 import { UnoCard, UnoCardBack, getUnoCardName } from "./components/UnoCard";
 import { UnoColorDialog } from "./components/UnoColorDialog";
 
@@ -22,6 +24,10 @@ interface UnoGameScreenProps {
 }
 
 type ColorChoice = { mode: "initial" } | { mode: "wild"; cardId: string };
+
+interface UnoDragPayload {
+  card: UnoCardData;
+}
 
 const COLOR_LABELS: Record<UnoColor, string> = {
   red: "красный",
@@ -147,6 +153,35 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
     [setAdminPause],
   );
 
+  const sendPlay = (card: UnoCardData, chosenColor?: UnoColor) => {
+    if (!canAct) return;
+    const accepted = sendGameCommand("uno", {
+      type: "play-card",
+      cardId: card.id,
+      ...(chosenColor ? { chosenColor } : {}),
+      ...(declareWithPlay ? { declareUno: true } : {}),
+    });
+    if (accepted) setColorChoice(null);
+  };
+
+  const playCard = (card: UnoCardData) => {
+    const isPlayable = playableCardIds.has(card.id) || bluffableWildDrawFourIds.has(card.id);
+    if (!canAct || !isPlayable) return;
+    if (card.kind === "wild" || card.kind === "wild-draw-four") {
+      setColorChoice({ mode: "wild", cardId: card.id });
+      return;
+    }
+    sendPlay(card);
+  };
+
+  const { session, announcement, bindDragSource, isDragging, activeTargetId } =
+    useCardDrag<UnoDragPayload>({
+      disabled: !canAct,
+      resetKey: snapshot.revision,
+      canDrop: (_payload, targetId) => targetId === "uno-discard",
+      onDrop: ({ card }) => playCard(card),
+    });
+
   if (!game) {
     return (
       <div className="screen platform-room-loading" role="status">
@@ -199,27 +234,6 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
     if (!adminPauseActiveRef.current) return;
     adminPauseActiveRef.current = false;
     setAdminPause(false);
-  };
-
-  const sendPlay = (card: UnoCardData, chosenColor?: UnoColor) => {
-    if (!canAct) return;
-    const accepted = sendGameCommand("uno", {
-      type: "play-card",
-      cardId: card.id,
-      ...(chosenColor ? { chosenColor } : {}),
-      ...(declareWithPlay ? { declareUno: true } : {}),
-    });
-    if (accepted) setColorChoice(null);
-  };
-
-  const playCard = (card: UnoCardData) => {
-    const isPlayable = playableCardIds.has(card.id) || bluffableWildDrawFourIds.has(card.id);
-    if (!canAct || !isPlayable) return;
-    if (card.kind === "wild" || card.kind === "wild-draw-four") {
-      setColorChoice({ mode: "wild", cardId: card.id });
-      return;
-    }
-    sendPlay(card);
   };
 
   const chooseColor = (color: UnoColor) => {
@@ -350,12 +364,25 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
             <span>Колода · {game.drawPileCount}</span>
           </button>
           <div
-            className="uno-pile"
+            className={`uno-pile ${isDragging ? "is-drag-target" : ""} ${
+              activeTargetId === "uno-discard" ? "is-drag-over" : ""
+            }`}
             role="group"
             aria-label={`Отбой. ${game.discardPileCount} карт`}
+            data-card-drop-target="uno-discard"
           >
             {game.topDiscard ? (
-              <UnoCard card={game.topDiscard} />
+              <div
+                className="uno-discard-card-shell"
+                key={game.topDiscard.id}
+                style={
+                  {
+                    "--discard-tilt": `${game.discardPileCount % 2 === 0 ? -1.4 : 1.4}deg`,
+                  } as CSSProperties
+                }
+              >
+                <UnoCard card={game.topDiscard} />
+              </div>
             ) : (
               <div className="uno-empty-card">—</div>
             )}
@@ -427,22 +454,35 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
             )}
           </div>
           <div className="uno-hand" role="group" aria-label="Карты в вашей руке">
-            {privateGame.hand.map((card) => {
+            <p id="uno-card-drag-instructions" className="uno-drag-instruction">
+              Карту можно выбрать кнопкой или перетащить в отбой.
+            </p>
+            {privateGame.hand.map((card, index) => {
               const playable = playableCardIds.has(card.id);
               const bluffable = bluffableWildDrawFourIds.has(card.id);
               const isDrawnCard = legalActions?.drawnCardId === card.id;
               const allowed = playable || bluffable;
+              const dragSource =
+                allowed && canAct ? bindDragSource({ card }, getUnoCardName(card)) : undefined;
+              const { className: dragClassName, ...dragBindings } = dragSource ?? {};
               return (
-                <UnoCard
+                <div
                   key={card.id}
-                  card={card}
-                  size="hand"
-                  playable={playable && canAct}
-                  bluffable={bluffable && canAct}
-                  disabled={!canAct || !allowed}
-                  onClick={() => playCard(card)}
-                  ariaLabel={`${getUnoCardName(card)}${bluffable ? ". Рискованный Wild +4" : ""}${isDrawnCard ? ". Добрана сейчас" : ""}`}
-                />
+                  className={`uno-hand-card-shell ${dragClassName ?? "card-motion-shell"}`}
+                  style={{ "--card-index": Math.min(index, 5) } as CSSProperties}
+                  {...dragBindings}
+                >
+                  <UnoCard
+                    card={card}
+                    size="hand"
+                    playable={playable && canAct}
+                    bluffable={bluffable && canAct}
+                    disabled={!canAct || !allowed}
+                    onClick={() => playCard(card)}
+                    ariaDescribedBy={dragSource ? "uno-card-drag-instructions" : undefined}
+                    ariaLabel={`${getUnoCardName(card)}${bluffable ? ". Рискованный Wild +4" : ""}${isDrawnCard ? ". Добрана сейчас" : ""}`}
+                  />
+                </div>
               );
             })}
           </div>
@@ -596,6 +636,11 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
           {error}
         </div>
       )}
+      <CardDragLayer
+        session={session}
+        announcement={announcement}
+        renderPreview={({ card }) => <UnoCard card={card} size="hand" />}
+      />
     </main>
   );
 }

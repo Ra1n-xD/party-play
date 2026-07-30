@@ -58,6 +58,7 @@ interface DurakCardProps {
   disabled?: boolean;
   onClick?: () => void;
   ariaLabel?: string;
+  ariaDescribedBy?: string;
 }
 
 export function DurakCard({
@@ -68,6 +69,7 @@ export function DurakCard({
   disabled = false,
   onClick,
   ariaLabel,
+  ariaDescribedBy,
 }: DurakCardProps) {
   const accessibleName = ariaLabel ?? getCardName(card);
   const className = [
@@ -105,6 +107,7 @@ export function DurakCard({
         disabled={disabled}
         aria-pressed={selected}
         aria-label={accessibleName}
+        aria-describedby={ariaDescribedBy}
         title={accessibleName}
       >
         {content}
