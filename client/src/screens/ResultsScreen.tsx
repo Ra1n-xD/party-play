@@ -1,8 +1,9 @@
 import { useGame } from "../context/GameContext";
 import { CardImage } from "../components/CardImage";
+import { GameRoomHeader } from "./game/GameRoomHeader";
 
 export function ResultsScreen() {
-  const { gameState, playerId, isSpectator, playAgain } = useGame();
+  const { connected, roomCode, gameState, playerId, isSpectator, playAgain, leaveRoom } = useGame();
 
   if (!gameState) return null;
 
@@ -85,7 +86,13 @@ export function ResultsScreen() {
   };
 
   return (
-    <div className="screen results-screen">
+    <main className="screen command-game-screen results-screen">
+      <GameRoomHeader
+        gameId="bunker"
+        roomCode={roomCode}
+        connected={connected}
+        onLeaveRoom={leaveRoom}
+      />
       <div className="results-container">
         <h2>
           {isSpectator ? "Игра окончена" : me?.alive ? "Вы попали в бункер!" : "Вы были изгнаны..."}
@@ -170,10 +177,10 @@ export function ResultsScreen() {
 
         {isHost && (
           <button className="btn btn-primary" onClick={playAgain}>
-            Играть снова
+            Сыграть ещё
           </button>
         )}
       </div>
-    </div>
+    </main>
   );
 }

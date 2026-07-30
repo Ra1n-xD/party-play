@@ -49,6 +49,7 @@ export function GameScreen() {
     consumePendingAdminOpen,
     hostSeatClaims,
     resolveSeatClaim,
+    assignTemporaryBot,
     kickPlayer,
     transferHost,
   } = useGame();
@@ -173,6 +174,7 @@ export function GameScreen() {
   return (
     <main className="screen command-game-screen has-game-command-bar">
       <GameRoomHeader
+        gameId="bunker"
         roomCode={roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
@@ -263,6 +265,7 @@ export function GameScreen() {
           onEndGame={endGameFromHostControls}
           seatClaims={hostSeatClaims}
           onResolveSeatClaim={resolveSeatClaim}
+          onAssignTemporaryBot={assignTemporaryBot}
           onKickPlayer={kickPlayer}
           onTransferHost={transferHost}
         />
