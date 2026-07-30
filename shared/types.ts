@@ -3,6 +3,7 @@ export * from "./games/durak/types.js";
 export * from "./games/uno/types.js";
 export * from "./platform/gameContract.js";
 export * from "./platform/protocol.js";
+export * from "./platform/reactions.js";
 export * from "./platform/room.js";
 
 // Compatibility names used by the existing Bunker implementation while it is

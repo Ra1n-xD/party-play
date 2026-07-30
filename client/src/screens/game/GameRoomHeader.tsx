@@ -1,9 +1,13 @@
 import { useState, type ReactNode } from "react";
-import { FiLogOut, FiWifi, FiWifiOff } from "react-icons/fi";
+import { FiBookOpen, FiLogOut, FiWifi, FiWifiOff } from "react-icons/fi";
 import { GiFalloutShelter } from "react-icons/gi";
+import { GameRulesModal } from "../../platform/components/GameRulesModal";
+import { RoomReactions } from "../../platform/components/RoomReactions";
+import { clientGameRegistry, type RegisteredClientGameId } from "../../platform/gameRegistry";
 import { AccessibleModal } from "./AccessibleModal";
 
 interface GameRoomHeaderProps {
+  gameId: RegisteredClientGameId;
   roomCode: string | null;
   connected: boolean;
   onLeaveRoom: () => void;
@@ -13,6 +17,7 @@ interface GameRoomHeaderProps {
 }
 
 export function GameRoomHeader({
+  gameId,
   roomCode,
   connected,
   onLeaveRoom,
@@ -21,6 +26,8 @@ export function GameRoomHeader({
   brandIcon,
 }: GameRoomHeaderProps) {
   const [leaveConfirmationOpen, setLeaveConfirmationOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const gameModule = clientGameRegistry[gameId];
 
   const requestLeave = () => {
     if (confirmActiveLeave) {
@@ -43,6 +50,17 @@ export function GameRoomHeader({
         </div>
 
         <div className="gs-room-controls">
+          <button
+            type="button"
+            className="gs-room-tool"
+            onClick={() => setRulesOpen(true)}
+            aria-haspopup="dialog"
+            aria-label={`Правила игры ${gameTitle}`}
+          >
+            <FiBookOpen aria-hidden="true" />
+            <span>Правила</span>
+          </button>
+          <RoomReactions />
           <div className="gs-room-code" aria-label={`Код комнаты ${roomCode || "неизвестен"}`}>
             <span>Комната</span>
             <strong>{roomCode || "—"}</strong>
@@ -64,6 +82,15 @@ export function GameRoomHeader({
           </button>
         </div>
       </header>
+
+      {rulesOpen && (
+        <GameRulesModal
+          gameId={gameId}
+          gameTitle={gameTitle}
+          rules={gameModule.rules}
+          onClose={() => setRulesOpen(false)}
+        />
+      )}
 
       {leaveConfirmationOpen && (
         <AccessibleModal
@@ -93,7 +120,7 @@ export function GameRoomHeader({
                 onLeaveRoom();
               }}
             >
-              Покинуть и сохранить место
+              Покинуть игру
             </button>
           </div>
         </AccessibleModal>

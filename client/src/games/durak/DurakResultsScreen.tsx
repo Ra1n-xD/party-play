@@ -50,6 +50,7 @@ export function DurakResultsScreen({ snapshot }: DurakResultsScreenProps) {
   return (
     <main className="screen command-game-screen durak-screen durak-results-screen">
       <GameRoomHeader
+        gameId="durak"
         roomCode={snapshot.roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}

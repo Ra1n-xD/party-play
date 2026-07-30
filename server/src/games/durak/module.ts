@@ -465,6 +465,10 @@ export const durakModule: ServerGameModule<"durak"> = {
     if (!durakRoom.gameState) {
       return { success: false, code: "CONFLICT", error: "Партия не запущена" };
     }
+    if (durakRoom.gameState.statusBySeatId[seatId] === "out") {
+      durakRoom.pauseReasons.disconnectedSeatIds.delete(seatId);
+      return { success: true };
+    }
 
     const remainingDisconnected = new Set(durakRoom.pauseReasons.disconnectedSeatIds);
     remainingDisconnected.delete(seatId);

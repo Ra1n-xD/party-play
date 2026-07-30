@@ -3,6 +3,7 @@ import cardBack from "../assets/card-back.svg";
 import drawTwoIcon from "../assets/draw-two.svg";
 import reverseIcon from "../assets/reverse.svg";
 import skipIcon from "../assets/skip.svg";
+import wildDrawFourIcon from "../assets/wild-draw-four.svg";
 import wildIcon from "../assets/wild.svg";
 
 const COLOR_NAMES: Record<UnoColor, string> = {
@@ -33,7 +34,8 @@ function actionIcon(card: UnoCardData): string | null {
   if (card.kind === "skip") return skipIcon;
   if (card.kind === "reverse") return reverseIcon;
   if (card.kind === "draw-two") return drawTwoIcon;
-  if (card.kind === "wild" || card.kind === "wild-draw-four") return wildIcon;
+  if (card.kind === "wild") return wildIcon;
+  if (card.kind === "wild-draw-four") return wildDrawFourIcon;
   return null;
 }
 

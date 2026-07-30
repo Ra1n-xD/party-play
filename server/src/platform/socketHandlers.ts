@@ -1,5 +1,6 @@
-import { timingSafeEqual } from "crypto";
+import { randomBytes, timingSafeEqual } from "crypto";
 import { Server, Socket } from "socket.io";
+import { isRoomReactionId } from "../../../shared/platform/reactions.js";
 import { normalizeRoomCode } from "../../../shared/roomCode.js";
 import {
   ClientEvents,
@@ -68,6 +69,10 @@ type SocketMembership = {
 // Map socketId -> { roomCode, playerId, role }
 const socketRoomMap = new Map<string, SocketMembership>();
 const spectatorGraceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const REACTION_COOLDOWN_MS = 1_200;
+const REACTION_RATE_WINDOW_MS = 10_000;
+const MAX_REACTIONS_PER_WINDOW = 6;
+const reactionRateBySocket = new Map<string, { lastAcceptedAt: number; acceptedAt: number[] }>();
 
 // --- Per-action rate limiting ---
 const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
@@ -162,6 +167,7 @@ function rejectRateLimitedClaimAction(socket: IOSocket, action: string): boolean
 
 function cleanupRateLimitEntry(socketId: string): void {
   socketActionCounts.delete(socketId);
+  reactionRateBySocket.delete(socketId);
 }
 
 // --- Progressive backoff for failed rejoin attempts (per client network identity) ---
@@ -211,6 +217,7 @@ export function resetSocketHandlerStateForTests(): void {
   spectatorGraceTimers.clear();
   socketRoomMap.clear();
   socketActionCounts.clear();
+  reactionRateBySocket.clear();
   ipActionCounts.clear();
   nextIpActionPruneAt = 0;
   rejoinThrottle.reset();
@@ -987,6 +994,53 @@ export function registerHandlers(io: IOServer): void {
         socket.emit("room:commandResult", result);
       }).catch(() => {
         socket.emit("room:error", { message: "Не удалось обработать команду" });
+      });
+    });
+
+    socket.on("room:sendReaction", (data) => {
+      const reactionId = data?.reactionId;
+      if (!isRoomReactionId(reactionId)) return;
+
+      const info = getCurrentSocketMembership(socket);
+      if (!info || info.role !== "player") return;
+
+      const room = getRoom(info.roomCode);
+      const player = room?.players.get(info.playerId);
+      if (
+        !room ||
+        !player ||
+        player.kicked ||
+        !player.connected ||
+        player.owner.kind !== "human" ||
+        player.controller.kind !== "human" ||
+        player.controller.socketId !== socket.id
+      ) {
+        return;
+      }
+
+      const now = Date.now();
+      const rateState = reactionRateBySocket.get(socket.id) ?? {
+        lastAcceptedAt: 0,
+        acceptedAt: [],
+      };
+      const acceptedAt = rateState.acceptedAt.filter(
+        (timestamp) => now - timestamp < REACTION_RATE_WINDOW_MS,
+      );
+      if (now - rateState.lastAcceptedAt < REACTION_COOLDOWN_MS) return;
+      if (acceptedAt.length >= MAX_REACTIONS_PER_WINDOW) {
+        reactionRateBySocket.set(socket.id, { ...rateState, acceptedAt });
+        return;
+      }
+
+      acceptedAt.push(now);
+      reactionRateBySocket.set(socket.id, { lastAcceptedAt: now, acceptedAt });
+      io.to(room.code).emit("room:reaction", {
+        eventId: `reaction_${randomBytes(10).toString("hex")}`,
+        roomCode: room.code,
+        reactionId,
+        senderSeatId: player.id,
+        senderName: player.name,
+        sentAt: now,
       });
     });
 

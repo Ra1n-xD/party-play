@@ -93,7 +93,7 @@ export function ReconnectHostControls({
     >
       <div className="reconnect-host-heading">
         <div>
-          <span className="reconnect-eyebrow">Восстановление комнаты</span>
+          <span className="reconnect-eyebrow">Управление комнатой</span>
           <h3 id="reconnect-host-title">Игроки и доступ</h3>
         </div>
         {claims.length > 0 && <span className="reconnect-claim-count">{claims.length}</span>}
@@ -172,8 +172,8 @@ export function ReconnectHostControls({
                   className="reconnect-host-action is-kick"
                   aria-label={
                     kickConfirmationId === player.id
-                      ? `Подтвердить удаление ${player.name}`
-                      : `Удалить игрока ${player.name}`
+                      ? `Подтвердить кик игрока ${player.name}`
+                      : `Кикнуть игрока ${player.name}`
                   }
                   onClick={() => {
                     if (kickConfirmationId !== player.id) {
@@ -184,7 +184,7 @@ export function ReconnectHostControls({
                     setKickConfirmationId(null);
                   }}
                 >
-                  {kickConfirmationId === player.id ? "Подтвердить удаление" : "Удалить навсегда"}
+                  {kickConfirmationId === player.id ? "Подтвердить кик" : "Кикнуть игрока"}
                 </button>
                 {kickConfirmationId === player.id && (
                   <button

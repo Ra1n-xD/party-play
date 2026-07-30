@@ -8,6 +8,7 @@ import type {
   Character,
 } from "../games/bunker/types.js";
 import type { AnyGameEvent, GameId } from "./gameContract.js";
+import type { RoomReactionEvent, RoomReactionId } from "./reactions.js";
 import type { AnyRoomCommandEnvelope, AnyRoomSnapshot, RoomCommandResult, SeatId } from "./room.js";
 
 export type HostChangeReason = "disconnect" | "manual" | "recovery";
@@ -66,6 +67,7 @@ export interface ClientEvents {
   }) => void;
   "room:cancelSeatClaim": (data: { requestId: string }) => void;
   "room:command": (data: AnyRoomCommandEnvelope) => void;
+  "room:sendReaction": (data: { reactionId: RoomReactionId }) => void;
 
   // Legacy Bunker adapters. The active client routes these through room:command.
   "player:ready": (data: { ready: boolean }) => void;
@@ -128,6 +130,7 @@ export interface ServerEvents {
   "room:kicked": (data: { message: string }) => void;
   "room:snapshot": (data: AnyRoomSnapshot) => void;
   "room:commandResult": (data: RoomCommandResult) => void;
+  "room:reaction": (data: RoomReactionEvent) => void;
   "game:event": (data: AnyGameEvent) => void;
   "admin:seatClaimsUpdated": (data: { claims: SeatClaimInfo[] }) => void;
 
