@@ -1,0 +1,62 @@
+.card-motion-shell,
+.card-drag-layer {
+  --card-motion-duration: 160ms;
+  --card-motion-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.card-motion-shell.is-draggable {
+  touch-action: pan-x;
+}
+
+.card-drag-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.card-drag-layer.is-settling,
+.card-drag-layer.is-returning {
+  transition: transform var(--card-motion-duration) var(--card-motion-easing);
+}
+
+.card-drag-preview {
+  width: 100%;
+  height: 100%;
+  opacity: 0.94;
+  animation: card-drag-preview-enter var(--card-motion-duration) var(--card-motion-easing);
+}
+
+@keyframes card-drag-preview-enter {
+  from {
+    opacity: 0.72;
+    transform: scale(0.97);
+  }
+
+  to {
+    opacity: 0.94;
+    transform: scale(1);
+  }
+}
+
+.card-drag-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-drag-layer {
+    transition: none;
+  }
+
+  .card-drag-preview {
+    animation: none;
+  }
+}

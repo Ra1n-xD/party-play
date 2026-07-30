@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
   DurakCard as DurakCardData,
   DurakLegalAction,
@@ -14,11 +14,26 @@ import {
 } from "../../platform/components/ReconnectHostControls";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
+import { CardDragLayer } from "../shared/CardDragLayer";
+import { useCardDrag } from "../shared/useCardDrag";
 import { DurakCard, DurakCardBack, getCardName, getSuitSymbol } from "./components/DurakCard";
 
 interface DurakGameScreenProps {
   snapshot: RoomSnapshot<"durak">;
 }
+
+type DurakDragPayload =
+  | {
+      kind: "attack";
+      action: "attack" | "throw-in";
+      cards: DurakCardData[];
+      cardIds: [string, ...string[]];
+    }
+  | {
+      kind: "defend";
+      card: DurakCardData;
+      attackCardIds: string[];
+    };
 
 const FIGHT_STAGE_LABELS = {
   attack: "Атака",
@@ -95,6 +110,55 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
   const canUseConnection =
     connected && reconnectState === "connected" && viewerSeat?.controllerKind === "human";
   const canAct = Boolean(privateGame && canUseConnection && !paused && !commandPending);
+  const playableCardIds = getLegalPlayableIds(legalAction);
+  const selectedCards = privateGame?.hand.filter((card) => selectedCardIds.includes(card.id)) ?? [];
+  const selectedDefenseTargets =
+    legalAction?.type === "defend" && selectedDefenseCardId
+      ? new Set(
+          legalAction.targets
+            .filter((target) => target.defenseCardId === selectedDefenseCardId)
+            .flatMap((target) => target.attackCardIds),
+        )
+      : new Set<string>();
+
+  const isCardSelectable = (card: DurakCardData): boolean => {
+    if (!canAct || !playableCardIds.has(card.id)) return false;
+    if (legalAction?.type === "defend") return true;
+    if (legalAction?.type !== "attack" && legalAction?.type !== "throw-in") return false;
+    if (selectedCardIds.includes(card.id)) return true;
+    if (selectedCardIds.length >= legalAction.maxCards) return false;
+    if (legalAction.type !== "attack" || selectedCards.length === 0) return true;
+    return selectedCards[0]?.rank === card.rank;
+  };
+
+  const isCardDraggable = (card: DurakCardData): boolean => canAct && playableCardIds.has(card.id);
+
+  const createDragPayload = (card: DurakCardData): DurakDragPayload | null => {
+    if (!privateGame || !isCardDraggable(card)) return null;
+
+    if (legalAction?.type === "defend") {
+      return {
+        kind: "defend",
+        card,
+        attackCardIds: legalAction.targets
+          .filter((target) => target.defenseCardId === card.id)
+          .flatMap((target) => target.attackCardIds),
+      };
+    }
+
+    if (legalAction?.type !== "attack" && legalAction?.type !== "throw-in") return null;
+
+    const cards = selectedCardIds.includes(card.id) ? selectedCards : [card];
+    const firstCard = cards[0];
+    if (!firstCard) return null;
+
+    return {
+      kind: "attack",
+      action: legalAction.type,
+      cards,
+      cardIds: [firstCard.id, ...cards.slice(1).map((candidate) => candidate.id)],
+    };
+  };
 
   const timerEndTime = useMemo(
     () =>
@@ -120,6 +184,37 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
     [],
   );
 
+  const { session, announcement, bindDragSource, isDragging, activeTargetId } =
+    useCardDrag<DurakDragPayload>({
+      disabled: !canAct,
+      resetKey: snapshot.revision,
+      canDrop: (payload, targetId) => {
+        if (payload.kind === "attack") return targetId === "durak-table";
+        const attackCardId = targetId.startsWith("durak-attack:")
+          ? targetId.slice("durak-attack:".length)
+          : "";
+        return attackCardId.length > 0 && payload.attackCardIds.includes(attackCardId);
+      },
+      onDrop: (payload, targetId) => {
+        if (!canAct) return;
+        if (payload.kind === "attack") {
+          sendGameCommand("durak", {
+            type: payload.action,
+            cardIds: payload.cardIds,
+          });
+          return;
+        }
+
+        const attackCardId = targetId.slice("durak-attack:".length);
+        if (!attackCardId) return;
+        sendGameCommand("durak", {
+          type: "defend",
+          cardId: payload.card.id,
+          attackCardId,
+        });
+      },
+    });
+
   if (!game) {
     return (
       <div className="screen platform-room-loading" role="status">
@@ -136,16 +231,11 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
     ...game.players.filter((player) => !game.activeOrder.includes(player.seatId)),
   ];
   const currentActor = game.currentActorSeatId ? playersById.get(game.currentActorSeatId) : null;
-  const playableCardIds = getLegalPlayableIds(legalAction);
-  const selectedCards = privateGame?.hand.filter((card) => selectedCardIds.includes(card.id)) ?? [];
-  const selectedDefenseTargets =
-    legalAction?.type === "defend" && selectedDefenseCardId
-      ? new Set(
-          legalAction.targets
-            .filter((target) => target.defenseCardId === selectedDefenseCardId)
-            .flatMap((target) => target.attackCardIds),
-        )
-      : new Set<string>();
+  const attackDragPayload =
+    isDragging && session?.payload.kind === "attack" ? session.payload : null;
+  const defenseDragPayload =
+    isDragging && session?.payload.kind === "defend" ? session.payload : null;
+  const isAttackDragging = attackDragPayload !== null;
   const recoverySeats: RecoverySeat[] = snapshot.seats
     .filter((seat) => !seat.closed)
     .map((seat) => ({
@@ -172,16 +262,6 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
     if (!adminPauseActiveRef.current) return;
     adminPauseActiveRef.current = false;
     setAdminPause(false);
-  };
-
-  const isCardSelectable = (card: DurakCardData): boolean => {
-    if (!canAct || !playableCardIds.has(card.id)) return false;
-    if (legalAction?.type === "defend") return true;
-    if (legalAction?.type !== "attack" && legalAction?.type !== "throw-in") return false;
-    if (selectedCardIds.includes(card.id)) return true;
-    if (selectedCardIds.length >= legalAction.maxCards) return false;
-    if (legalAction.type !== "attack" || selectedCards.length === 0) return true;
-    return selectedCards[0]?.rank === card.rank;
   };
 
   const selectHandCard = (card: DurakCardData) => {
@@ -363,7 +443,13 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
           <span className="durak-discard-count">В отбое: {game.discardCount}</span>
         </aside>
 
-        <section className="durak-table" aria-labelledby="durak-table-title">
+        <section
+          className={`durak-table ${isAttackDragging ? "is-drag-target" : ""} ${
+            isAttackDragging && activeTargetId === "durak-table" ? "is-drag-over" : ""
+          }`}
+          aria-labelledby="durak-table-title"
+          data-card-drop-target="durak-table"
+        >
           <div className="durak-table-heading">
             <div>
               <span className="durak-section-eyebrow">Стол</span>
@@ -382,6 +468,9 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
               {game.table.map((pair) => {
                 const canTarget =
                   !pair.defense && canAct && selectedDefenseTargets.has(pair.attack.id);
+                const isDefenseDragTarget =
+                  !pair.defense &&
+                  defenseDragPayload?.attackCardIds.includes(pair.attack.id) === true;
                 const attackerName = playersById.get(pair.attackPlayedBySeatId)?.name ?? "Игрок";
                 const defenderName = pair.defensePlayedBySeatId
                   ? (playersById.get(pair.defensePlayedBySeatId)?.name ?? "Игрок")
@@ -392,7 +481,18 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                     key={pair.attack.id}
                   >
                     <div className="durak-pair-cards">
-                      <div className="durak-pair-card is-attack">
+                      <div
+                        className={`durak-pair-card is-attack ${
+                          isDefenseDragTarget ? "is-drag-target" : ""
+                        } ${
+                          isDefenseDragTarget && activeTargetId === `durak-attack:${pair.attack.id}`
+                            ? "is-drag-over"
+                            : ""
+                        }`}
+                        {...(isDefenseDragTarget
+                          ? { "data-card-drop-target": `durak-attack:${pair.attack.id}` }
+                          : {})}
+                      >
                         <DurakCard
                           card={pair.attack}
                           size="table"
@@ -445,20 +545,41 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
             </p>
           </div>
           <div className="durak-hand" role="group" aria-label="Карты в вашей руке">
-            {privateGame.hand.map((card) => {
+            <p id="durak-card-drag-instructions" className="durak-drag-instruction">
+              Карту можно выбрать кнопкой или перетащить на доступную цель.
+            </p>
+            {privateGame.hand.map((card, index) => {
               const selectable = isCardSelectable(card);
+              const draggable = isCardDraggable(card);
               const selected =
                 selectedCardIds.includes(card.id) || selectedDefenseCardId === card.id;
+              const dragPayload = draggable ? createDragPayload(card) : null;
+              const dragSource = dragPayload
+                ? bindDragSource(
+                    dragPayload,
+                    dragPayload.kind === "attack" && dragPayload.cards.length > 1
+                      ? `Группа: ${formatCardCount(dragPayload.cards.length)}`
+                      : getCardName(card),
+                  )
+                : undefined;
+              const { className: dragClassName, ...dragBindings } = dragSource ?? {};
               return (
-                <DurakCard
+                <div
                   key={card.id}
-                  card={card}
-                  size="hand"
-                  selected={selected}
-                  playable={playableCardIds.has(card.id) && canAct}
-                  disabled={!selectable}
-                  onClick={() => selectHandCard(card)}
-                />
+                  className={`durak-hand-card-shell ${dragClassName ?? "card-motion-shell"}`}
+                  style={{ "--card-index": Math.min(index, 5) } as CSSProperties}
+                  {...dragBindings}
+                >
+                  <DurakCard
+                    card={card}
+                    size="hand"
+                    selected={selected}
+                    playable={playableCardIds.has(card.id) && canAct}
+                    disabled={!selectable}
+                    onClick={() => selectHandCard(card)}
+                    ariaDescribedBy={dragSource ? "durak-card-drag-instructions" : undefined}
+                  />
+                </div>
               );
             })}
           </div>
@@ -580,6 +701,29 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
           {error}
         </div>
       )}
+      <CardDragLayer
+        session={session}
+        announcement={announcement}
+        renderPreview={(payload) => {
+          const cards = payload.kind === "defend" ? [payload.card] : payload.cards;
+          if (cards.length === 1) return <DurakCard card={cards[0]} size="hand" />;
+
+          return (
+            <div className="durak-drag-stack">
+              {cards.slice(0, 3).map((card, index) => (
+                <div
+                  className="durak-drag-stack-card"
+                  key={card.id}
+                  style={{ "--drag-stack-index": index } as CSSProperties}
+                >
+                  <DurakCard card={card} size="hand" />
+                </div>
+              ))}
+              <span className="durak-drag-stack-count">{formatCardCount(cards.length)}</span>
+            </div>
+          );
+        }}
+      />
     </main>
   );
 }
