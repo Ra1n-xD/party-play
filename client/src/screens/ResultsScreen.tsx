@@ -86,7 +86,9 @@ export function ResultsScreen() {
   };
 
   return (
-    <main className="screen command-game-screen results-screen">
+    <main
+      className={`screen command-game-screen results-screen ${isHost ? "has-results-command-bar" : ""}`}
+    >
       <GameRoomHeader
         gameId="bunker"
         roomCode={roomCode}
@@ -174,13 +176,15 @@ export function ResultsScreen() {
             </div>
           </div>
         )}
-
-        {isHost && (
+      </div>
+      {isHost && (
+        <aside className="results-command-bar" aria-label="Действия после игры">
+          <strong>Партия завершена</strong>
           <button className="btn btn-primary" onClick={playAgain}>
             Сыграть ещё
           </button>
-        )}
-      </div>
+        </aside>
+      )}
     </main>
   );
 }

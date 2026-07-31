@@ -92,7 +92,7 @@ export function HomeScreen() {
           <nav className="platform-home-socials" aria-label="Ссылки проекта">
             <a href="https://t.me/Ra1n_xD" target="_blank" rel="noopener noreferrer">
               <FaTelegramPlane aria-hidden="true" />
-              Telegram
+              Сообщить о проблеме
             </a>
             <a href="https://t.me/fronted_engineer" target="_blank" rel="noopener noreferrer">
               <FaTelegramPlane aria-hidden="true" />
@@ -115,11 +115,10 @@ export function HomeScreen() {
         </header>
 
         <section className="platform-home-hero" aria-labelledby="platform-home-title">
-          <p className="platform-home-eyebrow">Игры для друзей и одного игрока</p>
-          <h1 id="platform-home-title">Вечер начинается с одной комнаты</h1>
+          <p className="platform-home-eyebrow">Онлайн-игры для компании</p>
+          <h1 id="platform-home-title">Соберите друзей в одной комнате</h1>
           <p className="platform-home-description">
-            Выберите игру, пригласите друзей или добавьте ботов. PartyPlay объединяет комнаты,
-            правила и живую игру в одном месте.
+            Выберите игру, создайте комнату и отправьте друзьям код.
           </p>
         </section>
 
@@ -211,9 +210,9 @@ export function HomeScreen() {
                       className="platform-game-play"
                       onClick={() => openCreateModal(game.id)}
                       aria-haspopup="dialog"
-                      aria-label={`Играть в ${game.metadata.title}`}
+                      aria-label={`Создать комнату для игры ${game.metadata.title}`}
                     >
-                      Играть
+                      Создать комнату
                     </button>
                     <button
                       type="button"

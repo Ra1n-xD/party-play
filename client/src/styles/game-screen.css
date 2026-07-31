@@ -1341,6 +1341,112 @@
   -webkit-backdrop-filter: blur(18px);
 }
 
+.command-game-screen .vote-command-bar,
+.command-game-screen .results-command-bar {
+  position: fixed;
+  right: 18px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 18px;
+  z-index: 80;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 74px;
+  padding: 10px 12px 10px 18px;
+  border: 1px solid rgba(178, 199, 185, 0.24);
+  border-radius: 16px;
+  background: rgba(7, 16, 12, 0.96);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.command-game-screen .vote-command-status {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.command-game-screen .vote-command-status small {
+  color: var(--gs-green);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.command-game-screen .vote-command-status strong,
+.command-game-screen .results-command-bar > strong {
+  overflow: hidden;
+  color: var(--gs-text);
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-game-screen .vote-command-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.command-game-screen .vote-command-actions .btn,
+.command-game-screen .results-command-bar .btn {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 12px;
+  font-size: 0.74rem;
+}
+
+.screen.command-game-screen.has-vote-command-bar,
+.screen.command-game-screen.has-results-command-bar {
+  padding-bottom: calc(104px + env(safe-area-inset-bottom));
+}
+
+.screen.command-game-screen.has-vote-command-bar .error-toast,
+.screen.command-game-screen.has-results-command-bar .error-toast {
+  bottom: calc(104px + env(safe-area-inset-bottom));
+}
+
+.command-game-screen .vote-candidate {
+  position: relative;
+}
+
+.command-game-screen .vote-candidate.is-selected {
+  border-color: rgba(239, 189, 88, 0.72);
+  background: rgba(239, 189, 88, 0.1);
+  box-shadow: inset 3px 0 0 var(--gs-gold);
+}
+
+.command-game-screen .vote-candidate-radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.command-game-screen .vote-candidate-mark {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid var(--gs-border);
+  border-radius: 999px;
+  color: var(--gs-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.command-game-screen .vote-candidate.is-selected .vote-candidate-mark {
+  border-color: rgba(239, 189, 88, 0.5);
+  color: #f6d894;
+}
+
 .command-game-screen .gs-command-status {
   display: grid;
   min-width: 0;
@@ -2055,6 +2161,51 @@
     padding: 6px 8px;
     font-size: 0.7rem;
     line-height: 1.15;
+  }
+
+  .command-game-screen .vote-command-bar,
+  .command-game-screen .results-command-bar {
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    left: 8px;
+    min-height: 72px;
+    gap: 8px;
+    padding: 10px 11px 10px 13px;
+    border-radius: 15px;
+  }
+
+  .command-game-screen .vote-command-status strong {
+    max-width: 34vw;
+    font-size: 0.7rem;
+  }
+
+  .command-game-screen .vote-command-actions {
+    max-width: 61vw;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .command-game-screen .vote-command-actions .btn {
+    min-width: max-content;
+    flex: 0 0 auto;
+    min-height: 44px;
+    font-size: 0.7rem;
+  }
+
+  .screen.command-game-screen.has-vote-command-bar,
+  .screen.command-game-screen.has-results-command-bar {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .screen.command-game-screen.has-vote-command-bar .error-toast,
+  .screen.command-game-screen.has-results-command-bar .error-toast {
+    bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .command-game-screen .vote-candidate {
+    flex-direction: row;
+    align-items: center;
   }
 
   .screen.command-game-screen.has-game-command-bar {

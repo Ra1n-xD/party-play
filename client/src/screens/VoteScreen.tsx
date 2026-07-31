@@ -7,7 +7,6 @@ import "../styles/game-screen.css";
 import { AccessibleModal } from "./game/AccessibleModal";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { HostControlDialog } from "./game/HostControlDialog";
-import { ReconnectHostBanner } from "./game/ReconnectHostControls";
 
 export function VoteScreen() {
   const {
@@ -44,6 +43,7 @@ export function VoteScreen() {
     transferHost,
   } = useGame();
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [confirmRevealAction, setConfirmRevealAction] = useState(false);
   const [voteSubmitting, setVoteSubmitting] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
@@ -81,6 +81,7 @@ export function VoteScreen() {
 
   useEffect(() => {
     setConfirmTarget(null);
+    setSelectedTarget(null);
     setConfirmRevealAction(false);
     setVoteSubmitting(false);
   }, [gameState?.phase]);
@@ -168,7 +169,7 @@ export function VoteScreen() {
 
   const handleVote = (targetId: string) => {
     if (!canVote || voted || voteLocked) return;
-    setConfirmTarget(targetId);
+    setSelectedTarget(targetId);
   };
 
   const confirmVote = () => {
@@ -179,7 +180,7 @@ export function VoteScreen() {
   };
 
   return (
-    <main className="screen command-game-screen vote-screen">
+    <main className="screen command-game-screen vote-screen has-vote-command-bar">
       <GameRoomHeader
         gameId="bunker"
         roomCode={roomCode}
@@ -187,14 +188,6 @@ export function VoteScreen() {
         onLeaveRoom={leaveRoom}
         confirmActiveLeave
       />
-
-      {isCurrentHost && canUseRoomActions && (
-        <ReconnectHostBanner
-          players={gameState.players}
-          claimsCount={hostSeatClaims.length}
-          onOpen={openAdminPanel}
-        />
-      )}
 
       <div className="sticky-top-bar vote-top-bar">
         <div className="top-bar-content">
@@ -223,19 +216,6 @@ export function VoteScreen() {
             </span>
           </div>
           <div className="top-bar-right">
-            {isCurrentHost && canUseRoomActions && (
-              <button
-                type="button"
-                className="btn btn-secondary vote-admin-trigger"
-                onClick={openAdminPanel}
-                aria-label="Управление игрой"
-                aria-haspopup="dialog"
-                aria-expanded={adminOpen}
-              >
-                <FiSettings aria-hidden="true" />
-                <span>Админ-панель</span>
-              </button>
-            )}
             <Timer endTime={gameState.phaseEndTime} size="large" />
           </div>
         </div>
@@ -278,7 +258,19 @@ export function VoteScreen() {
                 const playerNumber =
                   gameState.players.findIndex((candidate) => candidate.id === player.id) + 1;
                 return (
-                  <div key={player.id} className="vote-candidate">
+                  <label
+                    key={player.id}
+                    className={`vote-candidate ${selectedTarget === player.id ? "is-selected" : ""}`}
+                  >
+                    <input
+                      className="vote-candidate-radio"
+                      type="radio"
+                      name="vote-target"
+                      value={player.id}
+                      checked={selectedTarget === player.id}
+                      disabled={voteLocked}
+                      onChange={() => handleVote(player.id)}
+                    />
                     <div className="candidate-info">
                       <span className="candidate-name">
                         <span className="player-number">{playerNumber}</span>
@@ -300,15 +292,10 @@ export function VoteScreen() {
                         )}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      className="btn btn-vote"
-                      disabled={voteLocked}
-                      onClick={() => handleVote(player.id)}
-                    >
-                      Изгнать
-                    </button>
-                  </div>
+                    <span className="vote-candidate-mark" aria-hidden="true">
+                      {selectedTarget === player.id ? "Выбрано" : "Выбрать"}
+                    </span>
+                  </label>
                 );
               })}
             </div>
@@ -326,20 +313,61 @@ export function VoteScreen() {
                 />
               </div>
             </div>
-
-            {canRevealAction && (
-              <button
-                type="button"
-                className="btn btn-reveal-action"
-                disabled={voteLocked}
-                onClick={() => setConfirmRevealAction(true)}
-              >
-                Раскрыть особое условие
-              </button>
-            )}
           </>
         )}
       </div>
+
+      <aside className="vote-command-bar" aria-label="Действия голосования">
+        <div className="vote-command-status" role="status" aria-live="polite">
+          <small>{isTiebreak ? "Переголосование" : "Голосование"}</small>
+          <strong>
+            {selectedTarget
+              ? `Выбран: ${gameState.players.find((player) => player.id === selectedTarget)?.name ?? "игрок"}`
+              : voted
+                ? "Ваш голос принят"
+                : canVote
+                  ? "Выберите кандидата"
+                  : "Вы наблюдаете за голосованием"}
+          </strong>
+        </div>
+        <div className="vote-command-actions">
+          {canRevealAction && (
+            <button
+              type="button"
+              className="btn btn-reveal-action"
+              disabled={voteLocked}
+              onClick={() => setConfirmRevealAction(true)}
+            >
+              Раскрыть особое условие
+            </button>
+          )}
+          {isCurrentHost && canUseRoomActions && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={openAdminPanel}
+              aria-label="Управление игрой"
+              aria-haspopup="dialog"
+              aria-expanded={adminOpen}
+            >
+              <FiSettings aria-hidden="true" />
+              <span>
+                Админ-панель{hostSeatClaims.length > 0 ? ` · ${hostSeatClaims.length}` : ""}
+              </span>
+            </button>
+          )}
+          {canVote && !voted && (
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={!selectedTarget || voteLocked}
+              onClick={() => setConfirmTarget(selectedTarget)}
+            >
+              Изгнать выбранного
+            </button>
+          )}
+        </div>
+      </aside>
 
       {error && <div className="error-toast">{error}</div>}
 

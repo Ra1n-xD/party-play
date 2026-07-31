@@ -1,4 +1,5 @@
 import type { UnoCard as UnoCardData, UnoColor } from "../../../../../shared/games/uno/types";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import cardBack from "../assets/card-back.svg";
 import drawTwoIcon from "../assets/draw-two.svg";
 import reverseIcon from "../assets/reverse.svg";
@@ -52,6 +53,8 @@ interface UnoCardProps {
   bluffable?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  onDoubleClick?: () => void;
+  onKeyboardActivate?: () => void;
   ariaLabel?: string;
   ariaDescribedBy?: string;
 }
@@ -64,6 +67,8 @@ export function UnoCard({
   bluffable = false,
   disabled = false,
   onClick,
+  onDoubleClick,
+  onKeyboardActivate,
   ariaLabel,
   ariaDescribedBy,
 }: UnoCardProps) {
@@ -94,13 +99,26 @@ export function UnoCard({
     </>
   );
 
-  if (onClick) {
+  if (onClick || onDoubleClick || onKeyboardActivate) {
+    const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+      if (!onKeyboardActivate || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      onKeyboardActivate();
+    };
     return (
       <button
         type="button"
         className={className}
         disabled={disabled}
-        onClick={onClick}
+        onClick={
+          onClick
+            ? (event) => {
+                if (event.detail <= 1) onClick();
+              }
+            : undefined
+        }
+        onDoubleClick={onDoubleClick}
+        onKeyDown={handleKeyDown}
         aria-pressed={selected || undefined}
         aria-label={ariaLabel ?? getUnoCardName(card)}
         aria-describedby={ariaDescribedBy}

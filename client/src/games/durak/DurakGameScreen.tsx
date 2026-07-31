@@ -8,7 +8,6 @@ import type { RoomSnapshot } from "../../../../shared/platform/room";
 import { Timer } from "../../components/Timer";
 import { AccessibleModal } from "../../platform/components/AccessibleModal";
 import {
-  ReconnectHostBanner,
   ReconnectHostControls,
   type RecoverySeat,
 } from "../../platform/components/ReconnectHostControls";
@@ -16,6 +15,7 @@ import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
 import { CardDragLayer } from "../shared/CardDragLayer";
 import { useCardDrag } from "../shared/useCardDrag";
+import { useTableCardFlight } from "../shared/useTableCardFlight";
 import { DurakCard, DurakCardBack, getCardName, getSuitSymbol } from "./components/DurakCard";
 
 interface DurakGameScreenProps {
@@ -44,7 +44,7 @@ const FIGHT_STAGE_LABELS = {
 
 const TRUMP_LOCATION_LABELS = {
   deck: "под колодой",
-  hand: "в руке сдающего",
+  hand: "забран",
   table: "на столе",
   discard: "в отбое",
   removed: "вне партии",
@@ -95,7 +95,6 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
   } = usePlatform();
   const game = snapshot.game;
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
-  const [selectedDefenseCardId, setSelectedDefenseCardId] = useState<string | null>(null);
   const [managementOpen, setManagementOpen] = useState(false);
   const adminPauseActiveRef = useRef(false);
 
@@ -112,18 +111,10 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
   const canAct = Boolean(privateGame && canUseConnection && !paused && !commandPending);
   const playableCardIds = getLegalPlayableIds(legalAction);
   const selectedCards = privateGame?.hand.filter((card) => selectedCardIds.includes(card.id)) ?? [];
-  const selectedDefenseTargets =
-    legalAction?.type === "defend" && selectedDefenseCardId
-      ? new Set(
-          legalAction.targets
-            .filter((target) => target.defenseCardId === selectedDefenseCardId)
-            .flatMap((target) => target.attackCardIds),
-        )
-      : new Set<string>();
 
   const isCardSelectable = (card: DurakCardData): boolean => {
     if (!canAct || !playableCardIds.has(card.id)) return false;
-    if (legalAction?.type === "defend") return true;
+    if (legalAction?.type === "defend") return false;
     if (legalAction?.type !== "attack" && legalAction?.type !== "throw-in") return false;
     if (selectedCardIds.includes(card.id)) return true;
     if (selectedCardIds.length >= legalAction.maxCards) return false;
@@ -165,10 +156,31 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
       !game || paused || game.turnRemainingMs == null ? null : Date.now() + game.turnRemainingMs,
     [game?.turnRemainingMs, paused, snapshot.revision],
   );
+  const tableFlights = useMemo(
+    () =>
+      game?.table.flatMap((pair) => [
+        {
+          key: `attack:${pair.attack.id}`,
+          sourceSeatId: pair.attackPlayedBySeatId,
+          targetId: `durak-attack-flight:${pair.attack.id}`,
+        },
+        ...(pair.defense && pair.defensePlayedBySeatId
+          ? [
+              {
+                key: `defense:${pair.defense.id}`,
+                sourceSeatId: pair.defensePlayedBySeatId,
+                targetId: `durak-defense-flight:${pair.defense.id}`,
+              },
+            ]
+          : []),
+      ]) ?? [],
+    [game?.table],
+  );
+
+  useTableCardFlight({ revision: snapshot.revision, flights: tableFlights });
 
   useEffect(() => {
     setSelectedCardIds([]);
-    setSelectedDefenseCardId(null);
   }, [snapshot.revision, legalAction?.type]);
 
   useEffect(() => {
@@ -248,6 +260,9 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
       controllerKind: seat.controllerKind,
       temporaryBot: seat.temporaryBot,
     }));
+  const recoveryAttentionCount =
+    hostSeatClaims.length +
+    recoverySeats.filter((seat) => !seat.isBot && !seat.connected && !seat.kicked).length;
   const canManage = isHost && connected && reconnectState === "connected" && !commandPending;
 
   const openManagement = () => {
@@ -266,10 +281,6 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
 
   const selectHandCard = (card: DurakCardData) => {
     if (!isCardSelectable(card)) return;
-    if (legalAction?.type === "defend") {
-      setSelectedDefenseCardId((current) => (current === card.id ? null : card.id));
-      return;
-    }
     setSelectedCardIds((current) =>
       current.includes(card.id)
         ? current.filter((cardId) => cardId !== card.id)
@@ -277,49 +288,43 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
     );
   };
 
-  const sendSelectedCards = () => {
-    if (
-      !canAct ||
-      selectedCardIds.length === 0 ||
-      (legalAction?.type !== "attack" && legalAction?.type !== "throw-in")
-    ) {
+  const activateHandCard = (card: DurakCardData) => {
+    if (!canAct || !playableCardIds.has(card.id)) return;
+    if (legalAction?.type === "defend") {
+      const target = legalAction.targets.find((candidate) => candidate.defenseCardId === card.id);
+      if (!target || target.attackCardIds.length !== 1) return;
+      sendGameCommand("durak", {
+        type: "defend",
+        cardId: card.id,
+        attackCardId: target.attackCardIds[0],
+      });
       return;
     }
-    const firstCardId = selectedCardIds[0];
+    if (legalAction?.type !== "attack" && legalAction?.type !== "throw-in") {
+      return;
+    }
+    const ids = selectedCardIds.includes(card.id) ? selectedCardIds : [card.id];
+    const firstCardId = ids[0];
     if (!firstCardId) return;
-    const cardIds: [string, ...string[]] = [firstCardId, ...selectedCardIds.slice(1)];
+    const cardIds: [string, ...string[]] = [firstCardId, ...ids.slice(1)];
     sendGameCommand(
       "durak",
       legalAction.type === "attack" ? { type: "attack", cardIds } : { type: "throw-in", cardIds },
     );
   };
 
-  const defendAttack = (attackCardId: string) => {
-    if (
-      !canAct ||
-      legalAction?.type !== "defend" ||
-      !selectedDefenseCardId ||
-      !selectedDefenseTargets.has(attackCardId)
-    ) {
-      return;
-    }
-    sendGameCommand("durak", {
-      type: "defend",
-      cardId: selectedDefenseCardId,
-      attackCardId,
-    });
-  };
-
   const statusDescription = paused
     ? "Партия приостановлена"
     : game.takeDeclared
-      ? "Защищающийся берёт карты — идёт последний круг подкидывания"
-      : currentActor
-        ? `Решение принимает ${currentActor.name}`
-        : "Сервер завершает бой";
+      ? "Защищающийся берёт — атакующие могут подкидывать без очереди"
+      : game.fightStage === "defense"
+        ? "Защитник отбивается, остальные могут подкидывать одновременно"
+        : currentActor
+          ? `Первую атаку начинает ${currentActor.name}`
+          : "Сервер завершает бой";
 
   return (
-    <main className="screen command-game-screen durak-screen">
+    <main className="screen command-game-screen durak-screen has-durak-command-dock">
       <GameRoomHeader
         gameId="durak"
         roomCode={snapshot.roomCode}
@@ -330,56 +335,13 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
         brandIcon="♠"
       />
 
-      {isHost && (
-        <ReconnectHostBanner
-          players={recoverySeats}
-          claimsCount={hostSeatClaims.length}
-          onOpen={openManagement}
-        />
-      )}
-
-      <section className="durak-status-panel" aria-labelledby="durak-fight-title">
-        <div>
-          <span className="durak-section-eyebrow">
-            {game.fightStage ? FIGHT_STAGE_LABELS[game.fightStage] : "Подготовка"}
-          </span>
-          <h1 id="durak-fight-title">
-            {game.fightStage ? FIGHT_STAGE_LABELS[game.fightStage] : "Ждём первый ход"}
-          </h1>
-          <p>{statusDescription}</p>
-        </div>
-        <div className="durak-status-actions">
-          {snapshot.viewer.role === "spectator" && (
-            <span className="durak-spectator-badge">Наблюдатель</span>
-          )}
-          {game.turnRemainingMs == null ? (
-            <span className="durak-no-limit">Без лимита времени</span>
-          ) : paused ? (
-            <span className="durak-no-limit">Таймер заморожен</span>
-          ) : (
-            <Timer endTime={timerEndTime} size="large" />
-          )}
-          {isHost && (
-            <button
-              type="button"
-              className="btn btn-secondary durak-manage-button"
-              onClick={openManagement}
-              disabled={!canManage}
-            >
-              Управление комнатой
-              {hostSeatClaims.length > 0 ? ` · ${hostSeatClaims.length}` : ""}
-            </button>
-          )}
-        </div>
-      </section>
-
-      <section className="durak-players" aria-label="Участники по порядку хода">
+      <section className="durak-players" aria-label="Участники">
         {orderedPlayers.map((player) => {
           const seat = snapshot.seats.find((candidate) => candidate.seatId === player.seatId);
-          const orderIndex = game.activeOrder.indexOf(player.seatId);
           return (
             <article
               key={player.seatId}
+              data-card-player-seat={player.seatId}
               className={[
                 "durak-player",
                 player.seatId === viewerSeatId ? "is-me" : "",
@@ -389,7 +351,6 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                 .filter(Boolean)
                 .join(" ")}
             >
-              <span className="durak-player-order">{orderIndex >= 0 ? orderIndex + 1 : "—"}</span>
               <div className="durak-player-copy">
                 <strong>
                   {player.name}
@@ -397,16 +358,21 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                 </strong>
                 <span>{playerStatusLabel(player)}</span>
               </div>
-              <div className="durak-player-roles" aria-label={`Роли игрока ${player.name}`}>
+              <div className="durak-player-roles" aria-label={`Статусы игрока ${player.name}`}>
                 {seat?.isHost && <span>Хост</span>}
                 {player.isDealer && <span>Сдающий</span>}
-                {player.isAttacker && <span>Атакует</span>}
-                {player.isDefender && <span>Защищается</span>}
-                {game.throwInOrder.includes(player.seatId) && (
-                  <span>Подкидывает {game.throwInOrder.indexOf(player.seatId) + 1}-м</span>
-                )}
-                {game.passedSeatIds.includes(player.seatId) && <span>Пас</span>}
               </div>
+              {player.isCurrentActor && (
+                <span className="durak-player-timer">
+                  {game.turnRemainingMs == null ? (
+                    "Без лимита"
+                  ) : paused ? (
+                    "Пауза"
+                  ) : timerEndTime ? (
+                    <Timer endTime={timerEndTime} />
+                  ) : null}
+                </span>
+              )}
               <span className="durak-player-cards">{formatCardCount(player.cardCount)}</span>
             </article>
           );
@@ -430,15 +396,26 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
             <span>
               Козырь <strong>{game.trumpSuit ? getSuitSymbol(game.trumpSuit) : "—"}</strong>
             </span>
-            {game.trumpCard && <DurakCard card={game.trumpCard} size="mini" />}
-            {game.trumpCardLocation && (
-              <small>
-                {TRUMP_LOCATION_LABELS[game.trumpCardLocation]}
-                {game.trumpCardHolderSeatId
-                  ? ` · ${playersById.get(game.trumpCardHolderSeatId)?.name ?? "игрок"}`
-                  : ""}
-              </small>
+            {game.trumpCard && game.trumpCardLocation === "deck" ? (
+              <DurakCard card={game.trumpCard} size="mini" />
+            ) : (
+              <span className="durak-trump-status" role="status">
+                <strong>
+                  {game.trumpCardLocation === "hand"
+                    ? "Козырь забран"
+                    : "Козырь больше не в колоде"}
+                </strong>
+                <small>
+                  {game.trumpCardLocation
+                    ? TRUMP_LOCATION_LABELS[game.trumpCardLocation]
+                    : "местоположение неизвестно"}
+                  {game.trumpCardHolderSeatId
+                    ? ` · ${playersById.get(game.trumpCardHolderSeatId)?.name ?? "игрок"}`
+                    : ""}
+                </small>
+              </span>
             )}
+            {game.trumpCardLocation === "deck" && <small>под колодой</small>}
           </div>
           <span className="durak-discard-count">В отбое: {game.discardCount}</span>
         </aside>
@@ -467,7 +444,12 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
             <div className="durak-table-grid">
               {game.table.map((pair) => {
                 const canTarget =
-                  !pair.defense && canAct && selectedDefenseTargets.has(pair.attack.id);
+                  !pair.defense &&
+                  canAct &&
+                  legalAction?.type === "defend" &&
+                  legalAction.targets.some((target) =>
+                    target.attackCardIds.includes(pair.attack.id),
+                  );
                 const isDefenseDragTarget =
                   !pair.defense &&
                   defenseDragPayload?.attackCardIds.includes(pair.attack.id) === true;
@@ -492,12 +474,11 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                         {...(isDefenseDragTarget
                           ? { "data-card-drop-target": `durak-attack:${pair.attack.id}` }
                           : {})}
+                        data-table-card-flight={`durak-attack-flight:${pair.attack.id}`}
                       >
                         <DurakCard
                           card={pair.attack}
                           size="table"
-                          playable={canTarget}
-                          onClick={canTarget ? () => defendAttack(pair.attack.id) : undefined}
                           ariaLabel={
                             canTarget
                               ? `Побить карту: ${getCardName(pair.attack)} — атаковал ${attackerName}`
@@ -506,7 +487,10 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                         />
                       </div>
                       {pair.defense && (
-                        <div className="durak-pair-card is-defense">
+                        <div
+                          className="durak-pair-card is-defense"
+                          data-table-card-flight={`durak-defense-flight:${pair.defense.id}`}
+                        >
                           <DurakCard
                             card={pair.defense}
                             size="table"
@@ -532,27 +516,24 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
             </div>
             <p>
               {legalAction?.type === "defend"
-                ? selectedDefenseCardId
-                  ? "Теперь выберите подсвеченную атакующую карту на столе."
-                  : "Выберите карту для защиты, затем цель на столе."
+                ? "Дважды нажмите карту при одной цели или перетащите её на нужную атаку."
                 : legalAction?.type === "attack"
-                  ? "Для нескольких карт выберите одно достоинство."
+                  ? "Дважды нажмите карту или выберите одинаковые карты и перетащите группу."
                   : legalAction?.type === "throw-in"
-                    ? "Можно выбрать несколько разрешённых карт."
+                    ? "Подкидывайте без очереди двойным нажатием или перетаскиванием."
                     : legalAction?.type === "pass"
-                      ? "Подкидывать больше не обязательно."
-                      : "Ожидайте своего решения."}
+                      ? "Если закончили подкидывать, нажмите «Бито» внизу."
+                      : "Следите за столом — доступное действие появится автоматически."}
             </p>
           </div>
           <div className="durak-hand" role="group" aria-label="Карты в вашей руке">
             <p id="durak-card-drag-instructions" className="durak-drag-instruction">
-              Карту можно выбрать кнопкой или перетащить на доступную цель.
+              Карту можно разыграть двойным нажатием или перетащить на доступную цель.
             </p>
             {privateGame.hand.map((card, index) => {
               const selectable = isCardSelectable(card);
               const draggable = isCardDraggable(card);
-              const selected =
-                selectedCardIds.includes(card.id) || selectedDefenseCardId === card.id;
+              const selected = selectedCardIds.includes(card.id);
               const dragPayload = draggable ? createDragPayload(card) : null;
               const dragSource = dragPayload
                 ? bindDragSource(
@@ -575,81 +556,15 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                     size="hand"
                     selected={selected}
                     playable={playableCardIds.has(card.id) && canAct}
-                    disabled={!selectable}
-                    onClick={() => selectHandCard(card)}
+                    disabled={!draggable}
+                    onClick={selectable ? () => selectHandCard(card) : undefined}
+                    onDoubleClick={draggable ? () => activateHandCard(card) : undefined}
+                    onKeyboardActivate={draggable ? () => activateHandCard(card) : undefined}
                     ariaDescribedBy={dragSource ? "durak-card-drag-instructions" : undefined}
                   />
                 </div>
               );
             })}
-          </div>
-
-          <div className="durak-action-bar" aria-live="polite">
-            {commandPending ? (
-              <span className="durak-action-wait">Сервер принимает действие…</span>
-            ) : paused ? (
-              <span className="durak-action-wait">Действия недоступны во время паузы</span>
-            ) : legalAction?.type === "attack" ? (
-              <>
-                <span>Выбрано: {selectedCardIds.length}</span>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={!canAct || selectedCardIds.length === 0}
-                  onClick={sendSelectedCards}
-                >
-                  Атаковать
-                </button>
-              </>
-            ) : legalAction?.type === "defend" ? (
-              <>
-                <span>
-                  {selectedDefenseCardId ? "Выберите цель на столе" : "Выберите карту для защиты"}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  disabled={!canAct}
-                  onClick={() => sendGameCommand("durak", { type: "take" })}
-                >
-                  Взять
-                </button>
-              </>
-            ) : legalAction?.type === "throw-in" ? (
-              <>
-                <span>Можно подкинуть ещё: {legalAction.maxCards}</span>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={!canAct || selectedCardIds.length === 0}
-                  onClick={sendSelectedCards}
-                >
-                  Подкинуть
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={!canAct}
-                  onClick={() => sendGameCommand("durak", { type: "pass" })}
-                >
-                  Пас
-                </button>
-              </>
-            ) : legalAction?.type === "pass" ? (
-              <>
-                <span>Ваше решение в круге подкидывания</span>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={!canAct}
-                  onClick={() => sendGameCommand("durak", { type: "pass" })}
-                >
-                  Пас
-                </button>
-              </>
-            ) : (
-              <span className="durak-action-wait">Сейчас ходит другой участник</span>
-            )}
           </div>
         </section>
       ) : snapshot.viewer.role === "spectator" ? (
@@ -663,6 +578,58 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
           <span>Публичный стол уже доступен, личные карты появятся после синхронизации.</span>
         </section>
       )}
+
+      <aside className="durak-command-dock" aria-label="Игровые действия">
+        <div className="durak-command-status" role="status" aria-live="polite">
+          <small>
+            {snapshot.viewer.role === "spectator"
+              ? "Наблюдение"
+              : game.fightStage
+                ? FIGHT_STAGE_LABELS[game.fightStage]
+                : "Партия"}
+          </small>
+          <strong>
+            {commandPending
+              ? "Сервер принимает действие…"
+              : paused
+                ? "Действия приостановлены"
+                : statusDescription}
+          </strong>
+        </div>
+        <div className="durak-command-actions">
+          {legalAction?.type === "defend" && (
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={!canAct}
+              onClick={() => sendGameCommand("durak", { type: "take" })}
+            >
+              Взять
+            </button>
+          )}
+          {(legalAction?.type === "throw-in" || legalAction?.type === "pass") && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={!canAct}
+              onClick={() => sendGameCommand("durak", { type: "pass" })}
+            >
+              Бито
+            </button>
+          )}
+          {isHost && (
+            <button
+              type="button"
+              className="btn btn-secondary durak-manage-button"
+              onClick={openManagement}
+              disabled={!canManage}
+            >
+              Управление
+              {recoveryAttentionCount > 0 ? ` · ${recoveryAttentionCount}` : ""}
+            </button>
+          )}
+        </div>
+      </aside>
 
       {managementOpen && isHost && (
         <AccessibleModal
