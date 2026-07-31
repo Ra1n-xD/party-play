@@ -752,10 +752,11 @@ button.durak-card:focus-visible:not(.is-selected) {
 }
 
 .durak-action-bar {
+  position: relative;
   display: flex;
   min-height: 54px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
   margin-top: 4px;
   padding-top: 13px;
@@ -763,9 +764,14 @@ button.durak-card:focus-visible:not(.is-selected) {
 }
 
 .durak-action-bar > span {
-  margin-right: auto;
+  margin-right: 0;
   color: rgba(255, 255, 255, 0.62);
   font-size: 0.74rem;
+}
+
+.durak-action-bar > span:not(.durak-action-wait) {
+  position: absolute;
+  left: 0;
 }
 
 .durak-action-bar .btn {
@@ -1046,6 +1052,10 @@ button.durak-card:focus-visible:not(.is-selected) {
 
   .durak-action-bar > span {
     width: 100%;
+  }
+
+  .durak-action-bar > span:not(.durak-action-wait) {
+    position: static;
   }
 
   .durak-action-bar .btn {

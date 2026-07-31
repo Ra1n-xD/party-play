@@ -634,7 +634,7 @@ button.uno-card:focus-visible {
   display: flex;
   min-height: 53px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 9px;
   padding-top: 13px;
   border-top: 1px solid rgba(255, 255, 255, 0.09);
