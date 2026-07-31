@@ -9,7 +9,6 @@ import { GameCommandBar } from "./game/GameCommandBar";
 import { GameStatusHeader } from "./game/GameStatusHeader";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { HostControlDialog } from "./game/HostControlDialog";
-import { ReconnectHostBanner } from "./game/ReconnectHostControls";
 import { MobileGameTabs } from "./game/MobileGameTabs";
 import { PlayerBoard } from "./game/PlayerBoard";
 import { ScenarioSummary } from "./game/ScenarioSummary";
@@ -145,6 +144,10 @@ export function GameScreen() {
   }
 
   const view = buildGameScreenViewModel({ gameState, playerId, isSpectator, myCharacter });
+  const managementAttentionCount =
+    hostSeatClaims.length +
+    gameState.players.filter((player) => !player.isBot && !player.connected && !player.kicked)
+      .length;
 
   const handleReveal = (attributeIndex: number) => {
     revealAttribute(attributeIndex);
@@ -180,13 +183,6 @@ export function GameScreen() {
         onLeaveRoom={leaveRoom}
         confirmActiveLeave={!isSpectator}
       />
-      {isCurrentHost && canUseRoomActions && (
-        <ReconnectHostBanner
-          players={gameState.players}
-          claimsCount={hostSeatClaims.length}
-          onOpen={openHostControls}
-        />
-      )}
       <GameStatusHeader
         gameState={gameState}
         phaseLabel={view.phaseLabel}
@@ -235,6 +231,7 @@ export function GameScreen() {
         canRevealAction={canUseRoomActions && view.canRevealAction}
         canManageGame={canUseRoomActions && Boolean(view.me?.isHost)}
         canSkipDiscussion={canUseRoomActions && view.canSkipDiscussion}
+        managementAttentionCount={managementAttentionCount}
         hostControlsOpen={hostControlsOpen}
         onReveal={() => {
           if (gameState.roundNumber === 1) {

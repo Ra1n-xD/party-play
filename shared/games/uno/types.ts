@@ -79,6 +79,7 @@ export interface UnoPublicState {
   activeOrder: SeatId[];
   direction: UnoDirection;
   topDiscard: UnoCard | null;
+  lastPlayedBySeatId: SeatId | null;
   activeColor: UnoColor | null;
   drawPileCount: number;
   discardPileCount: number;

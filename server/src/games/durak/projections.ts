@@ -167,14 +167,14 @@ export function getDurakLegalAction(room: DurakRoom, seatId: SeatId): DurakLegal
     !fight ||
     !turn ||
     isPaused(room) ||
-    state.statusBySeatId[seatId] !== "active" ||
-    turn.actorSeatId !== seatId
+    state.statusBySeatId[seatId] !== "active"
   ) {
     return waitAction();
   }
 
   const hand = state.hands[seatId];
   if (turn.kind === "opening") {
+    if (turn.actorSeatId !== seatId) return waitAction();
     return {
       type: "attack",
       playableCardIds: hand.map((card) => card.id),
@@ -182,8 +182,9 @@ export function getDurakLegalAction(room: DurakRoom, seatId: SeatId): DurakLegal
     };
   }
 
-  if (turn.kind === "defense") {
+  if (fight.stage === "defense" && fight.defenderSeatId === seatId) {
     const uncoveredAttacks = fight.table.filter((pair) => pair.defense === null);
+    if (uncoveredAttacks.length === 0) return waitAction();
     const targets = hand.flatMap((defenseCard) => {
       const attackCardIds = uncoveredAttacks
         .filter((pair) => canBeatDurakCard(defenseCard, pair.attack, state.trumpSuit))
@@ -193,6 +194,15 @@ export function getDurakLegalAction(room: DurakRoom, seatId: SeatId): DurakLegal
     return { type: "defend", targets, canTake: true };
   }
 
+  if (
+    (fight.stage !== "defense" && fight.stage !== "take-throw-in") ||
+    fight.defenderSeatId === seatId ||
+    !fight.throwInOrder.includes(seatId) ||
+    fight.passedSeatIds.includes(seatId)
+  ) {
+    return waitAction();
+  }
+
   const tableRanks = new Set(
     fight.table.flatMap((pair) =>
       pair.defense ? [pair.attack.rank, pair.defense.rank] : [pair.attack.rank],
@@ -200,7 +210,7 @@ export function getDurakLegalAction(room: DurakRoom, seatId: SeatId): DurakLegal
   );
   const remainingCapacity = fight.maxAttackCards - fight.table.length;
   if (remainingCapacity <= 0) {
-    return { type: "pass", canPass: true };
+    return waitAction();
   }
   const playableCardIds = hand.filter((card) => tableRanks.has(card.rank)).map((card) => card.id);
   if (playableCardIds.length === 0) {

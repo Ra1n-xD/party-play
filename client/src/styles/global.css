@@ -398,12 +398,12 @@ textarea {
 }
 
 .platform-home-hero {
-  max-width: 760px;
-  padding: 54px 0 30px;
+  max-width: 900px;
+  padding: 32px 0 22px;
 }
 
 .platform-home-eyebrow {
-  margin-bottom: 10px;
+  margin-bottom: 7px;
   color: #ed9650;
   font-size: 0.72rem;
   font-weight: 800;
@@ -412,18 +412,18 @@ textarea {
 }
 
 .platform-home-hero h1 {
-  max-width: 700px;
-  font-size: clamp(2.2rem, 5.3vw, 4rem);
-  line-height: 1.02;
+  max-width: 900px;
+  font-size: clamp(1.85rem, 3.4vw, 2.75rem);
+  line-height: 1.06;
   letter-spacing: -0.035em;
 }
 
 .platform-home-description {
-  max-width: 610px;
-  margin-top: 16px;
+  max-width: 560px;
+  margin-top: 10px;
   color: rgba(247, 240, 229, 0.66);
   font-size: clamp(0.9rem, 1.7vw, 1.05rem);
-  line-height: 1.6;
+  line-height: 1.45;
 }
 
 .platform-home-entry {
@@ -596,7 +596,7 @@ textarea {
 
 .platform-game-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.75fr);
   gap: 7px;
   padding: 0 10px 10px;
 }
@@ -606,7 +606,7 @@ textarea {
   padding: 8px 10px;
   border-radius: 9px;
   font: inherit;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 850;
   cursor: pointer;
   transition:
@@ -789,7 +789,7 @@ textarea {
   max-width: 600px;
   margin: 9px 0 0;
   color: rgba(243, 241, 232, 0.68);
-  font-size: 0.9rem;
+  font-size: 0.98rem;
   line-height: 1.5;
 }
 
@@ -825,7 +825,7 @@ textarea {
   margin: 0;
   padding: 22px 24px 0;
   color: rgba(243, 241, 232, 0.86);
-  font-size: 1rem;
+  font-size: 1.08rem;
   line-height: 1.65;
 }
 
@@ -848,7 +848,7 @@ textarea {
 
 .game-rules-facts dt {
   color: rgba(243, 241, 232, 0.47);
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -857,7 +857,7 @@ textarea {
 .game-rules-facts dd {
   margin: 0;
   color: #f3f1e8;
-  font-size: 0.84rem;
+  font-size: 0.98rem;
   font-weight: 750;
   line-height: 1.35;
 }
@@ -896,14 +896,14 @@ textarea {
 .game-rules-sections h3 {
   margin: 1px 0 9px;
   color: #f3f1e8;
-  font-size: 1rem;
+  font-size: 1.08rem;
 }
 
 .modal.game-rules-modal .game-rules-sections p {
   margin: 0 0 9px;
   color: rgba(243, 241, 232, 0.62);
-  font-size: 0.82rem;
-  line-height: 1.55;
+  font-size: 1rem;
+  line-height: 1.62;
 }
 
 .game-rules-sections ul,
@@ -920,8 +920,8 @@ textarea {
   position: relative;
   padding-left: 16px;
   color: rgba(243, 241, 232, 0.72);
-  font-size: 0.8rem;
-  line-height: 1.55;
+  font-size: 0.98rem;
+  line-height: 1.62;
 }
 
 .game-rules-sections li::before,
@@ -948,7 +948,7 @@ textarea {
   display: block;
   margin-bottom: 10px;
   color: var(--rules-accent);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -962,7 +962,7 @@ textarea {
 
   .modal.game-rules-modal > .game-rules-summary {
     padding: 18px 16px 0;
-    font-size: 0.9rem;
+    font-size: 1rem;
   }
 
   .game-rules-facts {
@@ -1061,11 +1061,11 @@ textarea {
   }
 
   .platform-home-hero {
-    padding: 34px 0 22px;
+    padding: 25px 0 18px;
   }
 
   .platform-home-hero h1 {
-    font-size: clamp(2rem, 10vw, 3rem);
+    font-size: clamp(1.8rem, 9vw, 2.65rem);
   }
 
   .platform-home-entry {

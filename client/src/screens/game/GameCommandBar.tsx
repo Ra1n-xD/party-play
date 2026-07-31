@@ -10,6 +10,7 @@ interface GameCommandBarProps {
   canRevealAction: boolean;
   canManageGame: boolean;
   canSkipDiscussion: boolean;
+  managementAttentionCount: number;
   hostControlsOpen: boolean;
   onReveal: () => void;
   onRevealAction: () => void;
@@ -26,6 +27,7 @@ export function GameCommandBar({
   canRevealAction,
   canManageGame,
   canSkipDiscussion,
+  managementAttentionCount,
   hostControlsOpen,
   onReveal,
   onRevealAction,
@@ -97,7 +99,9 @@ export function GameCommandBar({
             aria-expanded={hostControlsOpen}
           >
             <FiSettings aria-hidden="true" />
-            <span>Админ-панель</span>
+            <span>
+              Админ-панель{managementAttentionCount > 0 ? ` · ${managementAttentionCount}` : ""}
+            </span>
           </button>
         )}
         {canReveal && (

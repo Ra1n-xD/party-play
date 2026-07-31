@@ -34,7 +34,6 @@ export interface DurakFight {
   stage: DurakInternalFightStage;
   takeDeclared: boolean;
   throwInOrder: SeatId[];
-  throwCursor: number;
   passedSeatIds: SeatId[];
 }
 

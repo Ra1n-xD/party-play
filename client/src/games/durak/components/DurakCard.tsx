@@ -3,6 +3,7 @@ import type {
   DurakRank,
   DurakSuit,
 } from "../../../../../shared/games/durak/types";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
 const SUIT_SYMBOLS: Record<DurakSuit, string> = {
   clubs: "♣",
@@ -57,6 +58,8 @@ interface DurakCardProps {
   playable?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  onDoubleClick?: () => void;
+  onKeyboardActivate?: () => void;
   ariaLabel?: string;
   ariaDescribedBy?: string;
 }
@@ -68,6 +71,8 @@ export function DurakCard({
   playable = false,
   disabled = false,
   onClick,
+  onDoubleClick,
+  onKeyboardActivate,
   ariaLabel,
   ariaDescribedBy,
 }: DurakCardProps) {
@@ -98,12 +103,25 @@ export function DurakCard({
     </>
   );
 
-  if (onClick) {
+  if (onClick || onDoubleClick || onKeyboardActivate) {
+    const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+      if (!onKeyboardActivate || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      onKeyboardActivate();
+    };
     return (
       <button
         type="button"
         className={className}
-        onClick={onClick}
+        onClick={
+          onClick
+            ? (event) => {
+                if (event.detail <= 1) onClick();
+              }
+            : undefined
+        }
+        onDoubleClick={onDoubleClick}
+        onKeyDown={handleKeyDown}
         disabled={disabled}
         aria-pressed={selected}
         aria-label={accessibleName}

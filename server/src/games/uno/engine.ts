@@ -259,6 +259,7 @@ function applyPlayedCard(
   const played = removeFromHand(next, actorSeatId, cardId);
   if (!played) return failure("Карты нет в руке");
   next.discardPile.push(played);
+  next.lastPlayedBySeatId = actorSeatId;
   if (played.color) next.activeColor = played.color;
   else next.activeColor = chosenColor!;
 
@@ -393,6 +394,7 @@ export function createUnoGameState(input: CreateUnoGameInput): UnoGameState {
     hands,
     drawPile: [...input.shuffledDeck],
     discardPile: [],
+    lastPlayedBySeatId: null,
     removedFaceDown: [],
     activeColor: null,
     turn: null,

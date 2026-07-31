@@ -45,6 +45,7 @@ export interface UnoGameState {
   hands: Record<SeatId, UnoCard[]>;
   drawPile: UnoCard[];
   discardPile: UnoCard[];
+  lastPlayedBySeatId: SeatId | null;
   removedFaceDown: UnoCard[];
   activeColor: UnoColor | null;
   turn: UnoTurn | null;

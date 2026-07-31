@@ -147,8 +147,13 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
     rememberTimer(room.code, "turnTimer", timer);
   }
 
-  const actor = room.players.get(turn.actorSeatId);
-  if (!actor || actor.controller.kind !== "bot" || actor.kicked) return;
+  const actor = state.seatOrder
+    .map((seatId) => room.players.get(seatId))
+    .find((candidate) => {
+      if (!candidate || candidate.controller.kind !== "bot" || candidate.kicked) return false;
+      return buildDurakPrivateState(room, candidate.id)?.legalAction.type !== "wait";
+    });
+  if (!actor) return;
 
   const expectedControllerEpoch = actor.controller.epoch;
   const expectedRevision = room.revision;
@@ -166,7 +171,7 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
       }
       const currentState = room.gameState;
       const currentTurn = currentState?.turn;
-      const currentActor = room.players.get(turn.actorSeatId);
+      const currentActor = room.players.get(actor.id);
       if (
         !currentState ||
         currentState.gameInstanceId !== expectedGameInstanceId ||
@@ -180,7 +185,7 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
 
       const publicState = buildDurakPublicState(room);
       const privateState = buildDurakPrivateState(room, currentActor.id);
-      if (!privateState) return;
+      if (!privateState || privateState.legalAction.type === "wait") return;
       const command = chooseDurakBotCommand(
         publicState,
         privateState,

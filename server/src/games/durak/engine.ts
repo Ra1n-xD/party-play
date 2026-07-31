@@ -7,13 +7,7 @@ import type {
   SeatId,
 } from "../../../../shared/types.js";
 import { canBeatDurakCard, createDurakDeck, durakRankValue, sortDurakHand } from "./cards.js";
-import type {
-  DurakFight,
-  DurakGameState,
-  DurakInternalFightStage,
-  DurakTurn,
-  DurakTurnKind,
-} from "./runtime.js";
+import type { DurakFight, DurakGameState, DurakTurn, DurakTurnKind } from "./runtime.js";
 
 export type DurakEngineResult =
   | { success: true; state: DurakGameState }
@@ -132,7 +126,6 @@ function beginFight(
     stage: "opening",
     takeDeclared: false,
     throwInOrder,
-    throwCursor: 0,
     passedSeatIds: [],
   };
   setTurn(state, attackerSeatId, "opening", nowMs, paused);
@@ -142,39 +135,54 @@ function setDefenseTurn(state: DurakGameState, nowMs: number, paused: boolean): 
   const fight = state.fight;
   if (!fight) return;
   fight.stage = "defense";
-  fight.throwCursor = 0;
-  fight.passedSeatIds = [];
+  fight.takeDeclared = false;
   setTurn(state, fight.defenderSeatId, "defense", nowMs, paused);
 }
 
-function beginThrowInCycle(
-  state: DurakGameState,
-  stage: Extract<DurakInternalFightStage, "throw-in" | "take-throw-in">,
-  nowMs: number,
-  paused: boolean,
-): void {
+function unpassedThrowers(fight: DurakFight): SeatId[] {
+  const passedSeatIds = new Set(fight.passedSeatIds);
+  return fight.throwInOrder.filter((seatId) => !passedSeatIds.has(seatId));
+}
+
+function allThrowersPassed(fight: DurakFight): boolean {
+  return unpassedThrowers(fight).length === 0;
+}
+
+function attackLimitReached(fight: DurakFight): boolean {
+  return fight.table.length >= fight.maxAttackCards;
+}
+
+function setTakeThrowInTurn(state: DurakGameState, nowMs: number, paused: boolean): void {
   const fight = state.fight;
   if (!fight) return;
-  fight.stage = stage;
-  fight.takeDeclared = stage === "take-throw-in";
-  fight.throwCursor = 0;
-  fight.passedSeatIds = [];
-  const firstActor = fight.throwInOrder[0];
-  if (!firstActor) {
-    if (fight.takeDeclared) {
-      resolveTakenFight(state, nowMs, paused);
-    } else if (allAttacksCovered(fight)) {
-      resolveDefendedFight(state, nowMs, paused);
-    } else {
-      setDefenseTurn(state, nowMs, paused);
-    }
-    return;
-  }
-  setTurn(state, firstActor, stage, nowMs, paused);
+  fight.stage = "take-throw-in";
+  fight.takeDeclared = true;
+  const timerOwnerSeatId = unpassedThrowers(fight)[0] ?? fight.primaryAttackerSeatId;
+  setTurn(state, timerOwnerSeatId, "take-throw-in", nowMs, paused);
+}
+
+function updateTakeThrowInTimerOwner(state: DurakGameState): void {
+  const fight = state.fight;
+  const turn = state.turn;
+  if (!fight || !turn) return;
+  turn.actorSeatId = unpassedThrowers(fight)[0] ?? fight.primaryAttackerSeatId;
+  turn.kind = "take-throw-in";
 }
 
 function allAttacksCovered(fight: DurakFight): boolean {
   return fight.table.every((pair) => pair.defense !== null);
+}
+
+function resolveFightIfReady(state: DurakGameState, nowMs: number, paused: boolean): boolean {
+  const fight = state.fight;
+  if (!fight || (!attackLimitReached(fight) && !allThrowersPassed(fight))) return false;
+  if (fight.takeDeclared) {
+    resolveTakenFight(state, nowMs, paused);
+    return true;
+  }
+  if (!allAttacksCovered(fight)) return false;
+  resolveDefendedFight(state, nowMs, paused);
+  return true;
 }
 
 function finishGame(state: DurakGameState, result: DurakResult): void {
@@ -399,9 +407,6 @@ export function applyDurakCommand(
   if (state.phase !== "PLAYING" || !state.fight || !state.turn) {
     return failure("Партия не активна");
   }
-  if (state.turn.actorSeatId !== actorSeatId) {
-    return failure("Сейчас ход другого игрока");
-  }
   if (state.statusBySeatId[actorSeatId] !== "active") {
     return failure("Место больше не участвует в партии");
   }
@@ -409,7 +414,11 @@ export function applyDurakCommand(
   const fight = state.fight;
   switch (command.type) {
     case "attack": {
-      if (fight.stage !== "opening" || state.turn.kind !== "opening") {
+      if (
+        fight.stage !== "opening" ||
+        state.turn.kind !== "opening" ||
+        state.turn.actorSeatId !== actorSeatId
+      ) {
         return failure("Сейчас нельзя начинать атаку");
       }
       if (command.cardIds.length === 0) {
@@ -437,7 +446,7 @@ export function applyDurakCommand(
     }
 
     case "defend": {
-      if (fight.stage !== "defense" || state.turn.kind !== "defense") {
+      if (fight.stage !== "defense") {
         return failure("Сейчас нельзя защищаться");
       }
       if (actorSeatId !== fight.defenderSeatId) {
@@ -460,26 +469,28 @@ export function applyDurakCommand(
         defense: defenseCard,
         defensePlayedBySeatId: actorSeatId,
       };
-      beginThrowInCycle(next, "throw-in", nowMs, false);
+      if (!resolveFightIfReady(next, nowMs, false)) {
+        setDefenseTurn(next, nowMs, false);
+      }
       return success(next);
     }
 
     case "throw-in": {
-      if (
-        (fight.stage !== "throw-in" && fight.stage !== "take-throw-in") ||
-        (state.turn.kind !== "throw-in" && state.turn.kind !== "take-throw-in")
-      ) {
+      if (fight.stage !== "defense" && fight.stage !== "take-throw-in") {
         return failure("Сейчас нельзя подкидывать");
       }
-      if (fight.throwInOrder[fight.throwCursor] !== actorSeatId) {
-        return failure("Сейчас приоритет у другого игрока");
+      if (!fight.throwInOrder.includes(actorSeatId) || fight.passedSeatIds.includes(actorSeatId)) {
+        return failure("Вы уже закончили подкидывать");
       }
       if (command.cardIds.length === 0) {
         return failure("Нужно выбрать хотя бы одну карту");
       }
       const remainingCapacity = fight.maxAttackCards - fight.table.length;
+      if (remainingCapacity <= 0) {
+        return failure("Стол уже заполнен");
+      }
       if (command.cardIds.length > remainingCapacity) {
-        return failure("Превышен лимит атакующих карт");
+        return failure("Стол уже заполнен");
       }
       const cards = cardsFromHand(state as DurakGameState, actorSeatId, command.cardIds);
       if (!cards) return failure("Карта не найдена в руке");
@@ -504,61 +515,43 @@ export function applyDurakCommand(
           }),
         ),
       );
-      beginThrowInCycle(
-        next,
-        next.fight!.takeDeclared ? "take-throw-in" : "throw-in",
-        nowMs,
-        false,
-      );
+      if (!resolveFightIfReady(next, nowMs, false)) {
+        if (next.fight!.takeDeclared) {
+          updateTakeThrowInTimerOwner(next);
+        } else {
+          setDefenseTurn(next, nowMs, false);
+        }
+      }
       return success(next);
     }
 
     case "take": {
       if (
         fight.stage !== "defense" ||
-        state.turn.kind !== "defense" ||
-        actorSeatId !== fight.defenderSeatId
+        actorSeatId !== fight.defenderSeatId ||
+        allAttacksCovered(fight)
       ) {
         return failure("Сейчас нельзя взять карты");
       }
       const next = cloneState(state as DurakGameState);
-      next.fight!.takeDeclared = true;
-      beginThrowInCycle(next, "take-throw-in", nowMs, false);
+      setTakeThrowInTurn(next, nowMs, false);
+      resolveFightIfReady(next, nowMs, false);
       return success(next);
     }
 
     case "pass": {
-      if (
-        (fight.stage !== "throw-in" && fight.stage !== "take-throw-in") ||
-        (state.turn.kind !== "throw-in" && state.turn.kind !== "take-throw-in")
-      ) {
+      if (fight.stage !== "defense" && fight.stage !== "take-throw-in") {
         return failure("Сейчас нельзя пасовать");
       }
-      if (fight.throwInOrder[fight.throwCursor] !== actorSeatId) {
-        return failure("Сейчас приоритет у другого игрока");
+      if (!fight.throwInOrder.includes(actorSeatId) || fight.passedSeatIds.includes(actorSeatId)) {
+        return failure("Вы уже закончили подкидывать");
       }
 
       const next = cloneState(state as DurakGameState);
       const nextFight = next.fight!;
-      if (!nextFight.passedSeatIds.includes(actorSeatId)) {
-        nextFight.passedSeatIds.push(actorSeatId);
-      }
-      nextFight.throwCursor++;
-      const nextActor = nextFight.throwInOrder[nextFight.throwCursor];
-      if (nextActor) {
-        setTurn(
-          next,
-          nextActor,
-          nextFight.takeDeclared ? "take-throw-in" : "throw-in",
-          nowMs,
-          false,
-        );
-      } else if (nextFight.takeDeclared) {
-        resolveTakenFight(next, nowMs, false);
-      } else if (allAttacksCovered(nextFight)) {
-        resolveDefendedFight(next, nowMs, false);
-      } else {
-        setDefenseTurn(next, nowMs, false);
+      nextFight.passedSeatIds.push(actorSeatId);
+      if (!resolveFightIfReady(next, nowMs, false) && nextFight.takeDeclared) {
+        updateTakeThrowInTimerOwner(next);
       }
       return success(next);
     }
@@ -592,9 +585,22 @@ export function applyDurakTurnTimeout(
     return success(next);
   }
 
-  const timeoutCommand: DurakCommand =
-    state.turn.kind === "defense" ? { type: "take" } : { type: "pass" };
-  return applyDurakCommand(state, state.turn.actorSeatId, timeoutCommand, nowMs, false);
+  if (state.turn.kind === "defense") {
+    if (!allAttacksCovered(state.fight)) {
+      return applyDurakCommand(state, state.fight.defenderSeatId, { type: "take" }, nowMs, false);
+    }
+    const next = cloneState(state as DurakGameState);
+    resolveDefendedFight(next, nowMs, false);
+    return success(next);
+  }
+
+  if (state.turn.kind === "take-throw-in") {
+    const next = cloneState(state as DurakGameState);
+    resolveTakenFight(next, nowMs, false);
+    return success(next);
+  }
+
+  return failure("Некорректный этап таймера");
 }
 
 export function freezeDurakTurn(state: Readonly<DurakGameState>, nowMs: number): DurakGameState {
@@ -779,6 +785,12 @@ export function assertDurakState(state: DurakGameState): void {
   if (fight.passedSeatIds.some((seatId) => !fight.throwInOrder.includes(seatId))) {
     throw new Error("Invalid Durak passing seat");
   }
+  if (
+    (fight.takeDeclared || allAttacksCovered(fight)) &&
+    (attackLimitReached(fight) || allThrowersPassed(fight))
+  ) {
+    throw new Error("Durak completed fight was not resolved");
+  }
 
   const expectedTurnKind: DurakTurnKind =
     fight.stage === "opening" ? "opening" : fight.stage === "defense" ? "defense" : fight.stage;
@@ -790,7 +802,7 @@ export function assertDurakState(state: DurakGameState): void {
       ? fight.primaryAttackerSeatId
       : fight.stage === "defense"
         ? fight.defenderSeatId
-        : fight.throwInOrder[fight.throwCursor];
+        : (unpassedThrowers(fight)[0] ?? fight.primaryAttackerSeatId);
   if (!expectedActor || turn.actorSeatId !== expectedActor) {
     throw new Error("Durak current actor is inconsistent");
   }
