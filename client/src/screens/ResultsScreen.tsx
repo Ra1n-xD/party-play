@@ -1,6 +1,7 @@
 import { useGame } from "../context/GameContext";
 import { CardImage } from "../components/CardImage";
 import { GameRoomHeader } from "./game/GameRoomHeader";
+import { GameDockTools } from "./game/GameDockTools";
 
 export function ResultsScreen() {
   const { connected, roomCode, gameState, playerId, isSpectator, playAgain, leaveRoom } = useGame();
@@ -86,15 +87,8 @@ export function ResultsScreen() {
   };
 
   return (
-    <main
-      className={`screen command-game-screen results-screen ${isHost ? "has-results-command-bar" : ""}`}
-    >
-      <GameRoomHeader
-        gameId="bunker"
-        roomCode={roomCode}
-        connected={connected}
-        onLeaveRoom={leaveRoom}
-      />
+    <main className="screen command-game-screen results-screen has-results-command-bar">
+      <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
       <div className="results-container">
         <h2>
           {isSpectator ? "Игра окончена" : me?.alive ? "Вы попали в бункер!" : "Вы были изгнаны..."}
@@ -177,14 +171,17 @@ export function ResultsScreen() {
           </div>
         )}
       </div>
-      {isHost && (
-        <aside className="results-command-bar" aria-label="Действия после игры">
-          <strong>Партия завершена</strong>
-          <button className="btn btn-primary" onClick={playAgain}>
-            Сыграть ещё
-          </button>
-        </aside>
-      )}
+      <aside className="results-command-bar" aria-label="Действия после игры">
+        <GameDockTools gameId="bunker" />
+        {isHost && (
+          <>
+            <strong>Партия завершена</strong>
+            <button className="btn btn-primary" onClick={playAgain}>
+              Сыграть ещё
+            </button>
+          </>
+        )}
+      </aside>
     </main>
   );
 }

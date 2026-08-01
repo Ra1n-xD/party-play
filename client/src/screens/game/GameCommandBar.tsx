@@ -1,5 +1,6 @@
 import { FiEye, FiMic, FiSettings, FiSkipForward, FiZap } from "react-icons/fi";
 import type { PlayerInfo } from "../../../../shared/types";
+import { GameDockTools } from "./GameDockTools";
 
 interface GameCommandBarProps {
   currentTurnPlayer?: PlayerInfo;
@@ -58,6 +59,7 @@ export function GameCommandBar({
       </div>
 
       <div className="gs-command-actions" aria-label="Доступные действия">
+        <GameDockTools gameId="bunker" />
         {canRevealAction && (
           <button
             type="button"

@@ -951,6 +951,24 @@ button.durak-card:focus-visible:not(.is-selected) {
   border-radius: 18px;
 }
 
+.durak-results-screen {
+  padding-bottom: calc(118px + env(safe-area-inset-bottom));
+}
+
+.durak-results-screen .durak-results-actions {
+  position: fixed;
+  z-index: 80;
+  right: 18px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 18px;
+  width: auto;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(8, 24, 18, 0.97);
+  backdrop-filter: blur(16px);
+}
+
 .durak-results-actions .btn {
   min-width: 190px;
 }
@@ -1115,6 +1133,14 @@ button.durak-card:focus-visible:not(.is-selected) {
 @media (max-width: 680px) {
   .durak-screen {
     padding-bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+
+  .durak-results-screen .durak-results-actions {
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    left: 8px;
+    flex-wrap: wrap;
+    padding: 8px 9px;
   }
 
   .durak-players {
@@ -1311,5 +1337,234 @@ button.durak-card:focus-visible:not(.is-selected) {
   .durak-command-status strong {
     max-width: 42vw;
     font-size: 0.65rem;
+  }
+}
+
+/* Final responsive overrides stay last so legacy size breakpoints cannot re-enable scrolling. */
+@media (min-width: 901px) {
+  .durak-board {
+    grid-template-columns: 208px minmax(0, 1fr);
+  }
+
+  .durak-deck-panel,
+  .durak-table {
+    min-height: 390px;
+  }
+
+  .durak-table-grid {
+    grid-template-columns: repeat(auto-fit, 154px);
+    gap: 24px;
+  }
+
+  .durak-table-pair {
+    min-height: 174px;
+  }
+
+  .durak-pair-cards {
+    width: 154px;
+    min-height: 154px;
+  }
+
+  .durak-card.is-table {
+    width: 104px;
+    height: 146px;
+  }
+
+  .durak-card.is-table .durak-card-corner {
+    font-size: 0.98rem;
+  }
+
+  .durak-card.is-table .durak-card-suit {
+    font-size: 2.55rem;
+  }
+
+  .durak-empty-deck {
+    width: 104px;
+  }
+}
+
+@media (max-width: 680px) {
+  .durak-screen {
+    padding-bottom: calc(166px + env(safe-area-inset-bottom));
+  }
+
+  .durak-players {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow: visible;
+  }
+
+  .durak-player {
+    width: auto;
+    min-width: 0;
+    min-height: 62px;
+    flex: initial;
+    grid-template-areas:
+      "copy cards"
+      "timer timer";
+    gap: 4px;
+    padding: 7px;
+  }
+
+  .durak-player-copy strong {
+    font-size: 0.7rem;
+  }
+
+  .durak-player-copy > span,
+  .durak-player-roles {
+    display: none;
+  }
+
+  .durak-player-cards {
+    min-width: 0;
+    padding: 4px 5px;
+    font-size: 0.6rem;
+  }
+
+  .durak-player-timer {
+    justify-self: stretch;
+    text-align: center;
+    font-size: 0.58rem;
+  }
+
+  .durak-player-timer .turn-timer {
+    min-width: 0;
+    min-height: 22px;
+    font-size: 0.62rem;
+  }
+
+  .durak-deck-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .durak-deck-visual .durak-card,
+  .durak-trump .durak-card,
+  .durak-empty-deck {
+    display: inline-flex;
+    width: 52px;
+    height: 74px;
+  }
+
+  .durak-trump {
+    align-items: center;
+    padding-left: 8px;
+    text-align: center;
+  }
+
+  .durak-trump > span:first-child,
+  .durak-trump > small {
+    display: none;
+  }
+
+  .durak-table {
+    min-height: 236px;
+    padding: 10px;
+  }
+
+  .durak-table-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(76px, 1fr));
+    gap: 7px 3px;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .durak-table-pair {
+    min-height: 104px;
+    flex: initial;
+  }
+
+  .durak-card.is-table {
+    width: 62px;
+    height: 88px;
+  }
+
+  .durak-card-corner,
+  .durak-card.is-table .durak-card-corner {
+    top: 5px;
+    left: 5px;
+    font-size: 0.78rem;
+  }
+
+  .durak-card-corner.is-bottom,
+  .durak-card.is-table .durak-card-corner.is-bottom {
+    inset: auto 5px 5px auto;
+  }
+
+  .durak-card-suit,
+  .durak-card.is-table .durak-card-suit {
+    font-size: 1.75rem;
+  }
+
+  .durak-card.is-hand {
+    width: 78px;
+    height: 112px;
+  }
+
+  .durak-hand-section {
+    padding: 11px 8px 9px;
+    overflow: hidden;
+  }
+
+  .durak-hand-heading p {
+    display: none;
+  }
+
+  .durak-hand {
+    min-height: 128px;
+    gap: 0;
+    margin-top: 5px;
+    padding: 8px 12px 7px;
+    overflow: visible;
+  }
+
+  .durak-hand > .durak-hand-card-shell:first-of-type,
+  .durak-hand > .durak-hand-card-shell:last-child {
+    margin: 0;
+  }
+
+  .durak-hand-card-shell {
+    flex: 0 0 clamp(4px, calc((100vw - 120px) / var(--hand-count)), 66px);
+    min-width: 0;
+    justify-content: center;
+    animation: none;
+    transform: translateY(var(--fan-rise)) rotate(var(--fan-angle));
+    transform-origin: center bottom;
+  }
+
+  .durak-command-dock {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    min-height: 0;
+    padding: 8px 9px max(8px, env(safe-area-inset-bottom));
+  }
+
+  .durak-command-status strong {
+    max-width: none;
+    font-size: 0.66rem;
+    text-align: center;
+  }
+
+  .durak-command-status small {
+    display: none;
+  }
+
+  .durak-command-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+    overflow: visible;
+  }
+
+  .durak-command-actions .btn {
+    min-width: 0;
+    min-height: 40px;
+    padding: 7px 10px;
+    font-size: 0.66rem;
   }
 }

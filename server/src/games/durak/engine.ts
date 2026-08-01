@@ -1,9 +1,11 @@
 import type {
+  CardVisualAnchor,
   DurakCard,
   DurakCommand,
   DurakResult,
   DurakSettings,
   DurakTablePair,
+  DurakVisualAction,
   SeatId,
 } from "../../../../shared/types.js";
 import { canBeatDurakCard, createDurakDeck, durakRankValue, sortDurakHand } from "./cards.js";
@@ -20,6 +22,28 @@ export interface CreateDurakGameInput {
   settings: DurakSettings;
   nowMs: number;
   gameInstanceId: string;
+}
+
+const MAX_VISUAL_EVENTS = 18;
+
+function appendAction(state: DurakGameState, seatId: SeatId, action: DurakVisualAction): void {
+  state.visualEvents = [
+    ...state.visualEvents.slice(-(MAX_VISUAL_EVENTS - 1)),
+    { id: state.nextVisualEventId++, type: "action", seatId, action },
+  ];
+}
+
+function appendTransfer(
+  state: DurakGameState,
+  source: CardVisualAnchor,
+  target: CardVisualAnchor,
+  cardCount: number,
+): void {
+  if (cardCount <= 0) return;
+  state.visualEvents = [
+    ...state.visualEvents.slice(-(MAX_VISUAL_EVENTS - 1)),
+    { id: state.nextVisualEventId++, type: "transfer", source, target, cardCount },
+  ];
 }
 
 function cloneFight(fight: DurakFight | null): DurakFight | null {
@@ -53,6 +77,11 @@ function cloneState(state: DurakGameState): DurakGameState {
     removedFaceDown: [...state.removedFaceDown],
     fight: cloneFight(state.fight),
     turn: cloneTurn(state.turn),
+    visualEvents: state.visualEvents.map((event) =>
+      event.type === "transfer"
+        ? { ...event, source: { ...event.source }, target: { ...event.target } }
+        : { ...event },
+    ),
     result: state.result ? { ...state.result } : null,
   };
 }
@@ -202,11 +231,18 @@ function replenishHands(state: DurakGameState, fight: DurakFight): void {
 
   for (const seatId of refillOrder) {
     const hand = state.hands[seatId];
+    const handSizeBefore = hand.length;
     while (hand.length < 6 && state.drawPile.length > 0) {
       const card = state.drawPile.shift();
       if (card) hand.push(card);
     }
     state.hands[seatId] = sortDurakHand(hand, state.trumpSuit);
+    appendTransfer(
+      state,
+      { kind: "deck" },
+      { kind: "player", seatId },
+      hand.length - handSizeBefore,
+    );
   }
 }
 
@@ -235,6 +271,8 @@ function settleEmptyHandsAndResult(state: DurakGameState): boolean {
 function resolveDefendedFight(state: DurakGameState, nowMs: number, paused: boolean): void {
   const fight = state.fight;
   if (!fight) return;
+  const tableCardCount = fight.table.reduce((count, pair) => count + (pair.defense ? 2 : 1), 0);
+  appendTransfer(state, { kind: "table" }, { kind: "discard" }, tableCardCount);
   for (const pair of fight.table) {
     state.discard.push(pair.attack);
     if (pair.defense) state.discard.push(pair.defense);
@@ -258,6 +296,13 @@ function resolveDefendedFight(state: DurakGameState, nowMs: number, paused: bool
 function resolveTakenFight(state: DurakGameState, nowMs: number, paused: boolean): void {
   const fight = state.fight;
   if (!fight) return;
+  const tableCardCount = fight.table.reduce((count, pair) => count + (pair.defense ? 2 : 1), 0);
+  appendTransfer(
+    state,
+    { kind: "table" },
+    { kind: "player", seatId: fight.defenderSeatId },
+    tableCardCount,
+  );
   const defenderHand = state.hands[fight.defenderSeatId];
   for (const pair of fight.table) {
     defenderHand.push(pair.attack);
@@ -389,6 +434,8 @@ export function createDurakGameState(input: CreateDurakGameInput): DurakGameStat
     turn: null,
     nextTurnId: 1,
     nextFightId: 1,
+    nextVisualEventId: 1,
+    visualEvents: [],
     result: null,
   };
   beginFight(state, firstAttackerSeatId, input.nowMs, false);
@@ -441,6 +488,13 @@ export function applyDurakCommand(
         defense: null,
         defensePlayedBySeatId: null,
       }));
+      appendAction(next, actorSeatId, "attack");
+      appendTransfer(
+        next,
+        { kind: "player", seatId: actorSeatId },
+        { kind: "table" },
+        cards.length,
+      );
       setDefenseTurn(next, nowMs, false);
       return success(next);
     }
@@ -469,6 +523,8 @@ export function applyDurakCommand(
         defense: defenseCard,
         defensePlayedBySeatId: actorSeatId,
       };
+      appendAction(next, actorSeatId, "defend");
+      appendTransfer(next, { kind: "player", seatId: actorSeatId }, { kind: "table" }, 1);
       if (!resolveFightIfReady(next, nowMs, false)) {
         setDefenseTurn(next, nowMs, false);
       }
@@ -515,6 +571,13 @@ export function applyDurakCommand(
           }),
         ),
       );
+      appendAction(next, actorSeatId, "throw-in");
+      appendTransfer(
+        next,
+        { kind: "player", seatId: actorSeatId },
+        { kind: "table" },
+        cards.length,
+      );
       if (!resolveFightIfReady(next, nowMs, false)) {
         if (next.fight!.takeDeclared) {
           updateTakeThrowInTimerOwner(next);
@@ -534,6 +597,7 @@ export function applyDurakCommand(
         return failure("Сейчас нельзя взять карты");
       }
       const next = cloneState(state as DurakGameState);
+      appendAction(next, actorSeatId, "take");
       setTakeThrowInTurn(next, nowMs, false);
       resolveFightIfReady(next, nowMs, false);
       return success(next);
@@ -550,6 +614,7 @@ export function applyDurakCommand(
       const next = cloneState(state as DurakGameState);
       const nextFight = next.fight!;
       nextFight.passedSeatIds.push(actorSeatId);
+      appendAction(next, actorSeatId, "pass");
       if (!resolveFightIfReady(next, nowMs, false) && nextFight.takeDeclared) {
         updateTakeThrowInTimerOwner(next);
       }

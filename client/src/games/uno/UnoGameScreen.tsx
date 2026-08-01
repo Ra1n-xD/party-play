@@ -3,6 +3,7 @@ import type {
   UnoCard as UnoCardData,
   UnoColor,
   UnoPlayerPublicState,
+  UnoVisualAction,
 } from "../../../../shared/games/uno/types";
 import type { RoomSnapshot } from "../../../../shared/platform/room";
 import { Timer } from "../../components/Timer";
@@ -13,8 +14,11 @@ import {
 } from "../../platform/components/ReconnectHostControls";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
+import { GameDockTools } from "../../screens/game/GameDockTools";
 import { CardDragLayer } from "../shared/CardDragLayer";
 import { useCardDrag } from "../shared/useCardDrag";
+import { useCardTransferMotion } from "../shared/useCardTransferMotion";
+import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
 import { UnoCard, UnoCardBack, getUnoCardName } from "./components/UnoCard";
 import { UnoColorDialog } from "./components/UnoColorDialog";
@@ -34,6 +38,17 @@ const COLOR_LABELS: Record<UnoColor, string> = {
   yellow: "жёлтый",
   green: "зелёный",
   blue: "синий",
+};
+
+const UNO_ACTION_LABELS: Record<UnoVisualAction, string> = {
+  "play-card": "Ходит картой",
+  "draw-card": "Берёт карту",
+  "end-turn": "Завершает ход",
+  "choose-color": "Выбирает цвет",
+  "accept-draw-four": "Принимает +4",
+  "challenge-draw-four": "Оспаривает +4",
+  "declare-uno": "UNO!",
+  "catch-uno": "Поймал UNO",
 };
 
 function formatCardCount(count: number): string {
@@ -112,8 +127,18 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
         : [],
     [game?.lastPlayedBySeatId, game?.topDiscard?.id],
   );
+  const transferEvents = useMemo(
+    () => game?.visualEvents.filter((event) => event.type === "transfer") ?? [],
+    [game?.visualEvents],
+  );
+  const actionEvents = useMemo(
+    () => game?.visualEvents.filter((event) => event.type === "action") ?? [],
+    [game?.visualEvents],
+  );
 
   useTableCardFlight({ revision: snapshot.revision, flights: tableFlights });
+  useCardTransferMotion({ gameId: "uno", revision: snapshot.revision, events: transferEvents });
+  const actionIndicators = usePlayerActionIndicators(actionEvents, UNO_ACTION_LABELS);
   const canOfferAtomicUnoIntent = Boolean(
     privateGame &&
     privateGame.hand.length === 2 &&
@@ -277,7 +302,6 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
   return (
     <main className="screen command-game-screen uno-screen has-uno-command-dock">
       <GameRoomHeader
-        gameId="uno"
         roomCode={snapshot.roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
@@ -318,12 +342,21 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
                 </span>
               )}
               <span className="uno-player-cards">{formatCardCount(player.cardCount)}</span>
+              {actionIndicators[player.seatId] && (
+                <span className="card-player-action" key={actionIndicators[player.seatId].eventId}>
+                  {actionIndicators[player.seatId].label}
+                </span>
+              )}
             </article>
           );
         })}
       </section>
 
-      <section className="uno-table" aria-labelledby="uno-table-title">
+      <section
+        className="uno-table"
+        aria-labelledby="uno-table-title"
+        data-card-motion-anchor="uno:table"
+      >
         <div className="uno-table-heading">
           <div>
             <span className="uno-eyebrow">Стол</span>
@@ -344,6 +377,7 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
           <div
             className="uno-pile uno-draw-pile"
             aria-label={`В колоде ${formatCardCount(game.drawPileCount)}`}
+            data-card-motion-anchor="uno:deck"
           >
             <UnoCardBack label={`Колода, осталось ${formatCardCount(game.drawPileCount)}`} />
             <span>Колода · {game.drawPileCount}</span>
@@ -355,6 +389,7 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
             role="group"
             aria-label={`Отбой. ${game.discardPileCount} карт`}
             data-card-drop-target="uno-discard"
+            data-card-motion-anchor="uno:discard"
           >
             {game.topDiscard ? (
               <div
@@ -414,7 +449,12 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
             </div>
             <p>Разыграйте карту двойным нажатием или перетащите её в отбой.</p>
           </div>
-          <div className="uno-hand" role="group" aria-label="Карты в вашей руке">
+          <div
+            className="uno-hand"
+            role="group"
+            aria-label="Карты в вашей руке"
+            style={{ "--hand-count": privateGame.hand.length } as CSSProperties}
+          >
             <p id="uno-card-drag-instructions" className="uno-drag-instruction">
               Карту можно разыграть двойным нажатием или перетащить в отбой.
             </p>
@@ -430,7 +470,13 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
                 <div
                   key={card.id}
                   className={`uno-hand-card-shell ${dragClassName ?? "card-motion-shell"}`}
-                  style={{ "--card-index": Math.min(index, 5) } as CSSProperties}
+                  style={
+                    {
+                      "--card-index": Math.min(index, 5),
+                      "--fan-angle": `${(index - (privateGame.hand.length - 1) / 2) * 1.35}deg`,
+                      "--fan-rise": `${Math.abs(index - (privateGame.hand.length - 1) / 2)}px`,
+                    } as CSSProperties
+                  }
                   {...dragBindings}
                 >
                   <UnoCard
@@ -473,6 +519,7 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
           </strong>
         </div>
         <div className="uno-command-actions">
+          <GameDockTools gameId="uno" gameTitle="UNO" />
           {ownWdfResponse && (
             <>
               <button

@@ -3,6 +3,7 @@ import type {
   DurakCard as DurakCardData,
   DurakLegalAction,
   DurakPlayerPublicState,
+  DurakVisualAction,
 } from "../../../../shared/games/durak/types";
 import type { RoomSnapshot } from "../../../../shared/platform/room";
 import { Timer } from "../../components/Timer";
@@ -13,8 +14,11 @@ import {
 } from "../../platform/components/ReconnectHostControls";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
+import { GameDockTools } from "../../screens/game/GameDockTools";
 import { CardDragLayer } from "../shared/CardDragLayer";
 import { useCardDrag } from "../shared/useCardDrag";
+import { useCardTransferMotion } from "../shared/useCardTransferMotion";
+import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
 import { DurakCard, DurakCardBack, getCardName, getSuitSymbol } from "./components/DurakCard";
 
@@ -49,6 +53,14 @@ const TRUMP_LOCATION_LABELS = {
   discard: "в отбое",
   removed: "вне партии",
 } as const;
+
+const DURAK_ACTION_LABELS: Record<DurakVisualAction, string> = {
+  attack: "Атакует",
+  defend: "Отбивается",
+  "throw-in": "Подкидывает",
+  take: "Берёт карты",
+  pass: "Бито",
+};
 
 function formatCardCount(count: number): string {
   const mod100 = count % 100;
@@ -176,8 +188,18 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
       ]) ?? [],
     [game?.table],
   );
+  const transferEvents = useMemo(
+    () => game?.visualEvents.filter((event) => event.type === "transfer") ?? [],
+    [game?.visualEvents],
+  );
+  const actionEvents = useMemo(
+    () => game?.visualEvents.filter((event) => event.type === "action") ?? [],
+    [game?.visualEvents],
+  );
 
   useTableCardFlight({ revision: snapshot.revision, flights: tableFlights });
+  useCardTransferMotion({ gameId: "durak", revision: snapshot.revision, events: transferEvents });
+  const actionIndicators = usePlayerActionIndicators(actionEvents, DURAK_ACTION_LABELS);
 
   useEffect(() => {
     setSelectedCardIds([]);
@@ -326,7 +348,6 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
   return (
     <main className="screen command-game-screen durak-screen has-durak-command-dock">
       <GameRoomHeader
-        gameId="durak"
         roomCode={snapshot.roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
@@ -374,6 +395,11 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                 </span>
               )}
               <span className="durak-player-cards">{formatCardCount(player.cardCount)}</span>
+              {actionIndicators[player.seatId] && (
+                <span className="card-player-action" key={actionIndicators[player.seatId].eventId}>
+                  {actionIndicators[player.seatId].label}
+                </span>
+              )}
             </article>
           );
         })}
@@ -382,7 +408,7 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
       <section className="durak-board">
         <aside className="durak-deck-panel" aria-label="Колода и козырь">
           <span className="durak-section-eyebrow">Колода</span>
-          <div className="durak-deck-visual">
+          <div className="durak-deck-visual" data-card-motion-anchor="durak:deck">
             {game.deckCount > 0 ? (
               <DurakCardBack label={`Колода, осталось ${formatCardCount(game.deckCount)}`} />
             ) : (
@@ -397,7 +423,7 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
               Козырь <strong>{game.trumpSuit ? getSuitSymbol(game.trumpSuit) : "—"}</strong>
             </span>
             {game.trumpCard && game.trumpCardLocation === "deck" ? (
-              <DurakCard card={game.trumpCard} size="mini" />
+              <DurakCard card={game.trumpCard} size="table" />
             ) : (
               <span className="durak-trump-status" role="status">
                 <strong>
@@ -417,7 +443,9 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
             )}
             {game.trumpCardLocation === "deck" && <small>под колодой</small>}
           </div>
-          <span className="durak-discard-count">В отбое: {game.discardCount}</span>
+          <span className="durak-discard-count" data-card-motion-anchor="durak:discard">
+            В отбое: {game.discardCount}
+          </span>
         </aside>
 
         <section
@@ -426,6 +454,7 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
           }`}
           aria-labelledby="durak-table-title"
           data-card-drop-target="durak-table"
+          data-card-motion-anchor="durak:table"
         >
           <div className="durak-table-heading">
             <div>
@@ -526,7 +555,12 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                       : "Следите за столом — доступное действие появится автоматически."}
             </p>
           </div>
-          <div className="durak-hand" role="group" aria-label="Карты в вашей руке">
+          <div
+            className="durak-hand"
+            role="group"
+            aria-label="Карты в вашей руке"
+            style={{ "--hand-count": privateGame.hand.length } as CSSProperties}
+          >
             <p id="durak-card-drag-instructions" className="durak-drag-instruction">
               Карту можно разыграть двойным нажатием или перетащить на доступную цель.
             </p>
@@ -548,7 +582,13 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                 <div
                   key={card.id}
                   className={`durak-hand-card-shell ${dragClassName ?? "card-motion-shell"}`}
-                  style={{ "--card-index": Math.min(index, 5) } as CSSProperties}
+                  style={
+                    {
+                      "--card-index": Math.min(index, 5),
+                      "--fan-angle": `${(index - (privateGame.hand.length - 1) / 2) * 1.5}deg`,
+                      "--fan-rise": `${Math.abs(index - (privateGame.hand.length - 1) / 2) * 1.2}px`,
+                    } as CSSProperties
+                  }
                   {...dragBindings}
                 >
                   <DurakCard
@@ -597,6 +637,7 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
           </strong>
         </div>
         <div className="durak-command-actions">
+          <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
           {legalAction?.type === "defend" && (
             <button
               type="button"

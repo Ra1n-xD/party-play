@@ -1,6 +1,7 @@
 import type { RoomSnapshot } from "../../../../shared/platform/room";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
+import { GameDockTools } from "../../screens/game/GameDockTools";
 
 interface UnoResultsScreenProps {
   snapshot: RoomSnapshot<"uno">;
@@ -36,7 +37,6 @@ export function UnoResultsScreen({ snapshot }: UnoResultsScreenProps) {
   return (
     <main className="screen command-game-screen uno-screen uno-results-screen">
       <GameRoomHeader
-        gameId="uno"
         roomCode={snapshot.roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
@@ -69,6 +69,7 @@ export function UnoResultsScreen({ snapshot }: UnoResultsScreenProps) {
         </div>
       </section>
       <section className="uno-results-actions">
+        <GameDockTools gameId="uno" gameTitle="UNO" />
         {viewerSeat?.isHost ? (
           <button
             type="button"

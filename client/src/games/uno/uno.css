@@ -864,6 +864,24 @@ button.uno-card:focus-visible {
   border-radius: 18px;
   background: rgba(18, 29, 46, 0.96);
 }
+
+.uno-results-screen {
+  padding-bottom: calc(118px + env(safe-area-inset-bottom));
+}
+
+.uno-results-screen .uno-results-actions {
+  position: fixed;
+  z-index: 80;
+  right: 18px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 18px;
+  width: auto;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(13, 24, 40, 0.97);
+  backdrop-filter: blur(16px);
+}
 .uno-results-actions .btn {
   min-width: 190px;
 }
@@ -970,6 +988,14 @@ button.uno-card:focus-visible {
 @media (max-width: 760px) {
   .uno-screen {
     padding-bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+
+  .uno-results-screen .uno-results-actions {
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    left: 8px;
+    flex-wrap: wrap;
+    padding: 8px 9px;
   }
   .uno-players {
     display: flex;
@@ -1101,5 +1127,215 @@ button.uno-card:focus-visible {
   .uno-hand-card-shell {
     animation: none;
     animation-delay: 0ms;
+  }
+}
+
+/* Larger desktop targets plus a centered, non-scrolling mobile card table. */
+@media (min-width: 901px) {
+  .uno-table {
+    min-height: 456px;
+  }
+
+  .uno-piles {
+    min-height: 334px;
+    justify-content: center;
+    gap: clamp(92px, 12vw, 172px);
+  }
+
+  .uno-draw-pile::before,
+  .uno-draw-pile::after,
+  .uno-empty-card,
+  .uno-card.is-table {
+    width: 104px;
+    height: 146px;
+  }
+
+  .uno-card.is-table .uno-card-corner {
+    font-size: 0.92rem;
+  }
+
+  .uno-card.is-table .uno-card-core {
+    width: 72px;
+    height: 72px;
+    font-size: 2.45rem;
+  }
+
+  .uno-card.is-table .uno-card-core img {
+    width: 66px;
+    height: 66px;
+  }
+}
+
+.uno-hand {
+  justify-content: center;
+}
+
+@media (max-width: 760px) {
+  .uno-screen {
+    gap: 9px;
+    padding-bottom: calc(174px + env(safe-area-inset-bottom));
+  }
+
+  .uno-players {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow: visible;
+  }
+
+  .uno-player {
+    position: relative;
+    width: auto;
+    min-width: 0;
+    min-height: 62px;
+    flex: initial;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "copy cards"
+      "timer timer";
+    gap: 4px;
+    padding: 7px;
+    overflow: visible;
+    border-radius: 10px;
+  }
+
+  .uno-player-copy strong {
+    font-size: 0.7rem;
+  }
+
+  .uno-player-copy small,
+  .uno-player-tags {
+    display: none;
+  }
+
+  .uno-player-cards {
+    min-width: 0;
+    padding: 4px 5px;
+    font-size: 0.6rem;
+  }
+
+  .uno-player-timer {
+    justify-self: stretch;
+    text-align: center;
+  }
+
+  .uno-player-timer .turn-timer,
+  .uno-player-timer .uno-no-limit {
+    min-width: 0;
+    min-height: 22px;
+    font-size: 0.62rem;
+  }
+
+  .uno-table {
+    min-height: 250px;
+    padding: 10px;
+  }
+
+  .uno-table-heading h2 {
+    font-size: 0.84rem;
+  }
+
+  .uno-direction {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+  }
+
+  .uno-piles {
+    min-height: 166px;
+    justify-content: center;
+    gap: 46px;
+  }
+
+  .uno-card.is-table,
+  .uno-draw-pile::before,
+  .uno-draw-pile::after,
+  .uno-empty-card {
+    width: 72px;
+    height: 102px;
+  }
+
+  .uno-hand-section {
+    padding: 11px 8px 9px;
+    overflow: hidden;
+  }
+
+  .uno-hand-heading > p {
+    display: none;
+  }
+
+  .uno-hand {
+    min-height: 128px;
+    justify-content: center;
+    gap: 0;
+    margin-top: 5px;
+    padding: 8px 12px 7px;
+    overflow: visible;
+    scrollbar-width: none;
+  }
+
+  .uno-hand-card-shell {
+    flex: 0 0 clamp(4px, calc((100vw - 120px) / var(--hand-count)), 66px);
+    min-width: 0;
+    justify-content: center;
+    animation: none;
+    transform: translateY(var(--fan-rise)) rotate(var(--fan-angle));
+    transform-origin: center bottom;
+  }
+
+  .uno-card.is-hand {
+    width: 78px;
+    height: 112px;
+  }
+
+  .uno-command-dock {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    min-height: 0;
+    padding: 8px 9px max(8px, env(safe-area-inset-bottom));
+  }
+
+  .uno-command-status strong {
+    max-width: none;
+    font-size: 0.66rem;
+    text-align: center;
+  }
+
+  .uno-command-status small {
+    display: none;
+  }
+
+  .uno-command-actions {
+    max-width: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+    overflow: visible;
+  }
+
+  .uno-command-actions .btn,
+  .uno-command-actions .uno-declare-intent {
+    min-width: 0;
+    min-height: 40px;
+    padding: 7px 9px;
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .uno-players {
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
+  .uno-player {
+    width: auto;
+    flex-basis: auto;
+  }
+
+  .uno-hand {
+    gap: 0;
   }
 }

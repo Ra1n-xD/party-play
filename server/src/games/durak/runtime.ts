@@ -3,6 +3,7 @@ import type {
   DurakResult,
   DurakSettings,
   DurakTablePair,
+  DurakVisualEvent,
   SeatId,
 } from "../../../../shared/types.js";
 import type { Room } from "../../platform/roomManager.js";
@@ -55,6 +56,8 @@ export interface DurakGameState {
   turn: DurakTurn | null;
   nextTurnId: number;
   nextFightId: number;
+  nextVisualEventId: number;
+  visualEvents: DurakVisualEvent[];
   result: DurakResult | null;
 }
 

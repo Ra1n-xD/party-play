@@ -1,3 +1,7 @@
+import type {
+  CardTransferVisualEvent,
+  PlayerActionVisualEvent,
+} from "../../platform/cardVisualEvents.js";
 import type { RoomRevision, SeatId } from "../../platform/room.js";
 
 export type DurakSuit = "clubs" | "diamonds" | "hearts" | "spades";
@@ -24,6 +28,8 @@ export interface DurakTablePair {
 }
 
 export type DurakSeatStatus = "active" | "out" | "excluded";
+export type DurakVisualAction = "attack" | "defend" | "throw-in" | "take" | "pass";
+export type DurakVisualEvent = CardTransferVisualEvent | PlayerActionVisualEvent<DurakVisualAction>;
 
 export interface DurakPlayerPublicState {
   seatId: SeatId;
@@ -65,6 +71,7 @@ export interface DurakPublicState {
   trumpCardHolderSeatId: SeatId | null;
   deckCount: number;
   discardCount: number;
+  visualEvents: DurakVisualEvent[];
   players: DurakPlayerPublicState[];
   turnRemainingMs: number | null;
   paused: boolean;
