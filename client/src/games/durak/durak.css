@@ -278,8 +278,7 @@
   gap: 8px;
 }
 
-.durak-deck-visual strong,
-.durak-discard-count {
+.durak-deck-visual strong {
   color: rgba(255, 255, 255, 0.68);
   font-size: 0.7rem;
 }
@@ -381,17 +380,6 @@
 .durak-results-list h2 {
   color: #fbf6ea;
   font-size: 1rem;
-}
-
-.durak-empty-table {
-  display: flex;
-  min-height: 230px;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 0.78rem;
-  text-align: center;
 }
 
 .durak-table-grid {
@@ -1039,11 +1027,6 @@ button.durak-card:focus-visible:not(.is-selected) {
     font-size: 1.14rem;
   }
 
-  .durak-empty-table {
-    min-height: 292px;
-    font-size: 0.9rem;
-  }
-
   .durak-table-grid {
     grid-template-columns: repeat(auto-fit, 158px);
     gap: 25px;
@@ -1211,10 +1194,6 @@ button.durak-card:focus-visible:not(.is-selected) {
 
   .durak-trump .durak-card {
     display: none;
-  }
-
-  .durak-discard-count {
-    text-align: right;
   }
 
   .durak-table {
@@ -1465,11 +1444,6 @@ button.durak-card:focus-visible:not(.is-selected) {
     text-align: center;
   }
 
-  .durak-trump > span:first-child,
-  .durak-trump > small {
-    display: none;
-  }
-
   .durak-table {
     min-height: 236px;
     padding: 10px;
@@ -1603,8 +1577,7 @@ button.durak-card:focus-visible:not(.is-selected) {
     display: grid;
     grid-template-areas:
       "eyebrow eyebrow"
-      "deck trump"
-      "discard discard";
+      "deck trump";
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 5px 8px;
     padding: 9px 10px;
@@ -1626,10 +1599,6 @@ button.durak-card:focus-visible:not(.is-selected) {
     padding: 0 0 0 8px;
     border-top: 0;
     border-left: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .durak-discard-count {
-    grid-area: discard;
   }
 
   .durak-deck-visual .durak-card,

@@ -4,9 +4,9 @@ import type {
   UnoCard as UnoCardData,
   UnoColor,
   UnoPlayerPublicState,
-  UnoVisualAction,
 } from "../../../../shared/games/uno/types";
 import type { CardTransferVisualEvent } from "../../../../shared/platform/cardVisualEvents";
+import type { PlayerActionVisualEvent } from "../../../../shared/types";
 import type { RoomSnapshot } from "../../../../shared/platform/room";
 import { AccessibleModal } from "../../platform/components/AccessibleModal";
 import {
@@ -44,15 +44,11 @@ const COLOR_LABELS: Record<UnoColor, string> = {
   blue: "синий",
 };
 
-const UNO_ACTION_LABELS: Record<UnoVisualAction, string> = {
-  "play-card": "Ходит картой",
-  "draw-card": "Берёт карту",
-  "end-turn": "Завершает ход",
-  "choose-color": "Выбирает цвет",
-  "accept-draw-four": "Принимает +4",
-  "challenge-draw-four": "Оспаривает +4",
-  "declare-uno": "UNO!",
-  "catch-uno": "Поймал UNO",
+type UnoShownAction = "draw-one" | "draw-many";
+
+const UNO_ACTION_LABELS: Record<UnoShownAction, string> = {
+  "draw-one": "Берёт карту",
+  "draw-many": "Берёт карты",
 };
 
 const UNO_COLOR_ORDER: Record<UnoColor, number> = {
@@ -172,8 +168,25 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     ],
     [animateInitialDeal, game],
   );
-  const actionEvents = useMemo(
-    () => game?.visualEvents.filter((event) => event.type === "action") ?? [],
+  const actionEvents = useMemo<PlayerActionVisualEvent<UnoShownAction>[]>(
+    () =>
+      game?.visualEvents.flatMap((event): PlayerActionVisualEvent<UnoShownAction>[] => {
+        if (
+          event.type !== "transfer" ||
+          event.source.kind !== "deck" ||
+          event.target.kind !== "player"
+        ) {
+          return [];
+        }
+        return [
+          {
+            id: event.id,
+            type: "action",
+            seatId: event.target.seatId,
+            action: event.cardCount === 1 ? "draw-one" : "draw-many",
+          },
+        ];
+      }) ?? [],
     [game?.visualEvents],
   );
 
@@ -184,7 +197,11 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     events: transferEvents,
     animateInitial: animateInitialDeal,
   });
-  const actionIndicators = usePlayerActionIndicators(actionEvents, UNO_ACTION_LABELS);
+  const actionIndicators = usePlayerActionIndicators(
+    actionEvents,
+    UNO_ACTION_LABELS,
+    animateInitialDeal,
+  );
   const canOfferAtomicUnoIntent = Boolean(
     privateGame &&
     privateGame.hand.length === 2 &&
@@ -408,18 +425,31 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                   game.direction === "clockwise" ? "По часовой стрелке" : "Против часовой стрелки"
                 }
               >
-                <span className="uno-direction-label">Ход</span>
-                <span aria-hidden="true">{game.direction === "clockwise" ? "↻" : "↺"}</span>
+                <span className="uno-direction-label">
+                  {game.direction === "clockwise" ? "По часовой" : "Против часовой"}
+                </span>
               </span>
             </div>
 
             <div className="uno-piles">
               <div
-                className="uno-pile uno-draw-pile"
-                aria-label={`В колоде ${formatCardCount(game.drawPileCount)}`}
+                className={`uno-pile uno-draw-pile ${
+                  game.drawPileCount > 0 ? "has-cards" : "is-empty"
+                }`}
+                aria-label={
+                  game.drawPileCount > 0
+                    ? `В колоде ${formatCardCount(game.drawPileCount)}`
+                    : "Колода пуста"
+                }
                 data-card-motion-anchor="uno:deck"
               >
-                <UnoCardBack label={`Колода, осталось ${formatCardCount(game.drawPileCount)}`} />
+                {game.drawPileCount > 0 ? (
+                  <UnoCardBack label={`Колода, осталось ${formatCardCount(game.drawPileCount)}`} />
+                ) : (
+                  <div className="uno-empty-card" aria-hidden="true">
+                    ∅
+                  </div>
+                )}
                 <span>{game.drawPileCount}</span>
               </div>
               <div

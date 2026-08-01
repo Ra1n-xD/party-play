@@ -13,6 +13,15 @@ const STATUS_LABELS = {
   excluded: "Исключён",
 } as const;
 
+function formatCardCount(count: number): string {
+  const mod100 = count % 100;
+  const mod10 = count % 10;
+  if (mod100 >= 11 && mod100 <= 14) return `${count} карт`;
+  if (mod10 === 1) return `${count} карта`;
+  if (mod10 >= 2 && mod10 <= 4) return `${count} карты`;
+  return `${count} карт`;
+}
+
 export function DurakResultsScreen({ snapshot }: DurakResultsScreenProps) {
   const { connected, commandPending, error, leaveRoom, playAgain } = usePlatform();
   const game = snapshot.game;
@@ -48,8 +57,13 @@ export function DurakResultsScreen({ snapshot }: DurakResultsScreenProps) {
     description = "В комнате осталось меньше двух активных участников.";
   }
 
+  const waitingMessage =
+    snapshot.viewer.role === "spectator"
+      ? "Вы наблюдали за этой партией."
+      : "Новую партию сможет запустить хост.";
+
   return (
-    <main className="screen command-game-screen durak-screen durak-results-screen">
+    <main className="screen command-game-screen durak-screen durak-results-screen card-results-screen">
       <GameRoomHeader
         roomCode={snapshot.roomCode}
         connected={connected}
@@ -58,44 +72,63 @@ export function DurakResultsScreen({ snapshot }: DurakResultsScreenProps) {
         brandIcon="♠"
       />
 
-      <section className="durak-results-hero">
-        <span className="durak-section-eyebrow">Результат партии</span>
-        <h1>{title}</h1>
-        <p>{description}</p>
-      </section>
+      <div className="card-results-content">
+        <section className="durak-results-hero card-results-hero">
+          <span className="durak-section-eyebrow card-results-eyebrow">Результат партии</span>
+          <h1>{title}</h1>
+          <p>{description}</p>
+        </section>
 
-      <section className="durak-results-list" aria-labelledby="durak-results-players-title">
-        <h2 id="durak-results-players-title">Участники</h2>
-        <div>
-          {game.players.map((player, index) => (
-            <article
-              key={player.seatId}
-              className={[
-                "durak-result-player",
-                player.seatId === viewerSeatId ? "is-me" : "",
-                fool?.seatId === player.seatId ? "is-fool" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <span className="durak-player-order">{index + 1}</span>
-              <div>
-                <strong>
-                  {player.name}
-                  {player.seatId === viewerSeatId ? " · вы" : ""}
-                </strong>
-                <span>{STATUS_LABELS[player.status]}</span>
-              </div>
-              <span className="durak-result-card-count">
-                {player.cardCount} {player.cardCount === 1 ? "карта" : "карт"}
-              </span>
-            </article>
-          ))}
-        </div>
-      </section>
+        <section
+          className="durak-results-list card-results-list"
+          aria-labelledby="durak-results-players-title"
+        >
+          <div className="card-results-list-heading">
+            <h2 id="durak-results-players-title">Участники</h2>
+            <span>{game.players.length}</span>
+          </div>
+          <div className="card-results-players">
+            {game.players.map((player) => (
+              <article
+                key={player.seatId}
+                className={[
+                  "durak-result-player",
+                  "card-result-player",
+                  player.seatId === viewerSeatId ? "is-me" : "",
+                  fool?.seatId === player.seatId ? "is-fool" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <div className="card-result-copy">
+                  <strong>
+                    {player.name}
+                    {player.seatId === viewerSeatId && <span className="card-result-you">вы</span>}
+                  </strong>
+                  <span>
+                    {fool?.seatId === player.seatId
+                      ? "Остался дураком"
+                      : STATUS_LABELS[player.status]}
+                  </span>
+                </div>
+                <span className="durak-result-card-count card-result-count">
+                  {formatCardCount(player.cardCount)}
+                </span>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
 
-      <section className="durak-results-actions">
+      <section
+        className={`durak-results-actions card-results-actions ${isHost ? "has-primary-action" : ""}`}
+        aria-label="Действия после игры"
+      >
         <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
+        <div className="card-results-action-copy">
+          <strong>{isHost ? "Ещё один раунд?" : "Партия завершена"}</strong>
+          <span>{isHost ? "Можно вернуться в лобби с тем же составом." : waitingMessage}</span>
+        </div>
         {isHost ? (
           <button
             type="button"
@@ -105,13 +138,7 @@ export function DurakResultsScreen({ snapshot }: DurakResultsScreenProps) {
           >
             {commandPending ? "Возвращаем в лобби…" : "Сыграть ещё"}
           </button>
-        ) : (
-          <p>
-            {snapshot.viewer.role === "spectator"
-              ? "Вы наблюдали за партией."
-              : "Ждём решения хоста."}
-          </p>
-        )}
+        ) : null}
       </section>
 
       {error && (

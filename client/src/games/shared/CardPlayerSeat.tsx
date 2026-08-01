@@ -24,20 +24,6 @@ interface CardPlayerSeatProps {
   action?: CardPlayerAction;
 }
 
-function getPlayerMarker({
-  isMe,
-  connected,
-  controllerKind,
-  temporaryBot,
-}: Pick<CardPlayerSeatProps, "isMe" | "connected" | "controllerKind" | "temporaryBot">):
-  | string
-  | null {
-  if (isMe) return "ВЫ";
-  if (temporaryBot || controllerKind === "bot") return "BOT";
-  if (!connected) return "OFF";
-  return null;
-}
-
 function formatCardCount(count: number): string {
   const mod100 = count % 100;
   const mod10 = count % 10;
@@ -75,7 +61,6 @@ export function CardPlayerSeat({
   action,
 }: CardPlayerSeatProps) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
-  const marker = getPlayerMarker({ isMe, connected, controllerKind, temporaryBot });
   const cardCountLabel = formatCardCount(cardCount);
   const statusLabel = status === "out" ? "Вышел" : status === "excluded" ? "Исключён" : null;
   const isInactive = status !== "active";
@@ -157,23 +142,11 @@ export function CardPlayerSeat({
         </>
       )}
 
-      <span className="card-player-seat-initial" aria-hidden="true">
-        {name.trim().charAt(0).toLocaleUpperCase("ru-RU") || "?"}
-      </span>
-
       <span className="card-player-seat-count" aria-label={cardCountLabel}>
         {cardCount}
       </span>
 
-      <div className="card-player-seat-badges" aria-hidden="true">
-        {marker && <span>{marker}</span>}
-        {isHost && <span>★</span>}
-        {isDealer && <span>С</span>}
-      </div>
-
       <strong className="card-player-seat-name">{name}</strong>
-
-      {statusLabel && <span className="card-player-seat-state">{statusLabel}</span>}
 
       {action && (
         <span className="card-player-action" key={action.eventId}>
