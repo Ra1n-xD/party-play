@@ -1,6 +1,13 @@
 #!/bin/bash
 set -Eeuo pipefail
 
+deploy_lock="${PARTYPLAY_DEPLOY_LOCK:-/tmp/partyplay-deploy.lock}"
+exec 9>"$deploy_lock"
+if ! flock -w 600 9; then
+  echo "ERROR: another PartyPlay deployment is still running" >&2
+  exit 1
+fi
+
 cd ~/party-play
 
 echo "Pulling latest changes..."
@@ -29,7 +36,7 @@ systemctl is-active --quiet partyplay
 
 health_url="${PARTYPLAY_HEALTH_URL:-http://127.0.0.1:3001/readyz}"
 health_attempt=1
-until curl --fail --silent "$health_url" >/dev/null; do
+until curl --fail --silent --show-error --connect-timeout 2 --max-time 3 "$health_url" >/dev/null; do
   if [ "$health_attempt" -ge 15 ]; then
     echo "ERROR: PartyPlay readiness check failed: $health_url" >&2
     exit 1

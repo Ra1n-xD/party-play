@@ -149,6 +149,15 @@ export function disposeInactiveRooms(now = Date.now()): number {
       roomLastActivity.delete(code);
       continue;
     }
+    const hasConnectedParticipant =
+      Array.from(room.players.values()).some(
+        (player) =>
+          player.owner.kind === "human" && player.connected && player.controller.kind === "human",
+      ) || Array.from(room.spectators.values()).some((spectator) => spectator.connected);
+    if (hasConnectedParticipant) {
+      roomLastActivity.set(code, now);
+      continue;
+    }
     if (disposeRoom(room, "inactive")) disposed++;
   }
   return disposed;
