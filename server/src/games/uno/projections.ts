@@ -6,7 +6,7 @@ import type {
   UnoPublicState,
   UnoSeatStatus,
 } from "../../../../shared/types.js";
-import { canPlayUnoCard } from "./cards.js";
+import { canPlayUnoCard, sortUnoHand } from "./cards.js";
 import type { UnoGameState, UnoRoom } from "./runtime.js";
 
 function isPaused(room: UnoRoom): boolean {
@@ -207,6 +207,6 @@ export function buildUnoPrivateState(room: UnoRoom, seatId: SeatId): UnoPrivateS
   const player = room.players.get(seatId);
   if (!player || player.kicked) return null;
   const state = room.gameState;
-  const hand: UnoCard[] = state ? [...(state.hands[seatId] ?? [])] : [];
+  const hand: UnoCard[] = state ? sortUnoHand(state.hands[seatId] ?? []) : [];
   return { seatId, hand, legalActions: getUnoLegalActions(room, seatId) };
 }

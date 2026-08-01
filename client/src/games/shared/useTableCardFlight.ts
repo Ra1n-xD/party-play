@@ -58,7 +58,7 @@ export function useTableCardFlight({ revision, flights }: UseTableCardFlightOpti
           cleanupTimersRef.current = cleanupTimersRef.current.filter(
             (timer) => timer !== cleanupTimer,
           );
-        }, 700);
+        }, 950);
         cleanupTimersRef.current.push(cleanupTimer);
       });
   }, [flights, revision]);

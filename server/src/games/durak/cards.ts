@@ -53,12 +53,14 @@ export function compareDurakCards(
   second: DurakCard,
   trumpSuit?: DurakSuit,
 ): number {
-  if (trumpSuit && first.suit !== second.suit) {
-    if (first.suit === trumpSuit) return 1;
-    if (second.suit === trumpSuit) return -1;
+  if (first.suit !== second.suit) {
+    if (trumpSuit) {
+      if (first.suit === trumpSuit) return 1;
+      if (second.suit === trumpSuit) return -1;
+    }
+    return SUIT_VALUE[first.suit] - SUIT_VALUE[second.suit];
   }
-  const rankDifference = durakRankValue(first.rank) - durakRankValue(second.rank);
-  return rankDifference || SUIT_VALUE[first.suit] - SUIT_VALUE[second.suit];
+  return durakRankValue(first.rank) - durakRankValue(second.rank);
 }
 
 export function sortDurakHand(cards: readonly DurakCard[], trumpSuit: DurakSuit): DurakCard[] {

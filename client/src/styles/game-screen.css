@@ -209,19 +209,19 @@
   top: 50%;
   left: 50%;
   max-width: calc(100% - 14px);
-  padding: 6px 10px;
+  padding: 8px 13px;
   border: 1px solid rgba(255, 225, 145, 0.72);
   border-radius: 999px;
   background: rgba(42, 21, 9, 0.96);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
   color: #ffe09a;
-  font-size: 0.7rem;
+  font-size: 0.95rem;
   font-weight: 900;
   line-height: 1.1;
   text-align: center;
   white-space: nowrap;
   pointer-events: none;
-  animation: card-player-action-in 2.2s ease both;
+  animation: card-player-action-in 4.2s ease both;
 }
 
 .command-game-screen .durak-player,
@@ -275,8 +275,8 @@
 
   .command-game-screen .card-player-action {
     max-width: calc(100% + 22px);
-    padding: 4px 7px;
-    font-size: 0.58rem;
+    padding: 6px 9px;
+    font-size: 0.82rem;
   }
 }
 

@@ -85,7 +85,7 @@ export function useCardTransferMotion({
             cleanupTimersRef.current = cleanupTimersRef.current.filter(
               (timer) => timer !== cleanupTimer,
             );
-          }, 900);
+          }, 2_100);
           cleanupTimersRef.current.push(cleanupTimer);
         }
       });

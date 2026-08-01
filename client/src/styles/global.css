@@ -1111,6 +1111,16 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .platform-game-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .platform-game-actions button {
+    width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
   .platform-home .input,
   .platform-home .platform-home-code-input {
     font-size: 1rem;

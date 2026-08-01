@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FiSmile } from "react-icons/fi";
 import type { RoomReactionId } from "../../../../shared/platform/reactions";
 import { usePlatform } from "../context/PlatformContext";
@@ -27,6 +28,7 @@ export function RoomReactions() {
     usePlatform();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [cooldownActive, setCooldownActive] = useState(false);
+  const [overlayRoot, setOverlayRoot] = useState<HTMLElement | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const cooldownActiveRef = useRef(false);
@@ -51,6 +53,10 @@ export function RoomReactions() {
   useEffect(() => {
     if (!eligible) setPopoverOpen(false);
   }, [eligible]);
+
+  useLayoutEffect(() => {
+    setOverlayRoot(rootRef.current?.closest<HTMLElement>(".command-game-screen") ?? null);
+  }, []);
 
   useEffect(() => {
     if (!popoverOpen) return;
@@ -97,6 +103,32 @@ export function RoomReactions() {
     }, LOCAL_COOLDOWN_MS);
   };
 
+  const liveRegion = (
+    <div
+      className="room-reactions-live"
+      aria-live="polite"
+      aria-relevant="additions"
+      aria-atomic="false"
+    >
+      {roomReactions.map((event) => {
+        const reaction = REACTIONS_BY_ID.get(event.reactionId);
+        if (!reaction) return null;
+
+        return (
+          <div className="room-reaction-message" key={event.eventId}>
+            <span className="room-reaction-message-emoji" aria-hidden="true">
+              {reaction.emoji}
+            </span>
+            <span className="room-reaction-message-copy">
+              <strong>{event.senderName}</strong>
+              <span>{reaction.label}</span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="room-reactions" ref={rootRef}>
       {eligible && (
@@ -142,29 +174,7 @@ export function RoomReactions() {
         </>
       )}
 
-      <div
-        className="room-reactions-live"
-        aria-live="polite"
-        aria-relevant="additions"
-        aria-atomic="false"
-      >
-        {roomReactions.map((event) => {
-          const reaction = REACTIONS_BY_ID.get(event.reactionId);
-          if (!reaction) return null;
-
-          return (
-            <div className="room-reaction-message" key={event.eventId}>
-              <span className="room-reaction-message-emoji" aria-hidden="true">
-                {reaction.emoji}
-              </span>
-              <span className="room-reaction-message-copy">
-                <strong>{event.senderName}</strong>
-                <span>{reaction.label}</span>
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      {overlayRoot ? createPortal(liveRegion, overlayRoot) : liveRegion}
     </div>
   );
 }
