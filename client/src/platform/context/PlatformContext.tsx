@@ -209,6 +209,7 @@ function createCommandId(): string {
 
 const COMMAND_RESULT_TIMEOUT_MS = 8_000;
 const MAX_COMMAND_TRANSPORT_RETRIES = 1;
+const REJOIN_CONFLICT_RETRY_DELAYS_MS = [500, 1_500] as const;
 
 export function PlatformProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
@@ -243,6 +244,8 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const commandTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const rejoinRetryTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const rejoinConflictAttemptRef = useRef(0);
   const acceptedSessionRef = useRef<ReconnectSession | null>(null);
   const reconnectSessionTombstonedRef = useRef(false);
   const sessionAcceptanceExpectationRef = useRef<SessionAcceptanceExpectation | null>(null);
@@ -269,6 +272,14 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     if (!commandTimeoutRef.current) return;
     clearTimeout(commandTimeoutRef.current);
     commandTimeoutRef.current = undefined;
+  }, []);
+
+  const clearRejoinRetry = useCallback((resetAttempts = true) => {
+    if (rejoinRetryTimerRef.current) {
+      clearTimeout(rejoinRetryTimerRef.current);
+      rejoinRetryTimerRef.current = undefined;
+    }
+    if (resetAttempts) rejoinConflictAttemptRef.current = 0;
   }, []);
 
   const setTimedError = useCallback((message: string) => {
@@ -381,6 +392,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const resetRoomUi = () => {
+      clearRejoinRetry();
       ignoreRoomEventsRef.current = true;
       ignoreRecoveryEventsRef.current = true;
       sessionAcceptanceExpectationRef.current = null;
@@ -422,16 +434,8 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       resetRoomUi();
     };
 
-    const attemptStoredRejoin = (): boolean => {
-      if (membershipRequestPendingRef.current || reconnectSessionTombstonedRef.current) {
-        return false;
-      }
-      const savedSession = acceptedSessionRef.current ?? readReconnectSession();
-      if (!savedSession) return false;
-
-      setRetainedReconnectSession(summarizeRetainedSession(savedSession));
-      if (!savedSession.autoRejoin) return false;
-
+    const emitStoredRejoin = (savedSession: ReconnectSession): boolean => {
+      if (!socket.connected || reconnectSessionTombstonedRef.current) return false;
       acceptedSessionRef.current = savedSession;
       membershipRequestPendingRef.current = true;
       setSessionPending(true);
@@ -462,6 +466,46 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       return true;
     };
 
+    const attemptStoredRejoin = (): boolean => {
+      if (membershipRequestPendingRef.current || reconnectSessionTombstonedRef.current) {
+        return false;
+      }
+      const savedSession = acceptedSessionRef.current ?? readReconnectSession();
+      if (!savedSession) return false;
+
+      setRetainedReconnectSession(summarizeRetainedSession(savedSession));
+      if (!savedSession.autoRejoin) return false;
+      return emitStoredRejoin(savedSession);
+    };
+
+    const returnToManualRejoin = (savedSession: ReconnectSession, message: string) => {
+      const manualSession: ReconnectSession = { ...savedSession, autoRejoin: false };
+      clearRejoinRetry();
+      if (manualSession.role === "player") {
+        acceptedSessionRef.current = manualSession;
+        if (!saveReconnectSession(manualSession)) clearReconnectSession();
+        setRetainedReconnectSession(summarizeRetainedSession(manualSession));
+      } else {
+        reconnectSessionTombstonedRef.current = true;
+        clearReconnectSession();
+        acceptedSessionRef.current = null;
+        setRetainedReconnectSession(null);
+      }
+      membershipRequestPendingRef.current = false;
+      membershipReadyRef.current = false;
+      sessionAcceptanceExpectationRef.current = null;
+      ignoreRoomEventsRef.current = true;
+      snapshotRef.current = null;
+      setSessionPending(false);
+      setActiveGameId(null);
+      setRoomCode(null);
+      setPlayerId(null);
+      setIsSpectator(false);
+      setSnapshot(null);
+      setReconnectState("idle");
+      setTimedError(message);
+    };
+
     const handleConnect = () => {
       setConnected(true);
       if (explicitLeaveSuppressedRef.current) return;
@@ -477,6 +521,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     };
 
     const handleDisconnect = () => {
+      clearRejoinRetry();
       setConnected(false);
       membershipReadyRef.current = false;
       resetCommandQueue();
@@ -514,6 +559,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       participantId: string,
       token: string,
     ) => {
+      clearRejoinRetry();
       const acceptedSession: ReconnectSession = {
         version: 1,
         gameId,
@@ -649,7 +695,55 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       setTimedError(message);
     };
 
-    const handleReconnectError: ServerEvents["room:reconnectError"] = ({ message, terminal }) => {
+    const handleReconnectError: ServerEvents["room:reconnectError"] = ({
+      code,
+      message,
+      terminal,
+    }) => {
+      if (code === "SEAT_ALREADY_CONNECTED" && !terminal) {
+        const savedSession = acceptedSessionRef.current ?? readReconnectSession();
+        if (!savedSession || !savedSession.autoRejoin) {
+          sessionAcceptanceExpectationRef.current = null;
+          membershipRequestPendingRef.current = false;
+          setSessionPending(false);
+          setReconnectState("idle");
+          setTimedError(message);
+          return;
+        }
+
+        const retryDelay = REJOIN_CONFLICT_RETRY_DELAYS_MS[rejoinConflictAttemptRef.current];
+        if (retryDelay === undefined) {
+          returnToManualRejoin(
+            savedSession,
+            "Место открыто в другой вкладке. Закройте её и нажмите «Вернуться в игру».",
+          );
+          return;
+        }
+
+        rejoinConflictAttemptRef.current += 1;
+        clearRejoinRetry(false);
+        membershipRequestPendingRef.current = false;
+        sessionAcceptanceExpectationRef.current = null;
+        setSessionPending(true);
+        setReconnectState("reconnecting");
+        rejoinRetryTimerRef.current = setTimeout(() => {
+          rejoinRetryTimerRef.current = undefined;
+          const retrySession = acceptedSessionRef.current ?? readReconnectSession();
+          if (!retrySession || !retrySession.autoRejoin) {
+            if (retrySession) {
+              returnToManualRejoin(retrySession, "Автоматическое возвращение остановлено");
+            } else {
+              setSessionPending(false);
+              setReconnectState("idle");
+            }
+            return;
+          }
+          emitStoredRejoin(retrySession);
+        }, retryDelay);
+        return;
+      }
+
+      clearRejoinRetry();
       sessionAcceptanceExpectationRef.current = null;
       membershipRequestPendingRef.current = false;
       setSessionPending(false);
@@ -768,12 +862,21 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
     const handlePublicRoomError: ServerEvents["publicRooms:error"] = (payload) => {
       const expectation = sessionAcceptanceExpectationRef.current;
-      if (expectation?.source === "public-player" || expectation?.source === "public-spectator") {
+      const matchesPublicMembershipRequest =
+        (expectation?.source === "public-player" || expectation?.source === "public-spectator") &&
+        (!payload.gameId || payload.gameId === expectation.gameId);
+      if (matchesPublicMembershipRequest) {
         membershipRequestPendingRef.current = false;
         setSessionPending(false);
         sessionAcceptanceExpectationRef.current = null;
       }
-      if (payload.gameId) selectedPublicDirectoryGameRef.current = payload.gameId;
+      if (
+        payload.gameId &&
+        payload.gameId !== selectedPublicDirectoryGameRef.current &&
+        !matchesPublicMembershipRequest
+      ) {
+        return;
+      }
       setPublicRoomError(payload);
     };
 
@@ -911,11 +1014,13 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       socket.off("admin:seatClaimsUpdated", handleSeatClaimsUpdated);
       socket.off("room:hostChanged", handleHostChanged);
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      clearRejoinRetry();
       clearRoomReactions();
       resetCommandQueue();
     };
   }, [
     clearCommandTimeout,
+    clearRejoinRetry,
     clearRoomReactions,
     flushCommandQueue,
     resetCommandQueue,

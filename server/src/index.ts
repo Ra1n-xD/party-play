@@ -38,6 +38,7 @@ app.use(
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim())
   : ["http://localhost:5173", "http://localhost:3001"];
+const allowedOriginSet = new Set(allowedOrigins);
 
 app.use(cors({ origin: allowedOrigins }));
 
@@ -59,9 +60,15 @@ const io = new Server(httpServer, {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
   },
+  allowRequest: (request, callback) => {
+    const origin = request.headers.origin;
+    callback(null, !origin || allowedOriginSet.has(origin));
+  },
   // Socket.IO payload size limit (1MB default -> 100KB)
   maxHttpBufferSize: 100_000,
 });
+let ready = false;
+let shuttingDown = false;
 
 app.get("/", (_req, res) => {
   res.json({ status: "ok", message: "PartyPlay Server" });
@@ -74,7 +81,7 @@ app.get("/healthz", (_req, res) => {
 
 app.get("/readyz", (_req, res) => {
   res.set("Cache-Control", "no-store");
-  res.json({ status: "ready" });
+  res.status(ready ? 200 : 503).json({ status: ready ? "ready" : "stopping" });
 });
 
 // Per-IP connection limiting
@@ -91,6 +98,7 @@ const bindHost =
   process.env.HOST || (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");
 
 httpServer.listen(CONFIG.PORT, bindHost, () => {
+  ready = true;
   const proto = useHttps ? "https" : "http";
   console.log(`PartyPlay server running on ${proto}://${bindHost}:${CONFIG.PORT}`);
   if (!useHttps) {
@@ -99,3 +107,28 @@ httpServer.listen(CONFIG.PORT, bindHost, () => {
     );
   }
 });
+
+function shutdown(signal: NodeJS.Signals): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  ready = false;
+  console.log(`Received ${signal}, stopping PartyPlay server...`);
+
+  const forceExitTimer = setTimeout(() => {
+    console.error("PartyPlay server did not stop within 10 seconds");
+    process.exit(1);
+  }, 10_000);
+  forceExitTimer.unref();
+
+  void io.close((error) => {
+    clearTimeout(forceExitTimer);
+    if (error) {
+      console.error("Failed to stop PartyPlay server cleanly", error);
+      process.exit(1);
+    }
+    process.exit(0);
+  });
+}
+
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => shutdown("SIGINT"));
