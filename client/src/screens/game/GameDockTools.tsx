@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { FiBookOpen } from "react-icons/fi";
 import { GameRulesModal } from "../../platform/components/GameRulesModal";
 import { RoomReactions } from "../../platform/components/RoomReactions";
@@ -29,14 +30,16 @@ export function GameDockTools({ gameId, gameTitle = "Бункер" }: GameDockTo
         <RoomReactions />
       </div>
 
-      {rulesOpen && (
-        <GameRulesModal
-          gameId={gameId}
-          gameTitle={gameTitle}
-          rules={gameModule.rules}
-          onClose={() => setRulesOpen(false)}
-        />
-      )}
+      {rulesOpen &&
+        createPortal(
+          <GameRulesModal
+            gameId={gameId}
+            gameTitle={gameTitle}
+            rules={gameModule.rules}
+            onClose={() => setRulesOpen(false)}
+          />,
+          document.body,
+        )}
     </>
   );
 }
