@@ -38,6 +38,6 @@ export const CONFIG = {
   MAX_PLAYER_NAME_LENGTH: 30, // Макс длина имени
   MAX_ROOMS: 500, // Макс количество комнат
   ROOM_INACTIVE_TTL: 30 * 60 * 1000, // 30 минут TTL для неактивных комнат
-  MAX_CONNECTIONS_PER_IP: 10, // Макс подключений с одного IP
+  MAX_CONNECTIONS_PER_IP: 24, // До 16 игроков за одним NAT + запас на зрителей и переподключения
   MAX_SPECTATORS_PER_ROOM: PUBLIC_ROOM_SPECTATOR_LIMIT, // Макс зрителей в одной комнате
 };

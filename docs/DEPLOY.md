@@ -246,7 +246,7 @@ Workflow-файл `.github/workflows/deploy.yml` уже есть в репози
 
 1. Подключится к VPS по SSH
 2. Стянет последние изменения (`git pull`)
-3. Установит зависимости (`npm install`)
+3. Установит зависимости (`npm ci --include=dev`)
 4. Соберёт проект (`npm run build`)
 5. Перезапустит сервис (`systemctl restart partyplay`)
 
@@ -260,7 +260,6 @@ Workflow-файл `.github/workflows/deploy.yml` уже есть в репози
 
 ```bash
 su - partyplay
-chmod +x ~/party-play/deploy.sh
 ~/party-play/deploy.sh
 ```
 

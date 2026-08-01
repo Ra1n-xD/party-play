@@ -1,20 +1,20 @@
 #!/bin/bash
-set -e
+set -Eeuo pipefail
 
 cd ~/party-play
 
 echo "Pulling latest changes..."
-git pull origin main
+git pull --ff-only origin main
 
 echo "Installing dependencies..."
-npm install --omit=dev
+npm ci --include=dev
 
 echo "Building project..."
 npm run build
 
 # Verify build output
-if [ ! -f server/dist/index.js ]; then
-  echo "ERROR: server build failed — server/dist/index.js not found" >&2
+if [ ! -f server/dist/server/src/index.js ]; then
+  echo "ERROR: server build failed — server/dist/server/src/index.js not found" >&2
   exit 1
 fi
 
@@ -25,6 +25,7 @@ fi
 
 echo "Build successful! Restarting service..."
 sudo systemctl restart partyplay
+systemctl is-active --quiet partyplay
 
 echo "Deploy complete."
 systemctl status partyplay --no-pager
