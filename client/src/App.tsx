@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { PlatformOverlays } from "./platform/components/PlatformOverlays";
-import { usePlatform } from "./platform/context/PlatformContext";
+import { PlatformProvider, usePlatform } from "./platform/context/PlatformContext";
 import { getLazyGameComponent } from "./platform/gameRegistry";
 import { HomeScreen } from "./platform/screens/HomeScreen";
 import { StatsScreen } from "./platform/screens/StatsScreen";
@@ -61,10 +61,10 @@ export default function App() {
       {statsRoute ? (
         <StatsScreen />
       ) : (
-        <>
+        <PlatformProvider>
           <RoomAppContent />
           <PlatformOverlays />
-        </>
+        </PlatformProvider>
       )}
       <div className="app-version">v{__APP_VERSION__}</div>
     </>
