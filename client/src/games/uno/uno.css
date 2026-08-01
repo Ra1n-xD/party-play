@@ -1,4 +1,4 @@
-.uno-screen {
+.screen.uno-screen {
   --uno-ink: #172033;
   --uno-paper: #f7f4ed;
   --uno-night: #101827;
@@ -11,7 +11,7 @@
   --uno-green: #2f9d68;
   --uno-blue: #357ac8;
   gap: 15px;
-  padding-bottom: calc(118px + env(safe-area-inset-bottom));
+  padding-bottom: calc(94px + env(safe-area-inset-bottom));
   background:
     radial-gradient(circle at 82% 5%, rgba(90, 153, 221, 0.2), transparent 25rem),
     radial-gradient(circle at 12% 28%, rgba(76, 175, 123, 0.14), transparent 28rem), #0b1220;
@@ -328,7 +328,7 @@
   --discard-tilt: 0deg;
   display: flex;
   flex: 0 0 auto;
-  animation: uno-discard-card-land 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: uno-discard-card-land 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   transform: rotate(var(--discard-tilt));
   transform-origin: center;
 }
@@ -415,7 +415,7 @@
   top: 5px;
   left: 6px;
   color: #fff9ed;
-  font-size: 0.65rem;
+  font-size: 0.78rem;
   font-weight: 900;
   line-height: 1;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
@@ -432,7 +432,7 @@
   height: 48px;
   place-items: center;
   color: #172033;
-  font-size: 1.65rem;
+  font-size: 1.85rem;
   font-weight: 900;
 }
 .uno-card-core img {
@@ -461,6 +461,14 @@
 }
 .uno-card.is-mini .uno-card-corner.is-bottom {
   inset: auto 3px 3px auto;
+}
+
+.uno-card.is-hand .uno-card-corner {
+  font-size: 0.94rem;
+}
+
+.uno-card.is-hand .uno-card-core {
+  font-size: 2.05rem;
 }
 button.uno-card {
   cursor: pointer;
@@ -542,9 +550,13 @@ button.uno-card:focus-visible {
 }
 
 .uno-hand-section {
-  padding: 18px;
+  padding: 12px 16px;
   border-radius: 18px;
   background: rgba(18, 29, 46, 0.96);
+}
+
+.uno-hand-section .uno-eyebrow {
+  display: none;
 }
 .uno-hand-heading > p {
   max-width: 470px;
@@ -575,18 +587,18 @@ button.uno-card:focus-visible {
 }
 .uno-hand {
   display: flex;
-  min-height: 145px;
+  min-height: 138px;
   align-items: flex-end;
   gap: 8px;
-  margin: 13px -2px 0;
-  padding: 9px 4px 13px;
+  margin: 7px -2px 0;
+  padding: 5px 4px 7px;
   overflow-x: auto;
   scrollbar-color: rgba(125, 181, 255, 0.35) transparent;
 }
 .uno-hand-card-shell {
   display: flex;
   flex: 0 0 auto;
-  animation: uno-hand-card-enter 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: uno-hand-card-enter 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   animation-delay: calc(var(--card-index) * 24ms);
 }
 .uno-hand-card-shell.is-draggable {
@@ -622,12 +634,12 @@ button.uno-card:focus-visible {
   bottom: calc(12px + env(safe-area-inset-bottom));
   left: 18px;
   z-index: 80;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
   align-items: center;
-  min-height: 78px;
-  padding: 12px 14px 12px 18px;
+  min-height: 62px;
+  padding: 9px 12px;
   border: 1px solid rgba(230, 192, 92, 0.46);
   border-radius: 18px;
   background: rgba(13, 24, 40, 0.96);
@@ -656,9 +668,9 @@ button.uno-card:focus-visible {
 }
 .uno-command-actions {
   display: flex;
-  max-width: 70vw;
+  max-width: none;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
 }
 .uno-command-actions .btn {
@@ -778,7 +790,7 @@ button.uno-card:focus-visible {
   font-size: 0.75rem;
 }
 
-.uno-results-screen {
+.screen.uno-results-screen {
   align-items: center;
 }
 .uno-results-screen > :not(.gs-room-header, .error-toast) {
@@ -865,7 +877,7 @@ button.uno-card:focus-visible {
   background: rgba(18, 29, 46, 0.96);
 }
 
-.uno-results-screen {
+.screen.uno-results-screen {
   padding-bottom: calc(118px + env(safe-area-inset-bottom));
 }
 
@@ -891,7 +903,7 @@ button.uno-card:focus-visible {
 }
 
 @media (min-width: 1180px) {
-  .uno-screen {
+  .screen.uno-screen {
     gap: 19px;
   }
   .uno-eyebrow {
@@ -972,21 +984,21 @@ button.uno-card:focus-visible {
     height: 56px;
   }
   .uno-hand-section {
-    padding: 21px 22px;
+    padding: 13px 18px;
   }
   .uno-hand-heading > p {
     max-width: 560px;
     font-size: 0.82rem;
   }
   .uno-hand {
-    min-height: 186px;
+    min-height: 170px;
     gap: 10px;
-    margin-top: 16px;
+    margin-top: 7px;
   }
 }
 
 @media (max-width: 760px) {
-  .uno-screen {
+  .screen.uno-screen {
     padding-bottom: calc(104px + env(safe-area-inset-bottom));
   }
 
@@ -1066,7 +1078,7 @@ button.uno-card:focus-visible {
 }
 
 @media (max-width: 420px) {
-  .uno-screen {
+  .screen.uno-screen {
     padding-inline: 10px;
   }
   .uno-screen .gs-room-header {
@@ -1151,13 +1163,13 @@ button.uno-card:focus-visible {
   }
 
   .uno-card.is-table .uno-card-corner {
-    font-size: 0.92rem;
+    font-size: 1.08rem;
   }
 
   .uno-card.is-table .uno-card-core {
     width: 72px;
     height: 72px;
-    font-size: 2.45rem;
+    font-size: 2.7rem;
   }
 
   .uno-card.is-table .uno-card-core img {
@@ -1171,9 +1183,9 @@ button.uno-card:focus-visible {
 }
 
 @media (max-width: 760px) {
-  .uno-screen {
+  .screen.uno-screen {
     gap: 9px;
-    padding-bottom: calc(174px + env(safe-area-inset-bottom));
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
   }
 
   .uno-players {
@@ -1258,7 +1270,7 @@ button.uno-card:focus-visible {
   }
 
   .uno-hand-section {
-    padding: 11px 8px 9px;
+    padding: 8px 8px 6px;
     overflow: hidden;
   }
 
@@ -1267,11 +1279,11 @@ button.uno-card:focus-visible {
   }
 
   .uno-hand {
-    min-height: 128px;
+    min-height: 116px;
     justify-content: center;
     gap: 0;
-    margin-top: 5px;
-    padding: 8px 12px 7px;
+    margin-top: 2px;
+    padding: 3px 12px 2px;
     overflow: visible;
     scrollbar-width: none;
   }
@@ -1291,7 +1303,6 @@ button.uno-card:focus-visible {
   }
 
   .uno-command-dock {
-    grid-template-columns: minmax(0, 1fr);
     gap: 5px;
     min-height: 0;
     padding: 8px 9px max(8px, env(safe-area-inset-bottom));
@@ -1321,6 +1332,59 @@ button.uno-card:focus-visible {
     min-height: 40px;
     padding: 7px 9px;
     font-size: 0.65rem;
+  }
+}
+
+@media (min-width: 761px) and (max-height: 800px) {
+  .screen.uno-screen {
+    gap: 8px;
+    padding-bottom: calc(114px + env(safe-area-inset-bottom));
+  }
+
+  .uno-players {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 7px;
+  }
+
+  .uno-player {
+    min-height: 64px;
+    padding: 8px 10px;
+  }
+
+  .uno-table {
+    min-height: 270px;
+    padding: 12px;
+  }
+
+  .uno-piles {
+    min-height: 180px;
+  }
+
+  .uno-hand-section {
+    padding: 8px 14px;
+  }
+
+  .uno-hand-heading > p {
+    display: none;
+  }
+
+  .uno-hand {
+    min-height: 148px;
+    margin-top: 3px;
+    padding: 2px 4px 3px;
+  }
+
+  .uno-card.is-hand {
+    width: 100px;
+    height: 142px;
+  }
+
+  .uno-command-dock {
+    right: 12px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    left: 12px;
+    min-height: 58px;
+    padding: 7px 10px;
   }
 }
 

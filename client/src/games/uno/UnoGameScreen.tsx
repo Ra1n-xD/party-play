@@ -16,6 +16,7 @@ import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
 import { GameDockTools } from "../../screens/game/GameDockTools";
 import { CardDragLayer } from "../shared/CardDragLayer";
+import { HandSortButton, type HandSortMode } from "../shared/HandSortButton";
 import { useCardDrag } from "../shared/useCardDrag";
 import { useCardTransferMotion } from "../shared/useCardTransferMotion";
 import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
@@ -50,6 +51,35 @@ const UNO_ACTION_LABELS: Record<UnoVisualAction, string> = {
   "declare-uno": "UNO!",
   "catch-uno": "Поймал UNO",
 };
+
+const UNO_COLOR_ORDER: Record<UnoColor, number> = {
+  red: 0,
+  yellow: 1,
+  green: 2,
+  blue: 3,
+};
+
+const UNO_KIND_ORDER: Record<UnoCardData["kind"], number> = {
+  number: 0,
+  skip: 10,
+  reverse: 11,
+  "draw-two": 12,
+  wild: 13,
+  "wild-draw-four": 14,
+};
+
+function compareUnoHandCards(first: UnoCardData, second: UnoCardData, mode: HandSortMode): number {
+  const firstColor = first.color === null ? 4 : UNO_COLOR_ORDER[first.color];
+  const secondColor = second.color === null ? 4 : UNO_COLOR_ORDER[second.color];
+  const colorDifference = firstColor - secondColor;
+  const firstRank = first.kind === "number" ? first.number : UNO_KIND_ORDER[first.kind];
+  const secondRank = second.kind === "number" ? second.number : UNO_KIND_ORDER[second.kind];
+  const rankDifference = firstRank - secondRank;
+
+  return mode === "suit"
+    ? colorDifference || rankDifference || first.id.localeCompare(second.id)
+    : rankDifference || colorDifference || first.id.localeCompare(second.id);
+}
 
 function formatCardCount(count: number): string {
   const mod100 = count % 100;
@@ -87,6 +117,7 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
   const game = snapshot.game;
   const [colorChoice, setColorChoice] = useState<ColorChoice | null>(null);
   const [declareWithPlay, setDeclareWithPlay] = useState(false);
+  const [handSortMode, setHandSortMode] = useState<HandSortMode>("suit");
   const [managementOpen, setManagementOpen] = useState(false);
   const adminPauseActiveRef = useRef(false);
 
@@ -101,6 +132,15 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
   const canUseConnection =
     connected && reconnectState === "connected" && viewerSeat?.controllerKind === "human";
   const canAct = Boolean(privateGame && canUseConnection && !paused && !commandPending);
+  const displayedHand = useMemo(
+    () =>
+      privateGame
+        ? [...privateGame.hand].sort((first, second) =>
+            compareUnoHandCards(first, second, handSortMode),
+          )
+        : [],
+    [handSortMode, privateGame],
+  );
   const playableCardIds = useMemo(
     () => new Set(legalActions?.playableCardIds ?? []),
     [legalActions?.playableCardIds],
@@ -217,7 +257,7 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
   const { session, announcement, bindDragSource, isDragging, activeTargetId } =
     useCardDrag<UnoDragPayload>({
       disabled: !canAct,
-      resetKey: snapshot.revision,
+      resetKey: `${snapshot.revision}:${handSortMode}`,
       canDrop: (_payload, targetId) => targetId === "uno-discard",
       onDrop: ({ card }) => playCard(card),
     });
@@ -237,7 +277,6 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
       .filter((player): player is UnoPlayerPublicState => player !== undefined),
     ...game.players.filter((player) => !game.activeOrder.includes(player.seatId)),
   ];
-  const currentActor = game.currentActorSeatId ? playersById.get(game.currentActorSeatId) : null;
   const pendingWildDrawFour = game.pendingWildDrawFour;
   const unoSubject = game.unoWindow ? playersById.get(game.unoWindow.subjectSeatId) : null;
   const recoverySeats: RecoverySeat[] = snapshot.seats
@@ -288,16 +327,6 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
     const card = privateGame?.hand.find((candidate) => candidate.id === colorChoice.cardId);
     if (card) sendPlay(card, color);
   };
-
-  const statusDescription = paused
-    ? "Партия приостановлена"
-    : pendingWildDrawFour
-      ? `${playersById.get(pendingWildDrawFour.targetSeatId)?.name ?? "Игрок"} решает, принять +4 или оспорить ход.`
-      : game.turnKind === "initial-color"
-        ? "Нужно выбрать стартовый цвет."
-        : currentActor
-          ? `Ходит ${currentActor.name}`
-          : "Сервер завершает переход";
 
   return (
     <main className="screen command-game-screen uno-screen has-uno-command-dock">
@@ -453,12 +482,12 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
             className="uno-hand"
             role="group"
             aria-label="Карты в вашей руке"
-            style={{ "--hand-count": privateGame.hand.length } as CSSProperties}
+            style={{ "--hand-count": displayedHand.length } as CSSProperties}
           >
             <p id="uno-card-drag-instructions" className="uno-drag-instruction">
               Карту можно разыграть двойным нажатием или перетащить в отбой.
             </p>
-            {privateGame.hand.map((card, index) => {
+            {displayedHand.map((card, index) => {
               const playable = playableCardIds.has(card.id);
               const bluffable = bluffableWildDrawFourIds.has(card.id);
               const isDrawnCard = legalActions?.drawnCardId === card.id;
@@ -473,8 +502,8 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
                   style={
                     {
                       "--card-index": Math.min(index, 5),
-                      "--fan-angle": `${(index - (privateGame.hand.length - 1) / 2) * 1.35}deg`,
-                      "--fan-rise": `${Math.abs(index - (privateGame.hand.length - 1) / 2)}px`,
+                      "--fan-angle": `${(index - (displayedHand.length - 1) / 2) * 1.35}deg`,
+                      "--fan-rise": `${Math.abs(index - (displayedHand.length - 1) / 2)}px`,
                     } as CSSProperties
                   }
                   {...dragBindings}
@@ -508,17 +537,13 @@ export function UnoGameScreen({ snapshot }: UnoGameScreenProps) {
       )}
 
       <aside className="uno-command-dock" aria-label="Игровые действия">
-        <div className="uno-command-status" role="status" aria-live="polite">
-          <small>{snapshot.viewer.role === "spectator" ? "Наблюдение" : "UNO"}</small>
-          <strong>
-            {commandPending
-              ? "Сервер принимает действие…"
-              : paused
-                ? "Действия приостановлены"
-                : statusDescription}
-          </strong>
-        </div>
         <div className="uno-command-actions">
+          {privateGame && (
+            <HandSortButton
+              mode={handSortMode}
+              onToggle={() => setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit"))}
+            />
+          )}
           <GameDockTools gameId="uno" gameTitle="UNO" />
           {ownWdfResponse && (
             <>

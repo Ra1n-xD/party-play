@@ -3,6 +3,8 @@ import type {
   DurakCard as DurakCardData,
   DurakLegalAction,
   DurakPlayerPublicState,
+  DurakRank,
+  DurakSuit,
   DurakVisualAction,
 } from "../../../../shared/games/durak/types";
 import type { RoomSnapshot } from "../../../../shared/platform/room";
@@ -16,6 +18,7 @@ import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
 import { GameDockTools } from "../../screens/game/GameDockTools";
 import { CardDragLayer } from "../shared/CardDragLayer";
+import { HandSortButton, type HandSortMode } from "../shared/HandSortButton";
 import { useCardDrag } from "../shared/useCardDrag";
 import { useCardTransferMotion } from "../shared/useCardTransferMotion";
 import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
@@ -37,14 +40,11 @@ type DurakDragPayload =
       kind: "defend";
       card: DurakCardData;
       attackCardIds: string[];
+    }
+  | {
+      kind: "return-only";
+      card: DurakCardData;
     };
-
-const FIGHT_STAGE_LABELS = {
-  attack: "Атака",
-  defense: "Защита",
-  "throw-in": "Подкидывание",
-  "take-throw-in": "Последнее подкидывание",
-} as const;
 
 const TRUMP_LOCATION_LABELS = {
   deck: "под колодой",
@@ -61,6 +61,41 @@ const DURAK_ACTION_LABELS: Record<DurakVisualAction, string> = {
   take: "Берёт карты",
   pass: "Бито",
 };
+
+const DURAK_SUIT_ORDER: Record<DurakSuit, number> = {
+  clubs: 0,
+  diamonds: 1,
+  hearts: 2,
+  spades: 3,
+};
+
+const DURAK_RANK_ORDER: Record<DurakRank, number> = {
+  "6": 0,
+  "7": 1,
+  "8": 2,
+  "9": 3,
+  "10": 4,
+  jack: 5,
+  queen: 6,
+  king: 7,
+  ace: 8,
+};
+
+function compareDurakHandCards(
+  first: DurakCardData,
+  second: DurakCardData,
+  mode: HandSortMode,
+  trumpSuit?: DurakSuit | null,
+): number {
+  const firstSuit = DURAK_SUIT_ORDER[first.suit] + (first.suit === trumpSuit ? 10 : 0);
+  const secondSuit = DURAK_SUIT_ORDER[second.suit] + (second.suit === trumpSuit ? 10 : 0);
+  const suitDifference = firstSuit - secondSuit;
+  const rankDifference = DURAK_RANK_ORDER[first.rank] - DURAK_RANK_ORDER[second.rank];
+
+  return mode === "suit"
+    ? suitDifference || rankDifference || first.id.localeCompare(second.id)
+    : rankDifference || suitDifference || first.id.localeCompare(second.id);
+}
 
 function formatCardCount(count: number): string {
   const mod100 = count % 100;
@@ -107,6 +142,7 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
   } = usePlatform();
   const game = snapshot.game;
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
+  const [handSortMode, setHandSortMode] = useState<HandSortMode>("suit");
   const [managementOpen, setManagementOpen] = useState(false);
   const adminPauseActiveRef = useRef(false);
 
@@ -120,9 +156,19 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
   const paused = snapshot.pause.active || game?.paused === true;
   const canUseConnection =
     connected && reconnectState === "connected" && viewerSeat?.controllerKind === "human";
+  const canDrag = Boolean(privateGame && canUseConnection);
   const canAct = Boolean(privateGame && canUseConnection && !paused && !commandPending);
   const playableCardIds = getLegalPlayableIds(legalAction);
-  const selectedCards = privateGame?.hand.filter((card) => selectedCardIds.includes(card.id)) ?? [];
+  const displayedHand = useMemo(
+    () =>
+      privateGame
+        ? [...privateGame.hand].sort((first, second) =>
+            compareDurakHandCards(first, second, handSortMode, game?.trumpSuit),
+          )
+        : [],
+    [game?.trumpSuit, handSortMode, privateGame],
+  );
+  const selectedCards = displayedHand.filter((card) => selectedCardIds.includes(card.id));
 
   const isCardSelectable = (card: DurakCardData): boolean => {
     if (!canAct || !playableCardIds.has(card.id)) return false;
@@ -134,10 +180,8 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
     return selectedCards[0]?.rank === card.rank;
   };
 
-  const isCardDraggable = (card: DurakCardData): boolean => canAct && playableCardIds.has(card.id);
-
-  const createDragPayload = (card: DurakCardData): DurakDragPayload | null => {
-    if (!privateGame || !isCardDraggable(card)) return null;
+  const createDragPayload = (card: DurakCardData): DurakDragPayload => {
+    if (!canAct || !playableCardIds.has(card.id)) return { kind: "return-only", card };
 
     if (legalAction?.type === "defend") {
       return {
@@ -149,11 +193,13 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
       };
     }
 
-    if (legalAction?.type !== "attack" && legalAction?.type !== "throw-in") return null;
+    if (legalAction?.type !== "attack" && legalAction?.type !== "throw-in") {
+      return { kind: "return-only", card };
+    }
 
     const cards = selectedCardIds.includes(card.id) ? selectedCards : [card];
     const firstCard = cards[0];
-    if (!firstCard) return null;
+    if (!firstCard) return { kind: "return-only", card };
 
     return {
       kind: "attack",
@@ -220,9 +266,10 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
 
   const { session, announcement, bindDragSource, isDragging, activeTargetId } =
     useCardDrag<DurakDragPayload>({
-      disabled: !canAct,
-      resetKey: snapshot.revision,
+      disabled: !canDrag,
+      resetKey: `${snapshot.revision}:${handSortMode}`,
       canDrop: (payload, targetId) => {
+        if (!canAct || payload.kind === "return-only") return false;
         if (payload.kind === "attack") return targetId === "durak-table";
         const attackCardId = targetId.startsWith("durak-attack:")
           ? targetId.slice("durak-attack:".length)
@@ -230,7 +277,7 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
         return attackCardId.length > 0 && payload.attackCardIds.includes(attackCardId);
       },
       onDrop: (payload, targetId) => {
-        if (!canAct) return;
+        if (!canAct || payload.kind === "return-only") return;
         if (payload.kind === "attack") {
           sendGameCommand("durak", {
             type: payload.action,
@@ -264,7 +311,6 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
       .filter((player): player is DurakPlayerPublicState => player !== undefined),
     ...game.players.filter((player) => !game.activeOrder.includes(player.seatId)),
   ];
-  const currentActor = game.currentActorSeatId ? playersById.get(game.currentActorSeatId) : null;
   const attackDragPayload =
     isDragging && session?.payload.kind === "attack" ? session.payload : null;
   const defenseDragPayload =
@@ -334,16 +380,6 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
       legalAction.type === "attack" ? { type: "attack", cardIds } : { type: "throw-in", cardIds },
     );
   };
-
-  const statusDescription = paused
-    ? "Партия приостановлена"
-    : game.takeDeclared
-      ? "Защищающийся берёт — атакующие могут подкидывать без очереди"
-      : game.fightStage === "defense"
-        ? "Защитник отбивается, остальные могут подкидывать одновременно"
-        : currentActor
-          ? `Первую атаку начинает ${currentActor.name}`
-          : "Сервер завершает бой";
 
   return (
     <main className="screen command-game-screen durak-screen has-durak-command-dock">
@@ -435,9 +471,6 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                   {game.trumpCardLocation
                     ? TRUMP_LOCATION_LABELS[game.trumpCardLocation]
                     : "местоположение неизвестно"}
-                  {game.trumpCardHolderSeatId
-                    ? ` · ${playersById.get(game.trumpCardHolderSeatId)?.name ?? "игрок"}`
-                    : ""}
                 </small>
               </span>
             )}
@@ -559,17 +592,17 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
             className="durak-hand"
             role="group"
             aria-label="Карты в вашей руке"
-            style={{ "--hand-count": privateGame.hand.length } as CSSProperties}
+            style={{ "--hand-count": displayedHand.length } as CSSProperties}
           >
             <p id="durak-card-drag-instructions" className="durak-drag-instruction">
               Карту можно разыграть двойным нажатием или перетащить на доступную цель.
             </p>
-            {privateGame.hand.map((card, index) => {
+            {displayedHand.map((card, index) => {
               const selectable = isCardSelectable(card);
-              const draggable = isCardDraggable(card);
+              const playable = playableCardIds.has(card.id) && canAct;
               const selected = selectedCardIds.includes(card.id);
-              const dragPayload = draggable ? createDragPayload(card) : null;
-              const dragSource = dragPayload
+              const dragPayload = createDragPayload(card);
+              const dragSource = canDrag
                 ? bindDragSource(
                     dragPayload,
                     dragPayload.kind === "attack" && dragPayload.cards.length > 1
@@ -585,8 +618,8 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                   style={
                     {
                       "--card-index": Math.min(index, 5),
-                      "--fan-angle": `${(index - (privateGame.hand.length - 1) / 2) * 1.5}deg`,
-                      "--fan-rise": `${Math.abs(index - (privateGame.hand.length - 1) / 2) * 1.2}px`,
+                      "--fan-angle": `${(index - (displayedHand.length - 1) / 2) * 1.5}deg`,
+                      "--fan-rise": `${Math.abs(index - (displayedHand.length - 1) / 2) * 1.2}px`,
                     } as CSSProperties
                   }
                   {...dragBindings}
@@ -595,11 +628,10 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
                     card={card}
                     size="hand"
                     selected={selected}
-                    playable={playableCardIds.has(card.id) && canAct}
-                    disabled={!draggable}
+                    playable={playable}
                     onClick={selectable ? () => selectHandCard(card) : undefined}
-                    onDoubleClick={draggable ? () => activateHandCard(card) : undefined}
-                    onKeyboardActivate={draggable ? () => activateHandCard(card) : undefined}
+                    onDoubleClick={playable ? () => activateHandCard(card) : undefined}
+                    onKeyboardActivate={playable ? () => activateHandCard(card) : undefined}
                     ariaDescribedBy={dragSource ? "durak-card-drag-instructions" : undefined}
                   />
                 </div>
@@ -620,23 +652,13 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
       )}
 
       <aside className="durak-command-dock" aria-label="Игровые действия">
-        <div className="durak-command-status" role="status" aria-live="polite">
-          <small>
-            {snapshot.viewer.role === "spectator"
-              ? "Наблюдение"
-              : game.fightStage
-                ? FIGHT_STAGE_LABELS[game.fightStage]
-                : "Партия"}
-          </small>
-          <strong>
-            {commandPending
-              ? "Сервер принимает действие…"
-              : paused
-                ? "Действия приостановлены"
-                : statusDescription}
-          </strong>
-        </div>
         <div className="durak-command-actions">
+          {privateGame && (
+            <HandSortButton
+              mode={handSortMode}
+              onToggle={() => setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit"))}
+            />
+          )}
           <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
           {legalAction?.type === "defend" && (
             <button
@@ -713,7 +735,7 @@ export function DurakGameScreen({ snapshot }: DurakGameScreenProps) {
         session={session}
         announcement={announcement}
         renderPreview={(payload) => {
-          const cards = payload.kind === "defend" ? [payload.card] : payload.cards;
+          const cards = payload.kind === "attack" ? payload.cards : [payload.card];
           if (cards.length === 1) return <DurakCard card={cards[0]} size="hand" />;
 
           return (

@@ -40,7 +40,7 @@ export function usePlayerActionIndicators<Action extends string>(
           return next;
         });
         timersRef.current = timersRef.current.filter((candidate) => candidate !== timer);
-      }, 2_200);
+      }, 4_400);
       timersRef.current.push(timer);
     }
   }, [events, labels]);

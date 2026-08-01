@@ -54,7 +54,7 @@ interface DragCandidate<TPayload> {
 
 const MOUSE_OR_PEN_DRAG_THRESHOLD = 6;
 const TOUCH_VERTICAL_DRAG_THRESHOLD = 10;
-const SETTLE_DURATION_MS = 160;
+const SETTLE_DURATION_MS = 260;
 export const CARD_DRAG_SOURCE_CLASS_NAME = "card-motion-shell is-draggable" as const;
 
 function rectToSession<TPayload>(
