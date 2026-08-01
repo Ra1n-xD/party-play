@@ -114,6 +114,7 @@ type QueuedRoomCommand = {
     gameId: G;
     command: PlatformCommand<G>;
     staleRetries: number;
+    transportRetries: number;
   };
 }[GameId];
 
@@ -206,6 +207,9 @@ function createCommandId(): string {
   return `cmd_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
 }
 
+const COMMAND_RESULT_TIMEOUT_MS = 8_000;
+const MAX_COMMAND_TRANSPORT_RETRIES = 1;
+
 export function PlatformProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [sessionPending, setSessionPending] = useState(false);
@@ -238,6 +242,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   const [publicRoomError, setPublicRoomError] = useState<PublicRoomErrorPayload | null>(null);
 
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const commandTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const acceptedSessionRef = useRef<ReconnectSession | null>(null);
   const reconnectSessionTombstonedRef = useRef(false);
   const sessionAcceptanceExpectationRef = useRef<SessionAcceptanceExpectation | null>(null);
@@ -260,12 +265,25 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   const latestServerRevisionRef = useRef<number | null>(null);
   const selectedPublicDirectoryGameRef = useRef<GameId | null>(null);
 
+  const clearCommandTimeout = useCallback(() => {
+    if (!commandTimeoutRef.current) return;
+    clearTimeout(commandTimeoutRef.current);
+    commandTimeoutRef.current = undefined;
+  }, []);
+
+  const setTimedError = useCallback((message: string) => {
+    setError(message);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setError(null), 4000);
+  }, []);
+
   const resetCommandQueue = useCallback(() => {
+    clearCommandTimeout();
     queuedCommandsRef.current = [];
     inFlightCommandRef.current = null;
     latestServerRevisionRef.current = null;
     setCommandPending(false);
-  }, []);
+  }, [clearCommandTimeout]);
 
   const clearRoomReactions = useCallback(() => {
     for (const timer of reactionTimersRef.current.values()) {
@@ -288,20 +306,48 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       queuedCommandsRef.current.shift();
     }
     const next = queuedCommandsRef.current[0];
-    if (!next) return;
+    if (!next) {
+      setCommandPending(false);
+      return;
+    }
 
     const expectedRevision = Math.max(
       current.revision,
       latestServerRevisionRef.current ?? current.revision,
     );
     inFlightCommandRef.current = next;
-    socket.emit("room:command", {
-      commandId: next.commandId,
-      gameId: next.gameId,
-      expectedRevision,
-      command: next.command,
-    } as AnyRoomCommandEnvelope);
-  }, []);
+
+    const sendCommand = () => {
+      socket.emit("room:command", {
+        commandId: next.commandId,
+        gameId: next.gameId,
+        expectedRevision,
+        command: next.command,
+      } as AnyRoomCommandEnvelope);
+
+      clearCommandTimeout();
+      commandTimeoutRef.current = setTimeout(() => {
+        if (inFlightCommandRef.current?.commandId !== next.commandId) return;
+
+        if (
+          socket.connected &&
+          membershipReadyRef.current &&
+          next.transportRetries < MAX_COMMAND_TRANSPORT_RETRIES
+        ) {
+          next.transportRetries += 1;
+          sendCommand();
+          return;
+        }
+
+        resetCommandQueue();
+        setTimedError("Ответ сервера задержался. Восстанавливаем состояние комнаты…");
+        socket.disconnect();
+        socket.connect();
+      }, COMMAND_RESULT_TIMEOUT_MS);
+    };
+
+    sendCommand();
+  }, [clearCommandTimeout, resetCommandQueue, setTimedError]);
 
   const enqueueRoomCommand = useCallback(
     <G extends GameId>(gameId: G, command: PlatformCommand<G>): boolean => {
@@ -320,6 +366,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         gameId,
         command,
         staleRetries: 0,
+        transportRetries: 0,
       } as QueuedRoomCommand);
       setCommandPending(true);
       flushCommandQueue();
@@ -333,12 +380,6 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   }, [snapshot]);
 
   useEffect(() => {
-    const setTimedError = (message: string) => {
-      setError(message);
-      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-      errorTimerRef.current = setTimeout(() => setError(null), 4000);
-    };
-
     const resetRoomUi = () => {
       ignoreRoomEventsRef.current = true;
       ignoreRecoveryEventsRef.current = true;
@@ -665,6 +706,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       if (ignoreRoomEventsRef.current) return;
       const inFlight = inFlightCommandRef.current;
       if (!inFlight || inFlight.commandId !== result.commandId) return;
+      clearCommandTimeout();
 
       latestServerRevisionRef.current = Math.max(
         latestServerRevisionRef.current ?? result.revision,
@@ -676,6 +718,8 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         inFlight.staleRetries < 1
       ) {
         inFlight.staleRetries += 1;
+        inFlight.transportRetries = 0;
+        inFlight.commandId = createCommandId();
         inFlightCommandRef.current = null;
         flushCommandQueue();
         return;
@@ -870,7 +914,13 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       clearRoomReactions();
       resetCommandQueue();
     };
-  }, [clearRoomReactions, flushCommandQueue, resetCommandQueue]);
+  }, [
+    clearCommandTimeout,
+    clearRoomReactions,
+    flushCommandQueue,
+    resetCommandQueue,
+    setTimedError,
+  ]);
 
   const createRoom = useCallback(
     (gameId: GameId, name: string, visibility: RoomVisibility = "private") => {

@@ -1314,6 +1314,36 @@ textarea {
   background: var(--bg-card);
 }
 
+.app-error-boundary-card {
+  justify-items: center;
+  text-align: center;
+}
+
+.app-error-boundary-card p {
+  color: var(--text-secondary);
+}
+
+.app-error-boundary-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.app-error-boundary-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+@media (max-width: 480px) {
+  .app-error-boundary-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .platform-lobby-game-name {
   display: block;
   margin-bottom: 6px;

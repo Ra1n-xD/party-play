@@ -67,6 +67,16 @@ app.get("/", (_req, res) => {
   res.json({ status: "ok", message: "PartyPlay Server" });
 });
 
+app.get("/healthz", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ status: "ok" });
+});
+
+app.get("/readyz", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ status: "ready" });
+});
+
 // Per-IP connection limiting
 const ipConnectionCounts = new Map<string, number>();
 const connectionLimiter = createNamespaceConnectionLimiter(

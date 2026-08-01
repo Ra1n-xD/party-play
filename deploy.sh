@@ -27,5 +27,16 @@ echo "Build successful! Restarting service..."
 sudo systemctl restart partyplay
 systemctl is-active --quiet partyplay
 
+health_url="${PARTYPLAY_HEALTH_URL:-http://127.0.0.1:3001/readyz}"
+health_attempt=1
+until curl --fail --silent "$health_url" >/dev/null; do
+  if [ "$health_attempt" -ge 15 ]; then
+    echo "ERROR: PartyPlay readiness check failed: $health_url" >&2
+    exit 1
+  fi
+  sleep 1
+  health_attempt=$((health_attempt + 1))
+done
+
 echo "Deploy complete."
 systemctl status partyplay --no-pager
