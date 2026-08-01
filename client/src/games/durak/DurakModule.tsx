@@ -1,4 +1,5 @@
-import type { RoomSnapshot } from "../../../../shared/platform/room";
+import { useEffect, useRef } from "react";
+import type { RoomLifecycle, RoomSnapshot } from "../../../../shared/platform/room";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { LobbyScreen } from "../../platform/screens/LobbyScreen";
 import "../../styles/game-screen.css";
@@ -6,9 +7,18 @@ import { DurakGameScreen } from "./DurakGameScreen";
 import { DurakLobbySettings, getTurnTimeoutLabel } from "./DurakLobbySettings";
 import { DurakResultsScreen } from "./DurakResultsScreen";
 import "./durak.css";
+import "../shared/card-game-arena.css";
 
 export default function DurakModule() {
   const { snapshot } = usePlatform();
+  const previousLifecycleRef = useRef<RoomLifecycle | null>(null);
+  const currentLifecycle = snapshot?.gameId === "durak" ? snapshot.lifecycle : null;
+  const animateInitialDeal =
+    previousLifecycleRef.current === "lobby" && currentLifecycle === "playing";
+
+  useEffect(() => {
+    previousLifecycleRef.current = currentLifecycle;
+  }, [currentLifecycle]);
 
   if (!snapshot || snapshot.gameId !== "durak") {
     return (
@@ -35,5 +45,5 @@ export default function DurakModule() {
     return <DurakResultsScreen snapshot={durakSnapshot} />;
   }
 
-  return <DurakGameScreen snapshot={durakSnapshot} />;
+  return <DurakGameScreen snapshot={durakSnapshot} animateInitialDeal={animateInitialDeal} />;
 }

@@ -5,6 +5,7 @@ interface UseCardTransferMotionOptions {
   gameId: "durak" | "uno";
   revision: string | number;
   events: readonly CardTransferVisualEvent[];
+  animateInitial?: boolean;
 }
 
 function findByDataAttribute(attribute: string, value: string): HTMLElement | null {
@@ -26,6 +27,7 @@ export function useCardTransferMotion({
   gameId,
   revision,
   events,
+  animateInitial = false,
 }: UseCardTransferMotionOptions): void {
   const previousIdsRef = useRef<Set<number> | null>(null);
   const cleanupTimersRef = useRef<number[]>([]);
@@ -34,10 +36,10 @@ export function useCardTransferMotion({
     const currentIds = new Set(events.map((event) => event.id));
     const previousIds = previousIdsRef.current;
     previousIdsRef.current = currentIds;
-    if (!previousIds) return;
+    if (!previousIds && !animateInitial) return;
 
     events
-      .filter((event) => !previousIds.has(event.id))
+      .filter((event) => !previousIds?.has(event.id))
       .filter(
         (event) =>
           !(
@@ -89,10 +91,11 @@ export function useCardTransferMotion({
           cleanupTimersRef.current.push(cleanupTimer);
         }
       });
-  }, [events, gameId, revision]);
+  }, [animateInitial, events, gameId, revision]);
 
   useEffect(
     () => () => {
+      previousIdsRef.current = null;
       cleanupTimersRef.current.forEach((timer) => window.clearTimeout(timer));
       cleanupTimersRef.current = [];
       document
