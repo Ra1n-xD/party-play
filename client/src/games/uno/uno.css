@@ -328,7 +328,7 @@
   --discard-tilt: 0deg;
   display: flex;
   flex: 0 0 auto;
-  animation: uno-discard-card-land 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: uno-discard-card-land 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   transform: rotate(var(--discard-tilt));
   transform-origin: center;
 }
@@ -598,8 +598,8 @@ button.uno-card:focus-visible {
 .uno-hand-card-shell {
   display: flex;
   flex: 0 0 auto;
-  animation: uno-hand-card-enter 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: calc(var(--card-index) * 24ms);
+  animation: uno-hand-card-enter 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--card-index) * 28ms);
 }
 .uno-hand-card-shell.is-draggable {
   cursor: grab;

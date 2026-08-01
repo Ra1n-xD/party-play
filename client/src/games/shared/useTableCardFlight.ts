@@ -11,6 +11,10 @@ interface UseTableCardFlightOptions {
   flights: readonly TableCardFlight[];
 }
 
+const TABLE_CARD_FLIGHT_DURATION_MS = 680;
+const TABLE_CARD_FLIGHT_STAGGER_MS = 55;
+const TABLE_CARD_FLIGHT_CLEANUP_BUFFER_MS = 220;
+
 function findByDataAttribute(attribute: string, value: string): HTMLElement | null {
   return (
     Array.from(document.querySelectorAll<HTMLElement>(`[${attribute}]`)).find(
@@ -45,20 +49,24 @@ export function useTableCardFlight({ revision, flights }: UseTableCardFlightOpti
 
         target.style.setProperty("--table-card-flight-x", `${sourceCenterX - targetCenterX}px`);
         target.style.setProperty("--table-card-flight-y", `${sourceCenterY - targetCenterY}px`);
-        target.style.setProperty("--table-card-flight-delay", `${Math.min(index, 4) * 45}ms`);
+        const flightDelay = Math.min(index, 4) * TABLE_CARD_FLIGHT_STAGGER_MS;
+        target.style.setProperty("--table-card-flight-delay", `${flightDelay}ms`);
         target.classList.remove("is-table-card-flying");
         void target.offsetWidth;
         target.classList.add("is-table-card-flying");
 
-        const cleanupTimer = window.setTimeout(() => {
-          target.classList.remove("is-table-card-flying");
-          target.style.removeProperty("--table-card-flight-x");
-          target.style.removeProperty("--table-card-flight-y");
-          target.style.removeProperty("--table-card-flight-delay");
-          cleanupTimersRef.current = cleanupTimersRef.current.filter(
-            (timer) => timer !== cleanupTimer,
-          );
-        }, 950);
+        const cleanupTimer = window.setTimeout(
+          () => {
+            target.classList.remove("is-table-card-flying");
+            target.style.removeProperty("--table-card-flight-x");
+            target.style.removeProperty("--table-card-flight-y");
+            target.style.removeProperty("--table-card-flight-delay");
+            cleanupTimersRef.current = cleanupTimersRef.current.filter(
+              (timer) => timer !== cleanupTimer,
+            );
+          },
+          flightDelay + TABLE_CARD_FLIGHT_DURATION_MS + TABLE_CARD_FLIGHT_CLEANUP_BUFFER_MS,
+        );
         cleanupTimersRef.current.push(cleanupTimer);
       });
   }, [flights, revision]);
