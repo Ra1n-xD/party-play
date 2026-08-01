@@ -290,8 +290,8 @@
   position: relative;
   isolation: isolate;
 }
-.uno-draw-pile::before,
-.uno-draw-pile::after {
+.uno-draw-pile.has-cards::before,
+.uno-draw-pile.has-cards::after {
   position: absolute;
   top: 2px;
   left: 50%;
@@ -304,10 +304,10 @@
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.22);
   content: "";
 }
-.uno-draw-pile::before {
+.uno-draw-pile.has-cards::before {
   transform: translateX(-50%) translate(6px, 4px) rotate(3deg);
 }
-.uno-draw-pile::after {
+.uno-draw-pile.has-cards::after {
   transform: translateX(-50%) translate(3px, 2px) rotate(1.5deg);
 }
 .uno-draw-pile > * {

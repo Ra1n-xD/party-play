@@ -7,6 +7,15 @@ interface UnoResultsScreenProps {
   snapshot: RoomSnapshot<"uno">;
 }
 
+function formatCardCount(count: number): string {
+  const mod100 = count % 100;
+  const mod10 = count % 10;
+  if (mod100 >= 11 && mod100 <= 14) return `${count} карт`;
+  if (mod10 === 1) return `${count} карта`;
+  if (mod10 >= 2 && mod10 <= 4) return `${count} карты`;
+  return `${count} карт`;
+}
+
 export function UnoResultsScreen({ snapshot }: UnoResultsScreenProps) {
   const { connected, commandPending, error, leaveRoom, playAgain } = usePlatform();
   const game = snapshot.game;
@@ -33,9 +42,14 @@ export function UnoResultsScreen({ snapshot }: UnoResultsScreenProps) {
       : winnerSeatId === viewerSeatId
         ? "Вы первым избавились от всех карт."
         : "Победитель первым избавился от всех карт.";
+  const isHost = viewerSeat?.isHost ?? false;
+  const waitingMessage =
+    snapshot.viewer.role === "spectator"
+      ? "Вы наблюдали за этой партией."
+      : "Новую партию сможет запустить хост.";
 
   return (
-    <main className="screen command-game-screen uno-screen uno-results-screen">
+    <main className="screen command-game-screen uno-screen uno-results-screen card-results-screen">
       <GameRoomHeader
         roomCode={snapshot.roomCode}
         connected={connected}
@@ -43,34 +57,55 @@ export function UnoResultsScreen({ snapshot }: UnoResultsScreenProps) {
         gameTitle="UNO"
         brandIcon="◆"
       />
-      <section className="uno-results-hero">
-        <span className="uno-eyebrow">Результат партии</span>
-        <h1>{title}</h1>
-        <p>{description}</p>
-      </section>
-      <section className="uno-results-list" aria-labelledby="uno-results-players-title">
-        <h2 id="uno-results-players-title">Участники</h2>
-        <div>
-          {game.players.map((player, index) => (
-            <article
-              className={`uno-result-player ${player.seatId === viewerSeatId ? "is-me" : ""} ${player.seatId === winnerSeatId ? "is-winner" : ""}`}
-              key={player.seatId}
-            >
-              <span>{index + 1}</span>
-              <strong>
-                {player.name}
-                {player.seatId === viewerSeatId ? " · вы" : ""}
-              </strong>
-              <small>
-                {player.status === "excluded" ? "Исключён" : `${player.cardCount} карт`}
-              </small>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="uno-results-actions">
+      <div className="card-results-content">
+        <section className="uno-results-hero card-results-hero">
+          <span className="uno-eyebrow card-results-eyebrow">Результат партии</span>
+          <h1>{title}</h1>
+          <p>{description}</p>
+        </section>
+        <section
+          className="uno-results-list card-results-list"
+          aria-labelledby="uno-results-players-title"
+        >
+          <div className="card-results-list-heading">
+            <h2 id="uno-results-players-title">Участники</h2>
+            <span>{game.players.length}</span>
+          </div>
+          <div className="card-results-players">
+            {game.players.map((player) => (
+              <article
+                className={`uno-result-player card-result-player ${player.seatId === viewerSeatId ? "is-me" : ""} ${player.seatId === winnerSeatId ? "is-winner" : ""}`}
+                key={player.seatId}
+              >
+                <div className="card-result-copy">
+                  <strong>
+                    {player.name}
+                    {player.seatId === viewerSeatId && <span className="card-result-you">вы</span>}
+                  </strong>
+                  <span>
+                    {player.seatId === winnerSeatId
+                      ? "Победитель"
+                      : player.status === "excluded"
+                        ? "Исключён"
+                        : "Участник"}
+                  </span>
+                </div>
+                <span className="card-result-count">{formatCardCount(player.cardCount)}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+      <section
+        className={`uno-results-actions card-results-actions ${isHost ? "has-primary-action" : ""}`}
+        aria-label="Действия после игры"
+      >
         <GameDockTools gameId="uno" gameTitle="UNO" />
-        {viewerSeat?.isHost ? (
+        <div className="card-results-action-copy">
+          <strong>{isHost ? "Ещё один раунд?" : "Партия завершена"}</strong>
+          <span>{isHost ? "Можно вернуться в лобби с тем же составом." : waitingMessage}</span>
+        </div>
+        {isHost ? (
           <button
             type="button"
             className="btn btn-primary"
@@ -79,13 +114,7 @@ export function UnoResultsScreen({ snapshot }: UnoResultsScreenProps) {
           >
             {commandPending ? "Возвращаем в лобби…" : "Сыграть ещё"}
           </button>
-        ) : (
-          <p>
-            {snapshot.viewer.role === "spectator"
-              ? "Вы наблюдали за партией."
-              : "Ждём решения хоста."}
-          </p>
-        )}
+        ) : null}
       </section>
       {error && (
         <div className="error-toast" role="alert">

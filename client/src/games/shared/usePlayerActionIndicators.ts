@@ -9,6 +9,7 @@ export interface PlayerActionIndicator {
 export function usePlayerActionIndicators<Action extends string>(
   events: readonly PlayerActionVisualEvent<Action>[],
   labels: Readonly<Record<Action, string>>,
+  showInitial = false,
 ): Readonly<Record<string, PlayerActionIndicator>> {
   const previousIdsRef = useRef<Set<number> | null>(null);
   const timersRef = useRef<number[]>([]);
@@ -18,9 +19,11 @@ export function usePlayerActionIndicators<Action extends string>(
     const currentIds = new Set(events.map((event) => event.id));
     const previousIds = previousIdsRef.current;
     previousIdsRef.current = currentIds;
-    if (!previousIds) return;
-
-    const freshEvents = events.filter((event) => !previousIds.has(event.id));
+    const freshEvents = previousIds
+      ? events.filter((event) => !previousIds.has(event.id))
+      : showInitial
+        ? [...events]
+        : [];
     if (freshEvents.length === 0) return;
 
     setIndicators((current) => {
@@ -43,12 +46,13 @@ export function usePlayerActionIndicators<Action extends string>(
       }, 4_400);
       timersRef.current.push(timer);
     }
-  }, [events, labels]);
+  }, [events, labels, showInitial]);
 
   useEffect(
     () => () => {
       timersRef.current.forEach((timer) => window.clearTimeout(timer));
       timersRef.current = [];
+      previousIdsRef.current = null;
     },
     [],
   );

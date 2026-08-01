@@ -9,6 +9,7 @@ import type {
   DurakVisualAction,
 } from "../../../../shared/games/durak/types";
 import type { CardTransferVisualEvent } from "../../../../shared/platform/cardVisualEvents";
+import type { PlayerActionVisualEvent } from "../../../../shared/types";
 import type { RoomSnapshot } from "../../../../shared/platform/room";
 import { AccessibleModal } from "../../platform/components/AccessibleModal";
 import {
@@ -49,11 +50,10 @@ type DurakDragPayload =
       card: DurakCardData;
     };
 
-const DURAK_ACTION_LABELS: Record<DurakVisualAction, string> = {
-  attack: "Атакует",
-  defend: "Отбивается",
-  "throw-in": "Подкидывает",
-  take: "Берёт карты",
+type DurakShownAction = Extract<DurakVisualAction, "take" | "pass">;
+
+const DURAK_ACTION_LABELS: Record<DurakShownAction, string> = {
+  take: "Беру",
   pass: "Бито",
 };
 
@@ -230,8 +230,14 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
     ],
     [animateInitialDeal, game],
   );
-  const actionEvents = useMemo(
-    () => game?.visualEvents.filter((event) => event.type === "action") ?? [],
+  const actionEvents = useMemo<PlayerActionVisualEvent<DurakShownAction>[]>(
+    () =>
+      game?.visualEvents.flatMap((event): PlayerActionVisualEvent<DurakShownAction>[] => {
+        if (event.type !== "action" || (event.action !== "take" && event.action !== "pass")) {
+          return [];
+        }
+        return [{ ...event, action: event.action }];
+      }) ?? [],
     [game?.visualEvents],
   );
 
@@ -432,7 +438,10 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
 
         <section className="card-arena-table-zone durak-arena-table-zone" aria-label="Игровой стол">
           <aside className="durak-deck-panel" aria-label="Колода и козырь">
-            <div className="durak-deck-visual" data-card-motion-anchor="durak:deck">
+            <div
+              className={`durak-deck-visual ${game.deckCount > 0 ? "has-cards" : ""}`}
+              data-card-motion-anchor="durak:deck"
+            >
               {game.deckCount > 0 ? (
                 <DurakCardBack label={`Колода, осталось ${formatCardCount(game.deckCount)}`} />
               ) : (
@@ -458,25 +467,24 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                 </span>
               )}
             </div>
-            <span className="durak-discard-count" data-card-motion-anchor="durak:discard">
-              <strong>{game.discardCount}</strong>
-              <small>отбой</small>
-            </span>
+            <span
+              className="durak-discard-motion-anchor"
+              data-card-motion-anchor="durak:discard"
+              aria-hidden="true"
+            />
           </aside>
 
           <section
             className={`durak-table ${isAttackDragging ? "is-drag-target" : ""} ${
               isAttackDragging && activeTargetId === "durak-table" ? "is-drag-over" : ""
             }`}
-            aria-label="Карты на столе"
+            aria-label={
+              game.table.length === 0 ? "Карты на столе, стол свободен" : "Карты на столе"
+            }
             data-card-drop-target="durak-table"
             data-card-motion-anchor="durak:table"
           >
-            {game.table.length === 0 ? (
-              <div className="durak-empty-table" role="status" aria-label="Стол свободен">
-                <span aria-hidden="true">◆</span>
-              </div>
-            ) : (
+            {game.table.length > 0 && (
               <div className="durak-table-grid">
                 {game.table.map((pair) => {
                   const canTarget =
