@@ -9,6 +9,7 @@ import type {
   ServerEvents,
 } from "../../../shared/types.js";
 import {
+  disposeRoomIfVacant,
   getAllRooms,
   getRoom,
   removePlayer,
@@ -64,6 +65,7 @@ export function bindPlayerSocket(
     player.controller.kind === "human" &&
     player.controller.socketId === socketId
   ) {
+    player.voluntarilyLeft = false;
     return { ok: true, previousSocketId: socketId };
   }
 
@@ -76,6 +78,7 @@ export function bindPlayerSocket(
   player.connected = true;
   player.isBot = false;
   player.temporaryBot = false;
+  player.voluntarilyLeft = false;
   player.controller = {
     kind: "human",
     participantId: player.owner.participantId,
@@ -528,7 +531,8 @@ export function kickPlayerPermanently(
   player.connected = false;
   player.alive = false;
   player.socketId = "";
-  if (needsFinalPublish && room.players.has(player.id)) {
+  const disposed = disposeRoomIfVacant(room);
+  if (!disposed && needsFinalPublish && room.players.has(player.id)) {
     module.publish(room, io);
   }
   return { success: true, releasedSocketId };
@@ -541,7 +545,7 @@ export function removePlayerWithHostFailover(room: Room, playerId: string, io: I
   const successor = wasHost ? findNextEligibleHost(room, playerId) : null;
 
   removePlayer(room, playerId);
-  if (room.players.size === 0) return;
+  if (getRoom(room.code) !== room) return;
 
   if (wasHost) {
     // removePlayer has a legacy fallback that may select a bot or disconnected seat.

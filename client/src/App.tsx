@@ -3,6 +3,7 @@ import { PlatformOverlays } from "./platform/components/PlatformOverlays";
 import { usePlatform } from "./platform/context/PlatformContext";
 import { getLazyGameComponent } from "./platform/gameRegistry";
 import { HomeScreen } from "./platform/screens/HomeScreen";
+import { StatsScreen } from "./platform/screens/StatsScreen";
 
 function RoomLoading({ message = "Загружаем комнату…" }: { message?: string }) {
   return (
@@ -15,7 +16,7 @@ function RoomLoading({ message = "Загружаем комнату…" }: { mes
   );
 }
 
-function AppContent() {
+function RoomAppContent() {
   const { roomCode, activeGameId, snapshot, sessionPending, leaveRoom } = usePlatform();
 
   if (!roomCode) return <HomeScreen />;
@@ -52,10 +53,19 @@ function AppContent() {
 }
 
 export default function App() {
+  const statsRoute =
+    window.location.pathname === "/stats" || window.location.pathname === "/stats/";
+
   return (
     <>
-      <AppContent />
-      <PlatformOverlays />
+      {statsRoute ? (
+        <StatsScreen />
+      ) : (
+        <>
+          <RoomAppContent />
+          <PlatformOverlays />
+        </>
+      )}
       <div className="app-version">v{__APP_VERSION__}</div>
     </>
   );

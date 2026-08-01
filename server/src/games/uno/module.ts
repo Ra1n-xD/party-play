@@ -373,6 +373,9 @@ export const unoModule: ServerGameModule<"uno"> = {
   minSeats: 2,
   maxSeats: 10,
   initialSettings: () => ({ turnTimeoutSeconds: null }),
+  publicRoomListingSettings: (room) => ({
+    turnTimeoutSeconds: room.settings.turnTimeoutSeconds,
+  }),
   validateSettings: validateUnoSettings,
   updateSettings: (room, settings, io) => {
     const unoRoom = requireUnoRoom(room);

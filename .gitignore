@@ -9,5 +9,6 @@ cards
 .env.local
 .env.*.local
 .DS_Store
+server/.data/
 *.pem
 *.key

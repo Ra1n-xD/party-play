@@ -18,6 +18,10 @@ export function generateSessionToken(): string {
   return randomBytes(32).toString("hex");
 }
 
+export function generatePublicRoomId(): string {
+  return "r_" + randomBytes(16).toString("hex");
+}
+
 export function randomPick<T>(arr: T[]): T {
   return arr[randomInt(arr.length)];
 }

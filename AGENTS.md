@@ -125,6 +125,14 @@ Avoid repository-wide formatting when only a small set of files changed.
 - Follow existing patterns before introducing new abstractions.
 - Keep multiplayer state and validation server-authoritative unless the task
   explicitly changes that architecture.
+- Keep `server/src/platform/roomManager.ts` as the only source for live room
+  counts and the public room directory. Never create a second room registry.
+- Public room directory payloads are strict allowlists: never publish room
+  codes, player or host names, seat/socket identifiers, session tokens, hidden
+  game state, or private projections. Private rooms never enter the directory.
+- Every newly registered active game inherits shared room counts and open-room
+  discovery through the platform registries and a narrow safe-settings hook.
+  Game modules must not implement their own matchmaking or public directory.
 - Every active game must publish complete, original rules through the client
   game registry and expose the shared accessible rules dialog both in the home
   catalog and in the active-game header. Rule text must match the implemented

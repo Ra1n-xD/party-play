@@ -293,6 +293,7 @@ export const bunkerModule: ServerGameModule<"bunker"> = {
   minSeats: CONFIG.MIN_PLAYERS,
   maxSeats: CONFIG.MAX_PLAYERS,
   initialSettings: () => null,
+  publicRoomListingSettings: () => null,
   validateSettings: (value): value is null => value === null,
   updateSettings: (room, settings, io) => {
     room.settings = settings;
