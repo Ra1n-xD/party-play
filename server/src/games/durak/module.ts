@@ -251,6 +251,7 @@ export function parseDurakCommand(value: unknown): DurakCommand | null {
         : null;
     case "take":
     case "pass":
+    case "beat":
       return { type: value.type };
     default:
       return null;

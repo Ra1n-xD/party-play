@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -30,6 +31,8 @@ export interface UseCardDragOptions<TPayload> {
 export interface CardDragSourceBindings {
   "data-card-drag-source": "";
   className: "card-motion-shell is-draggable";
+  draggable: false;
+  onDragStart: (event: ReactDragEvent<HTMLElement>) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   onClickCapture: (event: ReactMouseEvent<HTMLElement>) => void;
 }
@@ -288,6 +291,8 @@ export function useCardDrag<TPayload>(options: UseCardDragOptions<TPayload>) {
     (payload: TPayload, label: string): CardDragSourceBindings => ({
       "data-card-drag-source": "",
       className: CARD_DRAG_SOURCE_CLASS_NAME,
+      draggable: false,
+      onDragStart: (event) => event.preventDefault(),
       onPointerDown: (event) => {
         if (
           optionsRef.current.disabled ||

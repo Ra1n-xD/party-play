@@ -6,10 +6,8 @@ import type {
   DurakPlayerPublicState,
   DurakRank,
   DurakSuit,
-  DurakVisualAction,
 } from "../../../../shared/games/durak/types";
 import type { CardTransferVisualEvent } from "../../../../shared/platform/cardVisualEvents";
-import type { PlayerActionVisualEvent } from "../../../../shared/types";
 import type { RoomSnapshot } from "../../../../shared/platform/room";
 import { AccessibleModal } from "../../platform/components/AccessibleModal";
 import {
@@ -24,7 +22,6 @@ import { CardPlayerSeat } from "../shared/CardPlayerSeat";
 import { HandSortButton, type HandSortMode } from "../shared/HandSortButton";
 import { useCardDrag } from "../shared/useCardDrag";
 import { useCardTransferMotion } from "../shared/useCardTransferMotion";
-import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
 import { DurakCard, DurakCardBack, getCardName, getSuitSymbol } from "./components/DurakCard";
 
@@ -49,13 +46,6 @@ type DurakDragPayload =
       kind: "return-only";
       card: DurakCardData;
     };
-
-type DurakShownAction = Extract<DurakVisualAction, "take" | "pass">;
-
-const DURAK_ACTION_LABELS: Record<DurakShownAction, string> = {
-  take: "Беру",
-  pass: "Бито",
-};
 
 const DURAK_SUIT_ORDER: Record<DurakSuit, number> = {
   clubs: 0,
@@ -109,7 +99,12 @@ function formatCardCount(count: number): string {
 }
 
 function getLegalPlayableIds(legalAction: DurakLegalAction | null): Set<string> {
-  if (!legalAction || legalAction.type === "wait" || legalAction.type === "pass") {
+  if (
+    !legalAction ||
+    legalAction.type === "wait" ||
+    legalAction.type === "pass" ||
+    legalAction.type === "beat"
+  ) {
     return new Set();
   }
   if (legalAction.type === "defend") {
@@ -237,16 +232,19 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
     ],
     [animateInitialDeal, game],
   );
-  const actionEvents = useMemo<PlayerActionVisualEvent<DurakShownAction>[]>(
-    () =>
-      game?.visualEvents.flatMap((event): PlayerActionVisualEvent<DurakShownAction>[] => {
-        if (event.type !== "action" || (event.action !== "take" && event.action !== "pass")) {
-          return [];
-        }
-        return [{ ...event, action: event.action }];
-      }) ?? [],
-    [game?.visualEvents],
-  );
+  const actionIndicators = useMemo(() => {
+    const indicators: Record<string, { eventId: string; label: string }> = {};
+    for (const seatId of game?.passedSeatIds ?? []) {
+      indicators[seatId] = { eventId: `pass:${seatId}`, label: "Пас" };
+    }
+    if (game?.takeDeclared && game.defenderSeatId) {
+      indicators[game.defenderSeatId] = {
+        eventId: `take:${game.defenderSeatId}`,
+        label: "Беру",
+      };
+    }
+    return indicators;
+  }, [game?.defenderSeatId, game?.passedSeatIds, game?.takeDeclared]);
 
   useTableCardFlight({ revision: snapshot.revision, flights: tableFlights });
   useCardTransferMotion({
@@ -255,8 +253,6 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
     events: transferEvents,
     animateInitial: animateInitialDeal,
   });
-  const actionIndicators = usePlayerActionIndicators(actionEvents, DURAK_ACTION_LABELS);
-
   useEffect(() => {
     setSelectedCardIds([]);
   }, [snapshot.revision, legalAction?.type]);
@@ -664,12 +660,24 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
               Взять
             </button>
           )}
-          {(legalAction?.type === "throw-in" || legalAction?.type === "pass") && (
+          {(legalAction?.type === "pass" ||
+            (legalAction?.type === "throw-in" && legalAction.canPass)) && (
             <button
               type="button"
-              className="btn btn-secondary"
+              className="btn durak-finish-action"
               disabled={!canAct}
               onClick={() => sendGameCommand("durak", { type: "pass" })}
+            >
+              Пас
+            </button>
+          )}
+          {(legalAction?.type === "beat" ||
+            (legalAction?.type === "throw-in" && legalAction.canBeat)) && (
+            <button
+              type="button"
+              className="btn durak-finish-action"
+              disabled={!canAct}
+              onClick={() => sendGameCommand("durak", { type: "beat" })}
             >
               Бито
             </button>

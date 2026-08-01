@@ -105,9 +105,10 @@ function chooseDefense(
 function chooseThrowIn(
   publicState: DurakPublicState,
   privateState: DurakPrivateState,
-): DurakCommand {
+): DurakCommand | null {
   const legal = privateState.legalAction;
   if (legal.type === "pass") return { type: "pass" };
+  if (legal.type === "beat") return { type: "beat" };
   if (legal.type !== "throw-in" || !publicState.trumpSuit) return { type: "pass" };
 
   const allowedIds = new Set(legal.playableCardIds);
@@ -115,7 +116,10 @@ function chooseThrowIn(
     privateState.hand.filter((card) => allowedIds.has(card.id)),
     publicState,
   );
-  if (eligibleCards.length === 0) return { type: "pass" };
+  if (eligibleCards.length === 0) {
+    if (legal.canBeat) return { type: "beat" };
+    return legal.canPass ? { type: "pass" } : null;
+  }
 
   const canEmptyHand =
     privateState.hand.length <= legal.maxCards &&
@@ -130,7 +134,9 @@ function chooseThrowIn(
     canEmptyHand ? eligibleCards : conservativeCards.slice(0, Math.min(2, legal.maxCards))
   ).slice(0, legal.maxCards);
   const cardIds = nonEmptyCardIds(selected);
-  return cardIds ? { type: "throw-in", cardIds } : { type: "pass" };
+  if (cardIds) return { type: "throw-in", cardIds };
+  if (legal.canBeat) return { type: "beat" };
+  return legal.canPass ? { type: "pass" } : null;
 }
 
 export function chooseDurakBotCommand(
@@ -151,6 +157,7 @@ export function chooseDurakBotCommand(
       return chooseDefense(publicState as DurakPublicState, privateState as DurakPrivateState);
     case "throw-in":
     case "pass":
+    case "beat":
       return chooseThrowIn(publicState as DurakPublicState, privateState as DurakPrivateState);
   }
 }

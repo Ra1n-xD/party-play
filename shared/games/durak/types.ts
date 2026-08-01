@@ -87,8 +87,15 @@ export type DurakLegalAction =
       targets: { defenseCardId: string; attackCardIds: string[] }[];
       canTake: true;
     }
-  | { type: "throw-in"; playableCardIds: string[]; maxCards: number; canPass: true }
-  | { type: "pass"; canPass: true };
+  | {
+      type: "throw-in";
+      playableCardIds: string[];
+      maxCards: number;
+      canPass: boolean;
+      canBeat: boolean;
+    }
+  | { type: "pass"; canPass: true }
+  | { type: "beat"; canBeat: true };
 
 export interface DurakPrivateState {
   seatId: SeatId;
@@ -101,6 +108,7 @@ export type DurakCommand =
   | { type: "defend"; cardId: string; attackCardId: string }
   | { type: "throw-in"; cardIds: [string, ...string[]] }
   | { type: "take" }
-  | { type: "pass" };
+  | { type: "pass" }
+  | { type: "beat" };
 
 export type DurakEvent = never;
