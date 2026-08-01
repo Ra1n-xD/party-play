@@ -201,7 +201,7 @@ export function getDurakLegalAction(room: DurakRoom, seatId: SeatId): DurakLegal
   }
 
   if (
-    (fight.stage !== "defense" && fight.stage !== "take-throw-in") ||
+    (fight.stage !== "defense" && fight.stage !== "throw-in" && fight.stage !== "take-throw-in") ||
     fight.defenderSeatId === seatId ||
     !fight.throwInOrder.includes(seatId) ||
     fight.passedSeatIds.includes(seatId)
@@ -215,18 +215,30 @@ export function getDurakLegalAction(room: DurakRoom, seatId: SeatId): DurakLegal
     ),
   );
   const remainingCapacity = fight.maxAttackCards - fight.table.length;
+  const isPrimaryAttacker = seatId === fight.primaryAttackerSeatId;
+  const canPass = fight.takeDeclared || !isPrimaryAttacker;
+  const canBeat =
+    !fight.takeDeclared &&
+    isPrimaryAttacker &&
+    fight.stage === "throw-in" &&
+    fight.table.every((pair) => pair.defense !== null);
   if (remainingCapacity <= 0) {
+    if (canBeat) return { type: "beat", canBeat: true };
+    if (canPass) return { type: "pass", canPass: true };
     return waitAction();
   }
   const playableCardIds = hand.filter((card) => tableRanks.has(card.rank)).map((card) => card.id);
   if (playableCardIds.length === 0) {
-    return { type: "pass", canPass: true };
+    if (canBeat) return { type: "beat", canBeat: true };
+    if (canPass) return { type: "pass", canPass: true };
+    return waitAction();
   }
   return {
     type: "throw-in",
     playableCardIds,
     maxCards: remainingCapacity,
-    canPass: true,
+    canPass,
+    canBeat,
   };
 }
 

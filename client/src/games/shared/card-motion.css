@@ -8,6 +8,13 @@
   touch-action: pan-x;
 }
 
+.card-motion-shell.is-draggable,
+.card-motion-shell.is-draggable * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
 .card-drag-layer {
   position: fixed;
   top: 0;
