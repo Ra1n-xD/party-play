@@ -397,7 +397,7 @@
   min-height: 136px;
   align-items: center;
   justify-content: center;
-  animation: durak-table-pair-enter 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: durak-table-pair-enter 400ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .durak-pair-cards {
@@ -450,7 +450,7 @@
   z-index: 2;
   transform: translate(23px, -3px) rotate(7deg);
   filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.28));
-  animation: durak-defense-card-settle 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: durak-defense-card-settle 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @keyframes durak-table-pair-enter {
@@ -675,8 +675,8 @@ button.durak-card:focus-visible:not(.is-selected) {
 .durak-hand-card-shell {
   display: flex;
   flex: 0 0 auto;
-  animation: durak-hand-card-enter 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: calc(var(--card-index) * 24ms);
+  animation: durak-hand-card-enter 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--card-index) * 28ms);
 }
 
 .durak-hand-card-shell.is-draggable {

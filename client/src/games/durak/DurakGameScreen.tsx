@@ -64,6 +64,13 @@ const DURAK_SUIT_ORDER: Record<DurakSuit, number> = {
   spades: 3,
 };
 
+const DURAK_SUIT_LABELS: Record<DurakSuit, string> = {
+  clubs: "трефы",
+  diamonds: "бубны",
+  hearts: "червы",
+  spades: "пики",
+};
+
 const DURAK_RANK_ORDER: Record<DurakRank, number> = {
   "6": 0,
   "7": 1,
@@ -437,7 +444,10 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
         </section>
 
         <section className="card-arena-table-zone durak-arena-table-zone" aria-label="Игровой стол">
-          <aside className="durak-deck-panel" aria-label="Колода и козырь">
+          <aside
+            className={`durak-deck-panel ${game.deckCount === 0 ? "is-empty" : ""}`}
+            aria-label="Колода и козырь"
+          >
             <div
               className={`durak-deck-visual ${game.deckCount > 0 ? "has-cards" : ""}`}
               data-card-motion-anchor="durak:deck"
@@ -445,28 +455,42 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
               {game.deckCount > 0 ? (
                 <DurakCardBack label={`Колода, осталось ${formatCardCount(game.deckCount)}`} />
               ) : (
-                <div className="durak-empty-deck" aria-label="Колода пуста">
-                  ∅
+                <div
+                  className={`durak-empty-deck is-trump-marker ${
+                    game.trumpSuit === "diamonds" || game.trumpSuit === "hearts"
+                      ? "is-red"
+                      : "is-black"
+                  }`}
+                  role="status"
+                  aria-label={`Колода пуста. Козырь — ${
+                    game.trumpSuit ? DURAK_SUIT_LABELS[game.trumpSuit] : "не определён"
+                  }`}
+                >
+                  <span aria-hidden="true">
+                    {game.trumpSuit ? getSuitSymbol(game.trumpSuit) : "—"}
+                  </span>
                 </div>
               )}
               <strong aria-label={`В колоде ${formatCardCount(game.deckCount)}`}>
                 {game.deckCount}
               </strong>
             </div>
-            <div
-              className={`durak-trump ${
-                game.trumpCard && game.trumpCardLocation === "deck" ? "has-card" : "is-status"
-              }`}
-            >
-              {game.trumpCard && game.trumpCardLocation === "deck" ? (
-                <DurakCard card={game.trumpCard} size="table" />
-              ) : (
-                <span className="durak-trump-status" role="status">
-                  <strong>{game.trumpSuit ? getSuitSymbol(game.trumpSuit) : "—"}</strong>
-                  <small>Козырь вне колоды</small>
-                </span>
-              )}
-            </div>
+            {game.deckCount > 0 && (
+              <div
+                className={`durak-trump ${
+                  game.trumpCard && game.trumpCardLocation === "deck" ? "has-card" : "is-status"
+                }`}
+              >
+                {game.trumpCard && game.trumpCardLocation === "deck" ? (
+                  <DurakCard card={game.trumpCard} size="table" />
+                ) : (
+                  <span className="durak-trump-status" role="status">
+                    <strong>{game.trumpSuit ? getSuitSymbol(game.trumpSuit) : "—"}</strong>
+                    <small>Козырь вне колоды</small>
+                  </span>
+                )}
+              </div>
+            )}
             <span
               className="durak-discard-motion-anchor"
               data-card-motion-anchor="durak:discard"

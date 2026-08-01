@@ -142,6 +142,10 @@ export function CardPlayerSeat({
         </>
       )}
 
+      <span className="card-player-seat-initial" aria-hidden="true">
+        {name.trim().charAt(0).toLocaleUpperCase("ru-RU") || "?"}
+      </span>
+
       <span className="card-player-seat-count" aria-label={cardCountLabel}>
         {cardCount}
       </span>
