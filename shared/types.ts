@@ -4,6 +4,8 @@ export * from "./games/uno/types.js";
 export * from "./platform/gameContract.js";
 export * from "./platform/cardVisualEvents.js";
 export * from "./platform/protocol.js";
+export * from "./platform/publicRooms.js";
+export * from "./platform/projectStats.js";
 export * from "./platform/reactions.js";
 export * from "./platform/room.js";
 

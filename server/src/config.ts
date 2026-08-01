@@ -1,4 +1,5 @@
 import { ROOM_CODE_LENGTH } from "../../shared/roomCode.js";
+import { PUBLIC_ROOM_SPECTATOR_LIMIT } from "../../shared/platform/publicRooms.js";
 
 // ---- Тест (быстрые таймеры) ----
 const TEST_TIMERS = {
@@ -38,5 +39,5 @@ export const CONFIG = {
   MAX_ROOMS: 500, // Макс количество комнат
   ROOM_INACTIVE_TTL: 30 * 60 * 1000, // 30 минут TTL для неактивных комнат
   MAX_CONNECTIONS_PER_IP: 10, // Макс подключений с одного IP
-  MAX_SPECTATORS_PER_ROOM: 20, // Макс зрителей в одной комнате
+  MAX_SPECTATORS_PER_ROOM: PUBLIC_ROOM_SPECTATOR_LIMIT, // Макс зрителей в одной комнате
 };

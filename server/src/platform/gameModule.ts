@@ -6,6 +6,7 @@ import type {
   GamePrivateProjection,
   GamePublicProjection,
   GameSettings,
+  PublicRoomListingSettings,
   RoomLifecycle,
   ServerEvents,
 } from "../../../shared/types.js";
@@ -26,6 +27,7 @@ export interface ServerGameModule<G extends GameId> {
   readonly minSeats: number;
   readonly maxSeats: number;
   initialSettings(): GameSettings<G>;
+  publicRoomListingSettings(room: Room<G>): PublicRoomListingSettings<G>;
   validateSettings(value: unknown): value is GameSettings<G>;
   updateSettings(room: Room<G>, settings: GameSettings<G>, io: IOServer): GameCommandExecution;
   lifecycle(room: Room<G>): RoomLifecycle;

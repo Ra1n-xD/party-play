@@ -21,6 +21,12 @@ import type {
 } from "../../../../shared/platform/protocol";
 import type { RoomReactionEvent, RoomReactionId } from "../../../../shared/platform/reactions";
 import type {
+  AnyPublicRoomDirectorySnapshot,
+  PublicRoomCountsSnapshot,
+  PublicRoomErrorPayload,
+  RoomVisibility,
+} from "../../../../shared/platform/publicRooms";
+import type {
   AnyRoomCommandEnvelope,
   AnyRoomSnapshot,
   PlatformCommand,
@@ -83,7 +89,14 @@ type CommonPlatformCommand = Exclude<
 
 type SessionAcceptanceExpectation = {
   event: "room:created" | "room:joined" | "room:spectatorJoined";
-  source: "create" | "join" | "spectator" | "rejoin" | "claim";
+  source:
+    | "create"
+    | "join"
+    | "spectator"
+    | "rejoin"
+    | "claim"
+    | "public-player"
+    | "public-spectator";
   roomCode?: string;
   participantId?: string;
   gameId?: GameId;
@@ -124,9 +137,17 @@ interface PlatformContextValue {
   hostChangeNotice: HostChangeNotice | null;
   gameEvents: QueuedGameEvent[];
   roomReactions: RoomReactionEvent[];
-  createRoom: (gameId: GameId, name: string) => void;
+  publicRoomCounts: PublicRoomCountsSnapshot | null;
+  publicRoomDirectory: AnyPublicRoomDirectorySnapshot | null;
+  publicRoomError: PublicRoomErrorPayload | null;
+  createRoom: (gameId: GameId, name: string, visibility?: RoomVisibility) => void;
   joinRoom: (code: string, name: string) => void;
   joinAsSpectator: (code: string, name: string) => void;
+  subscribePublicRooms: (gameId: GameId) => void;
+  unsubscribePublicRooms: (gameId: GameId) => void;
+  joinPublicRoom: (gameId: GameId, publicRoomId: string, name: string) => void;
+  watchPublicRoom: (gameId: GameId, publicRoomId: string, name: string) => void;
+  clearPublicRoomError: () => void;
   rejoinRoom: (code: string, participantId: string) => boolean;
   resumeRetainedSession: () => boolean;
   leaveRoom: () => void;
@@ -211,6 +232,10 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   const [hostChangeNotice, setHostChangeNotice] = useState<HostChangeNotice | null>(null);
   const [gameEvents, setGameEvents] = useState<QueuedGameEvent[]>([]);
   const [roomReactions, setRoomReactions] = useState<RoomReactionEvent[]>([]);
+  const [publicRoomCounts, setPublicRoomCounts] = useState<PublicRoomCountsSnapshot | null>(null);
+  const [publicRoomDirectory, setPublicRoomDirectory] =
+    useState<AnyPublicRoomDirectorySnapshot | null>(null);
+  const [publicRoomError, setPublicRoomError] = useState<PublicRoomErrorPayload | null>(null);
 
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const acceptedSessionRef = useRef<ReconnectSession | null>(null);
@@ -233,6 +258,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   const queuedCommandsRef = useRef<QueuedRoomCommand[]>([]);
   const inFlightCommandRef = useRef<QueuedRoomCommand | null>(null);
   const latestServerRevisionRef = useRef<number | null>(null);
+  const selectedPublicDirectoryGameRef = useRef<GameId | null>(null);
 
   const resetCommandQueue = useCallback(() => {
     queuedCommandsRef.current = [];
@@ -341,6 +367,9 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       setHostChangeNotice(null);
       setGameEvents([]);
       clearRoomReactions();
+      selectedPublicDirectoryGameRef.current = null;
+      setPublicRoomDirectory(null);
+      setPublicRoomError(null);
     };
 
     const clearStoredSession = () => {
@@ -397,7 +426,13 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       if (explicitLeaveSuppressedRef.current) return;
       if (lastRejoinSocketIdRef.current === socket.id) return;
       lastRejoinSocketIdRef.current = socket.id ?? null;
-      setReconnectState(attemptStoredRejoin() ? "reconnecting" : "idle");
+      const rejoining = attemptStoredRejoin();
+      setReconnectState(rejoining ? "reconnecting" : "idle");
+      if (!rejoining && selectedPublicDirectoryGameRef.current) {
+        socket.emit("publicRooms:subscribe", {
+          gameId: selectedPublicDirectoryGameRef.current,
+        });
+      }
     };
 
     const handleDisconnect = () => {
@@ -475,6 +510,9 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       resetCommandQueue();
       setGameEvents([]);
       clearRoomReactions();
+      selectedPublicDirectoryGameRef.current = null;
+      setPublicRoomDirectory(null);
+      setPublicRoomError(null);
       saveReconnectSession(acceptedSession);
     };
 
@@ -675,6 +713,26 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       reactionTimersRef.current.set(reaction.eventId, timer);
     };
 
+    const handlePublicRoomCounts: ServerEvents["publicRooms:counts"] = (payload) => {
+      setPublicRoomCounts(payload);
+    };
+
+    const handlePublicRoomDirectory: ServerEvents["publicRooms:directory"] = (payload) => {
+      if (selectedPublicDirectoryGameRef.current !== payload.gameId) return;
+      setPublicRoomDirectory(payload);
+    };
+
+    const handlePublicRoomError: ServerEvents["publicRooms:error"] = (payload) => {
+      const expectation = sessionAcceptanceExpectationRef.current;
+      if (expectation?.source === "public-player" || expectation?.source === "public-spectator") {
+        membershipRequestPendingRef.current = false;
+        setSessionPending(false);
+        sessionAcceptanceExpectationRef.current = null;
+      }
+      if (payload.gameId) selectedPublicDirectoryGameRef.current = payload.gameId;
+      setPublicRoomError(payload);
+    };
+
     const handleReconnectableSeats: ServerEvents["room:reconnectableSeats"] = ({
       roomCode: recoveryRoomCode,
       seats,
@@ -772,6 +830,9 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     socket.on("room:commandResult", handleCommandResult);
     socket.on("game:event", handleGameEvent);
     socket.on("room:reaction", handleRoomReaction);
+    socket.on("publicRooms:counts", handlePublicRoomCounts);
+    socket.on("publicRooms:directory", handlePublicRoomDirectory);
+    socket.on("publicRooms:error", handlePublicRoomError);
     socket.on("room:reconnectableSeats", handleReconnectableSeats);
     socket.on("room:seatClaimSubmitted", handleSeatClaimSubmitted);
     socket.on("room:seatClaimResolved", handleSeatClaimResolved);
@@ -797,6 +858,9 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       socket.off("room:commandResult", handleCommandResult);
       socket.off("game:event", handleGameEvent);
       socket.off("room:reaction", handleRoomReaction);
+      socket.off("publicRooms:counts", handlePublicRoomCounts);
+      socket.off("publicRooms:directory", handlePublicRoomDirectory);
+      socket.off("publicRooms:error", handlePublicRoomError);
       socket.off("room:reconnectableSeats", handleReconnectableSeats);
       socket.off("room:seatClaimSubmitted", handleSeatClaimSubmitted);
       socket.off("room:seatClaimResolved", handleSeatClaimResolved);
@@ -808,7 +872,48 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     };
   }, [clearRoomReactions, flushCommandQueue, resetCommandQueue]);
 
-  const createRoom = useCallback((gameId: GameId, name: string) => {
+  const createRoom = useCallback(
+    (gameId: GameId, name: string, visibility: RoomVisibility = "private") => {
+      if (
+        membershipRequestPendingRef.current ||
+        seatLookupPendingRoomRef.current ||
+        pendingSeatClaimTargetRef.current
+      ) {
+        return;
+      }
+      membershipRequestPendingRef.current = true;
+      setSessionPending(true);
+      explicitLeaveSuppressedRef.current = false;
+      ignoreRecoveryEventsRef.current = true;
+      sessionAcceptanceExpectationRef.current = {
+        event: "room:created",
+        source: "create",
+        gameId,
+      };
+      socket.emit("room:create", { gameId, playerName: name, visibility });
+    },
+    [],
+  );
+
+  const subscribePublicRooms = useCallback((gameId: GameId) => {
+    if (selectedPublicDirectoryGameRef.current !== gameId) {
+      setPublicRoomDirectory(null);
+    }
+    selectedPublicDirectoryGameRef.current = gameId;
+    setPublicRoomError(null);
+    if (socket.connected) socket.emit("publicRooms:subscribe", { gameId });
+  }, []);
+
+  const unsubscribePublicRooms = useCallback((gameId: GameId) => {
+    if (socket.connected) socket.emit("publicRooms:unsubscribe", { gameId });
+    if (selectedPublicDirectoryGameRef.current === gameId) {
+      selectedPublicDirectoryGameRef.current = null;
+      setPublicRoomDirectory(null);
+      setPublicRoomError(null);
+    }
+  }, []);
+
+  const joinPublicRoom = useCallback((gameId: GameId, publicRoomId: string, name: string) => {
     if (
       membershipRequestPendingRef.current ||
       seatLookupPendingRoomRef.current ||
@@ -818,15 +923,43 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     }
     membershipRequestPendingRef.current = true;
     setSessionPending(true);
+    setPublicRoomError(null);
     explicitLeaveSuppressedRef.current = false;
     ignoreRecoveryEventsRef.current = true;
     sessionAcceptanceExpectationRef.current = {
-      event: "room:created",
-      source: "create",
+      event: "room:joined",
+      source: "public-player",
       gameId,
     };
-    socket.emit("room:create", { gameId, playerName: name });
+    socket.emit("publicRooms:join", { gameId, publicRoomId, playerName: name.trim() });
   }, []);
+
+  const watchPublicRoom = useCallback((gameId: GameId, publicRoomId: string, name: string) => {
+    if (
+      membershipRequestPendingRef.current ||
+      seatLookupPendingRoomRef.current ||
+      pendingSeatClaimTargetRef.current
+    ) {
+      return;
+    }
+    membershipRequestPendingRef.current = true;
+    setSessionPending(true);
+    setPublicRoomError(null);
+    explicitLeaveSuppressedRef.current = false;
+    ignoreRecoveryEventsRef.current = true;
+    sessionAcceptanceExpectationRef.current = {
+      event: "room:spectatorJoined",
+      source: "public-spectator",
+      gameId,
+    };
+    socket.emit("publicRooms:watch", {
+      gameId,
+      publicRoomId,
+      spectatorName: name.trim(),
+    });
+  }, []);
+
+  const clearPublicRoomError = useCallback(() => setPublicRoomError(null), []);
 
   const joinRoom = useCallback((code: string, name: string) => {
     if (
@@ -1168,9 +1301,17 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         hostChangeNotice,
         gameEvents,
         roomReactions,
+        publicRoomCounts,
+        publicRoomDirectory,
+        publicRoomError,
         createRoom,
         joinRoom,
         joinAsSpectator,
+        subscribePublicRooms,
+        unsubscribePublicRooms,
+        joinPublicRoom,
+        watchPublicRoom,
+        clearPublicRoomError,
         rejoinRoom,
         resumeRetainedSession,
         leaveRoom,

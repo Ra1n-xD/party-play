@@ -4,15 +4,20 @@ import { isRoomReactionId } from "../../../shared/platform/reactions.js";
 import { normalizeRoomCode } from "../../../shared/roomCode.js";
 import {
   ClientEvents,
+  GameId,
+  PublicRoomErrorCode,
   ReconnectErrorCode,
+  RoomVisibility,
   ServerEvents,
   type AttributeType,
 } from "../../../shared/types.js";
 import {
   createRoom,
+  disposeRoomIfVacant,
   joinRoom,
   joinRoomAsSpectator,
   getRoom,
+  getRoomByPublicId,
   removeSpectator,
   addBotToRoom,
   removeBotFromRoom,
@@ -21,6 +26,7 @@ import {
   setRoomDisposalHandler,
   touchRoom,
   Room,
+  Player,
   Spectator,
 } from "./roomManager.js";
 import { bunkerModule, executeBunkerCommand } from "../games/bunker/module.js";
@@ -56,6 +62,25 @@ import { getServerGameModule, isRegisteredGameId } from "./gameRegistry.js";
 import { executeInRoom, disposeRoomExecutor } from "./roomExecutor.js";
 import { dispatchRoomCommand } from "./roomCommandDispatcher.js";
 import type { GameCommandExecution } from "./gameModule.js";
+import {
+  emitPublicRoomCounts,
+  forgetDisposedRoomFromPublicDirectory,
+  isValidPublicRoomId,
+  subscribeToPublicRoomDirectory,
+  syncPublishedRoomWithPublicDirectory,
+  unsubscribeFromPublicRoomDirectory,
+} from "./publicRoomDirectory.js";
+import {
+  forgetDisposedRoomFromProjectStats,
+  getSocketAnalyticsId,
+  recordPlayerEntry,
+  recordRoomCreated,
+  recordSpectatorEntry,
+  subscribeToProjectStats,
+  syncPublishedRoomWithProjectStats,
+  unsubscribeFromProjectStats,
+} from "./projectStats.js";
+import { setRoomPublishedHook } from "./statePublisher.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 type IOSocket = Socket<ClientEvents, ServerEvents>;
@@ -79,6 +104,10 @@ const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
   "room:create": { max: 1, windowMs: 10000 },
   "room:join": { max: 3, windowMs: 10000 },
   "room:joinSpectator": { max: 3, windowMs: 10000 },
+  "publicRooms:subscribe": { max: 8, windowMs: 10000 },
+  "publicRooms:join": { max: 3, windowMs: 10000 },
+  "publicRooms:watch": { max: 3, windowMs: 10000 },
+  "stats:subscribe": { max: 8, windowMs: 10000 },
   "room:rejoin": { max: 3, windowMs: 10000 },
   "room:rejoinSpectator": { max: 3, windowMs: 10000 },
   "room:listReconnectableSeats": { max: 5, windowMs: 10000 },
@@ -92,10 +121,16 @@ const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
   default: { max: 20, windowMs: 10000 },
 };
 
-const CLAIM_IP_ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
+const IP_ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
+  "room:create": { max: 5, windowMs: 10 * 60 * 1000 },
+  "room:join": { max: 20, windowMs: 60 * 1000 },
+  "room:joinSpectator": { max: 20, windowMs: 60 * 1000 },
   "room:listReconnectableSeats": { max: 12, windowMs: 10000 },
   "room:requestSeatClaim": { max: 12, windowMs: 10000 },
   "admin:resolveSeatClaim": { max: 12, windowMs: 10000 },
+  "publicRooms:subscribe": { max: 24, windowMs: 10000 },
+  "publicRooms:join": { max: 12, windowMs: 10000 },
+  "publicRooms:watch": { max: 12, windowMs: 10000 },
 };
 
 // socketId -> (action -> { count, resetAt })
@@ -125,7 +160,7 @@ function isRateLimited(socketId: string, action: string = "default"): boolean {
 }
 
 function isIpRateLimited(socket: IOSocket, action: string): boolean {
-  const limit = CLAIM_IP_ACTION_LIMITS[action];
+  const limit = IP_ACTION_LIMITS[action];
   if (!limit) return false;
 
   const now = Date.now();
@@ -157,10 +192,14 @@ function isIpRateLimited(socket: IOSocket, action: string): boolean {
   return entry.count > limit.max;
 }
 
-function rejectRateLimitedClaimAction(socket: IOSocket, action: string): boolean {
+function isCombinedRateLimited(socket: IOSocket, action: string): boolean {
   const socketLimited = isRateLimited(socket.id, action);
   const ipLimited = isIpRateLimited(socket, action);
-  if (!socketLimited && !ipLimited) return false;
+  return socketLimited || ipLimited;
+}
+
+function rejectRateLimitedAction(socket: IOSocket, action: string): boolean {
+  if (!isCombinedRateLimited(socket, action)) return false;
   socket.emit("room:error", { message: "Слишком много запросов, подождите" });
   return true;
 }
@@ -209,6 +248,8 @@ function attachRoomDisposalHandler(room: Room, io: IOServer): void {
       cleanupRateLimitEntry(socketId);
       io.sockets.sockets.get(socketId)?.leave(disposedRoom.code);
     }
+    forgetDisposedRoomFromPublicDirectory(disposedRoom, io);
+    forgetDisposedRoomFromProjectStats(disposedRoom, io);
   });
 }
 
@@ -237,6 +278,24 @@ function isValidAttributeType(type: unknown): type is AttributeType | "action" {
 
 function isValidCardIndex(index: unknown): index is number {
   return typeof index === "number" && Number.isInteger(index) && index >= 0;
+}
+
+function isExactObject(
+  value: unknown,
+  requiredKeys: readonly string[],
+  optionalKeys: readonly string[] = [],
+): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const allowedKeys = new Set([...requiredKeys, ...optionalKeys]);
+  const keys = Object.keys(value);
+  return (
+    requiredKeys.every((key) => Object.prototype.hasOwnProperty.call(value, key)) &&
+    keys.every((key) => allowedKeys.has(key))
+  );
+}
+
+function isRoomVisibility(value: unknown): value is RoomVisibility {
+  return value === "private" || value === "public";
 }
 
 function sanitizePlayerName(name: string): string {
@@ -293,6 +352,63 @@ function emitPrivateVoterStatus(socket: IOSocket, room: Room, hasVoted: boolean)
 
 function publishRoom(room: Room, io: IOServer): void {
   getServerGameModule(room.gameId)?.publish(room, io);
+}
+
+function emitPublicRoomError(
+  socket: IOSocket,
+  gameId: GameId | undefined,
+  code: PublicRoomErrorCode,
+  message: string,
+  refreshDirectory = true,
+): void {
+  socket.emit("publicRooms:error", { code, message, ...(gameId ? { gameId } : {}) });
+  if (refreshDirectory && gameId && isRegisteredGameId(gameId)) {
+    subscribeToPublicRoomDirectory(socket, gameId);
+  }
+}
+
+function completePlayerJoin(socket: IOSocket, room: Room, player: Player, io: IOServer): void {
+  attachRoomDisposalHandler(room, io);
+  removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
+  unsubscribeFromPublicRoomDirectory(socket);
+  socket.join(room.code);
+  socketRoomMap.set(socket.id, {
+    roomCode: room.code,
+    playerId: player.id,
+    role: "player",
+  });
+  socket.emit("room:joined", {
+    roomCode: room.code,
+    gameId: room.gameId,
+    playerId: player.id,
+    sessionToken: player.sessionToken,
+  });
+  recordPlayerEntry(room.gameId, getSocketAnalyticsId(socket), io);
+  if (!ensureConnectedHost(room, io)) publishRoom(room, io);
+}
+
+function completeSpectatorJoin(
+  socket: IOSocket,
+  room: Room,
+  spectator: Spectator,
+  io: IOServer,
+): void {
+  removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
+  unsubscribeFromPublicRoomDirectory(socket);
+  socket.join(room.code);
+  socketRoomMap.set(socket.id, {
+    roomCode: room.code,
+    playerId: spectator.id,
+    role: "spectator",
+  });
+  socket.emit("room:spectatorJoined", {
+    roomCode: room.code,
+    gameId: room.gameId,
+    spectatorId: spectator.id,
+    sessionToken: spectator.sessionToken,
+  });
+  recordSpectatorEntry(room.gameId, io);
+  publishRoom(room, io);
 }
 
 function clearSpectatorGraceTimer(spectatorId: string): void {
@@ -391,7 +507,7 @@ function scheduleSpectatorGraceRemoval(
     if (spectator.connected || spectator.socketId !== disconnectedSocketId) return;
 
     removeSpectator(room, spectator.id);
-    if (room.players.size > 0) publishRoom(room, io);
+    if (getRoom(room.code) === room) publishRoom(room, io);
   }, CONFIG.RECONNECT_GRACE_PERIOD);
   spectatorGraceTimers.set(spectator.id, timer);
 }
@@ -417,7 +533,7 @@ function resolveSeatClaimCommand(
   if (!isValidSeatClaimId(requestId) || typeof approved !== "boolean") {
     return { success: false, code: "INVALID_COMMAND", error: "Некорректная заявка" };
   }
-  if (rejectRateLimitedClaimAction(socket, "admin:resolveSeatClaim")) {
+  if (rejectRateLimitedAction(socket, "admin:resolveSeatClaim")) {
     return { success: false, code: "CONFLICT", error: "Слишком много запросов, подождите" };
   }
 
@@ -471,6 +587,7 @@ function resolveSeatClaimCommand(
   };
   player.isBot = false;
   player.temporaryBot = false;
+  player.voluntarilyLeft = false;
   claimantSocket.join(room.code);
   socketRoomMap.set(claimantSocket.id, {
     roomCode: room.code,
@@ -496,21 +613,263 @@ function resolveSeatClaimCommand(
 
 export function registerHandlers(io: IOServer): void {
   installGameLifecycleHooks();
+  setRoomPublishedHook((room, publishedIo) => {
+    syncPublishedRoomWithPublicDirectory(room, publishedIo);
+    syncPublishedRoomWithProjectStats(room, publishedIo);
+  });
   io.on("connection", (socket: IOSocket) => {
     if (process.env.NODE_ENV !== "production") {
       console.log(`Connected: ${socket.id}`);
     }
+    emitPublicRoomCounts(socket);
 
-    socket.on("room:create", (data) => {
-      const playerName = data?.playerName;
-      const gameId = data?.gameId ?? "bunker";
-      if (rejectExistingSocketMembership(socket)) return;
-      if (isRateLimited(socket.id, "room:create")) {
-        socket.emit("room:error", {
-          message: "Слишком много запросов, подождите",
-        });
+    socket.on("stats:subscribe", () => {
+      if (isRateLimited(socket.id, "stats:subscribe")) return;
+      subscribeToProjectStats(socket);
+    });
+
+    socket.on("stats:unsubscribe", () => {
+      unsubscribeFromProjectStats(socket);
+    });
+
+    socket.on("publicRooms:subscribe", (data) => {
+      if (!isExactObject(data, ["gameId"]) || !isRegisteredGameId(data.gameId)) {
+        emitPublicRoomError(socket, undefined, "INVALID_REQUEST", "Игра недоступна", false);
         return;
       }
+      if (isCombinedRateLimited(socket, "publicRooms:subscribe")) {
+        emitPublicRoomError(
+          socket,
+          data.gameId,
+          "RATE_LIMITED",
+          "Слишком много запросов, подождите",
+          false,
+        );
+        return;
+      }
+      subscribeToPublicRoomDirectory(socket, data.gameId);
+    });
+
+    socket.on("publicRooms:unsubscribe", (data) => {
+      if (!isExactObject(data, ["gameId"]) || !isRegisteredGameId(data.gameId)) return;
+      unsubscribeFromPublicRoomDirectory(socket, data.gameId);
+    });
+
+    socket.on("publicRooms:join", (data) => {
+      if (
+        !isExactObject(data, ["gameId", "publicRoomId", "playerName"]) ||
+        !isRegisteredGameId(data.gameId) ||
+        !isValidPublicRoomId(data.publicRoomId) ||
+        !isValidPlayerName(data.playerName)
+      ) {
+        emitPublicRoomError(
+          socket,
+          isExactObject(data, ["gameId", "publicRoomId", "playerName"]) &&
+            isRegisteredGameId(data.gameId)
+            ? data.gameId
+            : undefined,
+          "INVALID_REQUEST",
+          `Проверьте имя и повторите выбор комнаты`,
+        );
+        return;
+      }
+      const { gameId, publicRoomId } = data;
+      if (isCombinedRateLimited(socket, "publicRooms:join")) {
+        emitPublicRoomError(socket, gameId, "RATE_LIMITED", "Слишком много запросов, подождите");
+        return;
+      }
+      if (getCurrentSocketMembership(socket)) {
+        emitPublicRoomError(
+          socket,
+          gameId,
+          "ALREADY_IN_ROOM",
+          "Вы уже находитесь в комнате",
+          false,
+        );
+        return;
+      }
+
+      unsubscribeFromPublicRoomDirectory(socket);
+      const initialRoom = getRoomByPublicId(publicRoomId);
+      if (!initialRoom || initialRoom.visibility !== "public" || initialRoom.gameId !== gameId) {
+        emitPublicRoomError(socket, gameId, "ROOM_NOT_FOUND", "Комната больше недоступна");
+        return;
+      }
+
+      void executeInRoom(initialRoom.code, () => {
+        if (!socket.connected) return;
+        if (getCurrentSocketMembership(socket)) {
+          emitPublicRoomError(
+            socket,
+            gameId,
+            "ALREADY_IN_ROOM",
+            "Вы уже находитесь в комнате",
+            false,
+          );
+          return;
+        }
+        const room = getRoomByPublicId(publicRoomId);
+        if (!room || room.code !== initialRoom.code || room.gameId !== gameId) {
+          emitPublicRoomError(socket, gameId, "ROOM_NOT_FOUND", "Комната больше недоступна");
+          return;
+        }
+        if (room.visibility !== "public") {
+          emitPublicRoomError(socket, gameId, "ROOM_CLOSED", "Комната больше не открыта");
+          return;
+        }
+        if (room.lifecycle !== "lobby") {
+          emitPublicRoomError(socket, gameId, "GAME_STARTED", "Игра уже началась");
+          return;
+        }
+        const module = getServerGameModule(gameId);
+        if (!module) {
+          emitPublicRoomError(socket, gameId, "GAME_UNAVAILABLE", "Игра недоступна");
+          return;
+        }
+        if (room.players.size >= module.maxSeats) {
+          emitPublicRoomError(socket, gameId, "ROOM_FULL", "Последнее место уже занято");
+          return;
+        }
+        const result = joinRoom(
+          room.code,
+          socket.id,
+          sanitizePlayerName(data.playerName),
+          module.maxSeats,
+        );
+        if ("error" in result) {
+          emitPublicRoomError(
+            socket,
+            gameId,
+            result.error === "Комната заполнена" ? "ROOM_FULL" : "ROOM_CLOSED",
+            result.error === "Комната заполнена"
+              ? "Последнее место уже занято"
+              : "Комната больше недоступна",
+          );
+          return;
+        }
+        completePlayerJoin(socket, result.room, result.player, io);
+      }).catch(() => {
+        emitPublicRoomError(
+          socket,
+          gameId,
+          "ROOM_CLOSED",
+          "Не удалось войти, повторите выбор комнаты",
+        );
+      });
+    });
+
+    socket.on("publicRooms:watch", (data) => {
+      if (
+        !isExactObject(data, ["gameId", "publicRoomId", "spectatorName"]) ||
+        !isRegisteredGameId(data.gameId) ||
+        !isValidPublicRoomId(data.publicRoomId) ||
+        !isValidPlayerName(data.spectatorName)
+      ) {
+        emitPublicRoomError(
+          socket,
+          isExactObject(data, ["gameId", "publicRoomId", "spectatorName"]) &&
+            isRegisteredGameId(data.gameId)
+            ? data.gameId
+            : undefined,
+          "INVALID_REQUEST",
+          "Проверьте имя и повторите выбор комнаты",
+        );
+        return;
+      }
+      const { gameId, publicRoomId } = data;
+      if (isCombinedRateLimited(socket, "publicRooms:watch")) {
+        emitPublicRoomError(socket, gameId, "RATE_LIMITED", "Слишком много запросов, подождите");
+        return;
+      }
+      if (getCurrentSocketMembership(socket)) {
+        emitPublicRoomError(
+          socket,
+          gameId,
+          "ALREADY_IN_ROOM",
+          "Вы уже находитесь в комнате",
+          false,
+        );
+        return;
+      }
+
+      unsubscribeFromPublicRoomDirectory(socket);
+      const initialRoom = getRoomByPublicId(publicRoomId);
+      if (!initialRoom || initialRoom.visibility !== "public" || initialRoom.gameId !== gameId) {
+        emitPublicRoomError(socket, gameId, "ROOM_NOT_FOUND", "Комната больше недоступна");
+        return;
+      }
+
+      void executeInRoom(initialRoom.code, () => {
+        if (!socket.connected) return;
+        if (getCurrentSocketMembership(socket)) {
+          emitPublicRoomError(
+            socket,
+            gameId,
+            "ALREADY_IN_ROOM",
+            "Вы уже находитесь в комнате",
+            false,
+          );
+          return;
+        }
+        const room = getRoomByPublicId(publicRoomId);
+        if (!room || room.code !== initialRoom.code || room.gameId !== gameId) {
+          emitPublicRoomError(socket, gameId, "ROOM_NOT_FOUND", "Комната больше недоступна");
+          return;
+        }
+        if (room.visibility !== "public") {
+          emitPublicRoomError(socket, gameId, "ROOM_CLOSED", "Комната больше не открыта");
+          return;
+        }
+        if (room.spectators.size >= CONFIG.MAX_SPECTATORS_PER_ROOM) {
+          emitPublicRoomError(
+            socket,
+            gameId,
+            "SPECTATOR_LIMIT",
+            "В комнате достигнут лимит зрителей",
+          );
+          return;
+        }
+        if (!getServerGameModule(gameId)) {
+          emitPublicRoomError(socket, gameId, "GAME_UNAVAILABLE", "Игра недоступна");
+          return;
+        }
+        const result = joinRoomAsSpectator(
+          room.code,
+          socket.id,
+          sanitizePlayerName(data.spectatorName),
+        );
+        if ("error" in result) {
+          emitPublicRoomError(
+            socket,
+            gameId,
+            result.error === "Слишком много зрителей" ? "SPECTATOR_LIMIT" : "ROOM_CLOSED",
+            result.error === "Слишком много зрителей"
+              ? "В комнате достигнут лимит зрителей"
+              : "Комната больше недоступна",
+          );
+          return;
+        }
+        completeSpectatorJoin(socket, result.room, result.spectator, io);
+      }).catch(() => {
+        emitPublicRoomError(
+          socket,
+          gameId,
+          "ROOM_CLOSED",
+          "Не удалось подключиться, повторите выбор комнаты",
+        );
+      });
+    });
+
+    socket.on("room:create", (data) => {
+      if (!isExactObject(data, ["playerName"], ["gameId", "visibility"])) {
+        socket.emit("room:error", { message: "Некорректные параметры комнаты" });
+        return;
+      }
+      const playerName = data.playerName;
+      const gameId = data.gameId ?? "bunker";
+      const visibility = data.visibility ?? "private";
+      if (rejectExistingSocketMembership(socket)) return;
+      if (rejectRateLimitedAction(socket, "room:create")) return;
 
       if (!isValidPlayerName(playerName)) {
         socket.emit("room:error", {
@@ -520,6 +879,10 @@ export function registerHandlers(io: IOServer): void {
       }
       if (!isRegisteredGameId(gameId)) {
         socket.emit("room:error", { message: "Игра недоступна" });
+        return;
+      }
+      if (!isRoomVisibility(visibility)) {
+        socket.emit("room:error", { message: "Некорректный тип комнаты" });
         return;
       }
       const module = getServerGameModule(gameId);
@@ -543,8 +906,10 @@ export function registerHandlers(io: IOServer): void {
         gameId,
         module.initialSettings(),
         module.maxSeats,
+        visibility,
       );
       attachRoomDisposalHandler(room, io);
+      recordRoomCreated(room, getSocketAnalyticsId(socket), io);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
         roomCode: room.code,
@@ -565,12 +930,7 @@ export function registerHandlers(io: IOServer): void {
       const roomCode = data?.roomCode;
       const playerName = data?.playerName;
       if (rejectExistingSocketMembership(socket)) return;
-      if (isRateLimited(socket.id, "room:join")) {
-        socket.emit("room:error", {
-          message: "Слишком много запросов, подождите",
-        });
-        return;
-      }
+      if (rejectRateLimitedAction(socket, "room:join")) return;
 
       if (!isValidPlayerName(playerName)) {
         socket.emit("room:error", {
@@ -580,7 +940,9 @@ export function registerHandlers(io: IOServer): void {
       }
       const normalizedRoomCode = normalizeRoomCode(roomCode);
       if (!normalizedRoomCode) {
-        socket.emit("room:error", { message: "Код комнаты должен состоять из 4 букв" });
+        socket.emit("room:error", {
+          message: `Код комнаты должен состоять из ${CONFIG.ROOM_CODE_LENGTH} букв`,
+        });
         return;
       }
 
@@ -602,22 +964,7 @@ export function registerHandlers(io: IOServer): void {
       }
 
       const { room, player } = result;
-      attachRoomDisposalHandler(room, io);
-      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
-      socket.join(room.code);
-      socketRoomMap.set(socket.id, {
-        roomCode: room.code,
-        playerId: player.id,
-        role: "player",
-      });
-
-      socket.emit("room:joined", {
-        roomCode: room.code,
-        gameId: room.gameId,
-        playerId: player.id,
-        sessionToken: player.sessionToken,
-      });
-      if (!ensureConnectedHost(room, io)) publishRoom(room, io);
+      completePlayerJoin(socket, room, player, io);
     });
 
     socket.on("room:rejoin", (data) => {
@@ -729,11 +1076,13 @@ export function registerHandlers(io: IOServer): void {
 
     socket.on("room:listReconnectableSeats", (data) => {
       if (rejectExistingSocketMembership(socket)) return;
-      if (rejectRateLimitedClaimAction(socket, "room:listReconnectableSeats")) return;
+      if (rejectRateLimitedAction(socket, "room:listReconnectableSeats")) return;
 
       const recoveryRoomCode = normalizeRoomCode(data?.roomCode);
       if (!recoveryRoomCode) {
-        socket.emit("room:error", { message: "Код комнаты должен состоять из 4 букв" });
+        socket.emit("room:error", {
+          message: `Код комнаты должен состоять из ${CONFIG.ROOM_CODE_LENGTH} букв`,
+        });
         return;
       }
       const room = getRoom(recoveryRoomCode);
@@ -757,13 +1106,15 @@ export function registerHandlers(io: IOServer): void {
 
     socket.on("room:requestSeatClaim", (data) => {
       if (rejectExistingSocketMembership(socket)) return;
-      if (rejectRateLimitedClaimAction(socket, "room:requestSeatClaim")) return;
+      if (rejectRateLimitedAction(socket, "room:requestSeatClaim")) return;
 
       const playerId = data?.playerId;
       const claimantName = data?.claimantName;
       const recoveryRoomCode = normalizeRoomCode(data?.roomCode);
       if (!recoveryRoomCode) {
-        socket.emit("room:error", { message: "Код комнаты должен состоять из 4 букв" });
+        socket.emit("room:error", {
+          message: `Код комнаты должен состоять из ${CONFIG.ROOM_CODE_LENGTH} букв`,
+        });
         return;
       }
       const room = getRoom(recoveryRoomCode);
@@ -817,12 +1168,7 @@ export function registerHandlers(io: IOServer): void {
       const roomCode = data?.roomCode;
       const spectatorName = data?.spectatorName;
       if (rejectExistingSocketMembership(socket)) return;
-      if (isRateLimited(socket.id, "room:joinSpectator")) {
-        socket.emit("room:error", {
-          message: "Слишком много запросов, подождите",
-        });
-        return;
-      }
+      if (rejectRateLimitedAction(socket, "room:joinSpectator")) return;
 
       if (!isValidPlayerName(spectatorName)) {
         socket.emit("room:error", {
@@ -832,7 +1178,9 @@ export function registerHandlers(io: IOServer): void {
       }
       const normalizedRoomCode = normalizeRoomCode(roomCode);
       if (!normalizedRoomCode) {
-        socket.emit("room:error", { message: "Код комнаты должен состоять из 4 букв" });
+        socket.emit("room:error", {
+          message: `Код комнаты должен состоять из ${CONFIG.ROOM_CODE_LENGTH} букв`,
+        });
         return;
       }
 
@@ -846,22 +1194,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
-      const { room, spectator } = result;
-      removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
-      socket.join(room.code);
-      socketRoomMap.set(socket.id, {
-        roomCode: room.code,
-        playerId: spectator.id,
-        role: "spectator",
-      });
-
-      socket.emit("room:spectatorJoined", {
-        roomCode: room.code,
-        gameId: room.gameId,
-        spectatorId: spectator.id,
-        sessionToken: spectator.sessionToken,
-      });
-      publishRoom(room, io);
+      completeSpectatorJoin(socket, result.room, result.spectator, io);
     });
 
     socket.on("room:rejoinSpectator", (data) => {
@@ -1582,7 +1915,7 @@ export function registerHandlers(io: IOServer): void {
         socketRoomMap.delete(socket.id);
         cleanupRateLimitEntry(socket.id);
         socket.leave(info.roomCode);
-        if (room && ownsSpectator && room.players.size > 0) {
+        if (room && ownsSpectator && getRoom(room.code) === room) {
           publishRoom(room, io);
         }
         return;
@@ -1607,7 +1940,9 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
 
+      player.voluntarilyLeft = true;
       markPlayerDisconnected(room, player.id, socket.id, io);
+      disposeRoomIfVacant(room);
       socketRoomMap.delete(socket.id);
       cleanupRateLimitEntry(socket.id);
       socket.leave(info.roomCode);

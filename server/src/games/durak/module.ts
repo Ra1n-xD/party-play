@@ -330,6 +330,9 @@ export const durakModule: ServerGameModule<"durak"> = {
   minSeats: 2,
   maxSeats: 6,
   initialSettings: () => ({ turnTimeoutSeconds: null }),
+  publicRoomListingSettings: (room) => ({
+    turnTimeoutSeconds: room.settings.turnTimeoutSeconds,
+  }),
   validateSettings: validateDurakSettings,
   updateSettings: (room, settings, io) => {
     const durakRoom = requireDurakRoom(room);

@@ -2,10 +2,17 @@ import {
   Character,
   type GameId,
   type GameSettings,
+  type RoomVisibility,
   type RoomCommandResult,
   type RoomLifecycle,
 } from "../../../shared/types.js";
-import { generateRoomCode, generatePlayerId, generateSessionToken, randomPick } from "../utils.js";
+import {
+  generatePlayerId,
+  generatePublicRoomId,
+  generateRoomCode,
+  generateSessionToken,
+  randomPick,
+} from "../utils.js";
 import { CONFIG } from "../config.js";
 
 export interface Player {
@@ -24,6 +31,7 @@ export interface Player {
   immuneThisRound: boolean;
   actionCardRevealed: boolean;
   kicked: boolean;
+  voluntarilyLeft: boolean;
   owner:
     | {
         kind: "human";
@@ -85,6 +93,10 @@ export interface Spectator {
 
 export interface Room<G extends GameId = GameId> {
   code: string;
+  readonly visibility: RoomVisibility;
+  readonly publicRoomId: string | null;
+  readonly createdAt: number;
+  directoryUpdatedAt: number;
   readonly gameId: G;
   readonly seatLimit: number;
   settings: GameSettings<G>;
@@ -118,6 +130,14 @@ function disposeRoom(room: Room, reason: RoomDisposalReason): boolean {
   rooms.delete(room.code);
   roomLastActivity.delete(room.code);
   return true;
+}
+
+export function disposeRoomIfVacant(room: Room): boolean {
+  const hasRetainedHumanSeat = Array.from(room.players.values()).some(
+    (player) => player.owner.kind === "human" && !player.kicked && !player.voluntarilyLeft,
+  );
+  if (hasRetainedHumanSeat || room.spectators.size > 0) return false;
+  return disposeRoom(room, "empty");
 }
 
 export function disposeInactiveRooms(now = Date.now()): number {
@@ -161,6 +181,7 @@ export function createRoom<G extends GameId>(
   gameId: G,
   settings: GameSettings<G>,
   seatLimit: number,
+  visibility?: RoomVisibility,
 ): { room: Room<G>; player: Player };
 export function createRoom<G extends GameId = "bunker">(
   socketId: string,
@@ -168,6 +189,7 @@ export function createRoom<G extends GameId = "bunker">(
   gameId: G = "bunker" as G,
   settings: GameSettings<G> = null as GameSettings<G>,
   seatLimit = CONFIG.MAX_PLAYERS,
+  visibility: RoomVisibility = "private",
 ): { room: Room<G>; player: Player } {
   let code: string;
   do {
@@ -176,6 +198,13 @@ export function createRoom<G extends GameId = "bunker">(
 
   const playerId = generatePlayerId();
   const sessionToken = generateSessionToken();
+  const createdAt = Date.now();
+  let publicRoomId: string | null = null;
+  if (visibility === "public") {
+    do {
+      publicRoomId = generatePublicRoomId();
+    } while (getRoomByPublicId(publicRoomId));
+  }
   const player: Player = {
     id: playerId,
     socketId,
@@ -192,6 +221,7 @@ export function createRoom<G extends GameId = "bunker">(
     immuneThisRound: false,
     actionCardRevealed: false,
     kicked: false,
+    voluntarilyLeft: false,
     owner: {
       kind: "human",
       participantId: playerId,
@@ -209,6 +239,10 @@ export function createRoom<G extends GameId = "bunker">(
 
   const room: Room<G> = {
     code,
+    visibility,
+    publicRoomId,
+    createdAt,
+    directoryUpdatedAt: createdAt,
     gameId,
     seatLimit,
     settings,
@@ -262,6 +296,7 @@ export function joinRoom(
     immuneThisRound: false,
     actionCardRevealed: false,
     kicked: false,
+    voluntarilyLeft: false,
     owner: {
       kind: "human",
       participantId: playerId,
@@ -287,6 +322,13 @@ export function getRoom(code: string): Room | undefined {
   return rooms.get(code);
 }
 
+export function getRoomByPublicId(publicRoomId: string): Room | undefined {
+  for (const room of rooms.values()) {
+    if (room.publicRoomId === publicRoomId) return room;
+  }
+  return undefined;
+}
+
 export function getRoomByPlayerId(playerId: string): Room | undefined {
   for (const room of rooms.values()) {
     if (room.players.has(playerId)) return room;
@@ -297,13 +339,12 @@ export function getRoomByPlayerId(playerId: string): Room | undefined {
 export function removePlayer(room: Room, playerId: string): void {
   room.players.delete(playerId);
   room.allPlayerIds = room.allPlayerIds.filter((id) => id !== playerId);
-  if (room.players.size === 0) {
-    disposeRoom(room, "empty");
-  } else if (room.hostId === playerId) {
+  if (disposeRoomIfVacant(room)) return;
+  if (room.hostId === playerId) {
     const firstPlayer = room.players.values().next().value;
     if (firstPlayer) room.hostId = firstPlayer.id;
   }
-  if (room.players.size > 0) touchRoom(room.code);
+  touchRoom(room.code);
 }
 
 export function getAlivePlayers(room: Room): Player[] {
@@ -376,6 +417,7 @@ export function addBotToRoom(room: Room, maxSeats = room.seatLimit): Player | nu
     immuneThisRound: false,
     actionCardRevealed: false,
     kicked: false,
+    voluntarilyLeft: false,
     owner: {
       kind: "bot",
       botId: playerId,
@@ -431,7 +473,8 @@ export function joinRoomAsSpectator(
 }
 
 export function removeSpectator(room: Room, spectatorId: string): void {
-  if (room.spectators.delete(spectatorId)) touchRoom(room.code);
+  if (!room.spectators.delete(spectatorId)) return;
+  if (!disposeRoomIfVacant(room)) touchRoom(room.code);
 }
 
 export function getRoomBySpectatorId(spectatorId: string): Room | undefined {

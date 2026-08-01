@@ -7,6 +7,13 @@ type SnapshotProjector<G extends GameId> = Pick<
   "lifecycle" | "publicProjection" | "privateProjection"
 >;
 
+type RoomPublishedHook = (room: Room, io: IOServer) => void;
+let roomPublishedHook: RoomPublishedHook = () => {};
+
+export function setRoomPublishedHook(hook: RoomPublishedHook): void {
+  roomPublishedHook = hook;
+}
+
 function buildPublicSeat(room: Room, seatId: string): PublicSeat | null {
   const player = room.players.get(seatId);
   if (!player) return null;
@@ -85,4 +92,6 @@ export function publishRoomSnapshots<G extends GameId>(
     };
     io.to(spectator.socketId).emit("room:snapshot", snapshot as AnyRoomSnapshot);
   }
+
+  roomPublishedHook(room, io);
 }

@@ -9,6 +9,13 @@ import type {
 } from "../games/bunker/types.js";
 import type { AnyGameEvent, GameId } from "./gameContract.js";
 import type { RoomReactionEvent, RoomReactionId } from "./reactions.js";
+import type {
+  AnyPublicRoomDirectorySnapshot,
+  PublicRoomCountsSnapshot,
+  PublicRoomErrorPayload,
+  RoomVisibility,
+} from "./publicRooms.js";
+import type { ProjectStatsSnapshot } from "./projectStats.js";
 import type { AnyRoomCommandEnvelope, AnyRoomSnapshot, RoomCommandResult, SeatId } from "./room.js";
 
 export type HostChangeReason = "disconnect" | "manual" | "recovery";
@@ -49,7 +56,11 @@ export interface SpectatorJoinedPayload {
 
 // Client -> Server
 export interface ClientEvents {
-  "room:create": (data: { gameId: GameId; playerName: string }) => void;
+  "room:create": (data: {
+    gameId?: GameId;
+    playerName: string;
+    visibility?: RoomVisibility;
+  }) => void;
   "room:join": (data: { roomCode: string; playerName: string }) => void;
   "room:joinSpectator": (data: { roomCode: string; spectatorName: string }) => void;
   "room:leave": () => void;
@@ -68,6 +79,16 @@ export interface ClientEvents {
   "room:cancelSeatClaim": (data: { requestId: string }) => void;
   "room:command": (data: AnyRoomCommandEnvelope) => void;
   "room:sendReaction": (data: { reactionId: RoomReactionId }) => void;
+  "publicRooms:subscribe": (data: { gameId: GameId }) => void;
+  "publicRooms:unsubscribe": (data: { gameId: GameId }) => void;
+  "publicRooms:join": (data: { gameId: GameId; publicRoomId: string; playerName: string }) => void;
+  "publicRooms:watch": (data: {
+    gameId: GameId;
+    publicRoomId: string;
+    spectatorName: string;
+  }) => void;
+  "stats:subscribe": () => void;
+  "stats:unsubscribe": () => void;
 
   // Legacy Bunker adapters. The active client routes these through room:command.
   "player:ready": (data: { ready: boolean }) => void;
@@ -131,6 +152,10 @@ export interface ServerEvents {
   "room:snapshot": (data: AnyRoomSnapshot) => void;
   "room:commandResult": (data: RoomCommandResult) => void;
   "room:reaction": (data: RoomReactionEvent) => void;
+  "publicRooms:counts": (data: PublicRoomCountsSnapshot) => void;
+  "publicRooms:directory": (data: AnyPublicRoomDirectorySnapshot) => void;
+  "publicRooms:error": (data: PublicRoomErrorPayload) => void;
+  "stats:snapshot": (data: ProjectStatsSnapshot) => void;
   "game:event": (data: AnyGameEvent) => void;
   "admin:seatClaimsUpdated": (data: { claims: SeatClaimInfo[] }) => void;
 
