@@ -76,6 +76,70 @@
   }
 }
 
+.card-transfer-flight {
+  position: fixed;
+  z-index: 1100;
+  width: 48px;
+  aspect-ratio: 5 / 7;
+  margin: -34px 0 0 -24px;
+  border: 2px solid rgb(255 255 255 / 88%);
+  border-radius: 8px;
+  pointer-events: none;
+  box-shadow: 0 12px 26px rgb(0 0 0 / 38%);
+  transform-origin: center;
+  will-change: transform, opacity;
+  animation: card-transfer-flight 620ms cubic-bezier(0.2, 0.82, 0.24, 1) both;
+  animation-delay: var(--card-transfer-delay, 0ms);
+}
+
+.card-transfer-flight.is-durak {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 16%) 25%, transparent 25%) 0 0 / 10px 10px,
+    linear-gradient(315deg, rgb(255 255 255 / 12%) 25%, transparent 25%) 0 0 / 10px 10px,
+    linear-gradient(145deg, #2e4a78, #132540);
+}
+
+.card-transfer-flight.is-uno {
+  border-color: #f7e7ac;
+  background: radial-gradient(ellipse at center, #f4cb32 0 20%, #d12f31 22% 58%, #151515 60%);
+}
+
+.card-transfer-count {
+  position: absolute;
+  right: -12px;
+  bottom: -10px;
+  min-width: 28px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: #1f1605;
+  background: #f4c957;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 30%);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+@keyframes card-transfer-flight {
+  from {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.7) rotate(var(--card-transfer-tilt, -4deg));
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  72% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(var(--card-transfer-x, 0), var(--card-transfer-y, 0)) scale(0.94)
+      rotate(calc(var(--card-transfer-tilt, 0deg) * -1));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card-drag-layer {
     transition: none;
@@ -87,5 +151,9 @@
 
   .is-table-card-flying {
     animation: none;
+  }
+
+  .card-transfer-flight {
+    display: none;
   }
 }

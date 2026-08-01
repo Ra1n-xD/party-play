@@ -1,3 +1,7 @@
+import type {
+  CardTransferVisualEvent,
+  PlayerActionVisualEvent,
+} from "../../platform/cardVisualEvents.js";
 import type { RoomRevision, SeatId } from "../../platform/room.js";
 
 export type UnoColor = "red" | "yellow" | "green" | "blue";
@@ -31,6 +35,16 @@ export interface UnoSettings {
 export type UnoPhase = "LOBBY" | "PLAYING" | "GAME_OVER";
 export type UnoTurnKind = "normal" | "after-draw" | "initial-color" | "wild-draw-four-response";
 export type UnoSeatStatus = "active" | "excluded";
+export type UnoVisualAction =
+  | "play-card"
+  | "draw-card"
+  | "end-turn"
+  | "choose-color"
+  | "accept-draw-four"
+  | "challenge-draw-four"
+  | "declare-uno"
+  | "catch-uno";
+export type UnoVisualEvent = CardTransferVisualEvent | PlayerActionVisualEvent<UnoVisualAction>;
 
 export interface UnoPlayerPublicState {
   seatId: SeatId;
@@ -83,6 +97,7 @@ export interface UnoPublicState {
   activeColor: UnoColor | null;
   drawPileCount: number;
   discardPileCount: number;
+  visualEvents: UnoVisualEvent[];
   players: UnoPlayerPublicState[];
   pendingWildDrawFour: UnoPendingWildDrawFour | null;
   unoWindow: UnoWindow | null;

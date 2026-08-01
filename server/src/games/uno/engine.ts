@@ -1,4 +1,5 @@
 import type {
+  CardVisualAnchor,
   SeatId,
   UnoCard,
   UnoChallengeResolution,
@@ -6,6 +7,7 @@ import type {
   UnoCommand,
   UnoResult,
   UnoSettings,
+  UnoVisualAction,
 } from "../../../../shared/types.js";
 import {
   UNO_COLORS,
@@ -34,6 +36,28 @@ export interface CreateUnoGameInput {
   gameInstanceId: string;
 }
 
+const MAX_VISUAL_EVENTS = 18;
+
+function appendAction(state: UnoGameState, seatId: SeatId, action: UnoVisualAction): void {
+  state.visualEvents = [
+    ...state.visualEvents.slice(-(MAX_VISUAL_EVENTS - 1)),
+    { id: state.nextVisualEventId++, type: "action", seatId, action },
+  ];
+}
+
+function appendTransfer(
+  state: UnoGameState,
+  source: CardVisualAnchor,
+  target: CardVisualAnchor,
+  cardCount: number,
+): void {
+  if (cardCount <= 0) return;
+  state.visualEvents = [
+    ...state.visualEvents.slice(-(MAX_VISUAL_EVENTS - 1)),
+    { id: state.nextVisualEventId++, type: "transfer", source, target, cardCount },
+  ];
+}
+
 function failure(error: string): UnoEngineResult {
   return { success: false, error };
 }
@@ -58,6 +82,11 @@ function cloneState(state: UnoGameState): UnoGameState {
     lastChallengeResolution: state.lastChallengeResolution
       ? { ...state.lastChallengeResolution }
       : null,
+    visualEvents: state.visualEvents.map((event) =>
+      event.type === "transfer"
+        ? { ...event, source: { ...event.source }, target: { ...event.target } }
+        : { ...event },
+    ),
     result: state.result ? { ...state.result } : null,
   };
 }
@@ -140,6 +169,7 @@ function recycleDiscardIntoDrawPile(state: UnoGameState): void {
   const recycled = state.discardPile.slice(0, -1);
   state.drawPile = shuffleUnoDeck(recycled);
   state.discardPile = [top];
+  appendTransfer(state, { kind: "discard" }, { kind: "deck" }, recycled.length);
 }
 
 function drawCards(state: UnoGameState, seatId: SeatId, count: number): UnoCard[] {
@@ -151,6 +181,7 @@ function drawCards(state: UnoGameState, seatId: SeatId, count: number): UnoCard[
     state.hands[seatId].push(card);
     drawn.push(card);
   }
+  appendTransfer(state, { kind: "deck" }, { kind: "player", seatId }, drawn.length);
   return drawn;
 }
 
@@ -260,6 +291,9 @@ function applyPlayedCard(
   if (!played) return failure("Карты нет в руке");
   next.discardPile.push(played);
   next.lastPlayedBySeatId = actorSeatId;
+  appendAction(next, actorSeatId, "play-card");
+  appendTransfer(next, { kind: "player", seatId: actorSeatId }, { kind: "discard" }, 1);
+  if (declareUno) appendAction(next, actorSeatId, "declare-uno");
   if (played.color) next.activeColor = played.color;
   else next.activeColor = chosenColor!;
 
@@ -313,6 +347,11 @@ function resolveWildDrawFour(
   const next = cloneState(state);
   const current = next.pendingWildDrawFour!;
   closeUnoForGameplayAction(next);
+  appendAction(
+    next,
+    actorSeatId,
+    decision === "accept" ? "accept-draw-four" : "challenge-draw-four",
+  );
   let resolution: UnoChallengeResolution;
 
   if (decision === "challenge" && !current.wasLegalAtPlay) {
@@ -405,6 +444,8 @@ export function createUnoGameState(input: CreateUnoGameInput): UnoGameState {
     nextUnoWindowId: 1,
     preDeclaredUno: null,
     lastChallengeResolution: null,
+    nextVisualEventId: 1,
+    visualEvents: [],
     result: null,
   };
 
@@ -481,6 +522,7 @@ export function applyUnoCommand(
       if (command.windowId !== undefined && command.windowId !== next.unoWindow.id)
         return failure("Окно UNO устарело");
       closeUnoWindow(next);
+      appendAction(next, actorSeatId, "declare-uno");
       return success(next);
     }
     if (
@@ -491,6 +533,7 @@ export function applyUnoCommand(
       return failure("Сейчас нельзя объявить UNO");
     }
     next.preDeclaredUno = { seatId: actorSeatId, turnId: next.turn.id };
+    appendAction(next, actorSeatId, "declare-uno");
     return success(next);
   }
 
@@ -506,6 +549,7 @@ export function applyUnoCommand(
       return failure("Игрок уже не обязан объявлять UNO");
     drawCards(next, window.subjectSeatId, 2);
     closeUnoWindow(next);
+    appendAction(next, actorSeatId, "catch-uno");
     return success(next);
   }
 
@@ -535,6 +579,7 @@ export function applyUnoCommand(
       }
       const next = cloneState(state as UnoGameState);
       closeUnoForGameplayAction(next);
+      appendAction(next, actorSeatId, "draw-card");
       const [drawn] = drawCards(next, actorSeatId, 1);
       if (!drawn) {
         const following = nextSeat(next, actorSeatId);
@@ -550,6 +595,7 @@ export function applyUnoCommand(
         return failure("Завершить ход можно только после добора");
       const next = cloneState(state as UnoGameState);
       closeUnoForGameplayAction(next);
+      appendAction(next, actorSeatId, "end-turn");
       const following = nextSeat(next, actorSeatId);
       if (!following) return failure("Недостаточно игроков");
       startNormalTurn(next, following, nowMs, false);
@@ -559,6 +605,7 @@ export function applyUnoCommand(
       if (state.turn.kind !== "initial-color") return failure("Сейчас нельзя выбирать цвет");
       const next = cloneState(state as UnoGameState);
       next.activeColor = command.color;
+      appendAction(next, actorSeatId, "choose-color");
       setTurn(next, actorSeatId, "normal", nowMs, false);
       return success(next);
     }

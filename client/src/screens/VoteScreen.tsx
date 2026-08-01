@@ -6,6 +6,7 @@ import { useGame } from "../context/GameContext";
 import "../styles/game-screen.css";
 import { AccessibleModal } from "./game/AccessibleModal";
 import { GameRoomHeader } from "./game/GameRoomHeader";
+import { GameDockTools } from "./game/GameDockTools";
 import { HostControlDialog } from "./game/HostControlDialog";
 
 export function VoteScreen() {
@@ -122,13 +123,8 @@ export function VoteScreen() {
 
   if (isSpectator) {
     return (
-      <main className="screen command-game-screen vote-screen">
-        <GameRoomHeader
-          gameId="bunker"
-          roomCode={roomCode}
-          connected={connected}
-          onLeaveRoom={leaveRoom}
-        />
+      <main className="screen command-game-screen vote-screen has-vote-command-bar">
+        <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
         <div className="sticky-top-bar">
           <div className="top-bar-content">
             <div className="top-bar-left">
@@ -148,6 +144,9 @@ export function VoteScreen() {
             totalVotesExpected={gameState.totalVotesExpected}
           />
         </div>
+        <aside className="vote-command-bar is-tools-only" aria-label="Правила и эмоции">
+          <GameDockTools gameId="bunker" />
+        </aside>
       </main>
     );
   }
@@ -182,7 +181,6 @@ export function VoteScreen() {
   return (
     <main className="screen command-game-screen vote-screen has-vote-command-bar">
       <GameRoomHeader
-        gameId="bunker"
         roomCode={roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
@@ -331,6 +329,7 @@ export function VoteScreen() {
           </strong>
         </div>
         <div className="vote-command-actions">
+          <GameDockTools gameId="bunker" />
           {canRevealAction && (
             <button
               type="button"

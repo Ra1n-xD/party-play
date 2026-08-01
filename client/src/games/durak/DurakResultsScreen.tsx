@@ -1,6 +1,7 @@
 import type { RoomSnapshot } from "../../../../shared/platform/room";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
+import { GameDockTools } from "../../screens/game/GameDockTools";
 
 interface DurakResultsScreenProps {
   snapshot: RoomSnapshot<"durak">;
@@ -50,7 +51,6 @@ export function DurakResultsScreen({ snapshot }: DurakResultsScreenProps) {
   return (
     <main className="screen command-game-screen durak-screen durak-results-screen">
       <GameRoomHeader
-        gameId="durak"
         roomCode={snapshot.roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
@@ -95,6 +95,7 @@ export function DurakResultsScreen({ snapshot }: DurakResultsScreenProps) {
       </section>
 
       <section className="durak-results-actions">
+        <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
         {isHost ? (
           <button
             type="button"

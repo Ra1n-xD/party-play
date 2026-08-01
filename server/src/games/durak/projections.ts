@@ -70,6 +70,7 @@ function lobbyPublicState(room: DurakRoom): DurakPublicState {
     trumpCardHolderSeatId: null,
     deckCount: 0,
     discardCount: 0,
+    visualEvents: [],
     players: room.allPlayerIds
       .map((seatId) => room.players.get(seatId))
       .filter((player) => player !== undefined)
@@ -145,6 +146,11 @@ export function buildDurakPublicState(room: DurakRoom, nowMs = Date.now()): Dura
     trumpCardHolderSeatId: trumpLocation.holderSeatId,
     deckCount: state.drawPile.length,
     discardCount: state.discard.length,
+    visualEvents: state.visualEvents.map((event) =>
+      event.type === "transfer"
+        ? { ...event, source: { ...event.source }, target: { ...event.target } }
+        : { ...event },
+    ),
     players,
     turnRemainingMs: remainingTurnMs(state, nowMs),
     paused: isPaused(room),

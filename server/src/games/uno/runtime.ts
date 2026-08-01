@@ -6,6 +6,7 @@ import type {
   UnoSettings,
   UnoTurnKind,
   UnoCard,
+  UnoVisualEvent,
   SeatId,
 } from "../../../../shared/types.js";
 import type { Room } from "../../platform/roomManager.js";
@@ -56,6 +57,8 @@ export interface UnoGameState {
   nextUnoWindowId: number;
   preDeclaredUno: { seatId: SeatId; turnId: number } | null;
   lastChallengeResolution: UnoChallengeResolution | null;
+  nextVisualEventId: number;
+  visualEvents: UnoVisualEvent[];
   result: UnoResult | null;
 }
 

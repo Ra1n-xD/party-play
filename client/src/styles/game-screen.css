@@ -186,6 +186,106 @@
   min-width: 0;
 }
 
+.command-game-screen .game-dock-tools {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.command-game-screen .game-dock-tools .room-reactions-popover {
+  top: auto;
+  right: 0;
+  bottom: calc(100% + 9px);
+}
+
+.command-game-screen .game-dock-tool {
+  flex: 0 0 auto;
+}
+
+.command-game-screen .card-player-action {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  left: 50%;
+  max-width: calc(100% - 14px);
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 225, 145, 0.72);
+  border-radius: 999px;
+  background: rgba(42, 21, 9, 0.96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+  color: #ffe09a;
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: card-player-action-in 2.2s ease both;
+}
+
+.command-game-screen .durak-player,
+.command-game-screen .uno-player {
+  position: relative;
+  overflow: visible;
+}
+
+@keyframes card-player-action-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.88);
+  }
+
+  12%,
+  78% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -64%) scale(0.96);
+  }
+}
+
+@media (max-width: 680px) {
+  .command-game-screen .game-dock-tools {
+    gap: 5px;
+  }
+
+  .command-game-screen .game-dock-tool {
+    width: 42px;
+    min-height: 40px;
+    padding: 0;
+  }
+
+  .command-game-screen .game-dock-tool span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .command-game-screen .room-reactions-trigger {
+    width: 42px;
+    min-height: 40px;
+    flex-basis: 42px;
+  }
+
+  .command-game-screen .card-player-action {
+    max-width: calc(100% + 22px);
+    padding: 4px 7px;
+    font-size: 0.58rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-game-screen .card-player-action {
+    animation: none;
+  }
+}
+
 .command-game-screen .room-reactions-trigger {
   width: 44px;
   flex: 0 0 44px;
@@ -1360,6 +1460,15 @@
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+}
+
+.command-game-screen .results-command-bar {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.command-game-screen .vote-command-bar.is-tools-only {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .command-game-screen .vote-command-status {

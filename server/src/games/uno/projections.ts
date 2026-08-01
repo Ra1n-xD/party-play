@@ -34,6 +34,7 @@ function lobbyPublicState(room: UnoRoom): UnoPublicState {
     activeColor: null,
     drawPileCount: 0,
     discardPileCount: 0,
+    visualEvents: [],
     players: room.allPlayerIds
       .map((seatId) => room.players.get(seatId))
       .filter((player) => player !== undefined)
@@ -75,6 +76,11 @@ export function buildUnoPublicState(room: UnoRoom, nowMs = Date.now()): UnoPubli
     activeColor: state.activeColor,
     drawPileCount: state.drawPile.length,
     discardPileCount: state.discardPile.length,
+    visualEvents: state.visualEvents.map((event) =>
+      event.type === "transfer"
+        ? { ...event, source: { ...event.source }, target: { ...event.target } }
+        : { ...event },
+    ),
     players: state.seatOrder.map((seatId) => {
       const player = room.players.get(seatId);
       const status: UnoSeatStatus = state.statusBySeatId[seatId] ?? "excluded";
