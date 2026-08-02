@@ -8,7 +8,7 @@ import type {
 } from "../../../../shared/types.js";
 import type { Room } from "../../platform/roomManager.js";
 
-export type DurakInternalPhase = "PLAYING" | "GAME_OVER";
+export type DurakInternalPhase = "PLAYING" | "RESOLVING" | "GAME_OVER";
 export type DurakInternalFightStage = "opening" | "defense" | "throw-in" | "take-throw-in";
 export type DurakInternalSeatStatus = "active" | "out" | "excluded";
 export type DurakTurnKind = "opening" | "defense" | "throw-in" | "take-throw-in";
@@ -25,6 +25,13 @@ export interface DurakTurn {
   readyAt: number;
   readyRemainingMs: number | null;
   clock: DurakTurnClock;
+}
+
+export interface DurakPendingResolution {
+  fightId: number;
+  kind: "defended" | "taken";
+  readyAt: number;
+  readyRemainingMs: number | null;
 }
 
 export interface DurakFight {
@@ -56,6 +63,7 @@ export interface DurakGameState {
   trumpSuit: DurakCard["suit"];
   fight: DurakFight | null;
   turn: DurakTurn | null;
+  pendingResolution: DurakPendingResolution | null;
   nextTurnId: number;
   nextFightId: number;
   nextVisualEventId: number;

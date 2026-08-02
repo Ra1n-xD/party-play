@@ -26,6 +26,7 @@ import { chooseDurakBotCommand } from "./bot.js";
 import { createDurakDeck } from "./cards.js";
 import {
   applyDurakCommand,
+  applyDurakPendingResolution,
   applyDurakTurnTimeout,
   createDurakGameState,
   excludeDurakSeat,
@@ -38,8 +39,17 @@ import { asDurakRoom, type DurakGameState, type DurakRoom } from "./runtime.js";
 
 interface PendingDurakActions {
   readyTimer: ReturnType<typeof setTimeout> | null;
+  resolutionTimer: ReturnType<typeof setTimeout> | null;
   turnTimer: ReturnType<typeof setTimeout> | null;
-  botTimer: ReturnType<typeof setTimeout> | null;
+  botActions: Map<string, PendingDurakBotAction>;
+}
+
+interface PendingDurakBotAction {
+  gameInstanceId: string;
+  turnId: number;
+  controllerEpoch: number;
+  dueAt: number;
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
 interface DurakReplayMetadata {
@@ -67,27 +77,55 @@ function requireDurakRoom(room: Room): DurakRoom {
 function clearDurakActions(roomCode: string): void {
   const pending = pendingActions.get(roomCode);
   if (pending?.readyTimer) clearTimeout(pending.readyTimer);
+  if (pending?.resolutionTimer) clearTimeout(pending.resolutionTimer);
   if (pending?.turnTimer) clearTimeout(pending.turnTimer);
-  if (pending?.botTimer) clearTimeout(pending.botTimer);
+  for (const botAction of pending?.botActions.values() ?? []) {
+    if (botAction.timer) clearTimeout(botAction.timer);
+  }
   pendingActions.delete(roomCode);
+}
+
+function getPendingDurakActions(roomCode: string): PendingDurakActions {
+  const existing = pendingActions.get(roomCode);
+  if (existing) return existing;
+  const pending: PendingDurakActions = {
+    readyTimer: null,
+    resolutionTimer: null,
+    turnTimer: null,
+    botActions: new Map(),
+  };
+  pendingActions.set(roomCode, pending);
+  return pending;
+}
+
+function clearDurakStateTimers(roomCode: string): PendingDurakActions {
+  const pending = getPendingDurakActions(roomCode);
+  if (pending.readyTimer) clearTimeout(pending.readyTimer);
+  if (pending.resolutionTimer) clearTimeout(pending.resolutionTimer);
+  if (pending.turnTimer) clearTimeout(pending.turnTimer);
+  pending.readyTimer = null;
+  pending.resolutionTimer = null;
+  pending.turnTimer = null;
+  return pending;
+}
+
+function clearDurakBotActions(pending: PendingDurakActions): void {
+  for (const botAction of pending.botActions.values()) {
+    if (botAction.timer) clearTimeout(botAction.timer);
+  }
+  pending.botActions.clear();
 }
 
 function rememberTimer(
   roomCode: string,
-  kind: keyof PendingDurakActions,
+  kind: "readyTimer" | "resolutionTimer" | "turnTimer",
   timer: ReturnType<typeof setTimeout>,
 ): void {
-  const pending = pendingActions.get(roomCode) ?? {
-    readyTimer: null,
-    turnTimer: null,
-    botTimer: null,
-  };
+  const pending = getPendingDurakActions(roomCode);
   pending[kind] = timer;
-  pendingActions.set(roomCode, pending);
 }
 
 function publishDurak(room: DurakRoom, io: IOServer): void {
-  clearDurakActions(room.code);
   room.revision++;
   publishRoomSnapshots(room, io, {
     lifecycle: (currentRoom) => currentRoom.lifecycle,
@@ -111,32 +149,67 @@ function commitDurakState(room: DurakRoom, nextState: DurakGameState, io: IOServ
 }
 
 function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
-  clearDurakActions(room.code);
+  const pending = clearDurakStateTimers(room.code);
   const state = room.gameState;
-  const turn = state?.turn;
-  if (
-    room.lifecycle !== "playing" ||
-    !state ||
-    state.phase !== "PLAYING" ||
-    !turn ||
-    isPaused(room)
-  ) {
+  if (room.lifecycle !== "playing" || !state || isPaused(room)) {
+    clearDurakBotActions(pending);
     return;
   }
 
   const expectedGameInstanceId = state.gameInstanceId;
+  if (state.phase === "RESOLVING") {
+    clearDurakBotActions(pending);
+    const resolution = state.pendingResolution;
+    const fight = state.fight;
+    if (!resolution || !fight || resolution.readyRemainingMs !== null) return;
+    const expectedFightId = fight.id;
+    const expectedReadyAt = resolution.readyAt;
+    const delay = Math.max(0, expectedReadyAt - Date.now());
+    const timer = setTimeout(() => {
+      void executeInRoom(room.code, () => {
+        if (getRoom(room.code) !== room || isPaused(room)) return;
+        const currentState = room.gameState;
+        const currentResolution = currentState?.pendingResolution;
+        if (
+          !currentState ||
+          currentState.gameInstanceId !== expectedGameInstanceId ||
+          currentState.phase !== "RESOLVING" ||
+          currentState.fight?.id !== expectedFightId ||
+          currentResolution?.fightId !== expectedFightId ||
+          currentResolution.readyAt !== expectedReadyAt ||
+          currentResolution.readyRemainingMs !== null
+        ) {
+          return;
+        }
+        const result = applyDurakPendingResolution(
+          currentState,
+          expectedFightId,
+          Date.now(),
+          false,
+        );
+        if (result.success) commitDurakState(room, result.state, io);
+      }).catch(() => {});
+    }, delay);
+    timer.unref();
+    rememberTimer(room.code, "resolutionTimer", timer);
+    return;
+  }
+
+  const turn = state.turn;
+  if (state.phase !== "PLAYING" || !turn) {
+    clearDurakBotActions(pending);
+    return;
+  }
+
   const expectedTurnId = turn.id;
   const nowMs = Date.now();
   if (turn.clock.kind === "running") {
     const expectedDeadline = turn.clock.deadlineAt;
-    const expectedRevision = room.revision;
     const expectedControllerEpoch = room.players.get(turn.actorSeatId)?.controller.epoch ?? null;
     const delay = Math.max(0, expectedDeadline - Date.now());
     const timer = setTimeout(() => {
       void executeInRoom(room.code, () => {
-        if (getRoom(room.code) !== room || room.revision !== expectedRevision || isPaused(room)) {
-          return;
-        }
+        if (getRoom(room.code) !== room || isPaused(room)) return;
         const currentState = room.gameState;
         const currentTurn = currentState?.turn;
         const currentActor = currentTurn ? room.players.get(currentTurn.actorSeatId) : null;
@@ -159,14 +232,12 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
   }
 
   if (!isDurakTurnReady(turn, nowMs)) {
-    const expectedRevision = room.revision;
+    clearDurakBotActions(pending);
     const expectedReadyAt = turn.readyAt;
     const delay = Math.max(0, expectedReadyAt - nowMs);
     const timer = setTimeout(() => {
       void executeInRoom(room.code, () => {
-        if (getRoom(room.code) !== room || room.revision !== expectedRevision || isPaused(room)) {
-          return;
-        }
+        if (getRoom(room.code) !== room || isPaused(room)) return;
         const currentState = room.gameState;
         const currentTurn = currentState?.turn;
         if (
@@ -186,59 +257,98 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
     return;
   }
 
-  const publicState = buildDurakPublicState(room);
-  let botDecision: { actor: Player; command: DurakCommand } | null = null;
-  const candidate = room.players.get(turn.actorSeatId);
-  if (candidate && candidate.controller.kind === "bot" && !candidate.kicked) {
+  const eligibleBots = new Map<string, Player>();
+  for (const candidate of room.players.values()) {
+    if (candidate.controller.kind !== "bot" || candidate.kicked) continue;
     const privateState = buildDurakPrivateState(room, candidate.id, nowMs);
-    if (privateState && privateState.legalAction.type !== "wait") {
-      const command = chooseDurakBotCommand(
-        publicState,
-        privateState,
-        () => randomInt(1_000_000) / 1_000_000,
-      );
-      if (command) botDecision = { actor: candidate, command };
+    if (!privateState || privateState.legalAction.type === "wait") continue;
+    eligibleBots.set(candidate.id, candidate);
+  }
+
+  for (const [seatId, botAction] of pending.botActions) {
+    const candidate = eligibleBots.get(seatId);
+    if (
+      !candidate ||
+      botAction.gameInstanceId !== expectedGameInstanceId ||
+      botAction.turnId !== expectedTurnId ||
+      botAction.controllerEpoch !== candidate.controller.epoch
+    ) {
+      if (botAction.timer) clearTimeout(botAction.timer);
+      pending.botActions.delete(seatId);
     }
   }
-  if (!botDecision) return;
-  const { actor, command } = botDecision;
 
-  const expectedControllerEpoch = actor.controller.epoch;
-  const expectedRevision = room.revision;
-  const naturalDelay = randomInt(650, 1401);
-  const remainingMs =
-    turn.clock.kind === "running" ? Math.max(0, turn.clock.deadlineAt - Date.now()) : null;
-  const botDelay =
-    remainingMs === null
-      ? naturalDelay
-      : Math.max(25, Math.min(naturalDelay, Math.max(25, remainingMs - 100)));
-  const botTimer = setTimeout(() => {
-    void executeInRoom(room.code, () => {
-      if (getRoom(room.code) !== room || room.revision !== expectedRevision || isPaused(room)) {
-        return;
-      }
-      const currentState = room.gameState;
-      const currentTurn = currentState?.turn;
-      const currentActor = room.players.get(actor.id);
-      if (
-        !currentState ||
-        currentState.gameInstanceId !== expectedGameInstanceId ||
-        currentTurn?.id !== expectedTurnId ||
-        currentActor !== actor ||
-        currentActor.controller.kind !== "bot" ||
-        currentActor.controller.epoch !== expectedControllerEpoch
-      ) {
-        return;
-      }
+  for (const [seatId, actor] of eligibleBots) {
+    if (pending.botActions.has(seatId)) continue;
+    const expectedControllerEpoch = actor.controller.epoch;
+    const naturalDelay = randomInt(650, 1401);
+    const remainingMs =
+      turn.clock.kind === "running" ? Math.max(0, turn.clock.deadlineAt - Date.now()) : null;
+    const botDelay =
+      remainingMs === null
+        ? naturalDelay
+        : Math.max(25, Math.min(naturalDelay, Math.max(25, remainingMs - 100)));
+    const dueAt = Date.now() + botDelay;
+    const botTimer = setTimeout(
+      () => {
+        void executeInRoom(room.code, () => {
+          const currentPending = pendingActions.get(room.code);
+          const currentBotAction = currentPending?.botActions.get(seatId);
+          if (!currentBotAction || currentBotAction.timer !== botTimer) return;
+          currentBotAction.timer = null;
+          if (getRoom(room.code) !== room || isPaused(room)) return;
 
-      const privateState = buildDurakPrivateState(room, currentActor.id);
-      if (!privateState || privateState.legalAction.type === "wait") return;
-      const result = applyDurakCommand(currentState, currentActor.id, command, Date.now(), false);
-      if (result.success) commitDurakState(room, result.state, io);
-    }).catch(() => {});
-  }, botDelay);
-  botTimer.unref();
-  rememberTimer(room.code, "botTimer", botTimer);
+          const currentState = room.gameState;
+          const currentTurn = currentState?.turn;
+          const currentActor = room.players.get(seatId);
+          if (
+            !currentState ||
+            currentState.gameInstanceId !== expectedGameInstanceId ||
+            currentState.phase !== "PLAYING" ||
+            currentTurn?.id !== expectedTurnId ||
+            !isDurakTurnReady(currentTurn, Date.now()) ||
+            currentActor !== actor ||
+            currentActor.controller.kind !== "bot" ||
+            currentActor.controller.epoch !== expectedControllerEpoch
+          ) {
+            return;
+          }
+
+          const decisionNowMs = Date.now();
+          const privateState = buildDurakPrivateState(room, currentActor.id, decisionNowMs);
+          if (!privateState || privateState.legalAction.type === "wait") return;
+          const publicState = buildDurakPublicState(room, decisionNowMs);
+          const command = chooseDurakBotCommand(
+            publicState,
+            privateState,
+            () => randomInt(1_000_000) / 1_000_000,
+          );
+          if (!command) return;
+          const result = applyDurakCommand(
+            currentState,
+            currentActor.id,
+            command,
+            decisionNowMs,
+            false,
+          );
+          if (result.success) {
+            commitDurakState(room, result.state, io);
+          } else {
+            scheduleDurakActions(room, io);
+          }
+        }).catch(() => {});
+      },
+      Math.max(0, dueAt - Date.now()),
+    );
+    botTimer.unref();
+    pending.botActions.set(seatId, {
+      gameInstanceId: expectedGameInstanceId,
+      turnId: expectedTurnId,
+      controllerEpoch: expectedControllerEpoch,
+      dueAt,
+      timer: botTimer,
+    });
+  }
 }
 
 function chooseDealer(room: DurakRoom, seatOrder: readonly string[]): string {
