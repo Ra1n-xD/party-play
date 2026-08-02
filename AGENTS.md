@@ -47,6 +47,27 @@ when it is genuinely reusable.
 - After every completed task, provide one suggested commit message in English.
   Never execute that commit.
 
+## Application Versioning
+
+- After every completed task that changes repository files, increase the root
+  application version before final verification and the final response.
+- Choose the SemVer increment according to the completed work:
+  - `patch` for fixes, visual changes, refactoring, documentation, configuration,
+    and other backward-compatible maintenance;
+  - `minor` for new backward-compatible features or user-facing capabilities;
+  - `major` for intentional breaking changes to public contracts, persisted data,
+    or compatibility.
+- Update the version in both the root `package.json` and root `package-lock.json`.
+  Keep their root package versions identical.
+- Do not change the independent versions of `client`, `server`, or `shared`
+  workspaces unless the task explicitly targets those package versions.
+- Do not increase the version for read-only analysis, status, review, or other
+  tasks that leave repository files unchanged.
+- A version change made only to satisfy this rule never triggers another version
+  increase.
+- Report the previous version, new version, and the chosen SemVer reason in the
+  final response.
+
 ## Branch and Commit Conventions
 
 Use short, descriptive, kebab-case branch names:
