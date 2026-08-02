@@ -5,8 +5,12 @@ import type {
 import type { RoomRevision, SeatId } from "../../platform/room.js";
 
 export const DURAK_INITIAL_DEAL_READY_DELAY_MS = 2_500;
-export const DURAK_ROUND_TRANSITION_DELAY_MS = 4_600;
+export const DURAK_TABLE_ACTION_READY_DELAY_MS = 950;
+export const DURAK_RESOLUTION_READY_DELAY_MS = 950;
 export const DURAK_REFILL_PHASE_PAUSE_MS = 250;
+export const DURAK_TRANSFER_DURATION_MS = 1_650;
+export const DURAK_TRANSFER_CARD_STAGGER_MS = 100;
+export const DURAK_REFILL_EVENT_STAGGER_MS = 130;
 
 export type DurakSuit = "clubs" | "diamonds" | "hearts" | "spades";
 export type DurakRank = "6" | "7" | "8" | "9" | "10" | "jack" | "queen" | "king" | "ace";

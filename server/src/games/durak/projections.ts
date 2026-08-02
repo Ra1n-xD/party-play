@@ -127,7 +127,7 @@ export function buildDurakPublicState(room: DurakRoom, nowMs = Date.now()): Dura
   return {
     gameId: "durak",
     revision: room.revision,
-    phase: state.phase,
+    phase: state.phase === "GAME_OVER" ? "GAME_OVER" : "PLAYING",
     fightStage:
       fight?.stage === "opening"
         ? "attack"

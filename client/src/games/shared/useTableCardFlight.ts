@@ -3,12 +3,16 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 export interface TableCardFlight {
   key: string;
   sourceSeatId: string;
+  sourceId?: string;
   targetId: string;
+  suppress?: boolean;
 }
 
 interface UseTableCardFlightOptions {
   revision: string | number;
   flights: readonly TableCardFlight[];
+  sourceDataAttribute?: string;
+  sourceElementSelector?: string;
 }
 
 const TABLE_CARD_FLIGHT_DURATION_MS = 680;
@@ -23,8 +27,14 @@ function findByDataAttribute(attribute: string, value: string): HTMLElement | nu
   );
 }
 
-export function useTableCardFlight({ revision, flights }: UseTableCardFlightOptions): void {
+export function useTableCardFlight({
+  revision,
+  flights,
+  sourceDataAttribute,
+  sourceElementSelector,
+}: UseTableCardFlightOptions): void {
   const previousKeysRef = useRef<Set<string> | null>(null);
+  const previousSourceRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const cleanupTimersRef = useRef<number[]>([]);
 
   useLayoutEffect(() => {
@@ -36,11 +46,18 @@ export function useTableCardFlight({ revision, flights }: UseTableCardFlightOpti
     flights
       .filter((flight) => !previousKeys.has(flight.key))
       .forEach((flight, index) => {
-        const source = findByDataAttribute("data-card-player-seat", flight.sourceSeatId);
-        const target = findByDataAttribute("data-table-card-flight", flight.targetId);
-        if (!source || !target) return;
+        if (flight.suppress) return;
 
-        const sourceRect = source.getBoundingClientRect();
+        const cachedSourceRect = flight.sourceId
+          ? previousSourceRectsRef.current.get(flight.sourceId)
+          : undefined;
+        const fallbackSource = cachedSourceRect
+          ? null
+          : findByDataAttribute("data-card-player-seat", flight.sourceSeatId);
+        const target = findByDataAttribute("data-table-card-flight", flight.targetId);
+        if ((!cachedSourceRect && !fallbackSource) || !target) return;
+
+        const sourceRect = cachedSourceRect ?? fallbackSource!.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
         const sourceCenterX = sourceRect.left + sourceRect.width / 2;
         const sourceCenterY = sourceRect.top + sourceRect.height / 2;
@@ -71,8 +88,27 @@ export function useTableCardFlight({ revision, flights }: UseTableCardFlightOpti
       });
   }, [flights, revision]);
 
+  useLayoutEffect(() => {
+    if (!sourceDataAttribute) {
+      previousSourceRectsRef.current = new Map();
+      return;
+    }
+
+    const nextSourceRects = new Map<string, DOMRect>();
+    document.querySelectorAll<HTMLElement>(`[${sourceDataAttribute}]`).forEach((element) => {
+      const sourceId = element.getAttribute(sourceDataAttribute);
+      if (!sourceId) return;
+      const sourceElement = sourceElementSelector
+        ? (element.querySelector<HTMLElement>(sourceElementSelector) ?? element)
+        : element;
+      nextSourceRects.set(sourceId, sourceElement.getBoundingClientRect());
+    });
+    previousSourceRectsRef.current = nextSourceRects;
+  });
+
   useEffect(
     () => () => {
+      previousSourceRectsRef.current = new Map();
       cleanupTimersRef.current.forEach((timer) => window.clearTimeout(timer));
       cleanupTimersRef.current = [];
     },

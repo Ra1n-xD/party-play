@@ -5,6 +5,8 @@ interface CardPlayerAction {
   label: string;
 }
 
+type CardPlayerTurnSemantics = "exclusive-turn" | "simultaneous-decision";
+
 interface CardPlayerSeatProps {
   seatId: string;
   name: string;
@@ -21,6 +23,7 @@ interface CardPlayerSeatProps {
   turnRemainingMs: number | null;
   turnTimeoutMs: number | null;
   turnAnimationKey: string;
+  turnSemantics?: CardPlayerTurnSemantics;
   action?: CardPlayerAction;
 }
 
@@ -58,15 +61,22 @@ export function CardPlayerSeat({
   turnRemainingMs,
   turnTimeoutMs,
   turnAnimationKey,
+  turnSemantics,
   action,
 }: CardPlayerSeatProps) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const resolvedTurnSemantics = turnSemantics ?? "exclusive-turn";
+  const usesSimultaneousDecision = resolvedTurnSemantics === "simultaneous-decision";
   const cardCountLabel = formatCardCount(cardCount);
   const statusLabel = status === "out" ? "Вышел" : status === "excluded" ? "Исключён" : null;
   const isInactive = status !== "active";
+  const displayedRemainingMs =
+    turnSemantics == null || secondsLeft == null
+      ? turnRemainingMs
+      : Math.min(turnRemainingMs ?? 0, secondsLeft * 1_000);
   const remainingRatio =
-    turnRemainingMs != null && turnTimeoutMs != null && turnTimeoutMs > 0
-      ? Math.max(0, Math.min(1, turnRemainingMs / turnTimeoutMs))
+    displayedRemainingMs != null && turnTimeoutMs != null && turnTimeoutMs > 0
+      ? Math.max(0, Math.min(1, displayedRemainingMs / turnTimeoutMs))
       : 1;
   const turnBorderStyle = {
     "--card-turn-duration": `${Math.max(turnRemainingMs ?? 0, 1)}ms`,
@@ -89,14 +99,33 @@ export function CardPlayerSeat({
   const turnStatusLabel = !isCurrent
     ? null
     : paused
-      ? "таймер хода приостановлен"
+      ? usesSimultaneousDecision
+        ? "таймер решения приостановлен"
+        : "таймер хода приостановлен"
       : turnRemainingMs != null && turnTimeoutMs != null
         ? secondsLeft == null
-          ? "идёт отсчёт времени хода"
+          ? usesSimultaneousDecision
+            ? "идёт отсчёт времени решения"
+            : "идёт отсчёт времени хода"
           : secondsLeft > 0
-            ? `на ход осталось ${formatSeconds(secondsLeft)}`
-            : "время хода истекло"
-        : "ход без ограничения времени";
+            ? usesSimultaneousDecision
+              ? `на решение осталось ${formatSeconds(secondsLeft)}`
+              : `на ход осталось ${formatSeconds(secondsLeft)}`
+            : usesSimultaneousDecision
+              ? "время решения истекло"
+              : "время хода истекло"
+        : usesSimultaneousDecision
+          ? "решение без ограничения времени"
+          : "ход без ограничения времени";
+  const currentStateLabel = !isCurrent
+    ? null
+    : usesSimultaneousDecision
+      ? paused
+        ? "таймер решения приостановлен"
+        : "владелец таймера решения"
+      : paused
+        ? "ход приостановлен"
+        : "сейчас ходит";
   const statusParts = [
     isMe ? "это вы" : null,
     isHost ? "хост" : null,
@@ -104,7 +133,7 @@ export function CardPlayerSeat({
     temporaryBot ? "временно играет бот" : controllerKind === "bot" ? "бот" : null,
     !connected ? "нет связи" : null,
     statusLabel?.toLocaleLowerCase("ru-RU") ?? null,
-    isCurrent ? (paused ? "ход приостановлен" : "сейчас ходит") : null,
+    currentStateLabel,
     turnStatusLabel,
     cardCountLabel,
   ].filter(Boolean);

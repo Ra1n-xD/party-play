@@ -7,6 +7,8 @@ interface UseCardTransferMotionOptions {
   revision: string | number;
   events: readonly CardTransferVisualEvent[];
   animateInitial?: boolean;
+  playerTargetAnchors?: Readonly<Record<string, string>>;
+  shouldRenderEvent?: (event: CardTransferVisualEvent) => boolean;
 }
 
 const CARD_TRANSFER_DURATION_MS = 1_650;
@@ -29,11 +31,28 @@ function findAnchor(gameId: "durak" | "uno", anchor: CardVisualAnchor): HTMLElem
   return findByDataAttribute("data-card-motion-anchor", `${gameId}:${anchor.kind}`);
 }
 
+function findTargetAnchor(
+  gameId: "durak" | "uno",
+  anchor: CardVisualAnchor,
+  playerTargetAnchors: Readonly<Record<string, string>> | undefined,
+): HTMLElement | null {
+  if (anchor.kind === "player") {
+    const overrideAnchor = playerTargetAnchors?.[anchor.seatId];
+    if (overrideAnchor) {
+      const overrideTarget = findByDataAttribute("data-card-motion-anchor", overrideAnchor);
+      if (overrideTarget) return overrideTarget;
+    }
+  }
+  return findAnchor(gameId, anchor);
+}
+
 export function useCardTransferMotion({
   gameId,
   revision,
   events,
   animateInitial = false,
+  playerTargetAnchors,
+  shouldRenderEvent,
 }: UseCardTransferMotionOptions): void {
   const previousIdsRef = useRef<Set<number> | null>(null);
   const cleanupTimersRef = useRef<number[]>([]);
@@ -70,8 +89,10 @@ export function useCardTransferMotion({
     let durakRefillEventIndex = 0;
 
     freshEvents.forEach((event, eventIndex) => {
+      if (shouldRenderEvent && !shouldRenderEvent(event)) return;
+
       const source = findAnchor(gameId, event.source);
-      const target = findAnchor(gameId, event.target);
+      const target = findTargetAnchor(gameId, event.target, playerTargetAnchors);
       if (!source || !target) return;
 
       const sourceRect = source.getBoundingClientRect();
@@ -123,7 +144,7 @@ export function useCardTransferMotion({
         cleanupTimersRef.current.push(cleanupTimer);
       }
     });
-  }, [animateInitial, events, gameId, revision]);
+  }, [animateInitial, events, gameId, playerTargetAnchors, revision, shouldRenderEvent]);
 
   useEffect(
     () => () => {
