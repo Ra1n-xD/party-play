@@ -235,7 +235,11 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
   const actionIndicators = useMemo(() => {
     const indicators: Record<string, { eventId: string; label: string }> = {};
     for (const seatId of game?.passedSeatIds ?? []) {
-      indicators[seatId] = { eventId: `pass:${seatId}`, label: "Пас" };
+      const isPrimaryAttacker = seatId === game?.attackerSeatId && game?.takeDeclared === false;
+      indicators[seatId] = {
+        eventId: `${isPrimaryAttacker ? "beat" : "pass"}:${seatId}`,
+        label: isPrimaryAttacker ? "Бито" : "Пас",
+      };
     }
     if (game?.takeDeclared && game.defenderSeatId) {
       indicators[game.defenderSeatId] = {
@@ -244,7 +248,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
       };
     }
     return indicators;
-  }, [game?.defenderSeatId, game?.passedSeatIds, game?.takeDeclared]);
+  }, [game?.attackerSeatId, game?.defenderSeatId, game?.passedSeatIds, game?.takeDeclared]);
 
   useTableCardFlight({ revision: snapshot.revision, flights: tableFlights });
   useCardTransferMotion({

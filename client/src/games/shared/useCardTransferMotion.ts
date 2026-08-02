@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
+import { DURAK_REFILL_PHASE_PAUSE_MS } from "../../../../shared/games/durak/types";
 import type { CardTransferVisualEvent, CardVisualAnchor } from "../../../../shared/types";
 
 interface UseCardTransferMotionOptions {
@@ -11,7 +12,6 @@ interface UseCardTransferMotionOptions {
 const CARD_TRANSFER_DURATION_MS = 1_650;
 const CARD_TRANSFER_EVENT_STAGGER_MS = 90;
 const CARD_TRANSFER_CARD_STAGGER_MS = 100;
-const DURAK_TAKE_PHASE_PAUSE_MS = 250;
 const CARD_TRANSFER_CLEANUP_BUFFER_MS = 250;
 
 function findByDataAttribute(attribute: string, value: string): HTMLElement | null {
@@ -53,17 +53,19 @@ export function useCardTransferMotion({
             (event.target.kind === "table" || event.target.kind === "discard")
           ),
       );
-    const durakTableTakeIndex =
+    const durakTableResolutionIndex =
       gameId === "durak"
         ? freshEvents.findIndex(
-            (event) => event.source.kind === "table" && event.target.kind === "player",
+            (event) =>
+              event.source.kind === "table" &&
+              (event.target.kind === "player" || event.target.kind === "discard"),
           )
         : -1;
-    const durakTableTakeEvent = freshEvents[durakTableTakeIndex];
-    const durakRefillPhaseDelay = durakTableTakeEvent
+    const durakTableResolutionEvent = freshEvents[durakTableResolutionIndex];
+    const durakRefillPhaseDelay = durakTableResolutionEvent
       ? CARD_TRANSFER_DURATION_MS +
-        (Math.min(durakTableTakeEvent.cardCount, 3) - 1) * CARD_TRANSFER_CARD_STAGGER_MS +
-        DURAK_TAKE_PHASE_PAUSE_MS
+        (Math.min(durakTableResolutionEvent.cardCount, 3) - 1) * CARD_TRANSFER_CARD_STAGGER_MS +
+        DURAK_REFILL_PHASE_PAUSE_MS
       : 0;
     let durakRefillEventIndex = 0;
 
@@ -79,12 +81,12 @@ export function useCardTransferMotion({
       const targetCenterX = targetRect.left + targetRect.width / 2;
       const targetCenterY = targetRect.top + targetRect.height / 2;
       const visibleCards = Math.min(event.cardCount, 3);
-      const isDurakRefillAfterTake =
-        durakTableTakeIndex >= 0 &&
-        eventIndex > durakTableTakeIndex &&
+      const isDurakRefillAfterTableResolution =
+        durakTableResolutionIndex >= 0 &&
+        eventIndex > durakTableResolutionIndex &&
         event.source.kind === "deck" &&
         event.target.kind === "player";
-      const eventDelay = isDurakRefillAfterTake
+      const eventDelay = isDurakRefillAfterTableResolution
         ? durakRefillPhaseDelay + durakRefillEventIndex++ * (CARD_TRANSFER_EVENT_STAGGER_MS + 40)
         : Math.min(eventIndex, 4) * CARD_TRANSFER_EVENT_STAGGER_MS;
 

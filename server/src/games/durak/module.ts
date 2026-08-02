@@ -30,12 +30,14 @@ import {
   createDurakGameState,
   excludeDurakSeat,
   freezeDurakTurn,
+  isDurakTurnReady,
   resumeDurakTurn,
 } from "./engine.js";
 import { buildDurakPrivateState, buildDurakPublicState } from "./projections.js";
 import { asDurakRoom, type DurakGameState, type DurakRoom } from "./runtime.js";
 
 interface PendingDurakActions {
+  readyTimer: ReturnType<typeof setTimeout> | null;
   turnTimer: ReturnType<typeof setTimeout> | null;
   botTimer: ReturnType<typeof setTimeout> | null;
 }
@@ -64,6 +66,7 @@ function requireDurakRoom(room: Room): DurakRoom {
 
 function clearDurakActions(roomCode: string): void {
   const pending = pendingActions.get(roomCode);
+  if (pending?.readyTimer) clearTimeout(pending.readyTimer);
   if (pending?.turnTimer) clearTimeout(pending.turnTimer);
   if (pending?.botTimer) clearTimeout(pending.botTimer);
   pendingActions.delete(roomCode);
@@ -75,6 +78,7 @@ function rememberTimer(
   timer: ReturnType<typeof setTimeout>,
 ): void {
   const pending = pendingActions.get(roomCode) ?? {
+    readyTimer: null,
     turnTimer: null,
     botTimer: null,
   };
@@ -122,6 +126,7 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
 
   const expectedGameInstanceId = state.gameInstanceId;
   const expectedTurnId = turn.id;
+  const nowMs = Date.now();
   if (turn.clock.kind === "running") {
     const expectedDeadline = turn.clock.deadlineAt;
     const expectedRevision = room.revision;
@@ -153,22 +158,47 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
     rememberTimer(room.code, "turnTimer", timer);
   }
 
+  if (!isDurakTurnReady(turn, nowMs)) {
+    const expectedRevision = room.revision;
+    const expectedReadyAt = turn.readyAt;
+    const delay = Math.max(0, expectedReadyAt - nowMs);
+    const timer = setTimeout(() => {
+      void executeInRoom(room.code, () => {
+        if (getRoom(room.code) !== room || room.revision !== expectedRevision || isPaused(room)) {
+          return;
+        }
+        const currentState = room.gameState;
+        const currentTurn = currentState?.turn;
+        if (
+          !currentState ||
+          currentState.gameInstanceId !== expectedGameInstanceId ||
+          currentTurn?.id !== expectedTurnId ||
+          currentTurn.readyAt !== expectedReadyAt ||
+          !isDurakTurnReady(currentTurn, Date.now())
+        ) {
+          return;
+        }
+        publishDurak(room, io);
+      }).catch(() => {});
+    }, delay);
+    timer.unref();
+    rememberTimer(room.code, "readyTimer", timer);
+    return;
+  }
+
   const publicState = buildDurakPublicState(room);
   let botDecision: { actor: Player; command: DurakCommand } | null = null;
-  // Preserve simultaneous throw-in order, but skip optional no-ops before the required actor.
-  for (const seatId of state.seatOrder) {
-    const candidate = room.players.get(seatId);
-    if (!candidate || candidate.controller.kind !== "bot" || candidate.kicked) continue;
-    const privateState = buildDurakPrivateState(room, candidate.id);
-    if (!privateState || privateState.legalAction.type === "wait") continue;
-    const command = chooseDurakBotCommand(
-      publicState,
-      privateState,
-      () => randomInt(1_000_000) / 1_000_000,
-    );
-    if (!command) continue;
-    botDecision = { actor: candidate, command };
-    break;
+  const candidate = room.players.get(turn.actorSeatId);
+  if (candidate && candidate.controller.kind === "bot" && !candidate.kicked) {
+    const privateState = buildDurakPrivateState(room, candidate.id, nowMs);
+    if (privateState && privateState.legalAction.type !== "wait") {
+      const command = chooseDurakBotCommand(
+        publicState,
+        privateState,
+        () => randomInt(1_000_000) / 1_000_000,
+      );
+      if (command) botDecision = { actor: candidate, command };
+    }
   }
   if (!botDecision) return;
   const { actor, command } = botDecision;

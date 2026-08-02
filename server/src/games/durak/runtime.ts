@@ -22,6 +22,8 @@ export interface DurakTurn {
   id: number;
   actorSeatId: SeatId;
   kind: DurakTurnKind;
+  readyAt: number;
+  readyRemainingMs: number | null;
   clock: DurakTurnClock;
 }
 
