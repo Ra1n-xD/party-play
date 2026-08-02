@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,6 +28,7 @@ try {
 
   rmSync(outputDirectory, { recursive: true, force: true });
   renameSync(stagingDirectory, outputDirectory);
+  chmodSync(outputDirectory, 0o755);
 } catch (error) {
   if (existsSync(stagingDirectory)) {
     rmSync(stagingDirectory, { recursive: true, force: true });
