@@ -734,6 +734,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
             onAssignTemporaryBot={assignTemporaryBot}
             onKickPlayer={kickPlayer}
             onTransferHost={transferHost}
+            disabled={!canManage}
           />
         </AccessibleModal>
       )}

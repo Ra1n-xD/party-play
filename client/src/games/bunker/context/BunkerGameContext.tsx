@@ -35,6 +35,7 @@ export type OverlayItem =
 
 interface BunkerGameContextValue {
   connected: boolean;
+  commandPending: boolean;
   roomCode: string | null;
   playerId: string | null;
   isSpectator: boolean;
@@ -318,6 +319,7 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
     <BunkerGameContext.Provider
       value={{
         connected: platform.connected,
+        commandPending: platform.commandPending,
         roomCode: platform.roomCode,
         playerId:
           bunkerSnapshot?.viewer.role === "player"

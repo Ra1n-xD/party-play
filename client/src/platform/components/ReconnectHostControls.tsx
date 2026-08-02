@@ -21,6 +21,7 @@ interface ReconnectHostControlsProps {
   onAssignTemporaryBot?: (playerId: string) => void;
   onReturnHumanControl?: (playerId: string) => void;
   compact?: boolean;
+  disabled?: boolean;
 }
 
 interface ReconnectHostBannerProps {
@@ -65,6 +66,7 @@ export function ReconnectHostControls({
   onAssignTemporaryBot,
   onReturnHumanControl,
   compact = false,
+  disabled = false,
 }: ReconnectHostControlsProps) {
   const [kickConfirmationId, setKickConfirmationId] = useState<string | null>(null);
   const removablePlayers = players.filter(
@@ -116,6 +118,7 @@ export function ReconnectHostControls({
                     type="button"
                     className="reconnect-host-action is-approve"
                     onClick={() => onResolveClaim(claim.requestId, true)}
+                    disabled={disabled}
                   >
                     Одобрить
                   </button>
@@ -123,6 +126,7 @@ export function ReconnectHostControls({
                     type="button"
                     className="reconnect-host-action is-reject"
                     onClick={() => onResolveClaim(claim.requestId, false)}
+                    disabled={disabled}
                   >
                     Отклонить
                   </button>
@@ -154,6 +158,7 @@ export function ReconnectHostControls({
                     type="button"
                     className="reconnect-host-action is-approve"
                     onClick={() => onAssignTemporaryBot(player.id)}
+                    disabled={disabled}
                   >
                     Временно передать боту
                   </button>
@@ -163,6 +168,7 @@ export function ReconnectHostControls({
                     type="button"
                     className="reconnect-host-action is-transfer"
                     onClick={() => onReturnHumanControl(player.id)}
+                    disabled={disabled}
                   >
                     Вернуть управление человеку
                   </button>
@@ -170,6 +176,7 @@ export function ReconnectHostControls({
                 <button
                   type="button"
                   className="reconnect-host-action is-kick"
+                  disabled={disabled}
                   aria-label={
                     kickConfirmationId === player.id
                       ? `Подтвердить кик игрока ${player.name}`
@@ -200,6 +207,7 @@ export function ReconnectHostControls({
                     type="button"
                     className="reconnect-host-action is-transfer"
                     onClick={() => onTransferHost(player.id)}
+                    disabled={disabled}
                   >
                     Передать права хоста
                   </button>

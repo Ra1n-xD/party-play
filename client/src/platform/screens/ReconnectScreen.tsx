@@ -8,6 +8,8 @@ interface ReconnectScreenProps {
 
 export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
   const {
+    connected,
+    sessionPending,
     reconnectableSeats,
     reconnectableSeatsRoomCode,
     seatLookupState,
@@ -37,9 +39,8 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
     lookupMatchesRoom && seatLookupState.status === "complete" && reconnectableSeats.length === 0;
 
   const findSeats = () => {
-    if (roomCode.length !== ROOM_CODE_LENGTH) return;
-    setSelectedPlayerId(null);
-    listReconnectableSeats(roomCode);
+    if (!connected || roomCode.length !== ROOM_CODE_LENGTH) return;
+    if (listReconnectableSeats(roomCode)) setSelectedPlayerId(null);
   };
 
   const submitClaim = () => {
@@ -71,8 +72,15 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
         <div className="reconnect-claim-status is-approved">
           <strong>Сохранённое место · {retainedReconnectSession.roomCode}</strong>
           <p>Можно вернуться напрямую в этом браузере без подтверждения хоста.</p>
-          <button type="button" className="btn btn-primary" onClick={resumeRetainedSession}>
-            Вернуться в игру · {retainedReconnectSession.roomCode}
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={resumeRetainedSession}
+            disabled={!connected || sessionPending}
+          >
+            {sessionPending
+              ? "Возвращаемся…"
+              : `Вернуться в игру · ${retainedReconnectSession.roomCode}`}
           </button>
         </div>
       )}
@@ -95,7 +103,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
             type="button"
             className="btn btn-primary"
             onClick={findSeats}
-            disabled={roomCode.length !== ROOM_CODE_LENGTH || lookupPending}
+            disabled={!connected || roomCode.length !== ROOM_CODE_LENGTH || lookupPending}
           >
             {lookupPending ? "Ищем места…" : "Найти места"}
           </button>
@@ -144,7 +152,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
               type="button"
               className="btn btn-primary"
               onClick={submitClaim}
-              disabled={!claimantName.trim()}
+              disabled={!connected || !claimantName.trim()}
             >
               Отправить заявку
             </button>
@@ -168,12 +176,22 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
                 : "Можно вернуться назад и попробовать снова.")}
           </p>
           {pendingSeatClaim.status === "waiting" && (
-            <button type="button" className="btn btn-secondary" onClick={cancelSeatClaim}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={cancelSeatClaim}
+              disabled={!connected}
+            >
               Отменить заявку
             </button>
           )}
           {["rejected", "cancelled"].includes(pendingSeatClaim.status) && (
-            <button type="button" className="btn btn-secondary" onClick={findSeats}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={findSeats}
+              disabled={!connected}
+            >
               Попробовать снова
             </button>
           )}

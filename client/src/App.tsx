@@ -5,23 +5,35 @@ import { getLazyGameComponent } from "./platform/gameRegistry";
 import { HomeScreen } from "./platform/screens/HomeScreen";
 import { StatsScreen } from "./platform/screens/StatsScreen";
 
-function RoomLoading({ message = "Загружаем комнату…" }: { message?: string }) {
+function RoomLoading({
+  message = "Загружаем комнату…",
+  onCancel,
+}: {
+  message?: string;
+  onCancel?: () => void;
+}) {
   return (
     <div className="screen platform-room-loading" role="status">
       <span className="platform-loading-mark" aria-hidden="true">
         ◆
       </span>
       <p>{message}</p>
+      {onCancel && (
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          Вернуться на главную
+        </button>
+      )}
     </div>
   );
 }
 
 function RoomAppContent() {
-  const { roomCode, activeGameId, snapshot, sessionPending, leaveRoom } = usePlatform();
+  const { roomCode, activeGameId, snapshot, sessionPending, cancelPendingMembership, leaveRoom } =
+    usePlatform();
 
   if (!roomCode) return <HomeScreen />;
   if (sessionPending && !snapshot) {
-    return <RoomLoading message="Возвращаемся в комнату…" />;
+    return <RoomLoading message="Возвращаемся в комнату…" onCancel={cancelPendingMembership} />;
   }
 
   const serverGameId = snapshot?.gameId ?? activeGameId;

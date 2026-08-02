@@ -12,6 +12,9 @@ interface LobbyScreenProps {
 export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
   const {
     snapshot,
+    connected,
+    reconnectState,
+    commandPending,
     playerId,
     isSpectator,
     setReady,
@@ -35,6 +38,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
       ? activeSeats.find((seat) => seat.seatId === viewerSeatId)
       : undefined;
   const isHost = me?.isHost ?? false;
+  const canMutateRoom = connected && reconnectState === "connected" && !commandPending;
 
   useEffect(() => {
     if (!isHost) setManagementOpen(false);
@@ -134,6 +138,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
                     type="button"
                     className="btn-remove-bot"
                     onClick={() => removeBot(seat.seatId)}
+                    disabled={!canMutateRoom}
                     aria-label={`Удалить бота ${seat.name}`}
                   >
                     ×
@@ -146,7 +151,12 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
 
         <div className="lobby-actions">
           {!isSpectator && isHost && canAddBot && (
-            <button type="button" className="btn btn-bot" onClick={addBot}>
+            <button
+              type="button"
+              className="btn btn-bot"
+              onClick={addBot}
+              disabled={!canMutateRoom}
+            >
               + Добавить бота
             </button>
           )}
@@ -165,6 +175,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
               type="button"
               className={`btn ${me?.ready ? "btn-secondary" : "btn-primary"}`}
               onClick={() => setReady(!me?.ready)}
+              disabled={!canMutateRoom}
             >
               {me?.ready ? "Не готов" : "Готов!"}
             </button>
@@ -174,7 +185,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
               type="button"
               className="btn btn-primary"
               onClick={startGame}
-              disabled={!enoughPlayers || !allReady}
+              disabled={!canMutateRoom || !enoughPlayers || !allReady}
             >
               {!enoughPlayers
                 ? `Нужно минимум ${gameModule.metadata.minPlayers} игрока`
@@ -220,6 +231,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
             onResolveClaim={resolveSeatClaim}
             onKickPlayer={kickPlayer}
             onTransferHost={transferHost}
+            disabled={!canMutateRoom}
           />
         </AccessibleModal>
       )}

@@ -166,6 +166,12 @@ server {
     listen 80;
     server_name _;
 
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss:; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
     # Статика клиента
     root /home/partyplay/party-play/client/dist;
     index index.html;
@@ -173,6 +179,23 @@ server {
     # SPA — все маршруты -> index.html
     location / {
         try_files $uri $uri/ /index.html;
+    }
+
+    # Реальные health/readiness Node.js, без SPA fallback
+    location = /healthz {
+        proxy_pass http://127.0.0.1:3001/healthz;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /readyz {
+        proxy_pass http://127.0.0.1:3001/readyz;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # Socket.IO -> Node.js
@@ -234,21 +257,33 @@ rm /tmp/deploy_key /tmp/deploy_key.pub
 
 GitHub → Репозиторий → Settings → Secrets and variables → Actions → New repository secret:
 
-| Секрет        | Значение                                                          |
-| ------------- | ----------------------------------------------------------------- |
-| `VPS_HOST`    | IP-адрес сервера (например `185.100.50.25`)                       |
-| `VPS_USER`    | `partyplay`                                                       |
-| `VPS_SSH_KEY` | Содержимое приватного ключа (весь текст из `cat /tmp/deploy_key`) |
+| Секрет                 | Значение                                                          |
+| ---------------------- | ----------------------------------------------------------------- |
+| `VPS_HOST`             | IP-адрес сервера (например `185.100.50.25`)                       |
+| `VPS_USER`             | `partyplay`                                                       |
+| `VPS_SSH_KEY`          | Содержимое приватного ключа (весь текст из `cat /tmp/deploy_key`) |
+| `VPS_HOST_FINGERPRINT` | SHA256 fingerprint SSH-хоста из команды ниже                      |
+
+Fingerprint получи непосредственно на VPS и сверь перед добавлением секрета:
+
+```bash
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $2}'
+```
 
 ### Шаг 3: Готово
 
 Workflow-файл `.github/workflows/deploy.yml` уже есть в репозитории. После пуша в `main` GitHub автоматически:
 
-1. Подключится к VPS по SSH
-2. Стянет последние изменения (`git pull`)
-3. Установит зависимости (`npm ci --include=dev`)
-4. Соберёт проект (`npm run build`)
-5. Перезапустит сервис (`systemctl restart partyplay`)
+1. Подключится к проверенному VPS по SSH
+2. Закроет создание комнат и отменит деплой, если остались активные или восстанавливаемые комнаты
+3. Стянет точный commit, который запустил workflow
+4. Сохранит предыдущие зависимости и собранные артефакты, затем соберёт клиент и сервер
+5. Перезапустит сервис и проверит readiness
+6. При ошибке восстановит готовый предыдущий snapshot без повторной установки из сети
+
+Первый workflow с deployment gate намеренно завершится ошибкой, если установленная версия ещё не
+знает маршрут `/deployz`. Это защита от незаметного рестарта активных комнат. Однократный bootstrap
+выполняется вручную по инструкции ниже.
 
 Статус деплоя смотри в GitHub → вкладка Actions.
 
@@ -256,11 +291,19 @@ Workflow-файл `.github/workflows/deploy.yml` уже есть в репози
 
 ## 15. Ручной деплой (если нужно)
 
-В репозитории есть скрипт `deploy.sh`. При первом запуске:
+В репозитории есть скрипт `deploy.sh`. Первый rollout версии с `/deployz` выполни только в тихое
+время, когда точно никто не играет. Автоматический workflow не обходит эту проверку. Для явного
+однократного bootstrap:
 
 ```bash
 su - partyplay
-~/party-play/deploy.sh
+cd ~/party-play
+git fetch origin main
+bootstrap_script=$(mktemp)
+git show origin/main:deploy.sh > "$bootstrap_script"
+target_commit=$(git rev-parse origin/main)
+PARTYPLAY_ALLOW_LEGACY_DEPLOY=1 PARTYPLAY_TARGET_COMMIT="$target_commit" bash "$bootstrap_script"
+rm -f "$bootstrap_script"
 ```
 
 В дальнейшем:
@@ -269,7 +312,19 @@ su - partyplay
 su - partyplay -c "~/party-play/deploy.sh"
 ```
 
-Скрипт стянет изменения, пересоберёт проект, проверит сборку и перезапустит сервис.
+Скрипт стянет изменения, пересоберёт проект, проверит сборку и перезапустит сервис. Если в памяти
+сервера есть комната, деплой завершится без рестарта и её состояние не потеряется. До изменения
+checkout и зависимостей скрипт сохраняет готовый rollback snapshot. При ошибке или сигналах
+`HUP`/`INT`/`TERM` он восстанавливает предыдущую версию и снимает режим drain.
+
+После изменения nginx проверь не только код ответа, но и JSON:
+
+```bash
+curl --fail --silent --show-error https://partyplay.duckdns.org/healthz
+curl --fail --silent --show-error https://partyplay.duckdns.org/readyz
+```
+
+Ожидаются `{"status":"ok"}` и `{"status":"ready"}`, а не HTML приложения.
 
 ---
 

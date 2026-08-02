@@ -757,7 +757,7 @@
 
 @media (max-width: 760px) {
   .screen.command-game-screen.card-game-screen {
-    --card-arena-dock-space: calc(62px + env(safe-area-inset-bottom));
+    --card-arena-dock-space: calc(70px + env(safe-area-inset-bottom));
     --card-arena-hand-height: 120px;
     --card-seat-size: clamp(54px, 16vw, 63px);
     padding: 0;
@@ -1049,7 +1049,7 @@
 
 @media (max-width: 380px), (max-height: 680px) {
   .screen.command-game-screen.card-game-screen {
-    --card-arena-dock-space: calc(60px + env(safe-area-inset-bottom));
+    --card-arena-dock-space: calc(68px + env(safe-area-inset-bottom));
     --card-arena-hand-height: 108px;
     --card-seat-size: clamp(50px, 14.5vw, 56px);
   }

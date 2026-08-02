@@ -2334,6 +2334,15 @@
     bottom: calc(140px + env(safe-area-inset-bottom));
   }
 
+  .screen.command-game-screen.has-game-command-bar:has(.gs-command-actions > :nth-child(5)) {
+    padding-bottom: calc(168px + env(safe-area-inset-bottom));
+  }
+
+  .screen.command-game-screen.has-game-command-bar:has(.gs-command-actions > :nth-child(5))
+    .error-toast {
+    bottom: calc(168px + env(safe-area-inset-bottom));
+  }
+
   .screen.command-game-screen.has-game-command-bar:not(:has(.gs-command-actions > *)) {
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }

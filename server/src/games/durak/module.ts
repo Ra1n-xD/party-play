@@ -14,7 +14,13 @@ import type {
 } from "../../platform/gameModule.js";
 import { publishRoomSnapshots } from "../../platform/statePublisher.js";
 import { executeInRoom } from "../../platform/roomExecutor.js";
-import { getRoom, removePlayer, touchRoom, type Room } from "../../platform/roomManager.js";
+import {
+  getRoom,
+  removePlayer,
+  touchRoom,
+  type Player,
+  type Room,
+} from "../../platform/roomManager.js";
 import { shuffle } from "../../utils.js";
 import { chooseDurakBotCommand } from "./bot.js";
 import { createDurakDeck } from "./cards.js";
@@ -147,13 +153,25 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
     rememberTimer(room.code, "turnTimer", timer);
   }
 
-  const actor = state.seatOrder
-    .map((seatId) => room.players.get(seatId))
-    .find((candidate) => {
-      if (!candidate || candidate.controller.kind !== "bot" || candidate.kicked) return false;
-      return buildDurakPrivateState(room, candidate.id)?.legalAction.type !== "wait";
-    });
-  if (!actor) return;
+  const publicState = buildDurakPublicState(room);
+  let botDecision: { actor: Player; command: DurakCommand } | null = null;
+  // Preserve simultaneous throw-in order, but skip optional no-ops before the required actor.
+  for (const seatId of state.seatOrder) {
+    const candidate = room.players.get(seatId);
+    if (!candidate || candidate.controller.kind !== "bot" || candidate.kicked) continue;
+    const privateState = buildDurakPrivateState(room, candidate.id);
+    if (!privateState || privateState.legalAction.type === "wait") continue;
+    const command = chooseDurakBotCommand(
+      publicState,
+      privateState,
+      () => randomInt(1_000_000) / 1_000_000,
+    );
+    if (!command) continue;
+    botDecision = { actor: candidate, command };
+    break;
+  }
+  if (!botDecision) return;
+  const { actor, command } = botDecision;
 
   const expectedControllerEpoch = actor.controller.epoch;
   const expectedRevision = room.revision;
@@ -183,15 +201,8 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
         return;
       }
 
-      const publicState = buildDurakPublicState(room);
       const privateState = buildDurakPrivateState(room, currentActor.id);
       if (!privateState || privateState.legalAction.type === "wait") return;
-      const command = chooseDurakBotCommand(
-        publicState,
-        privateState,
-        () => randomInt(1_000_000) / 1_000_000,
-      );
-      if (!command) return;
       const result = applyDurakCommand(currentState, currentActor.id, command, Date.now(), false);
       if (result.success) commitDurakState(room, result.state, io);
     }).catch(() => {});

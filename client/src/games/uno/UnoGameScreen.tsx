@@ -749,6 +749,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
             onReturnHumanControl={returnHumanControl}
             onKickPlayer={kickPlayer}
             onTransferHost={transferHost}
+            disabled={!canManage}
           />
         </AccessibleModal>
       )}
