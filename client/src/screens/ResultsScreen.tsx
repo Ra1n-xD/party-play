@@ -4,7 +4,17 @@ import { GameRoomHeader } from "./game/GameRoomHeader";
 import { GameDockTools } from "./game/GameDockTools";
 
 export function ResultsScreen() {
-  const { connected, roomCode, gameState, playerId, isSpectator, playAgain, leaveRoom } = useGame();
+  const {
+    connected,
+    commandPending,
+    reconnectState,
+    roomCode,
+    gameState,
+    playerId,
+    isSpectator,
+    playAgain,
+    leaveRoom,
+  } = useGame();
 
   if (!gameState) return null;
 
@@ -176,8 +186,12 @@ export function ResultsScreen() {
         {isHost && (
           <>
             <strong>Партия завершена</strong>
-            <button className="btn btn-primary" onClick={playAgain}>
-              Сыграть ещё
+            <button
+              className="btn btn-primary"
+              onClick={playAgain}
+              disabled={!connected || reconnectState !== "connected" || commandPending}
+            >
+              {commandPending ? "Возвращаем в лобби…" : "Сыграть ещё"}
             </button>
           </>
         )}

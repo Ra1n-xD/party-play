@@ -58,9 +58,11 @@ export function HomeScreen() {
     joinPublicRoom,
     watchPublicRoom,
     clearPublicRoomError,
+    resetSeatRecovery,
     publicRoomCounts,
     publicRoomDirectory,
     publicRoomError,
+    pendingSeatClaim,
     sessionPending,
     error,
   } = usePlatform();
@@ -104,9 +106,12 @@ export function HomeScreen() {
   const selectedDirectory =
     publicRoomDirectory?.gameId === publicRoomsGameId ? publicRoomDirectory : null;
   const availableGameCount = Object.keys(clientGameRegistry).length;
+  const recoveryTransitionLocked =
+    pendingSeatClaim !== null &&
+    ["submitting", "waiting", "cancelling", "approved"].includes(pendingSeatClaim.status);
 
   const canEnterRoom =
-    name.trim().length > 0 && joinCode.length === ROOM_CODE_LENGTH && !sessionPending;
+    connected && name.trim().length > 0 && joinCode.length === ROOM_CODE_LENGTH && !sessionPending;
 
   const handleJoin = (event: FormEvent) => {
     event.preventDefault();
@@ -142,6 +147,12 @@ export function HomeScreen() {
     setRecoveryOpen(true);
   };
 
+  const closeRecoveryModal = () => {
+    if (recoveryTransitionLocked) return;
+    resetSeatRecovery();
+    setRecoveryOpen(false);
+  };
+
   const openPublicRoomsModal = (gameId: RegisteredClientGameId) => {
     setSelectedGameId(null);
     setRulesGameId(null);
@@ -154,7 +165,7 @@ export function HomeScreen() {
   const handleCreate = (event: FormEvent) => {
     event.preventDefault();
     const normalizedName = createName.trim();
-    if (!selectedGameId || !normalizedName || sessionPending) return;
+    if (!selectedGameId || !normalizedName || sessionPending || !connected) return;
     setName(normalizedName);
     createRoom(selectedGameId, normalizedName, createVisibility);
   };
@@ -428,7 +439,7 @@ export function HomeScreen() {
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={!createName.trim() || sessionPending}
+              disabled={!connected || !createName.trim() || sessionPending}
             >
               {sessionPending ? "Создаём…" : "Создать комнату"}
             </button>
@@ -578,7 +589,7 @@ export function HomeScreen() {
       {recoveryOpen && (
         <AccessibleModal
           labelledBy="seat-recovery-title"
-          onClose={() => setRecoveryOpen(false)}
+          onClose={closeRecoveryModal}
           overlayClassName="platform-recovery-modal"
           panelClassName="platform-recovery-panel"
         >

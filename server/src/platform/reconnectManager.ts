@@ -580,6 +580,7 @@ export function markPlayerDisconnected(
   const wasHost = room.hostId === playerId;
   player.connected = false;
   player.controller = { kind: "none", epoch: player.controller.epoch + 1 };
+  player.socketId = "";
   touchRoom(room.code);
   const module = getServerGameModule(room.gameId);
   module?.onControllerChanged(room, player.id, "disconnect", io);

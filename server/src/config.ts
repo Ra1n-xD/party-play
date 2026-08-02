@@ -21,11 +21,24 @@ const PROD_TIMERS = {
   RESULT_DISPLAY_TIME: 6000, // 6 сек
 };
 
-// По умолчанию PROD. Для теста: USE_TEST_TIMERS=true
-const TIMERS = process.env.USE_TEST_TIMERS === "true" ? TEST_TIMERS : PROD_TIMERS;
+function readPort(rawPort: string | undefined): number {
+  const port = Number(rawPort ?? "3001");
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error("PORT must be an integer between 1 and 65535");
+  }
+  return port;
+}
+
+const useTestTimers = process.env.USE_TEST_TIMERS === "true";
+if (process.env.NODE_ENV === "production" && useTestTimers) {
+  throw new Error("USE_TEST_TIMERS must not be enabled in production");
+}
+
+// По умолчанию PROD. Для локальной отладки: USE_TEST_TIMERS=true
+const TIMERS = useTestTimers ? TEST_TIMERS : PROD_TIMERS;
 
 export const CONFIG = {
-  PORT: parseInt(process.env.PORT || "3001", 10),
+  PORT: readPort(process.env.PORT),
   MIN_PLAYERS: 4,
   MAX_PLAYERS: 16,
   ROOM_CODE_LENGTH,

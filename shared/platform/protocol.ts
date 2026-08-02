@@ -91,7 +91,6 @@ export interface ClientEvents {
   "stats:unsubscribe": () => void;
 
   // Legacy Bunker adapters. The active client routes these through room:command.
-  "player:ready": (data: { ready: boolean }) => void;
   "game:start": () => void;
   "game:revealAttribute": (data: { attributeIndex?: number }) => void;
   "game:revealActionCard": () => void;

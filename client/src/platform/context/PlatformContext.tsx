@@ -108,6 +108,14 @@ type PendingSeatClaimTarget = {
   playerId: string;
 };
 
+type ControlRequestKind = "membership" | "seat-lookup" | "claim-submit" | "claim-cancel";
+
+type PendingControlRequest = {
+  kind: ControlRequestKind;
+  generation: number;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
 type QueuedRoomCommand = {
   [G in GameId]: {
     commandId: string;
@@ -141,16 +149,17 @@ interface PlatformContextValue {
   publicRoomCounts: PublicRoomCountsSnapshot | null;
   publicRoomDirectory: AnyPublicRoomDirectorySnapshot | null;
   publicRoomError: PublicRoomErrorPayload | null;
-  createRoom: (gameId: GameId, name: string, visibility?: RoomVisibility) => void;
-  joinRoom: (code: string, name: string) => void;
-  joinAsSpectator: (code: string, name: string) => void;
+  createRoom: (gameId: GameId, name: string, visibility?: RoomVisibility) => boolean;
+  joinRoom: (code: string, name: string) => boolean;
+  joinAsSpectator: (code: string, name: string) => boolean;
   subscribePublicRooms: (gameId: GameId) => void;
   unsubscribePublicRooms: (gameId: GameId) => void;
-  joinPublicRoom: (gameId: GameId, publicRoomId: string, name: string) => void;
-  watchPublicRoom: (gameId: GameId, publicRoomId: string, name: string) => void;
+  joinPublicRoom: (gameId: GameId, publicRoomId: string, name: string) => boolean;
+  watchPublicRoom: (gameId: GameId, publicRoomId: string, name: string) => boolean;
   clearPublicRoomError: () => void;
   rejoinRoom: (code: string, participantId: string) => boolean;
   resumeRetainedSession: () => boolean;
+  cancelPendingMembership: () => void;
   leaveRoom: () => void;
   clearError: () => void;
   setReady: (ready: boolean) => boolean;
@@ -166,11 +175,11 @@ interface PlatformContextValue {
   resolveSeatClaim: (requestId: string, approved: boolean) => boolean;
   updateSettings: <G extends GameId>(gameId: G, settings: GameSettings<G>) => boolean;
   sendGameCommand: <G extends GameId>(gameId: G, command: GameCommand<G>) => boolean;
-  listReconnectableSeats: (roomCode: string) => void;
+  listReconnectableSeats: (roomCode: string) => boolean;
   clearReconnectableSeats: () => void;
   resetSeatRecovery: () => void;
-  requestSeatClaim: (roomCode: string, playerId: string, claimantName: string) => void;
-  cancelSeatClaim: () => void;
+  requestSeatClaim: (roomCode: string, playerId: string, claimantName: string) => boolean;
+  cancelSeatClaim: () => boolean;
   clearHostChangeNotice: () => void;
   sendReaction: (reactionId: RoomReactionId) => boolean;
 }
@@ -208,6 +217,7 @@ function createCommandId(): string {
 }
 
 const COMMAND_RESULT_TIMEOUT_MS = 8_000;
+const CONTROL_REQUEST_TIMEOUT_MS = 8_000;
 const MAX_COMMAND_TRANSPORT_RETRIES = 1;
 const REJOIN_CONFLICT_RETRY_DELAYS_MS = [500, 1_500] as const;
 
@@ -244,6 +254,8 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const commandTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const controlRequestRef = useRef<PendingControlRequest | null>(null);
+  const controlRequestGenerationRef = useRef(0);
   const rejoinRetryTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const rejoinConflictAttemptRef = useRef(0);
   const acceptedSessionRef = useRef<ReconnectSession | null>(null);
@@ -304,6 +316,122 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     seenReactionIdsRef.current.clear();
     setRoomReactions([]);
   }, []);
+
+  const clearControlRequest = useCallback((kind?: ControlRequestKind) => {
+    const pendingRequest = controlRequestRef.current;
+    if (!pendingRequest || (kind && pendingRequest.kind !== kind)) return;
+    clearTimeout(pendingRequest.timeout);
+    controlRequestRef.current = null;
+    controlRequestGenerationRef.current += 1;
+  }, []);
+
+  const returnPendingMembershipToManual = useCallback(
+    (message?: string, reconnectSession?: ReconnectSession | null) => {
+      const savedSession = reconnectSession ?? acceptedSessionRef.current ?? readReconnectSession();
+      clearControlRequest("membership");
+      clearRejoinRetry();
+
+      if (savedSession?.role === "player") {
+        const manualSession: ReconnectSession = { ...savedSession, autoRejoin: false };
+        reconnectSessionTombstonedRef.current = false;
+        acceptedSessionRef.current = manualSession;
+        if (!saveReconnectSession(manualSession)) clearReconnectSession();
+        setRetainedReconnectSession(summarizeRetainedSession(manualSession));
+      } else if (savedSession?.role === "spectator") {
+        reconnectSessionTombstonedRef.current = true;
+        clearReconnectSession();
+        acceptedSessionRef.current = null;
+        setRetainedReconnectSession(null);
+      }
+
+      membershipRequestPendingRef.current = false;
+      membershipReadyRef.current = false;
+      sessionAcceptanceExpectationRef.current = null;
+      pendingSeatClaimTargetRef.current = null;
+      explicitLeaveSuppressedRef.current = false;
+      ignoreRoomEventsRef.current = true;
+      ignoreRecoveryEventsRef.current = true;
+      snapshotRef.current = null;
+      resetCommandQueue();
+      setSessionPending(false);
+      setActiveGameId(null);
+      setRoomCode(null);
+      setPlayerId(null);
+      setIsSpectator(false);
+      setSnapshot(null);
+      setReconnectState("idle");
+      setReconnectableSeats([]);
+      setReconnectableSeatsRoomCode(null);
+      setSeatLookupState({ status: "idle", roomCode: null });
+      setPendingSeatClaim(null);
+      setHostSeatClaims([]);
+      setHostChangeNotice(null);
+      setGameEvents([]);
+      clearRoomReactions();
+      if (message) setTimedError(message);
+    },
+    [clearControlRequest, clearRejoinRetry, clearRoomReactions, resetCommandQueue, setTimedError],
+  );
+
+  const handleControlRequestTimeout = useCallback(
+    (kind: ControlRequestKind) => {
+      if (kind === "membership") {
+        returnPendingMembershipToManual("Ответ сервера задержался. Попробуйте подключиться снова.");
+      } else if (kind === "seat-lookup") {
+        seatLookupPendingRoomRef.current = null;
+        completedSeatLookupRoomRef.current = null;
+        discardPendingSeatLookupRef.current = false;
+        ignoreRecoveryEventsRef.current = true;
+        setReconnectableSeats([]);
+        setReconnectableSeatsRoomCode(null);
+        setSeatLookupState({ status: "idle", roomCode: null });
+        setTimedError("Не удалось получить список мест. Попробуйте снова.");
+      } else {
+        pendingSeatClaimTargetRef.current = null;
+        sessionAcceptanceExpectationRef.current = null;
+        ignoreRecoveryEventsRef.current = true;
+        const message =
+          kind === "claim-submit"
+            ? "Не удалось отправить заявку. Попробуйте снова."
+            : "Не удалось отменить заявку. Попробуйте снова.";
+        setPendingSeatClaim((current) =>
+          current
+            ? {
+                ...current,
+                status: kind === "claim-submit" ? "rejected" : "cancelled",
+                message,
+              }
+            : current,
+        );
+        setTimedError(message);
+      }
+
+      socket.disconnect();
+      socket.connect();
+    },
+    [returnPendingMembershipToManual, setTimedError],
+  );
+
+  const armControlRequest = useCallback(
+    (kind: ControlRequestKind) => {
+      clearControlRequest();
+      const generation = ++controlRequestGenerationRef.current;
+      const timeout = setTimeout(() => {
+        const pendingRequest = controlRequestRef.current;
+        if (!pendingRequest || pendingRequest.generation !== generation) return;
+        controlRequestRef.current = null;
+        handleControlRequestTimeout(kind);
+      }, CONTROL_REQUEST_TIMEOUT_MS);
+      controlRequestRef.current = { kind, generation, timeout };
+    },
+    [clearControlRequest, handleControlRequestTimeout],
+  );
+
+  const ensureSocketConnected = useCallback((): boolean => {
+    if (socket.connected) return true;
+    setTimedError("Соединение потеряно. Дождитесь восстановления связи.");
+    return false;
+  }, [setTimedError]);
 
   const flushCommandQueue = useCallback(() => {
     if (inFlightCommandRef.current || !socket.connected || !membershipReadyRef.current) {
@@ -392,6 +520,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const resetRoomUi = () => {
+      clearControlRequest();
       clearRejoinRetry();
       ignoreRoomEventsRef.current = true;
       ignoreRecoveryEventsRef.current = true;
@@ -449,6 +578,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       setRoomCode(savedSession.roomCode);
       setPlayerId(savedSession.participantId);
       setIsSpectator(savedSession.role === "spectator");
+      armControlRequest("membership");
 
       if (savedSession.role === "spectator") {
         socket.emit("room:rejoinSpectator", {
@@ -478,34 +608,6 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       return emitStoredRejoin(savedSession);
     };
 
-    const returnToManualRejoin = (savedSession: ReconnectSession, message: string) => {
-      const manualSession: ReconnectSession = { ...savedSession, autoRejoin: false };
-      clearRejoinRetry();
-      if (manualSession.role === "player") {
-        acceptedSessionRef.current = manualSession;
-        if (!saveReconnectSession(manualSession)) clearReconnectSession();
-        setRetainedReconnectSession(summarizeRetainedSession(manualSession));
-      } else {
-        reconnectSessionTombstonedRef.current = true;
-        clearReconnectSession();
-        acceptedSessionRef.current = null;
-        setRetainedReconnectSession(null);
-      }
-      membershipRequestPendingRef.current = false;
-      membershipReadyRef.current = false;
-      sessionAcceptanceExpectationRef.current = null;
-      ignoreRoomEventsRef.current = true;
-      snapshotRef.current = null;
-      setSessionPending(false);
-      setActiveGameId(null);
-      setRoomCode(null);
-      setPlayerId(null);
-      setIsSpectator(false);
-      setSnapshot(null);
-      setReconnectState("idle");
-      setTimedError(message);
-    };
-
     const handleConnect = () => {
       setConnected(true);
       if (explicitLeaveSuppressedRef.current) return;
@@ -521,6 +623,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     };
 
     const handleDisconnect = () => {
+      clearControlRequest();
       clearRejoinRetry();
       setConnected(false);
       membershipReadyRef.current = false;
@@ -559,6 +662,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       participantId: string,
       token: string,
     ) => {
+      clearControlRequest("membership");
       clearRejoinRetry();
       const acceptedSession: ReconnectSession = {
         version: 1,
@@ -612,6 +716,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       const expectation = sessionAcceptanceExpectationRef.current;
       if (!matchesSessionAcceptance(expectation, "room:created", code, seatId)) return;
       if (expectation?.gameId && expectation.gameId !== gameId) {
+        clearControlRequest("membership");
         membershipRequestPendingRef.current = false;
         setSessionPending(false);
         sessionAcceptanceExpectationRef.current = null;
@@ -661,10 +766,16 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     };
 
     const handleRoomError: ServerEvents["room:error"] = ({ message }) => {
+      const expectation = sessionAcceptanceExpectationRef.current;
+      if (expectation?.source === "rejoin") {
+        returnPendingMembershipToManual(message);
+        return;
+      }
+
+      clearControlRequest();
       const commandTransportFailed =
         message === "Команда доступна только игроку" || message === "Не удалось обработать команду";
       if (inFlightCommandRef.current && commandTransportFailed) resetCommandQueue();
-      const expectation = sessionAcceptanceExpectationRef.current;
       membershipRequestPendingRef.current = false;
       setSessionPending(false);
       if (expectation && expectation.source !== "claim") {
@@ -690,6 +801,11 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         if (current?.status === "cancelling") {
           return { ...current, status: "waiting", message };
         }
+        if (current?.status === "approved" && expectation?.source === "claim") {
+          sessionAcceptanceExpectationRef.current = null;
+          pendingSeatClaimTargetRef.current = null;
+          return { ...current, status: "rejected", message };
+        }
         return current;
       });
       setTimedError(message);
@@ -700,6 +816,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       message,
       terminal,
     }) => {
+      clearControlRequest("membership");
       if (code === "SEAT_ALREADY_CONNECTED" && !terminal) {
         const savedSession = acceptedSessionRef.current ?? readReconnectSession();
         if (!savedSession || !savedSession.autoRejoin) {
@@ -713,9 +830,9 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
         const retryDelay = REJOIN_CONFLICT_RETRY_DELAYS_MS[rejoinConflictAttemptRef.current];
         if (retryDelay === undefined) {
-          returnToManualRejoin(
-            savedSession,
+          returnPendingMembershipToManual(
             "Место открыто в другой вкладке. Закройте её и нажмите «Вернуться в игру».",
+            savedSession,
           );
           return;
         }
@@ -731,7 +848,10 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
           const retrySession = acceptedSessionRef.current ?? readReconnectSession();
           if (!retrySession || !retrySession.autoRejoin) {
             if (retrySession) {
-              returnToManualRejoin(retrySession, "Автоматическое возвращение остановлено");
+              returnPendingMembershipToManual(
+                "Автоматическое возвращение остановлено",
+                retrySession,
+              );
             } else {
               setSessionPending(false);
               setReconnectState("idle");
@@ -866,6 +986,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         (expectation?.source === "public-player" || expectation?.source === "public-spectator") &&
         (!payload.gameId || payload.gameId === expectation.gameId);
       if (matchesPublicMembershipRequest) {
+        clearControlRequest("membership");
         membershipRequestPendingRef.current = false;
         setSessionPending(false);
         sessionAcceptanceExpectationRef.current = null;
@@ -886,6 +1007,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     }) => {
       if (ignoreRecoveryEventsRef.current) return;
       if (seatLookupPendingRoomRef.current !== recoveryRoomCode) return;
+      clearControlRequest("seat-lookup");
       seatLookupPendingRoomRef.current = null;
       const discardResult = discardPendingSeatLookupRef.current;
       discardPendingSeatLookupRef.current = false;
@@ -901,6 +1023,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
     const handleSeatClaimSubmitted: ServerEvents["room:seatClaimSubmitted"] = ({ requestId }) => {
       if (ignoreRecoveryEventsRef.current) return;
+      clearControlRequest("claim-submit");
       if (pendingSeatClaimTargetRef.current) {
         pendingSeatClaimTargetRef.current.requestId = requestId;
       }
@@ -918,6 +1041,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       const target = pendingSeatClaimTargetRef.current;
       const matchesTarget =
         !!target && (target.requestId === null || target.requestId === requestId);
+      if (matchesTarget) clearControlRequest("claim-cancel");
       if (approved && matchesTarget) {
         sessionAcceptanceExpectationRef.current = {
           event: "room:joined",
@@ -927,6 +1051,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         };
         membershipRequestPendingRef.current = true;
         setSessionPending(true);
+        armControlRequest("membership");
       } else if (!approved && matchesTarget) {
         pendingSeatClaimTargetRef.current = null;
       }
@@ -1014,27 +1139,32 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       socket.off("admin:seatClaimsUpdated", handleSeatClaimsUpdated);
       socket.off("room:hostChanged", handleHostChanged);
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      clearControlRequest();
       clearRejoinRetry();
       clearRoomReactions();
       resetCommandQueue();
     };
   }, [
+    armControlRequest,
     clearCommandTimeout,
+    clearControlRequest,
     clearRejoinRetry,
     clearRoomReactions,
     flushCommandQueue,
     resetCommandQueue,
+    returnPendingMembershipToManual,
     setTimedError,
   ]);
 
   const createRoom = useCallback(
-    (gameId: GameId, name: string, visibility: RoomVisibility = "private") => {
+    (gameId: GameId, name: string, visibility: RoomVisibility = "private"): boolean => {
       if (
+        !ensureSocketConnected() ||
         membershipRequestPendingRef.current ||
         seatLookupPendingRoomRef.current ||
         pendingSeatClaimTargetRef.current
       ) {
-        return;
+        return false;
       }
       membershipRequestPendingRef.current = true;
       setSessionPending(true);
@@ -1045,9 +1175,11 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         source: "create",
         gameId,
       };
+      armControlRequest("membership");
       socket.emit("room:create", { gameId, playerName: name, visibility });
+      return true;
     },
-    [],
+    [armControlRequest, ensureSocketConnected],
   );
 
   const subscribePublicRooms = useCallback((gameId: GameId) => {
@@ -1068,159 +1200,195 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const joinPublicRoom = useCallback((gameId: GameId, publicRoomId: string, name: string) => {
-    if (
-      membershipRequestPendingRef.current ||
-      seatLookupPendingRoomRef.current ||
-      pendingSeatClaimTargetRef.current
-    ) {
-      return;
-    }
-    membershipRequestPendingRef.current = true;
-    setSessionPending(true);
-    setPublicRoomError(null);
-    explicitLeaveSuppressedRef.current = false;
-    ignoreRecoveryEventsRef.current = true;
-    sessionAcceptanceExpectationRef.current = {
-      event: "room:joined",
-      source: "public-player",
-      gameId,
-    };
-    socket.emit("publicRooms:join", { gameId, publicRoomId, playerName: name.trim() });
-  }, []);
+  const joinPublicRoom = useCallback(
+    (gameId: GameId, publicRoomId: string, name: string): boolean => {
+      if (
+        !ensureSocketConnected() ||
+        membershipRequestPendingRef.current ||
+        seatLookupPendingRoomRef.current ||
+        pendingSeatClaimTargetRef.current
+      ) {
+        return false;
+      }
+      membershipRequestPendingRef.current = true;
+      setSessionPending(true);
+      setPublicRoomError(null);
+      explicitLeaveSuppressedRef.current = false;
+      ignoreRecoveryEventsRef.current = true;
+      sessionAcceptanceExpectationRef.current = {
+        event: "room:joined",
+        source: "public-player",
+        gameId,
+      };
+      armControlRequest("membership");
+      socket.emit("publicRooms:join", { gameId, publicRoomId, playerName: name.trim() });
+      return true;
+    },
+    [armControlRequest, ensureSocketConnected],
+  );
 
-  const watchPublicRoom = useCallback((gameId: GameId, publicRoomId: string, name: string) => {
-    if (
-      membershipRequestPendingRef.current ||
-      seatLookupPendingRoomRef.current ||
-      pendingSeatClaimTargetRef.current
-    ) {
-      return;
-    }
-    membershipRequestPendingRef.current = true;
-    setSessionPending(true);
-    setPublicRoomError(null);
-    explicitLeaveSuppressedRef.current = false;
-    ignoreRecoveryEventsRef.current = true;
-    sessionAcceptanceExpectationRef.current = {
-      event: "room:spectatorJoined",
-      source: "public-spectator",
-      gameId,
-    };
-    socket.emit("publicRooms:watch", {
-      gameId,
-      publicRoomId,
-      spectatorName: name.trim(),
-    });
-  }, []);
+  const watchPublicRoom = useCallback(
+    (gameId: GameId, publicRoomId: string, name: string): boolean => {
+      if (
+        !ensureSocketConnected() ||
+        membershipRequestPendingRef.current ||
+        seatLookupPendingRoomRef.current ||
+        pendingSeatClaimTargetRef.current
+      ) {
+        return false;
+      }
+      membershipRequestPendingRef.current = true;
+      setSessionPending(true);
+      setPublicRoomError(null);
+      explicitLeaveSuppressedRef.current = false;
+      ignoreRecoveryEventsRef.current = true;
+      sessionAcceptanceExpectationRef.current = {
+        event: "room:spectatorJoined",
+        source: "public-spectator",
+        gameId,
+      };
+      armControlRequest("membership");
+      socket.emit("publicRooms:watch", {
+        gameId,
+        publicRoomId,
+        spectatorName: name.trim(),
+      });
+      return true;
+    },
+    [armControlRequest, ensureSocketConnected],
+  );
 
   const clearPublicRoomError = useCallback(() => setPublicRoomError(null), []);
 
-  const joinRoom = useCallback((code: string, name: string) => {
-    if (
-      membershipRequestPendingRef.current ||
-      seatLookupPendingRoomRef.current ||
-      pendingSeatClaimTargetRef.current
-    ) {
-      return;
-    }
-    const normalizedRoomCode = code.trim().toUpperCase();
-    membershipRequestPendingRef.current = true;
-    setSessionPending(true);
-    explicitLeaveSuppressedRef.current = false;
-    ignoreRecoveryEventsRef.current = true;
-    sessionAcceptanceExpectationRef.current = {
-      event: "room:joined",
-      source: "join",
-      roomCode: normalizedRoomCode,
-    };
-    socket.emit("room:join", { roomCode: normalizedRoomCode, playerName: name });
-  }, []);
+  const joinRoom = useCallback(
+    (code: string, name: string): boolean => {
+      if (
+        !ensureSocketConnected() ||
+        membershipRequestPendingRef.current ||
+        seatLookupPendingRoomRef.current ||
+        pendingSeatClaimTargetRef.current
+      ) {
+        return false;
+      }
+      const normalizedRoomCode = code.trim().toUpperCase();
+      membershipRequestPendingRef.current = true;
+      setSessionPending(true);
+      explicitLeaveSuppressedRef.current = false;
+      ignoreRecoveryEventsRef.current = true;
+      sessionAcceptanceExpectationRef.current = {
+        event: "room:joined",
+        source: "join",
+        roomCode: normalizedRoomCode,
+      };
+      armControlRequest("membership");
+      socket.emit("room:join", { roomCode: normalizedRoomCode, playerName: name });
+      return true;
+    },
+    [armControlRequest, ensureSocketConnected],
+  );
 
-  const joinAsSpectator = useCallback((code: string, name: string) => {
-    if (
-      membershipRequestPendingRef.current ||
-      seatLookupPendingRoomRef.current ||
-      pendingSeatClaimTargetRef.current
-    ) {
-      return;
-    }
-    const normalizedRoomCode = code.trim().toUpperCase();
-    membershipRequestPendingRef.current = true;
-    setSessionPending(true);
-    explicitLeaveSuppressedRef.current = false;
-    ignoreRecoveryEventsRef.current = true;
-    sessionAcceptanceExpectationRef.current = {
-      event: "room:spectatorJoined",
-      source: "spectator",
-      roomCode: normalizedRoomCode,
-    };
-    socket.emit("room:joinSpectator", {
-      roomCode: normalizedRoomCode,
-      spectatorName: name,
-    });
-  }, []);
-
-  const rejoinRoom = useCallback((code: string, participantId: string) => {
-    if (
-      membershipReadyRef.current ||
-      membershipRequestPendingRef.current ||
-      seatLookupPendingRoomRef.current ||
-      pendingSeatClaimTargetRef.current ||
-      reconnectSessionTombstonedRef.current
-    ) {
-      return false;
-    }
-    const savedSession = acceptedSessionRef.current ?? readReconnectSession();
-    if (!savedSession) return false;
-    if (
-      savedSession.roomCode !== code.trim().toUpperCase() ||
-      savedSession.participantId !== participantId
-    ) {
-      return false;
-    }
-
-    const automaticSession: ReconnectSession = {
-      ...savedSession,
-      autoRejoin: true,
-    };
-    acceptedSessionRef.current = automaticSession;
-    saveReconnectSession(automaticSession);
-    membershipRequestPendingRef.current = true;
-    setSessionPending(true);
-    explicitLeaveSuppressedRef.current = false;
-    sessionAcceptanceExpectationRef.current = {
-      event: automaticSession.role === "spectator" ? "room:spectatorJoined" : "room:joined",
-      source: "rejoin",
-      roomCode: automaticSession.roomCode,
-      participantId: automaticSession.participantId,
-    };
-    setActiveGameId(automaticSession.gameId);
-    setRoomCode(automaticSession.roomCode);
-    setPlayerId(automaticSession.participantId);
-    setIsSpectator(automaticSession.role === "spectator");
-    setReconnectState("reconnecting");
-
-    if (automaticSession.role === "spectator") {
-      socket.emit("room:rejoinSpectator", {
-        roomCode: automaticSession.roomCode,
-        spectatorId: automaticSession.participantId,
-        sessionToken: automaticSession.sessionToken,
+  const joinAsSpectator = useCallback(
+    (code: string, name: string): boolean => {
+      if (
+        !ensureSocketConnected() ||
+        membershipRequestPendingRef.current ||
+        seatLookupPendingRoomRef.current ||
+        pendingSeatClaimTargetRef.current
+      ) {
+        return false;
+      }
+      const normalizedRoomCode = code.trim().toUpperCase();
+      membershipRequestPendingRef.current = true;
+      setSessionPending(true);
+      explicitLeaveSuppressedRef.current = false;
+      ignoreRecoveryEventsRef.current = true;
+      sessionAcceptanceExpectationRef.current = {
+        event: "room:spectatorJoined",
+        source: "spectator",
+        roomCode: normalizedRoomCode,
+      };
+      armControlRequest("membership");
+      socket.emit("room:joinSpectator", {
+        roomCode: normalizedRoomCode,
+        spectatorName: name,
       });
-    } else {
-      socket.emit("room:rejoin", {
+      return true;
+    },
+    [armControlRequest, ensureSocketConnected],
+  );
+
+  const rejoinRoom = useCallback(
+    (code: string, participantId: string) => {
+      if (
+        !ensureSocketConnected() ||
+        membershipReadyRef.current ||
+        membershipRequestPendingRef.current ||
+        seatLookupPendingRoomRef.current ||
+        pendingSeatClaimTargetRef.current ||
+        reconnectSessionTombstonedRef.current
+      ) {
+        return false;
+      }
+      const savedSession = acceptedSessionRef.current ?? readReconnectSession();
+      if (!savedSession) return false;
+      if (
+        savedSession.roomCode !== code.trim().toUpperCase() ||
+        savedSession.participantId !== participantId
+      ) {
+        return false;
+      }
+
+      const automaticSession: ReconnectSession = {
+        ...savedSession,
+        autoRejoin: true,
+      };
+      acceptedSessionRef.current = automaticSession;
+      saveReconnectSession(automaticSession);
+      membershipRequestPendingRef.current = true;
+      setSessionPending(true);
+      explicitLeaveSuppressedRef.current = false;
+      sessionAcceptanceExpectationRef.current = {
+        event: automaticSession.role === "spectator" ? "room:spectatorJoined" : "room:joined",
+        source: "rejoin",
         roomCode: automaticSession.roomCode,
-        playerId: automaticSession.participantId,
-        sessionToken: automaticSession.sessionToken,
-      });
-    }
-    return true;
-  }, []);
+        participantId: automaticSession.participantId,
+      };
+      setActiveGameId(automaticSession.gameId);
+      setRoomCode(automaticSession.roomCode);
+      setPlayerId(automaticSession.participantId);
+      setIsSpectator(automaticSession.role === "spectator");
+      setReconnectState("reconnecting");
+      armControlRequest("membership");
+
+      if (automaticSession.role === "spectator") {
+        socket.emit("room:rejoinSpectator", {
+          roomCode: automaticSession.roomCode,
+          spectatorId: automaticSession.participantId,
+          sessionToken: automaticSession.sessionToken,
+        });
+      } else {
+        socket.emit("room:rejoin", {
+          roomCode: automaticSession.roomCode,
+          playerId: automaticSession.participantId,
+          sessionToken: automaticSession.sessionToken,
+        });
+      }
+      return true;
+    },
+    [armControlRequest, ensureSocketConnected],
+  );
 
   const resumeRetainedSession = useCallback(() => {
     if (!retainedReconnectSession) return false;
     return rejoinRoom(retainedReconnectSession.roomCode, retainedReconnectSession.participantId);
   }, [rejoinRoom, retainedReconnectSession]);
+
+  const cancelPendingMembership = useCallback(() => {
+    if (!membershipRequestPendingRef.current && !rejoinRetryTimerRef.current) return;
+    returnPendingMembershipToManual();
+    socket.disconnect();
+    socket.connect();
+  }, [returnPendingMembershipToManual]);
 
   const emitCommonCommand = useCallback(
     (command: CommonPlatformCommand): boolean => {
@@ -1273,6 +1441,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const leaveRoom = useCallback(() => {
+    clearControlRequest();
     const current = snapshotRef.current;
     const retainOwnership = shouldRetainReconnectSessionOnLeave(
       current?.lifecycle ?? null,
@@ -1326,42 +1495,49 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     setGameEvents([]);
     clearRoomReactions();
     if (!retainOwnership) setRetainedReconnectSession(null);
-  }, [clearRoomReactions, isSpectator, resetCommandQueue]);
+  }, [clearControlRequest, clearRoomReactions, isSpectator, resetCommandQueue]);
 
-  const listReconnectableSeats = useCallback((code: string) => {
-    if (
-      membershipRequestPendingRef.current ||
-      seatLookupPendingRoomRef.current ||
-      pendingSeatClaimTargetRef.current
-    ) {
-      return;
-    }
-    const normalizedRoomCode = code.trim().toUpperCase();
-    seatLookupPendingRoomRef.current = normalizedRoomCode;
-    completedSeatLookupRoomRef.current = null;
-    discardPendingSeatLookupRef.current = false;
-    ignoreRecoveryEventsRef.current = false;
-    sessionAcceptanceExpectationRef.current = null;
-    pendingSeatClaimTargetRef.current = null;
-    setReconnectableSeats([]);
-    setReconnectableSeatsRoomCode(null);
-    setSeatLookupState({ status: "pending", roomCode: normalizedRoomCode });
-    setPendingSeatClaim(null);
-    socket.emit("room:listReconnectableSeats", { roomCode: normalizedRoomCode });
-  }, []);
+  const listReconnectableSeats = useCallback(
+    (code: string): boolean => {
+      if (
+        !ensureSocketConnected() ||
+        membershipRequestPendingRef.current ||
+        seatLookupPendingRoomRef.current ||
+        pendingSeatClaimTargetRef.current
+      ) {
+        return false;
+      }
+      const normalizedRoomCode = code.trim().toUpperCase();
+      seatLookupPendingRoomRef.current = normalizedRoomCode;
+      completedSeatLookupRoomRef.current = null;
+      discardPendingSeatLookupRef.current = false;
+      ignoreRecoveryEventsRef.current = false;
+      sessionAcceptanceExpectationRef.current = null;
+      pendingSeatClaimTargetRef.current = null;
+      setReconnectableSeats([]);
+      setReconnectableSeatsRoomCode(null);
+      setSeatLookupState({ status: "pending", roomCode: normalizedRoomCode });
+      setPendingSeatClaim(null);
+      armControlRequest("seat-lookup");
+      socket.emit("room:listReconnectableSeats", { roomCode: normalizedRoomCode });
+      return true;
+    },
+    [armControlRequest, ensureSocketConnected],
+  );
 
   const requestSeatClaim = useCallback(
-    (code: string, targetPlayerId: string, claimantName: string) => {
+    (code: string, targetPlayerId: string, claimantName: string): boolean => {
       const normalizedRoomCode = code.trim().toUpperCase();
       const selectedSeat = reconnectableSeats.find((seat) => seat.playerId === targetPlayerId);
       if (
+        !ensureSocketConnected() ||
         membershipRequestPendingRef.current ||
         seatLookupPendingRoomRef.current ||
         pendingSeatClaimTargetRef.current ||
         completedSeatLookupRoomRef.current !== normalizedRoomCode ||
         !selectedSeat
       ) {
-        return;
+        return false;
       }
       ignoreRecoveryEventsRef.current = false;
       sessionAcceptanceExpectationRef.current = null;
@@ -1383,32 +1559,42 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         status: "submitting",
         message: null,
       });
+      armControlRequest("claim-submit");
       socket.emit("room:requestSeatClaim", {
         roomCode: normalizedRoomCode,
         playerId: targetPlayerId,
         claimantName,
       });
+      return true;
     },
-    [reconnectableSeats],
+    [armControlRequest, ensureSocketConnected, reconnectableSeats],
   );
 
   const clearReconnectableSeats = useCallback(() => {
     if (seatLookupPendingRoomRef.current) {
-      discardPendingSeatLookupRef.current = true;
-    } else {
-      setSeatLookupState({ status: "idle", roomCode: null });
+      clearControlRequest("seat-lookup");
+      seatLookupPendingRoomRef.current = null;
+      discardPendingSeatLookupRef.current = false;
+      ignoreRecoveryEventsRef.current = true;
+      socket.disconnect();
+      socket.connect();
     }
+    setSeatLookupState({ status: "idle", roomCode: null });
     completedSeatLookupRoomRef.current = null;
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
-  }, []);
+  }, [clearControlRequest]);
 
   const resetSeatRecovery = useCallback(() => {
     if (seatLookupPendingRoomRef.current) {
-      discardPendingSeatLookupRef.current = true;
-    } else {
-      setSeatLookupState({ status: "idle", roomCode: null });
+      clearControlRequest("seat-lookup");
+      seatLookupPendingRoomRef.current = null;
+      discardPendingSeatLookupRef.current = false;
+      ignoreRecoveryEventsRef.current = true;
+      socket.disconnect();
+      socket.connect();
     }
+    setSeatLookupState({ status: "idle", roomCode: null });
     completedSeatLookupRoomRef.current = null;
     setReconnectableSeats([]);
     setReconnectableSeatsRoomCode(null);
@@ -1419,17 +1605,19 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     setPendingSeatClaim((current) =>
       current && (current.status === "rejected" || current.status === "cancelled") ? null : current,
     );
-  }, []);
+  }, [clearControlRequest]);
 
-  const cancelSeatClaim = useCallback(() => {
-    if (!pendingSeatClaim?.requestId) return;
-    socket.emit("room:cancelSeatClaim", { requestId: pendingSeatClaim.requestId });
+  const cancelSeatClaim = useCallback((): boolean => {
+    if (!ensureSocketConnected() || !pendingSeatClaim?.requestId) return false;
     setPendingSeatClaim((current) =>
       current?.requestId === pendingSeatClaim.requestId
         ? { ...current, status: "cancelling", message: null }
         : current,
     );
-  }, [pendingSeatClaim?.requestId]);
+    armControlRequest("claim-cancel");
+    socket.emit("room:cancelSeatClaim", { requestId: pendingSeatClaim.requestId });
+    return true;
+  }, [armControlRequest, ensureSocketConnected, pendingSeatClaim?.requestId]);
 
   const clearError = useCallback(() => setError(null), []);
   const clearHostChangeNotice = useCallback(() => setHostChangeNotice(null), []);
@@ -1469,6 +1657,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         clearPublicRoomError,
         rejoinRoom,
         resumeRetainedSession,
+        cancelPendingMembership,
         leaveRoom,
         clearError,
         setReady: (ready) => emitCommonCommand({ type: "seat:set-ready", ready }),

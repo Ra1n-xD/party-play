@@ -17,6 +17,7 @@ export function VoteScreen() {
     myCharacter,
     myHasVoted,
     connected,
+    commandPending,
     roomCode,
     reconnectState,
     castVote,
@@ -51,7 +52,8 @@ export function VoteScreen() {
   const adminPauseActiveRef = useRef(false);
   const isCurrentHost =
     !isSpectator && Boolean(gameState?.players.find((player) => player.id === playerId)?.isHost);
-  const canUseRoomActions = connected && reconnectState === "connected";
+  const hasLiveConnection = connected && reconnectState === "connected";
+  const canUseRoomActions = hasLiveConnection && !commandPending;
 
   const openAdminPanel = useCallback(() => {
     if (!isCurrentHost || !canUseRoomActions || adminOpen || adminPauseActiveRef.current) return;
@@ -103,11 +105,11 @@ export function VoteScreen() {
   }, [adminUnpause]);
 
   useEffect(() => {
-    if (!isCurrentHost || !canUseRoomActions) {
+    if (!isCurrentHost || !hasLiveConnection) {
       setAdminOpen(false);
       adminPauseActiveRef.current = false;
     }
-  }, [canUseRoomActions, isCurrentHost]);
+  }, [hasLiveConnection, isCurrentHost]);
 
   useEffect(() => {
     if (!pendingAdminOpen) return;
@@ -340,11 +342,12 @@ export function VoteScreen() {
               Раскрыть особое условие
             </button>
           )}
-          {isCurrentHost && canUseRoomActions && (
+          {isCurrentHost && hasLiveConnection && (
             <button
               type="button"
               className="btn btn-secondary"
               onClick={openAdminPanel}
+              disabled={!canUseRoomActions}
               aria-label="Управление игрой"
               aria-haspopup="dialog"
               aria-expanded={adminOpen}
@@ -370,7 +373,7 @@ export function VoteScreen() {
 
       {error && <div className="error-toast">{error}</div>}
 
-      {isCurrentHost && canUseRoomActions && (
+      {isCurrentHost && hasLiveConnection && (
         <HostControlDialog
           open={adminOpen}
           gameState={gameState}

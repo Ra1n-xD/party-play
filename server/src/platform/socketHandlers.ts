@@ -29,6 +29,7 @@ import {
   Player,
   Spectator,
 } from "./roomManager.js";
+import { isDeploymentDraining } from "./deploymentState.js";
 import { bunkerModule, executeBunkerCommand } from "../games/bunker/module.js";
 import { asBunkerRoom } from "../games/bunker/runtime.js";
 import { CONFIG } from "../config.js";
@@ -861,6 +862,12 @@ export function registerHandlers(io: IOServer): void {
     });
 
     socket.on("room:create", (data) => {
+      if (isDeploymentDraining()) {
+        socket.emit("room:error", {
+          message: "Сервер обновляется. Создание комнат временно приостановлено",
+        });
+        return;
+      }
       if (!isExactObject(data, ["playerName"], ["gameId", "visibility"])) {
         socket.emit("room:error", { message: "Некорректные параметры комнаты" });
         return;
@@ -1283,22 +1290,6 @@ export function registerHandlers(io: IOServer): void {
         sessionToken: newToken,
       });
       publishRoom(room, io);
-    });
-
-    socket.on("player:ready", (data) => {
-      const ready = data?.ready;
-      const ctx = getSocketRoom(socket);
-      if (!ctx) return;
-      const player = ctx.room.players.get(ctx.info.playerId);
-      if (!player) return;
-
-      if (typeof ready !== "boolean") {
-        socket.emit("room:error", { message: "Некорректный статус готовности" });
-        return;
-      }
-
-      player.ready = ready;
-      publishRoom(ctx.room, io);
     });
 
     socket.on("room:command", (data) => {

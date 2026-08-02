@@ -25,6 +25,7 @@ export function GameScreen() {
     isSpectator,
     myCharacter,
     connected,
+    commandPending,
     reconnectState,
     roomCode,
     revealAttribute,
@@ -60,7 +61,8 @@ export function GameScreen() {
   const hostPauseActiveRef = useRef(false);
   const isCurrentHost =
     !isSpectator && Boolean(gameState?.players.find((player) => player.id === playerId)?.isHost);
-  const canUseRoomActions = connected && reconnectState === "connected";
+  const hasLiveConnection = connected && reconnectState === "connected";
+  const canUseRoomActions = hasLiveConnection && !commandPending;
 
   const closeLocalModals = useCallback(() => {
     setShowAttrPicker(false);
@@ -132,11 +134,11 @@ export function GameScreen() {
   ]);
 
   useEffect(() => {
-    if (!isCurrentHost || !canUseRoomActions) {
+    if (!isCurrentHost || !hasLiveConnection) {
       setHostControlsOpen(false);
       hostPauseActiveRef.current = false;
     }
-  }, [canUseRoomActions, isCurrentHost]);
+  }, [hasLiveConnection, isCurrentHost]);
 
   if (!gameState) return null;
   if (!isSpectator && !myCharacter) {
@@ -244,7 +246,7 @@ export function GameScreen() {
         onSkipDiscussion={adminSkipDiscussion}
       />
 
-      {isCurrentHost && canUseRoomActions && (
+      {isCurrentHost && hasLiveConnection && (
         <HostControlDialog
           open={hostControlsOpen}
           gameState={gameState}

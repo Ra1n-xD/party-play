@@ -8,6 +8,8 @@ import helmet from "helmet";
 import { CONFIG } from "./config.js";
 import { registerHandlers } from "./socketHandlers.js";
 import { createNamespaceConnectionLimiter } from "./namespaceConnectionLimiter.js";
+import { isDeploymentDraining, setDeploymentDraining } from "./platform/deploymentState.js";
+import { getAllRooms } from "./platform/roomManager.js";
 
 const app = express();
 
@@ -34,10 +36,34 @@ app.use(
   }),
 );
 
+const isProduction = process.env.NODE_ENV === "production";
+
+function readAllowedOrigins(rawOrigins: string | undefined): string[] {
+  if (isProduction && !rawOrigins) {
+    throw new Error("CORS_ORIGINS is required in production");
+  }
+  const candidates = rawOrigins
+    ? rawOrigins
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    : ["http://localhost:5173", "http://localhost:3001"];
+  if (candidates.length === 0) throw new Error("CORS_ORIGINS must not be empty");
+
+  return candidates.map((candidate) => {
+    const parsed = new URL(candidate);
+    if (
+      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+      parsed.origin !== candidate
+    ) {
+      throw new Error(`Invalid CORS origin: ${candidate}`);
+    }
+    return parsed.origin;
+  });
+}
+
 // CORS — restricted origins
-const allowedOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim())
-  : ["http://localhost:5173", "http://localhost:3001"];
+const allowedOrigins = readAllowedOrigins(process.env.CORS_ORIGINS);
 const allowedOriginSet = new Set(allowedOrigins);
 
 app.use(cors({ origin: allowedOrigins }));
@@ -49,6 +75,9 @@ app.use(express.urlencoded({ limit: "10kb", extended: true }));
 // HTTPS support: set SSL_CERT and SSL_KEY env vars to enable
 const sslCert = process.env.SSL_CERT;
 const sslKey = process.env.SSL_KEY;
+if (Boolean(sslCert) !== Boolean(sslKey)) {
+  throw new Error("SSL_CERT and SSL_KEY must be configured together");
+}
 const useHttps = sslCert && sslKey;
 
 const httpServer = useHttps
@@ -80,8 +109,57 @@ app.get("/healthz", (_req, res) => {
 });
 
 app.get("/readyz", (_req, res) => {
+  const acceptingTraffic = ready && !shuttingDown && !isDeploymentDraining();
   res.set("Cache-Control", "no-store");
-  res.status(ready ? 200 : 503).json({ status: ready ? "ready" : "stopping" });
+  res.status(acceptingTraffic ? 200 : 503).json({
+    status: acceptingTraffic ? "ready" : isDeploymentDraining() ? "draining" : "stopping",
+  });
+});
+
+function isLoopbackRequest(remoteAddress: string | undefined): boolean {
+  return (
+    remoteAddress === "127.0.0.1" || remoteAddress === "::1" || remoteAddress === "::ffff:127.0.0.1"
+  );
+}
+
+app.get("/deployz", (req, res) => {
+  if (!isLoopbackRequest(req.socket.remoteAddress)) {
+    res.sendStatus(404);
+    return;
+  }
+  const retainedRooms = getAllRooms().size;
+  const safe = ready && !shuttingDown && isDeploymentDraining() && retainedRooms === 0;
+  res.set("Cache-Control", "no-store");
+  res.status(safe ? 200 : 409).json({
+    status: safe ? "drained" : isDeploymentDraining() ? "busy" : "open",
+    retainedRooms,
+  });
+});
+
+app.post("/deployz/drain", (req, res) => {
+  if (!isLoopbackRequest(req.socket.remoteAddress)) {
+    res.sendStatus(404);
+    return;
+  }
+  const retainedRooms = getAllRooms().size;
+  if (!ready || shuttingDown || retainedRooms > 0) {
+    res.set("Cache-Control", "no-store");
+    res.status(409).json({ status: "busy", retainedRooms });
+    return;
+  }
+  setDeploymentDraining(true);
+  res.set("Cache-Control", "no-store");
+  res.json({ status: "drained", retainedRooms: 0 });
+});
+
+app.post("/deployz/resume", (req, res) => {
+  if (!isLoopbackRequest(req.socket.remoteAddress)) {
+    res.sendStatus(404);
+    return;
+  }
+  setDeploymentDraining(false);
+  res.set("Cache-Control", "no-store");
+  res.json({ status: "open" });
 });
 
 // Per-IP connection limiting
@@ -94,8 +172,10 @@ io.use(connectionLimiter);
 
 registerHandlers(io);
 
-const bindHost =
-  process.env.HOST || (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");
+const bindHost = process.env.HOST || (isProduction ? "127.0.0.1" : "0.0.0.0");
+if (isProduction && bindHost !== "127.0.0.1" && bindHost !== "::1") {
+  throw new Error("Production HOST must be a loopback address");
+}
 
 httpServer.listen(CONFIG.PORT, bindHost, () => {
   ready = true;
