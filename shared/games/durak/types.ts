@@ -4,6 +4,10 @@ import type {
 } from "../../platform/cardVisualEvents.js";
 import type { RoomRevision, SeatId } from "../../platform/room.js";
 
+export const DURAK_INITIAL_DEAL_READY_DELAY_MS = 2_500;
+export const DURAK_ROUND_TRANSITION_DELAY_MS = 4_600;
+export const DURAK_REFILL_PHASE_PAUSE_MS = 250;
+
 export type DurakSuit = "clubs" | "diamonds" | "hearts" | "spades";
 export type DurakRank = "6" | "7" | "8" | "9" | "10" | "jack" | "queen" | "king" | "ace";
 
@@ -28,7 +32,7 @@ export interface DurakTablePair {
 }
 
 export type DurakSeatStatus = "active" | "out" | "excluded";
-export type DurakVisualAction = "attack" | "defend" | "throw-in" | "take" | "pass";
+export type DurakVisualAction = "attack" | "defend" | "throw-in" | "take" | "pass" | "beat";
 export type DurakVisualEvent = CardTransferVisualEvent | PlayerActionVisualEvent<DurakVisualAction>;
 
 export interface DurakPlayerPublicState {

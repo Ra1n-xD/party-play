@@ -7,6 +7,7 @@ import type {
   SeatId,
 } from "../../../../shared/types.js";
 import { canBeatDurakCard, sortDurakHand } from "./cards.js";
+import { isDurakTurnReady } from "./engine.js";
 import type { DurakGameState, DurakRoom } from "./runtime.js";
 
 function isPaused(room: DurakRoom): boolean {
@@ -43,7 +44,9 @@ function getTrumpCardLocation(state: DurakGameState): {
 }
 
 function remainingTurnMs(state: DurakGameState, nowMs: number): number | null {
-  const clock = state.turn?.clock;
+  const turn = state.turn;
+  if (!turn || !isDurakTurnReady(turn, nowMs)) return null;
+  const clock = turn.clock;
   if (!clock || clock.kind === "unlimited") return null;
   return clock.kind === "frozen" ? clock.remainingMs : Math.max(0, clock.deadlineAt - nowMs);
 }
@@ -99,7 +102,8 @@ export function buildDurakPublicState(room: DurakRoom, nowMs = Date.now()): Dura
   if (!state) return lobbyPublicState(room);
 
   const fight = state.fight;
-  const currentActorSeatId = state.turn?.actorSeatId ?? null;
+  const currentActorSeatId =
+    state.turn && isDurakTurnReady(state.turn, nowMs) ? state.turn.actorSeatId : null;
   const trumpLocation = getTrumpCardLocation(state);
   const players = state.seatOrder.map((seatId) => {
     const player = room.players.get(seatId);
@@ -163,7 +167,11 @@ function waitAction(): DurakLegalAction {
   return { type: "wait" };
 }
 
-export function getDurakLegalAction(room: DurakRoom, seatId: SeatId): DurakLegalAction {
+export function getDurakLegalAction(
+  room: DurakRoom,
+  seatId: SeatId,
+  nowMs = Date.now(),
+): DurakLegalAction {
   const state = room.gameState;
   const fight = state?.fight;
   const turn = state?.turn;
@@ -172,6 +180,7 @@ export function getDurakLegalAction(room: DurakRoom, seatId: SeatId): DurakLegal
     state.phase !== "PLAYING" ||
     !fight ||
     !turn ||
+    !isDurakTurnReady(turn, nowMs) ||
     isPaused(room) ||
     state.statusBySeatId[seatId] !== "active"
   ) {
@@ -242,7 +251,11 @@ export function getDurakLegalAction(room: DurakRoom, seatId: SeatId): DurakLegal
   };
 }
 
-export function buildDurakPrivateState(room: DurakRoom, seatId: SeatId): DurakPrivateState | null {
+export function buildDurakPrivateState(
+  room: DurakRoom,
+  seatId: SeatId,
+  nowMs = Date.now(),
+): DurakPrivateState | null {
   const player = room.players.get(seatId);
   if (!player || player.kicked) return null;
   const state = room.gameState;
@@ -250,6 +263,6 @@ export function buildDurakPrivateState(room: DurakRoom, seatId: SeatId): DurakPr
   return {
     seatId,
     hand,
-    legalAction: getDurakLegalAction(room, seatId),
+    legalAction: getDurakLegalAction(room, seatId, nowMs),
   };
 }
