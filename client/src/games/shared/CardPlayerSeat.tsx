@@ -70,17 +70,18 @@ export function CardPlayerSeat({
   const cardCountLabel = formatCardCount(cardCount);
   const statusLabel = status === "out" ? "Вышел" : status === "excluded" ? "Исключён" : null;
   const isInactive = status !== "active";
-  const displayedRemainingMs =
-    turnSemantics == null || secondsLeft == null
-      ? turnRemainingMs
-      : Math.min(turnRemainingMs ?? 0, secondsLeft * 1_000);
   const remainingRatio =
-    displayedRemainingMs != null && turnTimeoutMs != null && turnTimeoutMs > 0
-      ? Math.max(0, Math.min(1, displayedRemainingMs / turnTimeoutMs))
+    turnRemainingMs != null && turnTimeoutMs != null && turnTimeoutMs > 0
+      ? Math.max(0, Math.min(1, turnRemainingMs / turnTimeoutMs))
       : 1;
+  const steppedRemainingRatio =
+    secondsLeft != null && turnTimeoutMs != null && turnTimeoutMs > 0
+      ? Math.max(0, Math.min(remainingRatio, (secondsLeft * 1_000) / turnTimeoutMs))
+      : remainingRatio;
   const turnBorderStyle = {
     "--card-turn-duration": `${Math.max(turnRemainingMs ?? 0, 1)}ms`,
     "--card-turn-elapsed": 100 - remainingRatio * 100,
+    "--card-turn-stepped-elapsed": 100 - steppedRemainingRatio * 100,
   } as CSSProperties;
 
   useEffect(() => {

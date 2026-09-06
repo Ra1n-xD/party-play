@@ -56,7 +56,7 @@ export function ResultsScreen() {
                   {attr.detail && <span className="attr-detail">{attr.detail}</span>}
                 </div>
               </div>
-              {!attr.wasRevealed && <span className="attr-status">Скрыто</span>}
+              {!attr.wasRevealed && <span className="attr-status">Не раскрывалось в игре</span>}
             </div>
           ))}
         </div>

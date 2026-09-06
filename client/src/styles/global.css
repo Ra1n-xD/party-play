@@ -3349,6 +3349,29 @@ textarea {
 }
 
 /* ============ ACTION CARD REVEAL OVERLAY ============ */
+.bunker-event-overlay {
+  z-index: 600;
+  background: rgba(2, 8, 5, 0.92);
+}
+
+.modal.bunker-event-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: min(480px, 100%);
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+
+.bunker-event-panel .phase-announcement-overlay,
+.bunker-event-panel .action-card-reveal-overlay {
+  position: static;
+  background: none;
+  backdrop-filter: none;
+  pointer-events: auto;
+}
+
 .action-card-reveal-overlay {
   position: fixed;
   inset: 0;

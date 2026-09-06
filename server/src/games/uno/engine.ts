@@ -152,6 +152,7 @@ function closeUnoWindow(state: UnoGameState): void {
 function closeUnoForGameplayAction(state: UnoGameState): void {
   closeUnoWindow(state);
   state.preDeclaredUno = null;
+  state.lastChallengeResolution = null;
 }
 
 function startNormalTurn(
@@ -287,6 +288,7 @@ function applyPlayedCard(
   // A card play is the next accepted gameplay action, so an older catch window
   // cannot survive it. Keep a same-turn pre-declaration for the atomic play.
   next.unoWindow = null;
+  next.lastChallengeResolution = null;
   const played = removeFromHand(next, actorSeatId, cardId);
   if (!played) return failure("Карты нет в руке");
   next.discardPile.push(played);
@@ -510,11 +512,19 @@ export function applyUnoCommand(
   command: UnoCommand,
   nowMs: number,
   paused: boolean,
+  allowExpiredTurn = false,
 ): UnoEngineResult {
   if (paused) return failure("Игра на паузе");
   if (state.phase !== "PLAYING" || !state.turn) return failure("Партия не активна");
   if (state.statusBySeatId[actorSeatId] !== "active")
     return failure("Место больше не участвует в партии");
+  if (
+    !allowExpiredTurn &&
+    state.turn.clock.kind === "running" &&
+    nowMs >= state.turn.clock.deadlineAt
+  ) {
+    return failure("Время хода истекло");
+  }
 
   if (command.type === "declare-uno") {
     const next = cloneState(state as UnoGameState);
@@ -531,6 +541,12 @@ export function applyUnoCommand(
       next.hands[actorSeatId].length !== 2
     ) {
       return failure("Сейчас нельзя объявить UNO");
+    }
+    if (
+      next.preDeclaredUno?.seatId === actorSeatId &&
+      next.preDeclaredUno.turnId === next.turn.id
+    ) {
+      return failure("UNO уже объявлено");
     }
     next.preDeclaredUno = { seatId: actorSeatId, turnId: next.turn.id };
     appendAction(next, actorSeatId, "declare-uno");
@@ -648,13 +664,15 @@ export function applyUnoTurnTimeout(
       { type: "choose-initial-color", color: randomUnoColor() },
       nowMs,
       false,
+      true,
     );
   }
   if (state.turn.kind === "after-draw") {
-    return applyUnoCommand(state, actor, { type: "end-turn" }, nowMs, false);
+    return applyUnoCommand(state, actor, { type: "end-turn" }, nowMs, false, true);
   }
   const next = cloneState(state as UnoGameState);
   closeUnoForGameplayAction(next);
+  appendAction(next, actor, "draw-card");
   drawCards(next, actor, 1);
   const following = nextSeat(next, actor);
   if (!following) return failure("Недостаточно игроков");
@@ -726,7 +744,7 @@ export function excludeUnoSeat(
     }
     startNormalTurn(next, following, nowMs, paused);
   }
-  return success(next);
+  return success(paused ? freezeUnoTurn(next, nowMs) : resumeUnoTurn(next, nowMs));
 }
 
 export function assertUnoState(state: UnoGameState): void {

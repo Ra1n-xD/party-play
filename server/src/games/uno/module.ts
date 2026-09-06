@@ -29,6 +29,7 @@ import { buildUnoPrivateState, buildUnoPublicState } from "./projections.js";
 import { asUnoRoom, type UnoGameState, type UnoRoom } from "./runtime.js";
 
 interface PendingUnoActions {
+  state: UnoGameState;
   turnTimer: ReturnType<typeof setTimeout> | null;
   botTimer: ReturnType<typeof setTimeout> | null;
   unoReactionTimer: ReturnType<typeof setTimeout> | null;
@@ -69,21 +70,21 @@ function clearUnoActions(roomCode: string): void {
 }
 
 function rememberTimer(
-  roomCode: string,
-  kind: keyof PendingUnoActions,
+  room: UnoRoom,
+  kind: "turnTimer" | "botTimer" | "unoReactionTimer",
   timer: ReturnType<typeof setTimeout>,
 ): void {
-  const pending = pendingActions.get(roomCode) ?? {
+  const pending = pendingActions.get(room.code) ?? {
+    state: room.gameState!,
     turnTimer: null,
     botTimer: null,
     unoReactionTimer: null,
   };
   pending[kind] = timer;
-  pendingActions.set(roomCode, pending);
+  pendingActions.set(room.code, pending);
 }
 
 function publishUno(room: UnoRoom, io: IOServer): void {
-  clearUnoActions(room.code);
   room.revision++;
   publishRoomSnapshots(room, io, {
     lifecycle: (currentRoom) => currentRoom.lifecycle,
@@ -107,8 +108,9 @@ function commitUnoState(room: UnoRoom, nextState: UnoGameState, io: IOServer): v
 }
 
 function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
-  clearUnoActions(room.code);
   const state = room.gameState;
+  if (state && !isPaused(room) && pendingActions.get(room.code)?.state === state) return;
+  clearUnoActions(room.code);
   const turn = state?.turn;
   if (
     room.lifecycle !== "playing" ||
@@ -121,7 +123,6 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
 
   const expectedGameInstanceId = state.gameInstanceId;
   const expectedTurnId = turn.id;
-  const expectedRevision = room.revision;
   const actor = room.players.get(turn.actorSeatId);
   const expectedControllerEpoch = actor?.controller.epoch ?? null;
 
@@ -130,8 +131,7 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
     const timeout = setTimeout(
       () => {
         void executeInRoom(room.code, () => {
-          if (getRoom(room.code) !== room || room.revision !== expectedRevision || isPaused(room))
-            return;
+          if (getRoom(room.code) !== room || room.gameState !== state || isPaused(room)) return;
           const currentState = room.gameState;
           const currentTurn = currentState?.turn;
           const currentActor = currentTurn ? room.players.get(currentTurn.actorSeatId) : null;
@@ -152,15 +152,14 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
       Math.max(0, expectedDeadline - Date.now()),
     );
     timeout.unref();
-    rememberTimer(room.code, "turnTimer", timeout);
+    rememberTimer(room, "turnTimer", timeout);
   }
 
   if (actor?.controller.kind === "bot" && !actor.kicked) {
     const delay = randomInt(650, 1401);
     const botTimer = setTimeout(() => {
       void executeInRoom(room.code, () => {
-        if (getRoom(room.code) !== room || room.revision !== expectedRevision || isPaused(room))
-          return;
+        if (getRoom(room.code) !== room || room.gameState !== state || isPaused(room)) return;
         const currentState = room.gameState;
         const currentTurn = currentState?.turn;
         const currentActor = room.players.get(turn.actorSeatId);
@@ -188,7 +187,7 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
       }).catch(() => {});
     }, delay);
     botTimer.unref();
-    rememberTimer(room.code, "botTimer", botTimer);
+    rememberTimer(room, "botTimer", botTimer);
   }
 
   const unoWindow = state.unoWindow;
@@ -208,8 +207,7 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
   const reactionTimer = setTimeout(
     () => {
       void executeInRoom(room.code, () => {
-        if (getRoom(room.code) !== room || room.revision !== expectedRevision || isPaused(room))
-          return;
+        if (getRoom(room.code) !== room || room.gameState !== state || isPaused(room)) return;
         const currentState = room.gameState;
         const currentBot = room.players.get(catchingBot.id);
         if (
@@ -234,7 +232,7 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
     randomInt(450, 901),
   );
   reactionTimer.unref();
-  rememberTimer(room.code, "unoReactionTimer", reactionTimer);
+  rememberTimer(room, "unoReactionTimer", reactionTimer);
 }
 
 function chooseDealer(room: UnoRoom, seatOrder: readonly string[]): string {
@@ -340,7 +338,7 @@ function resetUnoRoom(room: UnoRoom, io: IOServer): void {
   clearUnoActions(room.code);
   const excludedSeatIds = new Set(
     Array.from(room.players.values())
-      .filter((player) => player.kicked)
+      .filter((player) => player.kicked || player.voluntarilyLeft)
       .map((player) => player.id),
   );
   for (const seatId of excludedSeatIds) room.players.delete(seatId);

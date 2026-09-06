@@ -162,6 +162,9 @@ function executeBunkerRoomCommand(
   command: BunkerCommand,
   io: IOServer,
 ): GameCommandExecution {
+  if (room.lifecycle !== "playing" || !room.gameState || room.gameState.phase === "GAME_OVER") {
+    return { success: false, code: "CONFLICT", error: "Партия не активна" };
+  }
   if (isGameplayPaused(room)) {
     const gameplayCommand =
       command.type === "reveal-attribute" ||

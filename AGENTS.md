@@ -1,181 +1,42 @@
-# AGENTS.md
+# Repository Guidelines
 
-This file defines repository-specific rules for Codex and other coding agents.
+## Project Structure & Module Organization
 
-## Project Overview
+PartyPlay is a real-time multiplayer platform using npm workspaces:
 
-PartyPlay is a real-time multiplayer platform for a collection of independent
-party games.
+- `client/src/`: React UI; `platform/` contains shared flows, `games/<gameId>/` contains game interfaces. Assets live in `client/src/assets/`, game-local `assets/`, and `client/public/`.
+- `server/src/`: Express and Socket.IO; `platform/` owns rooms, sessions, and reconnects; `games/<gameId>/` owns rules, bots, and projections.
+- `shared/platform/` and `shared/games/`: contracts and game types shared by both applications.
+- `docs/ARCHITECTURE.md`: canonical architecture and game-registration instructions; `docs/DEPLOY.md`: deployment setup.
 
-The platform provides shared infrastructure such as rooms, sessions,
-real-time communication, and common UI. Each game is a separate module and
-must not define the architecture of the whole platform.
+Prefer canonical `platform/` and `games/` modules over legacy compatibility entry points. Keep game rules isolated and validate multiplayer state changes on the server. Update all consumers when shared contracts change.
 
-## Repository Structure
+## Build, Test, and Development Commands
 
-The project is an npm-workspaces monorepo:
+Run from the repository root:
 
-- `shared/` — common types, contracts, and utilities.
-- `server/` — backend, real-time communication, platform services, and
-  server-side game logic.
-- `client/` — frontend, shared UI, platform flows, and client-side game
-  interfaces.
-- `docs/` — architecture and project documentation.
+- `npm ci`: install dependencies from the lockfile.
+- `npm run dev`: start the server and Vite client together; client defaults to port 5173, server to 3001.
+- `npm run dev:server` / `npm run dev:client`: run either workspace separately.
+- `npm run build`: compile the server, type-check the client, and bundle into workspace `dist/` directories.
+- `npm run format:check`: check Prettier formatting.
+- `npx prettier --write <path>`: format changed files; avoid repository-wide formatting sweeps.
+- `git diff --check`: detect whitespace errors.
 
-Keep platform-wide code separate from game-specific code. Place functionality
-in the narrowest appropriate scope and move it into shared infrastructure only
-when it is genuinely reusable.
+## Coding Style & Naming Conventions
 
-## Non-Negotiable Git Rules
+Use strict TypeScript and ES modules. Prettier specifies two spaces, double quotes, semicolons, trailing commas, and 100-column lines. Use PascalCase components/types, camelCase functions/variables, and `useSomething` hooks. Preserve `.js` extensions in server-relative imports. Keep user-facing text consistent with the existing Russian UI. No ESLint configuration is present.
 
-- **Never stage, commit, or push changes.** Never run `git add`, `git commit`,
-  or `git push`, and do not use equivalent commands or tools. The user performs
-  all staging, committing, and pushing personally.
-- Leave every agent change unstaged and never alter changes that the user has
-  already staged.
-- Check the worktree before editing and preserve all pre-existing or unrelated
-  changes.
-- Do not create, rename, switch, or delete branches unless the user explicitly
-  requests that exact operation. Such a request never authorizes staging,
-  committing, or pushing.
-- Never run `merge` or `rebase`.
-- Do not run `reset`, `restore`, `stash`, or `clean` unless the user explicitly
-  requests that exact operation. Never use them as cleanup or as a workaround
-  for these rules.
-- Read-only Git commands such as `git status`, `git diff`, `git log`, and
-  `git branch` are allowed.
-- After every completed task, provide one suggested commit message in English.
-  Never execute that commit.
+## Testing Guidelines
 
-## Application Versioning
+There is no automated test suite, test script, naming convention, or coverage threshold. Creating, modifying, or running automated tests requires a separate user request. For code changes, build and check formatting; manually verify affected room flows with multiple clients, including reconnects, spectators, bots, and replay. Include mobile checks for UI changes. Report checks actually performed.
 
-- After every completed task that changes repository files, increase the root
-  application version before final verification and the final response.
-- Choose the SemVer increment according to the completed work:
-  - `patch` for fixes, visual changes, refactoring, documentation, configuration,
-    and other backward-compatible maintenance;
-  - `minor` for new backward-compatible features or user-facing capabilities;
-  - `major` for intentional breaking changes to public contracts, persisted data,
-    or compatibility.
-- Update the version in both the root `package.json` and root `package-lock.json`.
-  Keep their root package versions identical.
-- Do not change the independent versions of `client`, `server`, or `shared`
-  workspaces unless the task explicitly targets those package versions.
-- Do not increase the version for read-only analysis, status, review, or other
-  tasks that leave repository files unchanged.
-- A version change made only to satisfy this rule never triggers another version
-  increase.
-- Report the previous version, new version, and the chosen SemVer reason in the
-  final response.
+## Commit & Pull Request Guidelines
 
-## Branch and Commit Conventions
+History predominantly uses Conventional Commits, e.g. `fix(durak): preserve throw-in turns`. PRs should explain behavior changes, link relevant issues, list validation, and include screenshots for UI changes.
 
-Use short, descriptive, kebab-case branch names:
+Agents must preserve existing changes, leave edits unstaged, never stage/commit/push/merge/rebase, and suggest an English commit message. Branch or destructive Git operations require explicit requests.
 
-```text
-feature/<topic>
-fix/<topic>
-```
+## Security & Configuration
 
-Use `docs/`, `chore/`, or `refactor/` when they describe the branch better.
-Avoid personal names, tool names, vague abbreviations, and spelling errors.
-
-Suggested commit messages must follow Conventional Commits:
-
-```text
-<type>(<optional-scope>): <imperative English summary>
-```
-
-Allowed types:
-
-- `feat`
-- `fix`
-- `docs`
-- `style`
-- `refactor`
-- `test`
-- `ci`
-- `chore`
-
-Use a scope such as `client`, `server`, `shared`, `platform`, or a game name
-only when it adds useful precision.
-
-Examples:
-
-```text
-feat(client): add room invitation flow
-fix(server): preserve player session
-docs: simplify repository guidelines
-```
-
-End the final response for every completed task with one task-specific line:
-
-```text
-Commit message: <type>(<optional-scope>): <imperative English summary>
-```
-
-## Common Commands
-
-```bash
-# Install dependencies
-npm install
-
-# Run the complete development environment
-npm run dev
-
-# Run one side only
-npm run dev:server
-npm run dev:client
-
-# Build the project
-npm run build
-
-# Check formatting without modifying files
-npm run format:check
-```
-
-Do not create, modify, or run automated tests without a separate user request.
-
-Avoid repository-wide formatting when only a small set of files changed.
-
-## Working Principles
-
-- Keep every change focused on the requested task.
-- Do not perform unrelated refactors, dependency upgrades, formatting sweeps,
-  or generated-file updates.
-- Follow existing patterns before introducing new abstractions.
-- Keep multiplayer state and validation server-authoritative unless the task
-  explicitly changes that architecture.
-- Keep `server/src/platform/roomManager.ts` as the only source for live room
-  counts and the public room directory. Never create a second room registry.
-- Public room directory payloads are strict allowlists: never publish room
-  codes, player or host names, seat/socket identifiers, session tokens, hidden
-  game state, or private projections. Private rooms never enter the directory.
-- Every newly registered active game inherits shared room counts and open-room
-  discovery through the platform registries and a narrow safe-settings hook.
-  Game modules must not implement their own matchmaking or public directory.
-- Every active game must publish complete, original rules through the client
-  game registry and expose the shared accessible rules dialog both in the home
-  catalog and in the active-game header. Rule text must match the implemented
-  server rules; placeholder cards do not receive rule content.
-- Shared room reactions are ephemeral platform events, not game commands or
-  room snapshots. Only a connected human-controlled player seat may send them;
-  spectators and bots may receive them but never send them. Keep validation,
-  identity, and rate limiting server-authoritative, never advance room revision
-  or expose hidden game state, and preserve accessible responsive controls.
-- Every game must expose the shared host room-management flow in its lobby and
-  active game UI. The host must be able to resolve seat claims and permanently
-  kick any other human player through platform commands; authorization and
-  connection removal stay server-authoritative, while each game normalizes its
-  runtime through `excludeSeat`. Kicking an already out or eliminated player
-  closes room access without rewriting game history; completed results stay
-  immutable.
-- When a shared contract changes, update all affected producers and consumers.
-- Keep game-specific rules, state, content, and UI isolated from other games
-  and from shared platform infrastructure.
-- Follow the language and style of the existing user-facing surface.
-- Never expose secrets or log credential values.
-- Do not modify generated, runtime, or internal tooling artifacts unless the
-  task explicitly targets them.
-- Do not initiate deployment unless the user explicitly requests it.
-- Validate changes proportionally with relevant builds and formatting checks.
+Keep `.env*`, credentials, and `server/.data/` untracked. Never expose private game state or session tokens in public payloads. Pushes to `main` trigger deployment; deploy only when explicitly requested.

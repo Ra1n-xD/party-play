@@ -447,7 +447,7 @@ function resetDurakRoom(room: DurakRoom, io: IOServer): void {
 
   const excludedSeatIds = new Set(
     Array.from(room.players.values())
-      .filter((player) => player.kicked)
+      .filter((player) => player.kicked || player.voluntarilyLeft)
       .map((player) => player.id),
   );
   for (const seatId of excludedSeatIds) room.players.delete(seatId);
