@@ -258,8 +258,10 @@ export function revealAttribute(
 
   let idxToReveal: number;
   if (room.gameState.roundNumber === 1) {
-    // Round 1: must reveal profession (index 0)
-    idxToReveal = 0;
+    idxToReveal = player.character.attributes.findIndex(
+      (attribute) => attribute.type === "profession",
+    );
+    if (!unrevealed.includes(idxToReveal)) return false;
   } else if (attributeIndex !== undefined && unrevealed.includes(attributeIndex)) {
     idxToReveal = attributeIndex;
   } else {
@@ -559,6 +561,10 @@ function eliminatePlayer(room: Room, playerId: string, io: IOServer): void {
 
 function afterVoting(room: Room, io: IOServer): void {
   if (!room.gameState || isGameplayPaused(room)) return;
+  if (getAlivePlayers(room).length <= room.gameState.bunkerCapacity) {
+    transitionToGameOver(room, io);
+    return;
+  }
 
   room.gameState.currentVotingInRound++;
   const roundIdx = room.gameState.roundNumber - 1;
@@ -921,6 +927,12 @@ export function adminEliminatePlayer(
   room.gameState.eliminationOrder.push(targetPlayerId);
   room.gameState.lastEliminatedId = targetPlayerId;
 
+  removePlayerFromRevealOrder(room, targetPlayerId);
+  if (getAlivePlayers(room).length <= room.gameState.bunkerCapacity) {
+    forceEndGame(room, io);
+    return { success: true, error: "" };
+  }
+
   broadcastState(room, io);
   return { success: true, error: "" };
 }
@@ -1261,7 +1273,7 @@ export function resetGame(room: Room, io: IOServer): void {
 
   const kickedPlayerIds = new Set(
     Array.from(room.players.values())
-      .filter((player) => player.kicked)
+      .filter((player) => player.kicked || player.voluntarilyLeft)
       .map((player) => player.id),
   );
   for (const playerId of kickedPlayerIds) room.players.delete(playerId);
@@ -1437,6 +1449,31 @@ function getVoters_fromState(room: Room): Player[] {
 }
 
 export function broadcastState(room: Room, io: IOServer): void {
+  const gs = room.gameState;
+  if (gs?.phase === "ROUND_REVEAL") {
+    // Administrative edits can remove a participant's only legal reveal.
+    // Advance before publishing so neither humans nor bots wait on an impossible action.
+    while (gs.currentTurnIndex < gs.turnOrder.length) {
+      const player = room.players.get(gs.turnOrder[gs.currentTurnIndex]);
+      const hiddenAttributes =
+        player?.character?.attributes.filter(
+          (_, index) => !player.revealedIndices.includes(index),
+        ) ?? [];
+      if (
+        player?.alive &&
+        !player.kicked &&
+        hiddenAttributes.length > 1 &&
+        (gs.roundNumber !== 1 ||
+          hiddenAttributes.some((attribute) => attribute.type === "profession"))
+      )
+        break;
+      gs.currentTurnIndex++;
+    }
+    if (gs.currentTurnIndex >= gs.turnOrder.length && !isGameplayPaused(room)) {
+      afterRevealPhase(room, io);
+      return;
+    }
+  }
   room.revision++;
   const state = buildPublicState(room);
   io.to(room.code).emit("game:state", state);

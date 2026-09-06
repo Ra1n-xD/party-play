@@ -920,6 +920,12 @@ export function freezeDurakTurn(state: Readonly<DurakGameState>, nowMs: number):
       remainingMs: Math.max(0, next.turn.clock.deadlineAt - actionWindowStartedAt),
     };
   }
+  if (next.turn && next.turn.readyRemainingMs === null && next.turn.readyAt > nowMs) {
+    next.turn.readyRemainingMs = next.turn.readyAt - nowMs;
+  }
+  if (next.pendingResolution && next.pendingResolution.readyRemainingMs === null) {
+    next.pendingResolution.readyRemainingMs = Math.max(0, next.pendingResolution.readyAt - nowMs);
+  }
   assertDurakState(next);
   return next;
 }

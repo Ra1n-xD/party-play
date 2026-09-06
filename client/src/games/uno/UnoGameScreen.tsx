@@ -44,11 +44,13 @@ const COLOR_LABELS: Record<UnoColor, string> = {
   blue: "синий",
 };
 
-type UnoShownAction = "draw-one" | "draw-many";
+type UnoShownAction = "draw-one" | "draw-many" | "declare-uno" | "catch-uno";
 
 const UNO_ACTION_LABELS: Record<UnoShownAction, string> = {
   "draw-one": "Берёт карту",
   "draw-many": "Берёт карты",
+  "declare-uno": "UNO!",
+  "catch-uno": "Поймал UNO!",
 };
 
 const UNO_COLOR_ORDER: Record<UnoColor, number> = {
@@ -172,6 +174,12 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     () =>
       game?.visualEvents.flatMap((event): PlayerActionVisualEvent<UnoShownAction>[] => {
         if (
+          event.type === "action" &&
+          (event.action === "declare-uno" || event.action === "catch-uno")
+        ) {
+          return [{ ...event, action: event.action }];
+        }
+        if (
           event.type !== "transfer" ||
           event.source.kind !== "deck" ||
           event.target.kind !== "player"
@@ -205,7 +213,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   const canOfferAtomicUnoIntent = Boolean(
     privateGame &&
     privateGame.hand.length === 2 &&
-    game?.turnKind === "normal" &&
+    (game?.turnKind === "normal" || game?.turnKind === "after-draw") &&
     !game.pendingWildDrawFour &&
     (legalActions?.playableCardIds.length || legalActions?.bluffableWildDrawFourCardIds.length),
   );
@@ -215,10 +223,6 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   const canPostDeclareUno = Boolean(
     legalActions?.canDeclareUno && legalActions.declareUnoWindowId != null,
   );
-
-  useEffect(() => {
-    setDeclareWithPlay(false);
-  }, [snapshot.revision]);
 
   useEffect(() => {
     if (!canOfferAtomicUnoIntent) setDeclareWithPlay(false);
@@ -280,7 +284,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   const { session, announcement, bindDragSource, isDragging, activeTargetId } =
     useCardDrag<UnoDragPayload>({
       disabled: !canAct,
-      resetKey: `${snapshot.revision}:${handSortMode}`,
+      resetKey: JSON.stringify([handSortMode, legalActions, displayedHand.map((card) => card.id)]),
       canDrop: (_payload, targetId) => targetId === "uno-discard",
       onDrop: ({ card }) => playCard(card),
     });
@@ -386,6 +390,25 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     if (card) sendPlay(card, color);
   };
 
+  const actorName = playersById.get(game.currentActorSeatId ?? "")?.name ?? "Игрок";
+  const actionHint = paused
+    ? "Игра на паузе"
+    : ownWdfResponse
+      ? "Ваше решение: принять +4 или оспорить ход. Неудачная проверка — 6 карт"
+      : legalActions?.canChooseInitialColor
+        ? "Ваш ход: выберите начальный цвет"
+        : legalActions?.canEndTurn
+          ? legalActions.playableCardIds.length > 0
+            ? "Можно сыграть взятую карту двойным нажатием или завершить ход"
+            : "Взятая карта не подходит — нажмите «Завершить ход»"
+          : legalActions?.canDraw
+            ? "Подходящих карт нет — нажмите «Взять карту»"
+            : playableCardIds.size > 0
+              ? "Ваш ход: сыграйте подсвеченную карту двойным нажатием или перетащите её в сброс"
+              : pendingWildDrawFour
+                ? `Ждём решения по +4: ${actorName}`
+                : `Сейчас ходит: ${actorName}`;
+
   return (
     <main className="screen command-game-screen card-game-screen uno-screen has-uno-command-dock">
       <GameRoomHeader
@@ -396,6 +419,10 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
         gameTitle="UNO"
         brandIcon="◆"
       />
+
+      <p className="card-game-action-hint" role="status">
+        {actionHint}
+      </p>
 
       <div className="card-game-arena uno-arena">
         <section className="card-arena-opponents" aria-label="Соперники">
@@ -494,6 +521,10 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                     {playersById.get(pendingWildDrawFour.sourceSeatId)?.name ?? "Игрок"} объявил
                     цвет «{COLOR_LABELS[pendingWildDrawFour.declaredColor]}».
                   </p>
+                  <p>
+                    Проверка выяснит, была ли у него карта прежнего цвета:{" "}
+                    {COLOR_LABELS[pendingWildDrawFour.previousActiveColor]}.
+                  </p>
                 </div>
                 <span className="uno-wdf-wait">
                   {ownWdfResponse ? "Решение — внизу" : "Ждём решения"}
@@ -506,7 +537,13 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                   ? "Оспаривание удалось."
                   : game.lastChallengeResolution.outcome === "challenge-failed"
                     ? "Оспаривание не удалось."
-                    : "Штраф +4 принят."}
+                    : "Штраф +4 принят."}{" "}
+                {playersById.get(
+                  game.lastChallengeResolution.outcome === "challenge-succeeded"
+                    ? game.lastChallengeResolution.sourceSeatId
+                    : game.lastChallengeResolution.targetSeatId,
+                )?.name ?? "Игрок"}
+                : штраф +{game.lastChallengeResolution.drawCount}.
               </p>
             )}
           </section>

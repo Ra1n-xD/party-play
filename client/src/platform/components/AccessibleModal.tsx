@@ -17,6 +17,43 @@ interface AccessibleModalProps {
   panelClassName?: string;
 }
 
+interface ModalLayer {
+  overlay: HTMLElement;
+  panel: HTMLElement;
+}
+
+const modalLayers: ModalLayer[] = [];
+const originalInertStates = new Map<HTMLElement, boolean>();
+let originalBodyOverflow: string | null = null;
+
+function syncModalLayers(): void {
+  for (const [element, wasInert] of originalInertStates) {
+    element.toggleAttribute("inert", wasInert);
+  }
+  originalInertStates.clear();
+
+  const topLayer = modalLayers.at(-1);
+  if (!topLayer) {
+    if (originalBodyOverflow !== null) document.body.style.overflow = originalBodyOverflow;
+    originalBodyOverflow = null;
+    return;
+  }
+
+  originalBodyOverflow ??= document.body.style.overflow;
+  let currentLayer: HTMLElement | null = topLayer.overlay;
+  while (currentLayer && currentLayer !== document.body) {
+    const parent: HTMLElement | null = currentLayer.parentElement;
+    if (!parent) break;
+    for (const sibling of Array.from(parent.children)) {
+      if (!(sibling instanceof HTMLElement) || sibling === currentLayer) continue;
+      originalInertStates.set(sibling, sibling.hasAttribute("inert"));
+      sibling.setAttribute("inert", "");
+    }
+    currentLayer = parent;
+  }
+  document.body.style.overflow = "hidden";
+}
+
 function getFocusableElements(panel: HTMLElement): HTMLElement[] {
   return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
     (element) => element.getClientRects().length > 0,
@@ -45,29 +82,18 @@ export function AccessibleModal({
 
     const previousActiveElement =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousBodyOverflow = document.body.style.overflow;
-    const siblingInertStates = new Map<HTMLElement, boolean>();
-
-    let currentLayer: HTMLElement | null = overlay;
-    while (currentLayer && currentLayer !== document.body) {
-      const parent: HTMLElement | null = currentLayer.parentElement;
-      if (!parent) break;
-
-      for (const sibling of Array.from(parent.children)) {
-        if (!(sibling instanceof HTMLElement) || sibling === currentLayer) continue;
-        siblingInertStates.set(sibling, sibling.hasAttribute("inert"));
-        sibling.setAttribute("inert", "");
-      }
-      currentLayer = parent;
-    }
-    document.body.style.overflow = "hidden";
+    const layer = { overlay, panel };
+    modalLayers.push(layer);
+    syncModalLayers();
 
     const focusFrame = requestAnimationFrame(() => {
+      if (modalLayers.at(-1) !== layer) return;
       const [firstFocusable] = getFocusableElements(panel);
       (firstFocusable ?? panel).focus({ preventScroll: true });
     });
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (modalLayers.at(-1) !== layer) return;
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
@@ -99,12 +125,20 @@ export function AccessibleModal({
     return () => {
       cancelAnimationFrame(focusFrame);
       document.removeEventListener("keydown", handleKeyDown, true);
-      document.body.style.overflow = previousBodyOverflow;
-      for (const [sibling, wasInert] of siblingInertStates) {
-        if (!wasInert) sibling.removeAttribute("inert");
-      }
-      if (previousActiveElement?.isConnected) {
+      const wasTopLayer = modalLayers.at(-1) === layer;
+      modalLayers.splice(modalLayers.indexOf(layer), 1);
+      syncModalLayers();
+      if (!wasTopLayer) return;
+      const topLayer = modalLayers.at(-1);
+      if (
+        previousActiveElement?.isConnected &&
+        !previousActiveElement.closest("[inert]") &&
+        (!topLayer || topLayer.panel.contains(previousActiveElement))
+      ) {
         previousActiveElement.focus({ preventScroll: true });
+      } else if (topLayer) {
+        const [firstFocusable] = getFocusableElements(topLayer.panel);
+        (firstFocusable ?? topLayer.panel).focus({ preventScroll: true });
       }
     };
   }, []);

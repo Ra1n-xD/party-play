@@ -24,7 +24,9 @@ function directorySocketRoom(gameId: GameId): string {
 }
 
 function occupiedSeatCount(room: Room): number {
-  return Array.from(room.players.values()).filter((player) => !player.kicked).length;
+  return Array.from(room.players.values()).filter(
+    (player) => !player.kicked && !player.voluntarilyLeft,
+  ).length;
 }
 
 function isPaused(room: Room): boolean {

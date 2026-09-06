@@ -6,6 +6,7 @@ import { ResultsScreen } from "../../screens/ResultsScreen";
 import { VoteScreen } from "../../screens/VoteScreen";
 import { LobbyScreen } from "../../platform/screens/LobbyScreen";
 import { usePlatform } from "../../platform/context/PlatformContext";
+import { AccessibleModal } from "../../platform/components/AccessibleModal";
 import { BunkerGameProvider, useBunkerGame, type OverlayItem } from "./context/BunkerGameContext";
 
 const ATTRIBUTE_LABELS: Record<AttributeType, string> = {
@@ -68,7 +69,7 @@ function OverlayRenderer({ item }: { item: OverlayItem }) {
 
 function BunkerView() {
   const { snapshot } = usePlatform();
-  const { gameState, currentOverlay } = useBunkerGame();
+  const { gameState, currentOverlay, dismissOverlays } = useBunkerGame();
 
   if (!snapshot) {
     return (
@@ -112,7 +113,22 @@ function BunkerView() {
   return (
     <>
       {screen}
-      {currentOverlay && <OverlayRenderer item={currentOverlay} />}
+      {currentOverlay && (
+        <AccessibleModal
+          labelledBy="bunker-event-title"
+          onClose={dismissOverlays}
+          overlayClassName="bunker-event-overlay"
+          panelClassName="bunker-event-panel"
+        >
+          <h2 id="bunker-event-title" hidden>
+            Игровое событие
+          </h2>
+          <OverlayRenderer item={currentOverlay} />
+          <button type="button" className="btn btn-secondary" onClick={dismissOverlays}>
+            Продолжить игру
+          </button>
+        </AccessibleModal>
+      )}
     </>
   );
 }

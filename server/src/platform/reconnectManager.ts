@@ -541,6 +541,16 @@ export function kickPlayerPermanently(
 export function removePlayerWithHostFailover(room: Room, playerId: string, io: IOServer): void {
   const player = room.players.get(playerId);
   if (!player) return;
+  if (room.lifecycle === "results") {
+    // Results still project names, characters and outcomes from these seats.
+    // Retain that history until replay, while closing the departing session.
+    player.voluntarilyLeft = true;
+    player.sessionToken = generateSessionToken();
+    if (player.owner.kind === "human") player.owner.sessionToken = player.sessionToken;
+    markPlayerDisconnected(room, playerId, player.socketId, io);
+    disposeRoomIfVacant(room);
+    return;
+  }
   const wasHost = room.hostId === playerId;
   const successor = wasHost ? findNextEligibleHost(room, playerId) : null;
 

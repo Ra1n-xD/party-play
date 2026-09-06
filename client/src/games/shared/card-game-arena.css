@@ -36,6 +36,18 @@
   content: none;
 }
 
+.card-game-action-hint {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 5px 12px;
+  color: #f7f4eb;
+  background: rgba(0, 0, 0, 0.22);
+  font-size: clamp(0.72rem, 1.5vw, 0.85rem);
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 .card-arena-opponents {
   position: absolute;
   z-index: 30;
@@ -1647,6 +1659,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .card-player-turn-border rect {
+    stroke-dashoffset: var(--card-turn-stepped-elapsed, 0);
+  }
   .card-player-turn-border rect,
   .card-player-seat .card-player-action {
     animation: none;
