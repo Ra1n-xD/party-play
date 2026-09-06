@@ -1180,7 +1180,7 @@
 .command-game-screen .gs-public-attributes {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
   gap: 4px 6px;
   align-items: stretch;
 }
@@ -1502,6 +1502,10 @@
   gap: 8px;
 }
 
+.command-game-screen .vote-command-actions > * {
+  flex: 0 0 auto;
+}
+
 .command-game-screen .vote-command-actions .btn,
 .command-game-screen .results-command-bar .btn {
   display: inline-flex;
@@ -1634,6 +1638,14 @@
   line-height: 1.15;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.command-game-screen .gs-command-button > svg {
+  flex: 0 0 1em;
+}
+
+.command-game-screen .gs-command-button > span {
+  min-width: 0;
 }
 
 .screen.command-game-screen.has-game-command-bar {
@@ -2284,22 +2296,33 @@
   }
 
   .command-game-screen .vote-command-status strong {
-    max-width: 34vw;
+    max-width: none;
     font-size: 0.7rem;
+  }
+
+  .command-game-screen .vote-command-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .command-game-screen .vote-command-status {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
   }
 
   .command-game-screen .vote-command-actions {
-    max-width: 61vw;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
   }
 
   .command-game-screen .vote-command-actions .btn {
-    min-width: max-content;
-    flex: 0 0 auto;
+    min-width: 0;
     min-height: 44px;
     font-size: 0.7rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .screen.command-game-screen.has-vote-command-bar,
@@ -2310,6 +2333,23 @@
   .screen.command-game-screen.has-vote-command-bar .error-toast,
   .screen.command-game-screen.has-results-command-bar .error-toast {
     bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .screen.command-game-screen.has-vote-command-bar {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom));
+  }
+
+  .screen.command-game-screen.has-vote-command-bar .error-toast {
+    bottom: calc(120px + env(safe-area-inset-bottom));
+  }
+
+  .screen.command-game-screen.has-vote-command-bar:has(.vote-command-actions > :nth-child(3)) {
+    padding-bottom: calc(174px + env(safe-area-inset-bottom));
+  }
+
+  .screen.command-game-screen.has-vote-command-bar:has(.vote-command-actions > :nth-child(3))
+    .error-toast {
+    bottom: calc(174px + env(safe-area-inset-bottom));
   }
 
   .command-game-screen .vote-candidate {

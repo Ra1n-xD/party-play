@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { CardDragSession } from "./useCardDrag";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { CARD_DRAG_SETTLE_DURATION_MS, type CardDragSession } from "./useCardDrag";
 import "./card-motion.css";
 
 export interface CardDragLayerProps<TPayload> {
@@ -133,11 +133,14 @@ export function CardDragLayer<TPayload>({
       {session ? (
         <div
           className={`card-drag-layer is-${session.phase}`}
-          style={{
-            width: session.width,
-            height: session.height,
-            transform: `translate3d(${clampedLeft}px, ${clampedTop}px, 0)`,
-          }}
+          style={
+            {
+              "--card-motion-duration": `${CARD_DRAG_SETTLE_DURATION_MS}ms`,
+              width: session.width,
+              height: session.height,
+              transform: `translate3d(${clampedLeft}px, ${clampedTop}px, 0)`,
+            } as CSSProperties
+          }
           aria-hidden="true"
           ref={markPreviewInert}
         >

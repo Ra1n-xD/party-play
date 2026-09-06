@@ -57,7 +57,7 @@ interface DragCandidate<TPayload> {
 
 const MOUSE_OR_PEN_DRAG_THRESHOLD = 6;
 const TOUCH_VERTICAL_DRAG_THRESHOLD = 10;
-const SETTLE_DURATION_MS = 260;
+export const CARD_DRAG_SETTLE_DURATION_MS = 320;
 export const CARD_DRAG_SOURCE_CLASS_NAME = "card-motion-shell is-draggable" as const;
 
 function rectToSession<TPayload>(
@@ -355,7 +355,7 @@ export function useCardDrag<TPayload>(options: UseCardDragOptions<TPayload>) {
           settleTimerRef.current = window.setTimeout(() => {
             settleTimerRef.current = null;
             setSession(null);
-          }, SETTLE_DURATION_MS);
+          }, CARD_DRAG_SETTLE_DURATION_MS + 32);
         };
 
         const handlePointerMove = (moveEvent: PointerEvent) => {

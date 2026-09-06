@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "react";
 import type { AttributeType } from "../../../../shared/games/bunker/types";
 import BackgroundParticles from "../../components/BackgroundParticles";
 import { CardImage } from "../../components/CardImage";
@@ -70,6 +71,12 @@ function OverlayRenderer({ item }: { item: OverlayItem }) {
 function BunkerView() {
   const { snapshot } = usePlatform();
   const { gameState, currentOverlay, dismissOverlays } = useBunkerGame();
+  const isVoteScreen =
+    gameState?.phase === "ROUND_VOTE" || gameState?.phase === "ROUND_VOTE_TIEBREAK";
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [isVoteScreen]);
 
   if (!snapshot) {
     return (

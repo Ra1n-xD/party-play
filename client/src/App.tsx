@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useLayoutEffect } from "react";
 import { PlatformOverlays } from "./platform/components/PlatformOverlays";
 import { PlatformProvider, usePlatform } from "./platform/context/PlatformContext";
 import { getLazyGameComponent } from "./platform/gameRegistry";
@@ -30,6 +30,10 @@ function RoomLoading({
 function RoomAppContent() {
   const { roomCode, activeGameId, snapshot, sessionPending, cancelPendingMembership, leaveRoom } =
     usePlatform();
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [roomCode, snapshot?.lifecycle]);
 
   if (!roomCode) return <HomeScreen />;
   if (sessionPending && !snapshot) {

@@ -1658,6 +1658,210 @@
   }
 }
 
+/* Keep the table, hand and seats separate on landscape phones. */
+@media (min-width: 560px) and (max-height: 500px) {
+  .screen.command-game-screen.card-game-screen {
+    --card-arena-dock-space: calc(56px + env(safe-area-inset-bottom));
+    --card-arena-hand-height: clamp(64px, 20dvh, 90px);
+    --card-seat-size: 44px;
+  }
+
+  .screen.card-game-screen .gs-room-header {
+    flex-basis: 44px;
+    min-height: 44px;
+    padding-block: 3px;
+  }
+
+  .card-game-screen .card-arena-opponents {
+    top: 4px;
+    right: 4px;
+    left: 4px;
+    max-width: none;
+    gap: 3px;
+  }
+
+  .card-game-screen .card-arena-table-zone,
+  .card-game-screen
+    .card-arena-opponents:has(> .card-player-seat:nth-child(6))
+    + .card-arena-table-zone {
+    inset: calc(var(--card-seat-size) + 12px) 68px
+      calc(var(--card-arena-dock-space) + var(--card-arena-hand-height) + 10px) 0;
+  }
+
+  .card-game-screen .card-arena-self-seat {
+    top: calc(var(--card-seat-size) + 14px);
+    right: 10px;
+    bottom: auto;
+    transform: none;
+  }
+
+  .card-game-screen .card-arena-self-seat .card-player-action {
+    top: calc(100% + 4px);
+    right: 0;
+    bottom: auto;
+    left: auto;
+    max-width: 64px;
+    white-space: normal;
+    transform: none;
+    animation: none;
+  }
+
+  .card-game-screen .durak-arena .durak-hand,
+  .card-game-screen .uno-arena .uno-hand {
+    gap: 0;
+    padding: 0 20px 2px;
+  }
+
+  .card-game-screen .durak-arena .durak-hand-card-shell,
+  .card-game-screen .uno-arena .uno-hand-card-shell {
+    flex-basis: clamp(4px, calc((100vw - 80px) / var(--hand-count)), 90px);
+    transform: none;
+  }
+
+  .card-game-screen .durak-arena .durak-card.is-hand,
+  .card-game-screen .uno-arena .uno-card.is-hand,
+  .card-game-screen .card-drag-preview .durak-card.is-hand,
+  .card-game-screen .card-drag-preview .uno-card.is-hand {
+    width: clamp(44px, 13dvh, 60px);
+    height: clamp(62px, 18.5dvh, 84px);
+  }
+
+  .card-game-screen .durak-command-dock,
+  .card-game-screen .uno-command-dock {
+    right: 7px;
+    left: 7px;
+    min-height: 48px;
+    max-height: 50px;
+    padding: 4px 7px;
+  }
+
+  .card-game-screen .durak-arena-table-zone .durak-deck-panel {
+    top: 0;
+    width: 90px;
+    height: 72px;
+    transform: none;
+  }
+
+  .card-game-screen .durak-arena-table-zone .durak-deck-visual .durak-card,
+  .card-game-screen .durak-arena-table-zone .durak-trump .durak-card,
+  .card-game-screen .durak-arena-table-zone .durak-empty-deck {
+    width: 42px;
+    height: 60px;
+  }
+
+  .card-game-screen .durak-arena-table-zone .durak-table {
+    inset: 0 0 0 94px;
+  }
+
+  .card-game-screen .durak-arena-table-zone .durak-deck-panel.is-empty + .durak-table {
+    left: 56px;
+  }
+
+  .card-game-screen .durak-arena-table-zone .durak-table-grid {
+    width: 100%;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 2px;
+    padding: 0;
+  }
+
+  .card-game-screen .durak-arena-table-zone .durak-table-pair,
+  .card-game-screen .durak-arena-table-zone .durak-pair-cards {
+    min-height: 64px;
+  }
+
+  .card-game-screen .durak-arena-table-zone .durak-pair-cards {
+    width: 54px;
+  }
+
+  .card-game-screen .durak-arena-table-zone .durak-card.is-table {
+    width: 38px;
+    height: 54px;
+  }
+
+  .card-game-screen.durak-screen .durak-card .durak-card-corner {
+    top: 3px;
+    left: 3px;
+    font-size: 0.55rem;
+  }
+
+  .card-game-screen.durak-screen .durak-card .durak-card-corner.is-bottom {
+    inset: auto 3px 3px auto;
+  }
+
+  .card-game-screen.durak-screen .durak-card .durak-card-suit {
+    font-size: 1.15rem;
+  }
+
+  .card-game-screen .durak-table-pair.is-covered .durak-table-card-flight-shell {
+    left: 6px;
+  }
+
+  .card-game-screen .durak-table-pair.is-covered .is-attack .durak-pair-card {
+    transform: translate(-8px, 6px) rotate(-4deg);
+  }
+
+  .card-game-screen .durak-table-pair.is-covered .is-defense .durak-pair-card {
+    transform: translate(12px, -3px) rotate(7deg);
+  }
+
+  .card-game-screen .uno-arena-status {
+    top: 50%;
+    left: 10px;
+    flex-direction: column;
+    transform: translateY(-50%);
+  }
+
+  .card-game-screen .uno-arena-table-zone .uno-piles {
+    left: 100px;
+    gap: clamp(40px, 9vw, 100px);
+    padding: 0;
+  }
+
+  .card-game-screen .uno-arena-table-zone .uno-card.is-table,
+  .card-game-screen .uno-arena-table-zone .uno-draw-pile::before,
+  .card-game-screen .uno-arena-table-zone .uno-draw-pile::after,
+  .card-game-screen .uno-arena-table-zone .uno-empty-card {
+    width: 48px;
+    height: 68px;
+  }
+
+  .card-game-screen .uno-arena-table-zone .uno-pile > span:last-child {
+    position: absolute;
+    right: -12px;
+    bottom: -4px;
+    z-index: 3;
+    height: 20px;
+  }
+
+  .card-game-screen.uno-screen .uno-card .uno-card-core {
+    width: 65%;
+    height: auto;
+    aspect-ratio: 1;
+    font-size: 1.4rem;
+  }
+
+  .card-game-screen.uno-screen .uno-card .uno-card-core img {
+    width: 100%;
+    height: 100%;
+  }
+
+  .card-game-screen.uno-screen .uno-card .uno-card-corner {
+    top: 3px;
+    left: 3px;
+    font-size: 0.65rem;
+  }
+
+  .card-game-screen.uno-screen .uno-card .uno-card-corner.is-bottom {
+    inset: auto 3px 3px auto;
+  }
+
+  .card-game-screen .card-arena-public {
+    bottom: var(--card-arena-dock-space);
+    min-height: 44px;
+    padding: 8px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card-player-turn-border rect {
     stroke-dashoffset: var(--card-turn-stepped-elapsed, 0);
