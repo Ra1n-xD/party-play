@@ -30,8 +30,11 @@
 }
 
 .card-drag-preview {
+  display: flex;
   width: 100%;
   height: 100%;
+  align-items: center;
+  justify-content: center;
   opacity: 0.94;
   animation: card-drag-preview-enter var(--card-motion-duration) var(--card-motion-easing);
 }
@@ -108,8 +111,8 @@
 }
 
 .card-transfer-flight.is-uno {
-  border-color: #f7e7ac;
-  background: radial-gradient(ellipse at center, #f4cb32 0 20%, #d12f31 22% 58%, #151515 60%);
+  border-color: #f8f8f5;
+  background: #152238 url("../uno/assets/card-back.svg") center / cover no-repeat;
 }
 
 .card-transfer-count {

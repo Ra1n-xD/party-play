@@ -2948,6 +2948,13 @@ textarea {
 .result-desktop {
   display: grid;
 }
+
+.results-screen .attribute-card.hidden {
+  opacity: 1;
+  filter: none;
+  border-style: dashed;
+}
+
 .result-mobile {
   display: none;
 }
@@ -2970,9 +2977,9 @@ textarea {
 
 .result-tag.tag-hidden {
   background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.05);
-  color: var(--text-muted);
-  opacity: 0.5;
+  border-color: rgba(255, 255, 255, 0.16);
+  border-style: dashed;
+  color: var(--text-secondary);
 }
 
 .result-tag-label {
@@ -3106,6 +3113,9 @@ textarea {
   padding: 24px;
   max-width: 400px;
   width: 100%;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(20px);
 }
@@ -3364,12 +3374,38 @@ textarea {
   overflow-y: auto;
 }
 
+.bunker-event-panel > * {
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .bunker-event-panel .phase-announcement-overlay,
 .bunker-event-panel .action-card-reveal-overlay {
   position: static;
+  width: 100%;
   background: none;
   backdrop-filter: none;
   pointer-events: auto;
+}
+
+.bunker-event-panel .phase-announcement-content,
+.bunker-event-panel .action-card-reveal-content {
+  min-width: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.bunker-event-panel .phase-announcement-content {
+  padding: 12px 0;
+}
+
+.bunker-event-panel .phase-announcement-title {
+  font-size: clamp(1.4rem, 5vw, 2.2rem);
+}
+
+.bunker-event-panel .action-card-reveal-card {
+  padding: 20px clamp(12px, 4vw, 24px);
 }
 
 .action-card-reveal-overlay {
@@ -3777,6 +3813,19 @@ textarea {
 @media (max-width: 768px) {
   .particle:nth-child(n + 15) {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .particles-bg {
+    display: none;
+  }
+
+  .bunker-event-panel .phase-announcement-overlay,
+  .bunker-event-panel .phase-announcement-content,
+  .bunker-event-panel .action-card-reveal-overlay,
+  .bunker-event-panel .action-card-reveal-content {
+    animation: none;
   }
 }
 
