@@ -102,7 +102,6 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     sendGameCommand,
     resolveSeatClaim,
     assignTemporaryBot,
-    returnHumanControl,
     kickPlayer,
     transferHost,
     setAdminPause,
@@ -783,7 +782,6 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
             claims={hostSeatClaims}
             onResolveClaim={resolveSeatClaim}
             onAssignTemporaryBot={assignTemporaryBot}
-            onReturnHumanControl={returnHumanControl}
             onKickPlayer={kickPlayer}
             onTransferHost={transferHost}
             disabled={!canManage}

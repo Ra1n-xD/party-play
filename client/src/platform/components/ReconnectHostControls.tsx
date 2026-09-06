@@ -19,7 +19,6 @@ interface ReconnectHostControlsProps {
   onKickPlayer: (playerId: string) => void;
   onTransferHost: (playerId: string) => void;
   onAssignTemporaryBot?: (playerId: string) => void;
-  onReturnHumanControl?: (playerId: string) => void;
   compact?: boolean;
   disabled?: boolean;
 }
@@ -64,7 +63,6 @@ export function ReconnectHostControls({
   onKickPlayer,
   onTransferHost,
   onAssignTemporaryBot,
-  onReturnHumanControl,
   compact = false,
   disabled = false,
 }: ReconnectHostControlsProps) {
@@ -151,6 +149,9 @@ export function ReconnectHostControls({
                       ? "В комнате"
                       : "Отключён — место зарезервировано"}
                 </span>
+                {player.temporaryBot && (
+                  <span>Игрок получит управление автоматически после переподключения.</span>
+                )}
               </div>
               <div className="reconnect-host-actions">
                 {!player.connected && !player.temporaryBot && onAssignTemporaryBot && (
@@ -161,16 +162,6 @@ export function ReconnectHostControls({
                     disabled={disabled}
                   >
                     Временно передать боту
-                  </button>
-                )}
-                {player.temporaryBot && onReturnHumanControl && (
-                  <button
-                    type="button"
-                    className="reconnect-host-action is-transfer"
-                    onClick={() => onReturnHumanControl(player.id)}
-                    disabled={disabled}
-                  >
-                    Вернуть управление человеку
                   </button>
                 )}
                 <button
