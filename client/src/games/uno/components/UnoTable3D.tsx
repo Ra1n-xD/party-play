@@ -12,7 +12,6 @@ interface Props {
   viewerSeatId: string | null;
   roomCode: string;
   canSendLook: boolean;
-  cursorVisible: boolean;
   onCursorChange: (visible: boolean) => void;
   onClassic: () => void;
   paused: boolean;
@@ -95,7 +94,6 @@ export default function UnoTable3D(props: Props) {
       roomCode={props.roomCode}
       canSendLook={props.canSendLook}
       paused={props.paused}
-      cursorVisible={props.cursorVisible}
       onCursorChange={props.onCursorChange}
       onClassic={props.onClassic}
       title="ЦВЕТНОЙ СТОЛ"

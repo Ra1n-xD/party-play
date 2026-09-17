@@ -229,7 +229,6 @@ export function GameScreen({
       {is3D ? (
         <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
           <BunkerTable3D
-            cursorVisible={cursorVisible}
             onCursorChange={setCursorVisible}
             onClassic={onToggle3D}
             onReveal={

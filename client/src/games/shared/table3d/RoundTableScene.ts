@@ -113,10 +113,7 @@ export class RoundTableScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.domElement.tabIndex = 0;
-    this.renderer.domElement.setAttribute(
-      "aria-label",
-      "Круглый 3D-стол. Q — курсор, R — посмотреть на стол.",
-    );
+    this.renderer.domElement.setAttribute("aria-label", "Круглый 3D-стол. R — посмотреть на стол.");
     this.host.append(this.renderer.domElement);
     this.scene.background = new THREE.Color(0x172521);
     this.scene.fog = new THREE.Fog(0x172521, 12, 28);
@@ -986,13 +983,8 @@ export class RoundTableScene {
     this.avatars.get(event.senderSeatId)?.react(event.reactionId, performance.now());
   }
 
-  releaseCursor() {
-    this.controls.setCursor(true);
-  }
-
   setPaused(paused: boolean) {
     this.paused = paused;
-    if (paused) this.releaseCursor();
   }
 
   private resize() {

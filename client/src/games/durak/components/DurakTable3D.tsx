@@ -14,7 +14,6 @@ interface Props {
   onDefend: (attackCardId: string) => void;
   roomCode: string;
   canSendLook: boolean;
-  cursorVisible: boolean;
   onCursorChange: (visible: boolean) => void;
   focusedTargetId: string | null;
   secondaryLabel: string;
@@ -37,7 +36,6 @@ export default function DurakTable3D({
   revision,
   roomCode,
   canSendLook,
-  cursorVisible,
   onCursorChange,
   focusedTargetId,
   secondaryLabel,
@@ -214,9 +212,7 @@ export default function DurakTable3D({
         </button>
       </div>
       <aside className="table3d-keyboard" aria-label="Управление с клавиатуры">
-        <span className="table3d-keyboard-state">
-          {cursorVisible ? "ВЗГЛЯД ЗАКРЕПЛЁН" : "СВОБОДНЫЙ ВЗГЛЯД"}
-        </span>
+        <span className="table3d-keyboard-state">УПРАВЛЕНИЕ</span>
         <ul>
           <li>
             <span>Правила</span>
@@ -264,10 +260,6 @@ export default function DurakTable3D({
               </li>
             </>
           )}
-          <li>
-            <span>{cursorVisible ? "Свободный взгляд" : "Показать курсор"}</span>
-            <kbd>Q</kbd>
-          </li>
           <li>
             <span>К столу</span>
             <kbd>R</kbd>

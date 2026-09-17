@@ -15,7 +15,7 @@ export function isTableInputBlocked(target: EventTarget | null): boolean {
   );
 }
 
-/** Owns browser pointer lock and its escape/blur lifecycle, separately from the renderer. */
+/** Keeps mouse look active; only dialogs, text entry and an inactive window suspend it. */
 export class TableLookControls {
   readonly target: AvatarLook = { yaw: 0, pitch: TABLE_DEFAULT_PITCH };
   private readonly abort = new AbortController();
@@ -34,6 +34,10 @@ export class TableLookControls {
     this.root = canvas.closest<HTMLElement>(".is-3d") ?? canvas;
     const options = { signal: this.abort.signal };
     this.onCursor(this.cursorVisible);
+    const isInterfaceClick = (event: MouseEvent) =>
+      event.detail === 0 ||
+      (event.target instanceof Element &&
+        Boolean(event.target.closest('button, a[href], input, textarea, select, [role="button"]')));
     document.addEventListener(
       "mousemove",
       (event) => {
@@ -64,6 +68,7 @@ export class TableLookControls {
         if (
           this.cursorVisible ||
           isTableInputBlocked(event.target) ||
+          isInterfaceClick(event) ||
           window.matchMedia("(pointer: coarse)").matches
         )
           return;
@@ -78,6 +83,7 @@ export class TableLookControls {
         if (
           this.cursorVisible ||
           isTableInputBlocked(event.target) ||
+          isInterfaceClick(event) ||
           window.matchMedia("(pointer: coarse)").matches
         )
           return;
@@ -98,13 +104,7 @@ export class TableLookControls {
           isTableInputBlocked(event.target)
         )
           return;
-        if (event.code === "KeyQ") {
-          event.preventDefault();
-          this.setCursor(!this.cursorVisible);
-          if (!this.cursorVisible) this.capturePointer();
-        } else if (event.code === "Escape") {
-          this.setCursor(true);
-        } else if (event.code === "KeyR") {
+        if (event.code === "KeyR") {
           event.preventDefault();
           this.target.yaw = 0;
           this.target.pitch = this.defaultPitch;
@@ -116,7 +116,7 @@ export class TableLookControls {
       "pointerlockchange",
       () => {
         this.previous = null;
-        this.setCursor(document.pointerLockElement !== canvas);
+        this.syncCursor();
       },
       options,
     );
@@ -128,18 +128,16 @@ export class TableLookControls {
       },
       options,
     );
-    window.addEventListener("blur", () => this.setCursor(true), options);
-    document.addEventListener(
-      "visibilitychange",
-      () => {
-        if (document.hidden) this.setCursor(true);
-      },
-      options,
-    );
+    const syncCursor = () => this.syncCursor();
+    window.addEventListener("blur", syncCursor, options);
+    window.addEventListener("focus", syncCursor, options);
+    document.addEventListener("visibilitychange", syncCursor, options);
+    document.addEventListener("focusin", syncCursor, options);
+    document.addEventListener("focusout", syncCursor, options);
     canvas.addEventListener(
       "pointerdown",
       (event) => {
-        if (event.pointerType !== "touch") return;
+        if (event.pointerType !== "touch" || isTableInputBlocked(event.target)) return;
         this.touch = { id: event.pointerId, x: event.clientX, y: event.clientY };
         canvas.setPointerCapture(event.pointerId);
       },
@@ -148,7 +146,7 @@ export class TableLookControls {
     canvas.addEventListener(
       "pointermove",
       (event) => {
-        if (this.touch?.id !== event.pointerId) return;
+        if (this.touch?.id !== event.pointerId || isTableInputBlocked(event.target)) return;
         this.move(event.clientX - this.touch.x, event.clientY - this.touch.y);
         this.touch.x = event.clientX;
         this.touch.y = event.clientY;
@@ -161,11 +159,14 @@ export class TableLookControls {
     canvas.addEventListener("pointerup", releaseTouch, options);
     canvas.addEventListener("pointercancel", releaseTouch, options);
     canvas.addEventListener("lostpointercapture", releaseTouch, options);
-    this.modalObserver = new MutationObserver(() => {
-      if (!this.cursorVisible && isTableInputBlocked(null)) this.setCursor(true);
+    this.modalObserver = new MutationObserver(syncCursor);
+    this.modalObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-modal", "role", "data-table-input-block", "contenteditable"],
     });
-    this.modalObserver.observe(document.body, { childList: true, subtree: true });
-    if (isTableInputBlocked(null)) this.setCursor(true);
+    this.syncCursor();
   }
 
   private move(dx: number, dy: number) {
@@ -197,10 +198,18 @@ export class TableLookControls {
     }
   }
 
-  setCursor(visible: boolean) {
-    this.cursorVisible = visible;
-    this.previous = null;
-    this.onCursor(visible);
+  private syncCursor() {
+    const visible =
+      window.matchMedia("(pointer: coarse)").matches ||
+      document.hidden ||
+      !document.hasFocus() ||
+      isTableInputBlocked(document.activeElement);
+    if (this.cursorVisible !== visible) {
+      this.cursorVisible = visible;
+      this.previous = null;
+      this.touch = null;
+      this.onCursor(visible);
+    }
     if (visible && document.pointerLockElement === this.canvas) document.exitPointerLock();
   }
 

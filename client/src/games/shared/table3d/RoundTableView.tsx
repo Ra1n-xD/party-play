@@ -14,7 +14,6 @@ interface Props {
   roomCode: string;
   canSendLook: boolean;
   paused: boolean;
-  cursorVisible: boolean;
   onCursorChange: (visible: boolean) => void;
   onClassic: () => void;
   title: string;
@@ -99,15 +98,12 @@ export default function RoundTableView(props: Props) {
         </button>
       </div>
       <aside className="table3d-keyboard" aria-label="Управление с клавиатуры">
-        <span className="table3d-keyboard-state">
-          {props.cursorVisible ? "ВЗГЛЯД ЗАКРЕПЛЁН" : "СВОБОДНЫЙ ВЗГЛЯД"}
-        </span>
+        <span className="table3d-keyboard-state">УПРАВЛЕНИЕ</span>
         <ul>
           {[
             ...props.shortcuts,
             { label: "Правила", keys: ["L"] },
             ...(props.canSendLook ? [{ label: "Эмоции", keys: ["V"] }] : []),
-            { label: props.cursorVisible ? "Свободный взгляд" : "Показать курсор", keys: ["Q"] },
             { label: "К столу", keys: ["R"] },
           ].map((item) => (
             <li key={item.label} className={item.active ? "is-available" : ""}>
