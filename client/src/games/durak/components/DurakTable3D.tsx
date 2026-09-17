@@ -5,10 +5,12 @@ import { getDurakCardFace, getSuitSymbol } from "./DurakCard";
 import type { TableHandCard } from "../../shared/table3d/FirstPersonHand";
 
 import { useTablePresence } from "../../shared/table3d/useTablePresence";
+import { TableSessionMenu, type TableMenuHandle } from "../../shared/table3d/TableSessionMenu";
 
 interface Props {
   game: DurakPublicState;
   isHost: boolean;
+  onManage: () => void;
   viewerSeatId: string | null;
   targetIds: string[];
   onDefend: (attackCardId: string) => void;
@@ -28,6 +30,7 @@ interface Props {
 export default function DurakTable3D({
   game,
   isHost,
+  onManage,
   viewerSeatId,
   targetIds,
   onDefend,
@@ -46,6 +49,8 @@ export default function DurakTable3D({
   const host = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
   const scene = useRef<RoundTableScene | null>(null);
+  const menu = useRef<TableMenuHandle>(null);
+  const [overview, setOverview] = useState(false);
   const cursorCallback = useRef(onCursorChange);
   cursorCallback.current = onCursorChange;
   const handCallbacks = useRef({ onFocusCard, onSelectCard });
@@ -80,6 +85,8 @@ export default function DurakTable3D({
           cursorCallback.current(true);
         },
         {
+          onMenuRequest: (error) => menu.current?.open(error),
+          onOverviewChange: setOverview,
           onFocusHandCard: (id) => handCallbacks.current.onFocusCard(id),
           onSelectHandCard: (id) => handCallbacks.current.onSelectCard(id),
         },
@@ -197,7 +204,10 @@ export default function DurakTable3D({
 
   const actor = game.players.find((player) => player.isCurrentActor);
   return (
-    <section className="durak-table3d" aria-label="Игра за круглым столом">
+    <section
+      className={`durak-table3d${overview ? " is-overview" : ""}`}
+      aria-label="Игра за круглым столом"
+    >
       <div ref={host} className="table3d-canvas" />
       <div ref={labels} className="table3d-labels" aria-hidden="true" />
       <div className="table3d-vignette" />
@@ -209,6 +219,16 @@ export default function DurakTable3D({
         </div>
         <button type="button" className="table3d-classic" onClick={onClassic}>
           2D
+        </button>
+        <button type="button" className="table3d-classic" onClick={() => menu.current?.open()}>
+          Меню
+        </button>
+        <button
+          type="button"
+          className="table3d-overview-touch table3d-classic"
+          onClick={() => scene.current?.toggleOverview()}
+        >
+          {overview ? "За стол" : "Сверху"}
         </button>
       </div>
       <aside className="table3d-keyboard" aria-label="Управление с клавиатуры">
@@ -261,8 +281,20 @@ export default function DurakTable3D({
             </>
           )}
           <li>
-            <span>К столу</span>
+            <span>{overview ? "За стол" : "Вид сверху"}</span>
             <kbd>R</kbd>
+          </li>
+          <li>
+            <span>Меню</span>
+            <kbd>Esc</kbd>
+          </li>
+          <li>
+            <span>Перейти в 2D</span>
+            <kbd>2</kbd>
+          </li>
+          <li>
+            <span>Участники</span>
+            <kbd>P</kbd>
           </li>
           {viewerSeatId && (
             <li>
@@ -356,6 +388,18 @@ export default function DurakTable3D({
           </button>
         </div>
       )}
+      <TableSessionMenu
+        ref={menu}
+        scene={scene}
+        gameId="durak"
+        onClassic={onClassic}
+        actions={isHost ? [{ label: "Управление комнатой", key: "H", onSelect: onManage }] : []}
+        people={game.players.map((player) => ({
+          id: player.seatId,
+          name: player.name,
+          detail: `${player.cardCount} карт${player.isCurrentActor ? " · ходит" : ""}${player.controllerKind === "bot" ? " · бот" : ""}`,
+        }))}
+      />
     </section>
   );
 }

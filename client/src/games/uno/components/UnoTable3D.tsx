@@ -9,6 +9,7 @@ const COLORS = { red: "Красный", yellow: "Жёлтый", green: "Зелё
 interface Props {
   game: UnoPublicState;
   isHost: boolean;
+  onManage: () => void;
   viewerSeatId: string | null;
   roomCode: string;
   canSendLook: boolean;
@@ -96,6 +97,9 @@ export default function UnoTable3D(props: Props) {
       paused={props.paused}
       onCursorChange={props.onCursorChange}
       onClassic={props.onClassic}
+      menuActions={
+        props.isHost ? [{ label: "Управление комнатой", key: "H", onSelect: props.onManage }] : []
+      }
       title="ЦВЕТНОЙ СТОЛ"
       onFocusHandCard={props.onFocusCard}
       onSelectHandCard={props.onSelectCard}

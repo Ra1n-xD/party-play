@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RoundTableScene, type RoundTableState, type TableSceneOptions } from "./RoundTableScene";
 import { useTablePresence } from "./useTablePresence";
+import { TableSessionMenu, type TableMenuAction, type TableMenuHandle } from "./TableSessionMenu";
 import "./table3d.css";
 
 export interface TableShortcut {
@@ -16,6 +17,7 @@ interface Props {
   paused: boolean;
   onCursorChange: (visible: boolean) => void;
   onClassic: () => void;
+  menuActions?: TableMenuAction[];
   title: string;
   shortcuts: TableShortcut[];
   onSelectPerson?: TableSceneOptions["onSelectPerson"];
@@ -29,6 +31,8 @@ export default function RoundTableView(props: Props) {
   const host = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
   const scene = useRef<RoundTableScene | null>(null);
+  const menu = useRef<TableMenuHandle>(null);
+  const [overview, setOverview] = useState(false);
   const latest = useRef(props);
   latest.current = props;
   const [failed, setFailed] = useState(false);
@@ -53,6 +57,8 @@ export default function RoundTableView(props: Props) {
         fail,
         {
           variant: props.variant,
+          onMenuRequest: (error) => menu.current?.open(error),
+          onOverviewChange: setOverview,
           onSelectPerson: (id) => latest.current.onSelectPerson?.(id),
           onFocusHandCard: (id) => latest.current.onFocusHandCard?.(id),
           onSelectHandCard: (id) => latest.current.onSelectHandCard?.(id),
@@ -77,7 +83,7 @@ export default function RoundTableView(props: Props) {
   }, [props.focusedPerson]);
   return (
     <section
-      className={`table3d-scene table3d-${props.variant}`}
+      className={`table3d-scene table3d-${props.variant}${overview ? " is-overview" : ""}`}
       aria-label="Игра за круглым столом"
     >
       <div ref={host} className="table3d-canvas" />
@@ -96,6 +102,16 @@ export default function RoundTableView(props: Props) {
         <button type="button" className="table3d-classic" onClick={props.onClassic}>
           2D
         </button>
+        <button type="button" className="table3d-classic" onClick={() => menu.current?.open()}>
+          Меню
+        </button>
+        <button
+          type="button"
+          className="table3d-overview-touch table3d-classic"
+          onClick={() => scene.current?.toggleOverview()}
+        >
+          {overview ? "За стол" : "Сверху"}
+        </button>
       </div>
       <aside className="table3d-keyboard" aria-label="Управление с клавиатуры">
         <span className="table3d-keyboard-state">УПРАВЛЕНИЕ</span>
@@ -104,7 +120,10 @@ export default function RoundTableView(props: Props) {
             ...props.shortcuts,
             { label: "Правила", keys: ["L"] },
             ...(props.canSendLook ? [{ label: "Эмоции", keys: ["V"] }] : []),
-            { label: "К столу", keys: ["R"] },
+            { label: overview ? "За стол" : "Вид сверху", keys: ["R"] },
+            { label: "Меню", keys: ["Esc"] },
+            { label: "Перейти в 2D", keys: ["2"] },
+            ...(props.variant !== "bunker" ? [{ label: "Участники", keys: ["P"] }] : []),
           ].map((item) => (
             <li key={item.label} className={item.active ? "is-available" : ""}>
               <span>{item.label}</span>
@@ -118,6 +137,14 @@ export default function RoundTableView(props: Props) {
         </ul>
       </aside>
       {props.children}
+      <TableSessionMenu
+        ref={menu}
+        scene={scene}
+        gameId={props.variant}
+        onClassic={props.onClassic}
+        actions={props.menuActions}
+        people={props.state.people}
+      />
       {failed && (
         <div className="table3d-failure" role="alert">
           <strong>Не удалось открыть 3D-комнату</strong>

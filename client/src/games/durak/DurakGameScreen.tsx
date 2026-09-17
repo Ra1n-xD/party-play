@@ -821,6 +821,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
           >
             <DurakTable3D
               game={game}
+              onManage={openManagement}
               isHost={isHost}
               viewerSeatId={viewerSeatId}
               hand={displayedHand.map((card) => ({

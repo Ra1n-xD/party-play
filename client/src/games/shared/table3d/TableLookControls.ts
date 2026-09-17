@@ -5,7 +5,7 @@ import {
   type AvatarLook,
 } from "../../../../../shared/platform/avatarLook";
 
-export const TABLE_DEFAULT_PITCH = -0.48;
+export const TABLE_DEFAULT_PITCH = -0.36;
 
 export function isTableInputBlocked(target: EventTarget | null): boolean {
   return Boolean(
@@ -15,88 +15,40 @@ export function isTableInputBlocked(target: EventTarget | null): boolean {
   );
 }
 
-/** Keeps mouse look active; only dialogs, text entry and an inactive window suspend it. */
+/** Desktop play requires pointer lock; losing it returns to the keyboard-accessible menu. */
 export class TableLookControls {
   readonly target: AvatarLook = { yaw: 0, pitch: TABLE_DEFAULT_PITCH };
   private readonly abort = new AbortController();
-  private cursorVisible = window.matchMedia("(pointer: coarse)").matches;
-  private previous: { x: number; y: number } | null = null;
+  private readonly coarse = window.matchMedia("(pointer: coarse)");
+  private cursorVisible = true;
   private touch: { id: number; x: number; y: number } | null = null;
-  private readonly root: HTMLElement;
   private readonly modalObserver: MutationObserver;
+  private requestPending = false;
+  private disposed = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly onCursor: (visible: boolean) => void,
-    private readonly defaultPitch = TABLE_DEFAULT_PITCH,
+    private readonly onMenu: (error?: string) => void,
+    private readonly onOverview: () => void,
+    defaultPitch = TABLE_DEFAULT_PITCH,
   ) {
     this.target.pitch = defaultPitch;
-    this.root = canvas.closest<HTMLElement>(".is-3d") ?? canvas;
     const options = { signal: this.abort.signal };
-    this.onCursor(this.cursorVisible);
-    const isInterfaceClick = (event: MouseEvent) =>
-      event.detail === 0 ||
-      (event.target instanceof Element &&
-        Boolean(event.target.closest('button, a[href], input, textarea, select, [role="button"]')));
+    this.onCursor(true);
     document.addEventListener(
       "mousemove",
       (event) => {
-        if (this.cursorVisible || isTableInputBlocked(event.target)) {
-          this.previous = null;
-          return;
-        }
-        if (document.pointerLockElement === canvas) {
-          this.move(event.movementX, event.movementY);
-        } else if (event.target instanceof Node && this.root.contains(event.target)) {
-          if (this.previous)
-            this.move(event.clientX - this.previous.x, event.clientY - this.previous.y);
-          this.previous = { x: event.clientX, y: event.clientY };
-        } else this.previous = null;
+        if (document.pointerLockElement !== canvas || isTableInputBlocked(event.target)) return;
+        this.move(event.movementX, event.movementY);
       },
       options,
-    );
-    this.root.addEventListener(
-      "mouseleave",
-      () => {
-        this.previous = null;
-      },
-      options,
-    );
-    this.root.addEventListener(
-      "dblclick",
-      (event) => {
-        if (
-          this.cursorVisible ||
-          isTableInputBlocked(event.target) ||
-          isInterfaceClick(event) ||
-          window.matchMedia("(pointer: coarse)").matches
-        )
-          return;
-        event.preventDefault();
-        event.stopPropagation();
-      },
-      { ...options, capture: true },
-    );
-    this.root.addEventListener(
-      "click",
-      (event) => {
-        if (
-          this.cursorVisible ||
-          isTableInputBlocked(event.target) ||
-          isInterfaceClick(event) ||
-          window.matchMedia("(pointer: coarse)").matches
-        )
-          return;
-        event.preventDefault();
-        event.stopPropagation();
-        this.capturePointer();
-      },
-      { ...options, capture: true },
     );
     document.addEventListener(
       "keydown",
       (event) => {
         if (
+          event.defaultPrevented ||
           event.repeat ||
           event.altKey ||
           event.ctrlKey ||
@@ -104,10 +56,13 @@ export class TableLookControls {
           isTableInputBlocked(event.target)
         )
           return;
-        if (event.code === "KeyR") {
+        if (event.code === "Escape") {
           event.preventDefault();
-          this.target.yaw = 0;
-          this.target.pitch = this.defaultPitch;
+          this.release();
+          this.onMenu();
+        } else if (event.code === "KeyR") {
+          event.preventDefault();
+          this.onOverview();
         }
       },
       options,
@@ -115,25 +70,25 @@ export class TableLookControls {
     document.addEventListener(
       "pointerlockchange",
       () => {
-        this.previous = null;
+        this.requestPending = false;
+        if (document.pointerLockElement === canvas) canvas.focus({ preventScroll: true });
         this.syncCursor();
       },
       options,
     );
-    // Unsupported/denied pointer lock still permits bounded mouse look inside the game.
-    document.addEventListener(
-      "pointerlockerror",
+    document.addEventListener("pointerlockerror", () => this.captureFailed(), options);
+    window.addEventListener(
+      "blur",
       () => {
-        this.previous = null;
+        this.release();
+        if (!this.coarse.matches && !isTableInputBlocked(null)) this.onMenu();
       },
       options,
     );
     const syncCursor = () => this.syncCursor();
-    window.addEventListener("blur", syncCursor, options);
     window.addEventListener("focus", syncCursor, options);
     document.addEventListener("visibilitychange", syncCursor, options);
-    document.addEventListener("focusin", syncCursor, options);
-    document.addEventListener("focusout", syncCursor, options);
+    this.coarse.addEventListener("change", syncCursor, options);
     canvas.addEventListener(
       "pointerdown",
       (event) => {
@@ -164,7 +119,7 @@ export class TableLookControls {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["aria-modal", "role", "data-table-input-block", "contenteditable"],
+      attributeFilter: ["aria-modal", "role", "data-table-input-block"],
     });
     this.syncCursor();
   }
@@ -184,39 +139,62 @@ export class TableLookControls {
     return this.cursorVisible;
   }
 
-  private capturePointer() {
+  /** Call synchronously from a trusted click/key, after removing the menu. */
+  resume() {
+    if (this.disposed) return;
+    if (this.coarse.matches) {
+      this.canvas.focus({ preventScroll: true });
+      return;
+    }
+    if (document.pointerLockElement === this.canvas || this.requestPending) return;
+    if (!this.canvas.requestPointerLock) {
+      this.onMenu("Захват мыши недоступен в этом браузере. Можно продолжить партию в 2D.");
+      return;
+    }
+    this.requestPending = true;
     this.canvas.focus({ preventScroll: true });
-    if (document.pointerLockElement === this.canvas || !this.canvas.requestPointerLock) return;
     try {
       const request = this.canvas.requestPointerLock();
-      if (request)
-        void request.catch(() => {
-          this.previous = null;
-        });
-    } catch {
-      this.previous = null;
+      if (request) void request.catch((error: unknown) => this.captureFailed(error));
+    } catch (error) {
+      this.captureFailed(error);
     }
+  }
+
+  release() {
+    this.touch = null;
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+    this.setCursor(true);
+  }
+
+  private captureFailed(error?: unknown) {
+    if (this.disposed) return;
+    if (error && import.meta.env.DEV) console.debug("3D mouse capture was denied", error);
+    this.requestPending = false;
+    this.setCursor(true);
+    this.onMenu("Не удалось захватить мышь. Нажмите Enter или «Продолжить» ещё раз.");
+  }
+
+  private setCursor(visible: boolean) {
+    if (this.cursorVisible === visible) return;
+    this.cursorVisible = visible;
+    this.onCursor(visible);
   }
 
   private syncCursor() {
-    const visible =
-      window.matchMedia("(pointer: coarse)").matches ||
-      document.hidden ||
-      !document.hasFocus() ||
-      isTableInputBlocked(document.activeElement);
-    if (this.cursorVisible !== visible) {
-      this.cursorVisible = visible;
-      this.previous = null;
-      this.touch = null;
-      this.onCursor(visible);
-    }
-    if (visible && document.pointerLockElement === this.canvas) document.exitPointerLock();
+    if (this.disposed) return;
+    const blocked = isTableInputBlocked(document.activeElement);
+    // Keyboard dialogs suspend camera motion but retain capture. Esc/the main menu releases it.
+    if (document.hidden || !document.hasFocus()) this.release();
+    else this.setCursor(document.pointerLockElement !== this.canvas);
+    if (!this.coarse.matches && this.cursorVisible && !blocked && !this.requestPending)
+      this.onMenu();
   }
 
   dispose() {
+    this.disposed = true;
     this.abort.abort();
     this.modalObserver.disconnect();
-    if (document.pointerLockElement === this.canvas) document.exitPointerLock();
-    this.onCursor(true);
+    this.release();
   }
 }
