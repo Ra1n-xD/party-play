@@ -841,7 +841,6 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
               revision={snapshot.revision}
               roomCode={snapshot.roomCode}
               canSendLook={Boolean(viewerSeatId && canUseConnection)}
-              cursorVisible={cursorVisible}
               onCursorChange={setCursorVisible}
               focusedTargetId={focusedTarget}
               secondaryLabel={

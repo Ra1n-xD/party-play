@@ -526,7 +526,6 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
               onSelectCard={selectCard}
               roomCode={snapshot.roomCode}
               canSendLook={Boolean(viewerSeatId && canUseConnection)}
-              cursorVisible={cursorVisible}
               onCursorChange={setCursorVisible}
               onClassic={() => setIs3D(false)}
               paused={paused && snapshot.lifecycle !== "results"}

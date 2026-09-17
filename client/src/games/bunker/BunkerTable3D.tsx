@@ -12,7 +12,6 @@ import { Timer } from "../../components/Timer";
 import { BUNKER_ATTRIBUTE_ICONS, BunkerAttributeIcon } from "./BunkerAttributeIcon";
 
 interface Props {
-  cursorVisible: boolean;
   onCursorChange: (visible: boolean) => void;
   onClassic: () => void;
   onReveal?: () => void;
@@ -173,7 +172,6 @@ export default function BunkerTable3D(props: Props) {
           reconnectState === "connected",
         )}
         paused={game.paused}
-        cursorVisible={props.cursorVisible}
         onCursorChange={props.onCursorChange}
         onClassic={props.onClassic}
         title="СОВЕТ УБЕЖИЩА"

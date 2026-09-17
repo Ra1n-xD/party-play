@@ -140,11 +140,7 @@ export function VoteScreen({
         <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
         {is3D ? (
           <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
-            <BunkerTable3D
-              cursorVisible={cursorVisible}
-              onCursorChange={setCursorVisible}
-              onClassic={onToggle3D}
-            />
+            <BunkerTable3D onCursorChange={setCursorVisible} onClassic={onToggle3D} />
           </Suspense>
         ) : (
           <>
@@ -224,7 +220,6 @@ export function VoteScreen({
       {is3D ? (
         <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
           <BunkerTable3D
-            cursorVisible={cursorVisible}
             onCursorChange={setCursorVisible}
             onClassic={onToggle3D}
             onSpecial={
