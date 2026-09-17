@@ -1,6 +1,6 @@
 .screen.card-game-screen.is-3d {
-  --card-arena-hand-height: 124px;
-  --card-arena-dock-space: calc(62px + env(safe-area-inset-bottom));
+  --card-arena-hand-height: 0px;
+  --card-arena-dock-space: 0px;
   background: #17231f;
 }
 .is-3d .card-game-arena {
@@ -33,7 +33,7 @@
   pointer-events: none;
 }
 .table3d-vignette {
-  background: linear-gradient(#10181465, transparent 24%, transparent 70%, #111a18ab);
+  background: linear-gradient(#10181465, transparent 24%, transparent 70%, #111a1830);
 }
 .is-3d.is-looking,
 .is-3d.is-looking * {
@@ -328,63 +328,7 @@
   max-width: 380px;
   color: #bac6c4;
 }
-.is-3d .card-game-arena .card-arena-hand {
-  z-index: 6;
-  right: 0;
-  left: 0;
-  padding-top: 4px;
-  background: transparent;
-}
-.is-3d .card-game-arena .durak-hand {
-  min-height: 0;
-  height: 100%;
-  align-items: flex-end;
-  padding: 8px 25px 6px;
-}
-.is-3d .durak-card.is-hand {
-  width: 79px;
-  height: 112px;
-  border-radius: 7px;
-  background: #fff8e9;
-  box-shadow: 0 7px 18px #0007;
-}
-.is-3d .durak-card.is-hand.is-playable {
-  border-color: #d7c797;
-}
-.is-3d .durak-card.is-hand.is-selected {
-  border-color: #ffcf69;
-  box-shadow:
-    0 0 0 2px #e2b453,
-    0 0 20px #f4ce6640;
-}
-.is-3d .is-keyboard-focused {
-  z-index: 5;
-}
-.is-3d .is-keyboard-focused .durak-card {
-  outline: 2px solid #f2dba2;
-  outline-offset: 4px;
-  transform: translateY(-10px);
-}
-.is-3d .is-keyboard-focused::after {
-  position: absolute;
-  bottom: -1px;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #f2dba2;
-  content: "";
-  transform: translateX(-50%);
-}
-.is-3d .durak-command-dock {
-  border-color: #d0bc8b25;
-  background: #17251dde;
-}
-
 @media (max-width: 680px) {
-  .screen.card-game-screen.is-3d {
-    --card-arena-hand-height: 111px;
-  }
   .table3d-toolbar {
     top: 12px;
     left: 10px;
@@ -458,13 +402,6 @@
     justify-content: flex-end;
     left: 42%;
   }
-  .is-3d .durak-card.is-hand {
-    width: 68px;
-    height: 96px;
-  }
-  .is-3d .card-game-arena .durak-hand {
-    padding-inline: 22px;
-  }
 }
 @media (pointer: coarse) {
   .table3d-keyboard {
@@ -476,14 +413,6 @@
   }
 }
 @media (max-height: 540px) and (min-width: 681px) {
-  .screen.card-game-screen.is-3d {
-    --card-arena-hand-height: 79px;
-    --card-arena-dock-space: 52px;
-  }
-  .is-3d .durak-card.is-hand {
-    width: 48px;
-    height: 68px;
-  }
   .table3d-keyboard {
     top: 8px;
     right: 10px;
@@ -538,4 +467,206 @@
 }
 .table3d-elimination-notice span {
   font-size: 0.75rem;
+}
+
+/* Actions float over the room; there is no footer panel or reserved footer space in 3D. */
+.screen.command-game-screen.card-game-screen.is-3d,
+.screen.command-game-screen.is-3d.bunker3d-screen {
+  padding-bottom: 0;
+}
+.screen.command-game-screen.is-3d
+  :is(.uno-command-dock, .durak-command-dock, .gs-action-bar, .vote-command-bar) {
+  position: absolute;
+  inset: auto 16px max(14px, env(safe-area-inset-bottom)) auto;
+  display: block;
+  width: auto;
+  max-width: min(480px, 40%);
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+}
+.screen.command-game-screen.is-3d
+  :is(.uno-command-actions, .durak-command-actions, .gs-command-actions, .vote-command-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+  overflow: visible;
+}
+.screen.command-game-screen.is-3d
+  :is(.uno-command-dock, .durak-command-dock, .gs-action-bar, .vote-command-bar)
+  button {
+  pointer-events: auto;
+  flex: 0 0 auto;
+  min-width: 42px;
+  min-height: 42px;
+  box-shadow: 0 3px 12px #0005;
+}
+.screen.command-game-screen.is-3d :is(.gs-command-status, .vote-command-status) {
+  display: none;
+}
+.is-3d .btn kbd {
+  margin-left: 7px;
+  opacity: 0.65;
+  font: inherit;
+}
+.screen.card-game-screen.is-3d .card-arena-public {
+  right: auto;
+  left: 16px;
+  bottom: 80px;
+  min-height: 0;
+  padding: 8px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  text-shadow: 0 2px 4px #000;
+}
+.table3d-hand-inputs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.table3d-hand-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.table3d-hand-inputs[inert] .table3d-hand-card,
+.table3d-hand-inputs[inert] .table3d-hand-step {
+  pointer-events: none;
+}
+.table3d-hand-card[aria-disabled="true"] {
+  cursor: default;
+}
+.table3d-hand-card:focus-visible {
+  outline: none;
+}
+.table3d-hand-inputs[hidden],
+.table3d-hand-card[hidden],
+.table3d-hand-step[hidden] {
+  display: none;
+}
+.table3d-hand-caption {
+  position: absolute;
+  top: 222px;
+  left: 22px;
+  width: min(220px, 35%);
+  color: #f4e5c1;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  text-align: left;
+  text-shadow:
+    0 1px 4px #000,
+    0 2px 12px #000;
+  pointer-events: none;
+}
+.table3d-hand-step {
+  position: absolute;
+  bottom: 135px;
+  left: max(12px, calc(50% - 300px));
+  z-index: 500;
+  width: 42px;
+  height: 44px;
+  border: 1px solid #d4bf8555;
+  border-radius: 50%;
+  background: #16231caa;
+  color: #f0d7a0;
+  font-size: 1.5rem;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.table3d-hand-step.is-next {
+  left: auto;
+  right: max(12px, calc(50% - 300px));
+}
+.table3d-bottom-info {
+  top: 182px;
+  bottom: auto;
+}
+.table3d-targets {
+  bottom: 38%;
+}
+@media (max-width: 680px) {
+  .screen.command-game-screen.is-3d
+    :is(.uno-command-dock, .durak-command-dock, .gs-action-bar, .vote-command-bar) {
+    right: 10px;
+    left: 10px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    max-width: none;
+  }
+  .screen.command-game-screen.is-3d
+    :is(.uno-command-actions, .durak-command-actions, .gs-command-actions, .vote-command-actions) {
+    justify-content: center;
+    gap: 5px;
+  }
+  .table3d-hand-caption {
+    top: 197px;
+    left: 10px;
+    width: 42%;
+    font-size: 0.62rem;
+  }
+  .table3d-hand-step {
+    bottom: 185px;
+    left: 8px;
+    width: 36px;
+  }
+  .table3d-hand-step.is-next {
+    right: 8px;
+  }
+  .table3d-bottom-info {
+    top: 157px;
+  }
+}
+@media (max-height: 540px) and (min-width: 681px) {
+  .table3d-keyboard {
+    width: 300px;
+    padding: 8px 10px;
+  }
+  .table3d-keyboard ul {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+  }
+  .table3d-hand-caption {
+    top: 187px;
+  }
+  .table3d-hand-step {
+    bottom: 80px;
+  }
+  .table3d-bottom-info {
+    top: 146px;
+  }
+  .screen.command-game-screen.is-3d :is(.uno-command-dock, .durak-command-dock) {
+    max-width: 35%;
+    bottom: 8px;
+  }
+}
+
+/* Desktop play uses the keyboard. Touch devices retain their action controls. */
+@media (pointer: fine) {
+  .screen.command-game-screen.is-3d
+    :is(.uno-command-dock, .durak-command-dock, .gs-action-bar, .vote-command-bar),
+  .is-3d .bunker3d-tools,
+  .is-3d .table3d-hand-step,
+  .is-3d .table3d-targets {
+    display: none;
+  }
 }

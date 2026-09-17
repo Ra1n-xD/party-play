@@ -9,13 +9,7 @@
 }
 .bunker3d-screen > .table3d-scene {
   top: 54px;
-  bottom: 94px;
-}
-.bunker3d-screen .gs-action-bar,
-.bunker3d-screen .vote-command-bar {
-  z-index: 20;
-  background: #17251df5;
-  border-color: #d0bc8b35;
+  bottom: 0;
 }
 .bunker3d-screen .gs-command-status {
   max-width: 300px;
@@ -177,9 +171,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: center;
+  justify-content: flex-start;
   left: 12px;
-  right: 12px;
+  right: 55%;
   bottom: 18px;
 }
 .bunker3d-tools button {
@@ -245,15 +239,14 @@
 }
 @media (max-width: 680px) {
   .bunker3d-screen > .table3d-scene {
-    bottom: 130px;
+    bottom: 0;
   }
   .bunker3d-screen .gs-command-status {
     max-width: none;
   }
   .bunker3d-screen .gs-command-actions {
-    flex-wrap: nowrap;
-    overflow: auto;
-    justify-content: flex-start;
+    flex-wrap: wrap;
+    overflow: visible;
   }
   .bunker3d-screen .gs-command-button {
     flex-shrink: 0;
@@ -277,13 +270,15 @@
   }
   .bunker3d-table-caption {
     width: 65%;
-    bottom: 105px;
+    bottom: 245px;
   }
   .bunker3d-table-caption strong {
     font-size: 0.9rem;
   }
   .bunker3d-tools {
-    bottom: 8px;
+    bottom: 150px;
+    right: 12px;
+    justify-content: center;
     gap: 4px;
   }
   .bunker3d-tools button {
@@ -303,7 +298,7 @@
 }
 @media (max-height: 540px) and (min-width: 681px) {
   .bunker3d-screen > .table3d-scene {
-    bottom: 70px;
+    bottom: 0;
   }
   .bunker3d-screen .gs-command-status {
     display: none;

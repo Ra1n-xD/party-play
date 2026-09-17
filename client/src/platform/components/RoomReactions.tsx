@@ -86,6 +86,10 @@ export function RoomReactions() {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const popoverWidth = Math.min(POPOVER_WIDTH, viewportWidth - POPOVER_MARGIN * 2);
+    if (!triggerRect.width && trigger.closest(".is-3d")) {
+      setPopoverPosition({ bottom: 24, left: Math.max(12, viewportWidth - popoverWidth - 24) });
+      return;
+    }
     const maxLeft = Math.max(POPOVER_MARGIN, viewportWidth - popoverWidth - POPOVER_MARGIN);
     const left = Math.min(Math.max(POPOVER_MARGIN, triggerRect.right - popoverWidth), maxLeft);
     const openAbove =

@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import type { UnoPublicState } from "../../../../../shared/games/uno/types";
 import RoundTableView from "../../shared/table3d/RoundTableView";
 import type { RoundTableState } from "../../shared/table3d/RoundTableScene";
-import { getUnoCardName } from "./UnoCard";
+import { getUnoCardMark, getUnoCardName } from "./UnoCard";
+import type { TableHandCard } from "../../shared/table3d/FirstPersonHand";
 
 const COLORS = { red: "Красный", yellow: "Жёлтый", green: "Зелёный", blue: "Синий" };
 interface Props {
   game: UnoPublicState;
+  isHost: boolean;
   viewerSeatId: string | null;
   roomCode: string;
   canSendLook: boolean;
@@ -16,6 +18,9 @@ interface Props {
   paused: boolean;
   revision: number;
   secondary: string;
+  hand: TableHandCard[];
+  onFocusCard: (id: string) => void;
+  onSelectCard: (id: string) => void;
 }
 export default function UnoTable3D(props: Props) {
   const { game, viewerSeatId } = props;
@@ -34,13 +39,7 @@ export default function UnoTable3D(props: Props) {
   }, [game.turnRemainingMs, props.paused, props.revision]);
   const state = useMemo<RoundTableState>(() => {
     const card = game.topDiscard;
-    const rank = !card
-      ? ""
-      : card.kind === "number"
-        ? String(card.number)
-        : { skip: "⊘", reverse: "↺", "draw-two": "+2", wild: "✦", "wild-draw-four": "+4" }[
-            card.kind
-          ];
+    const rank = card ? getUnoCardMark(card) : "";
     return {
       people: game.players.map((player) => ({
         id: player.seatId,
@@ -64,6 +63,7 @@ export default function UnoTable3D(props: Props) {
                     : "за столом",
       })),
       viewerId: viewerSeatId,
+      ownHand: props.hand,
       cards: card
         ? [
             {
@@ -86,7 +86,7 @@ export default function UnoTable3D(props: Props) {
       trump: null,
       takeSeatId: null,
     };
-  }, [game, viewerSeatId]);
+  }, [game, viewerSeatId, props.hand]);
   const actor = game.players.find((player) => player.seatId === game.currentActorSeatId);
   return (
     <RoundTableView
@@ -99,10 +99,14 @@ export default function UnoTable3D(props: Props) {
       onCursorChange={props.onCursorChange}
       onClassic={props.onClassic}
       title="ЦВЕТНОЙ СТОЛ"
+      onFocusHandCard={props.onFocusCard}
+      onSelectHandCard={props.onSelectCard}
       shortcuts={
         viewerSeatId
           ? [
               { label: "Карта", keys: ["A", "D"] },
+              ...(props.isHost ? [{ label: "Управление", keys: ["H"] }] : []),
+              { label: "Выбрать", keys: ["Пробел"] },
               { label: "Сыграть / цвет", keys: ["E"] },
               { label: props.secondary, keys: ["F"] },
               { label: "Оспорить +4", keys: ["G"] },

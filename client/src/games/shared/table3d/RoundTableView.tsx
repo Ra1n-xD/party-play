@@ -20,6 +20,8 @@ interface Props {
   title: string;
   shortcuts: TableShortcut[];
   onSelectPerson?: TableSceneOptions["onSelectPerson"];
+  onFocusHandCard?: TableSceneOptions["onFocusHandCard"];
+  onSelectHandCard?: TableSceneOptions["onSelectHandCard"];
   focusedPerson?: string | null;
   children?: ReactNode;
 }
@@ -50,7 +52,12 @@ export default function RoundTableView(props: Props) {
         sendLook,
         (visible) => latest.current.onCursorChange(visible),
         fail,
-        { variant: props.variant, onSelectPerson: (id) => latest.current.onSelectPerson?.(id) },
+        {
+          variant: props.variant,
+          onSelectPerson: (id) => latest.current.onSelectPerson?.(id),
+          onFocusHandCard: (id) => latest.current.onFocusHandCard?.(id),
+          onSelectHandCard: (id) => latest.current.onSelectHandCard?.(id),
+        },
       );
     } catch {
       fail();
@@ -98,6 +105,7 @@ export default function RoundTableView(props: Props) {
         <ul>
           {[
             ...props.shortcuts,
+            { label: "Правила", keys: ["L"] },
             ...(props.canSendLook ? [{ label: "Эмоции", keys: ["V"] }] : []),
             { label: props.cursorVisible ? "Свободный взгляд" : "Показать курсор", keys: ["Q"] },
             { label: "К столу", keys: ["R"] },

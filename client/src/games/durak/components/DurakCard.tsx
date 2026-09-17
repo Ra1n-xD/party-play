@@ -51,6 +51,14 @@ export function getCardName(card: DurakCardData): string {
   return `${RANK_NAMES[card.rank]} ${SUIT_LABELS[card.suit]}`;
 }
 
+export function getDurakCardFace(card: DurakCardData) {
+  return {
+    rank: RANK_LABELS[card.rank],
+    suit: getSuitSymbol(card.suit),
+    red: card.suit === "hearts" || card.suit === "diamonds",
+  };
+}
+
 interface DurakCardProps {
   card: DurakCardData;
   size?: "hand" | "table" | "mini";

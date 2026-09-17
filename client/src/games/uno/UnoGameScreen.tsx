@@ -23,7 +23,7 @@ import { useCardDrag } from "../shared/useCardDrag";
 import { useCardTransferMotion } from "../shared/useCardTransferMotion";
 import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
-import { UnoCard, UnoCardBack, getUnoCardName } from "./components/UnoCard";
+import { UnoCard, UnoCardBack, getUnoCardMark, getUnoCardName } from "./components/UnoCard";
 import { UnoColorDialog } from "./components/UnoColorDialog";
 
 import { useTableHotkeys } from "../shared/table3d/useTableHotkeys";
@@ -113,6 +113,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   const [is3D, setIs3D] = useState(true);
   const [cursorVisible, setCursorVisible] = useState(false);
   const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [colorChoice, setColorChoice] = useState<ColorChoice | null>(null);
   const [declareWithPlay, setDeclareWithPlay] = useState(false);
   const [handSortMode, setHandSortMode] = useState<HandSortMode>("suit");
@@ -234,6 +235,16 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   }, [canOfferAtomicUnoIntent]);
 
   useEffect(() => {
+    setSelectedCardId((id) =>
+      id &&
+      (playableCardIds.has(id) || bluffableWildDrawFourIds.has(id)) &&
+      displayedHand.some((card) => card.id === id)
+        ? id
+        : null,
+    );
+  }, [playableCardIds, bluffableWildDrawFourIds, displayedHand]);
+
+  useEffect(() => {
     if (!colorChoice) return;
     if (colorChoice.mode === "initial") {
       if (!legalActions?.canChooseInitialColor) setColorChoice(null);
@@ -273,7 +284,10 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
       ...(chosenColor ? { chosenColor } : {}),
       ...(declareWithPlay ? { declareUno: true } : {}),
     });
-    if (accepted) setColorChoice(null);
+    if (accepted) {
+      setColorChoice(null);
+      setSelectedCardId(null);
+    }
   };
 
   const playCard = (card: UnoCardData) => {
@@ -295,7 +309,16 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     });
 
   const focusedCard = displayedHand.find((card) => card.id === focusedCardId) ?? displayedHand[0];
+  const selectedCard = displayedHand.find((card) => card.id === selectedCardId);
+  const selectCard = (id: string) => {
+    if (!canAct || (!playableCardIds.has(id) && !bluffableWildDrawFourIds.has(id))) return;
+    setSelectedCardId((current) => (current === id ? null : id));
+  };
   useTableHotkeys(is3D && !managementOpen && !colorChoice, (code) => {
+    if (code === "KeyH") {
+      openManagement();
+      return true;
+    }
     if (["KeyA", "KeyD", "ArrowLeft", "ArrowRight"].includes(code)) {
       const index = Math.max(
         0,
@@ -313,9 +336,11 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
       return true;
     }
     if (!canAct) return false;
-    if (code === "KeyE" || code === "Enter" || code === "Space") {
+    if (code === "Space") {
+      if (focusedCard) selectCard(focusedCard.id);
+    } else if (code === "KeyE" || code === "Enter") {
       if (legalActions?.canChooseInitialColor) setColorChoice({ mode: "initial" });
-      else if (focusedCard) playCard(focusedCard);
+      else if (selectedCard) playCard(selectedCard);
     } else if (code === "KeyF") {
       if (legalActions?.canAcceptWildDrawFour) respondToWildDrawFour("accept");
       else if (legalActions?.canEndTurn) sendGameCommand("uno", { type: "end-turn" });
@@ -481,7 +506,24 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
           <Suspense fallback={<div className="table3d-loading">Готовим 3D-стол…</div>}>
             <UnoTable3D
               game={game}
+              isHost={isHost}
               viewerSeatId={viewerSeatId}
+              hand={displayedHand.map((card) => ({
+                id: card.id,
+                rank: getUnoCardMark(card),
+                suit: "",
+                red: false,
+                color: card.color ?? "wild",
+                label: `${getUnoCardName(card)}${bluffableWildDrawFourIds.has(card.id) ? ". Рискованный +4" : ""}`,
+                focused: focusedCard?.id === card.id,
+                selected: selectedCardId === card.id,
+                playable:
+                  canAct && (playableCardIds.has(card.id) || bluffableWildDrawFourIds.has(card.id)),
+                selectable:
+                  canAct && (playableCardIds.has(card.id) || bluffableWildDrawFourIds.has(card.id)),
+              }))}
+              onFocusCard={setFocusedCardId}
+              onSelectCard={selectCard}
               roomCode={snapshot.roomCode}
               canSendLook={Boolean(viewerSeatId && canUseConnection)}
               cursorVisible={cursorVisible}
@@ -647,54 +689,55 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
           </>
         )}
         {privateGame ? (
-          <section className="card-arena-hand uno-hand-section" aria-label="Карты в вашей руке">
-            <div
-              className="uno-hand"
-              role="group"
-              aria-label="Карты в вашей руке"
-              style={{ "--hand-count": displayedHand.length } as CSSProperties}
-            >
-              {displayedHand.map((card, index) => {
-                const playable = playableCardIds.has(card.id);
-                const bluffable = bluffableWildDrawFourIds.has(card.id);
-                const isDrawnCard = legalActions?.drawnCardId === card.id;
-                const allowed = playable || bluffable;
-                const dragSource =
-                  allowed && canAct && !is3D
-                    ? bindDragSource({ card }, getUnoCardName(card))
-                    : undefined;
-                const { className: dragClassName, ...dragBindings } = dragSource ?? {};
-                return (
-                  <div
-                    key={card.id}
-                    className={`uno-hand-card-shell ${dragClassName ?? "card-motion-shell"} ${is3D && focusedCard?.id === card.id ? "is-keyboard-focused" : ""}`}
-                    style={
-                      {
-                        "--card-index": Math.min(index, 5),
-                        "--fan-angle": `${
-                          (index - (displayedHand.length - 1) / 2) * handFanAngleStep
-                        }deg`,
-                        "--fan-rise": `${Math.abs(index - (displayedHand.length - 1) / 2)}px`,
-                      } as CSSProperties
-                    }
-                    {...dragBindings}
-                  >
-                    <UnoCard
-                      card={card}
-                      size="hand"
-                      playable={playable && canAct}
-                      bluffable={bluffable && canAct}
-                      disabled={!canAct || !allowed}
-                      onClick={is3D ? () => setFocusedCardId(card.id) : undefined}
-                      onDoubleClick={() => playCard(card)}
-                      onKeyboardActivate={() => playCard(card)}
-                      ariaLabel={`${getUnoCardName(card)}${bluffable ? ". Рискованный Wild +4" : ""}${isDrawnCard ? ". Добрана сейчас" : ""}`}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          !is3D && (
+            <section className="card-arena-hand uno-hand-section" aria-label="Карты в вашей руке">
+              <div
+                className="uno-hand"
+                role="group"
+                aria-label="Карты в вашей руке"
+                style={{ "--hand-count": displayedHand.length } as CSSProperties}
+              >
+                {displayedHand.map((card, index) => {
+                  const playable = playableCardIds.has(card.id);
+                  const bluffable = bluffableWildDrawFourIds.has(card.id);
+                  const isDrawnCard = legalActions?.drawnCardId === card.id;
+                  const allowed = playable || bluffable;
+                  const dragSource =
+                    allowed && canAct && !is3D
+                      ? bindDragSource({ card }, getUnoCardName(card))
+                      : undefined;
+                  const { className: dragClassName, ...dragBindings } = dragSource ?? {};
+                  return (
+                    <div
+                      key={card.id}
+                      className={`uno-hand-card-shell ${dragClassName ?? "card-motion-shell"}`}
+                      style={
+                        {
+                          "--card-index": Math.min(index, 5),
+                          "--fan-angle": `${
+                            (index - (displayedHand.length - 1) / 2) * handFanAngleStep
+                          }deg`,
+                          "--fan-rise": `${Math.abs(index - (displayedHand.length - 1) / 2)}px`,
+                        } as CSSProperties
+                      }
+                      {...dragBindings}
+                    >
+                      <UnoCard
+                        card={card}
+                        size="hand"
+                        playable={playable && canAct}
+                        bluffable={bluffable && canAct}
+                        disabled={!canAct || !allowed}
+                        onDoubleClick={() => playCard(card)}
+                        onKeyboardActivate={() => playCard(card)}
+                        ariaLabel={`${getUnoCardName(card)}${bluffable ? ". Рискованный Wild +4" : ""}${isDrawnCard ? ". Добрана сейчас" : ""}`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )
         ) : snapshot.viewer.role === "spectator" ? (
           <section className="card-arena-public uno-public-only" role="status">
             <strong>Режим наблюдателя</strong>
@@ -716,6 +759,16 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
             />
           )}
           <GameDockTools gameId="uno" gameTitle="UNO" />
+          {is3D && privateGame && !ownWdfResponse && !legalActions?.canChooseInitialColor && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!canAct || !selectedCard}
+              onClick={() => selectedCard && playCard(selectedCard)}
+            >
+              Сыграть <kbd>E</kbd>
+            </button>
+          )}
           {ownWdfResponse && (
             <>
               <button

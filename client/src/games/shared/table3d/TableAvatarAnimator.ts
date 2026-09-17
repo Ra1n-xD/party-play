@@ -96,7 +96,6 @@ export class TableAvatarAnimator {
     const envelope =
       ease(reactionElapsed / 260) * ease((REACTION_DURATION_MS - reactionElapsed) / 420);
     const pulse = Math.sin(t * 12);
-    this.cards.visible = false;
     switch (this.reaction.id) {
       case "good-move":
         this.rightArm.rotation.set(-1.1 * envelope, -0.12 * envelope, -0.1 * envelope);
