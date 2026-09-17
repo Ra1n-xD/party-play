@@ -71,8 +71,40 @@
   font-size: 0.62rem;
 }
 .table3d-person-label.is-active {
-  border-color: #d9b675;
-  background: #463c26de;
+  border-color: #72f3a5;
+  background: #123b29f5;
+  box-shadow:
+    0 0 0 2px #65e99b30,
+    0 0 24px #40d88335,
+    0 5px 20px #0008;
+}
+.table3d-person-label.is-active strong {
+  color: #b4ffd0;
+}
+.table3d-person-label .table3d-person-turn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  background: #70efa3;
+  color: #092c18;
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.table3d-person-turn::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.table3d-person-turn[hidden] {
+  display: none;
 }
 .table3d-person-label.is-muted {
   opacity: 0.62;
@@ -179,7 +211,7 @@
 .table3d-information {
   position: absolute;
   z-index: 2;
-  top: 61px;
+  top: 185px;
   left: 22px;
   display: flex;
   align-items: center;
@@ -216,7 +248,7 @@
 .table3d-roster {
   position: absolute;
   z-index: 4;
-  top: 124px;
+  top: 251px;
   left: 22px;
   max-width: min(260px, 75%);
   padding: 8px 11px;
@@ -249,28 +281,118 @@
 .table3d-roster li span {
   color: #b1c0b0;
 }
-.table3d-bottom-info {
+.table3d-turn-indicator {
   position: absolute;
+  z-index: 5;
+  top: 61px;
   left: 22px;
-  bottom: calc(var(--card-arena-dock-space) + var(--card-arena-hand-height) + 18px);
-  max-width: 35%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 310px;
+  padding: 14px 16px;
+  border: 1px solid #adbdba8a;
+  border-left: 4px solid #b7c9c0;
+  border-radius: 10px;
+  background: #101e1af5;
+  box-shadow: 0 8px 28px #0006;
+  color: #f4f8f1;
   pointer-events: none;
 }
-.table3d-turn {
-  display: block;
-  padding: 8px 13px;
-  overflow: hidden;
-  border: 1px solid #e8d7b240;
-  border-radius: 5px;
-  background: #1b2822e8;
-  font-size: 0.73rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.table3d-turn-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 5px;
 }
-.table3d-turn.is-yours {
-  border-color: #dfb76c90;
-  background: #524127;
-  color: #fff0c2;
+.table3d-turn-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #bccdc4;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.table3d-turn-eyebrow i {
+  flex: 0 0 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.table3d-turn-copy strong {
+  font-size: 1.4rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.table3d-turn-detail {
+  color: #c7d6ce;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.table3d-turn-clock {
+  display: grid;
+  flex: 0 0 82px;
+  justify-items: center;
+  gap: 2px;
+  padding: 9px 6px;
+  border: 1px solid #b4c7ba38;
+  border-radius: 7px;
+  background: #ffffff0a;
+  color: #fff;
+}
+.table3d-turn-clock strong {
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.table3d-turn-clock span {
+  font-size: 0.58rem;
+}
+.table3d-turn-indicator.is-yours {
+  border-color: #6bf0a1;
+  background: #113826f5;
+  box-shadow:
+    0 0 0 3px #6bf0a11a,
+    0 8px 32px #0006;
+}
+.table3d-turn-indicator.is-yours .table3d-turn-copy strong {
+  color: #aaffcb;
+  text-transform: uppercase;
+}
+.table3d-turn-indicator.is-yours .table3d-turn-eyebrow {
+  color: #78f3a7;
+}
+.table3d-turn-indicator.is-urgent .table3d-turn-clock {
+  border-color: #ffcb65;
+  background: #5a3d16;
+  color: #ffe4a4;
+}
+.table3d-turn-indicator.is-critical .table3d-turn-clock {
+  border-color: #ff9287;
+  background: #672a25;
+  color: #fff0ed;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .table3d-turn-indicator.is-critical .table3d-turn-clock {
+    animation: table3d-clock-pulse 1s ease-in-out infinite;
+  }
+  @keyframes table3d-clock-pulse {
+    50% {
+      box-shadow: 0 0 0 4px #ff928730;
+    }
+  }
+}
+.table3d-turn-indicator.is-paused {
+  border-color: #c9b98b;
 }
 .table3d-targets {
   position: absolute;
@@ -330,11 +452,12 @@
 }
 @media (max-width: 680px) {
   .table3d-toolbar {
-    top: 12px;
+    top: 88px;
     left: 10px;
     gap: 5px;
   }
   .table3d-title {
+    display: none;
     font-size: 0.46rem;
     letter-spacing: 0.07em;
     gap: 5px;
@@ -343,7 +466,7 @@
     display: none;
   }
   .table3d-keyboard {
-    top: 12px;
+    top: 88px;
     right: 9px;
     width: 125px;
     padding: 8px;
@@ -368,13 +491,13 @@
     font-size: 0.5rem;
   }
   .table3d-information {
-    top: 49px;
+    top: 135px;
     left: 10px;
     gap: 12px;
     padding: 8px 10px;
   }
   .table3d-roster {
-    top: 112px;
+    top: 197px;
     left: 10px;
     max-width: 47%;
     padding: 7px 9px;
@@ -390,13 +513,32 @@
   .table3d-person-label span {
     font-size: 0.54rem;
   }
-  .table3d-bottom-info {
+  .table3d-turn-indicator {
+    top: 8px;
     left: 10px;
-    max-width: 40%;
+    width: calc(100% - 20px);
+    gap: 8px;
+    padding: 8px 10px;
   }
-  .table3d-turn {
-    font-size: 0.61rem;
-    padding: 7px 9px;
+  .table3d-turn-copy strong {
+    -webkit-line-clamp: 1;
+    font-size: 1.06rem;
+  }
+  .table3d-turn-eyebrow {
+    display: none;
+    font-size: 0.45rem;
+    letter-spacing: 0.03em;
+    gap: 4px;
+  }
+  .table3d-turn-detail {
+    font-size: 0.6rem;
+  }
+  .table3d-turn-clock {
+    flex-basis: 60px;
+    padding: 9px 3px;
+  }
+  .table3d-turn-clock strong {
+    font-size: 1.35rem;
   }
   .table3d-targets {
     justify-content: flex-end;
@@ -567,7 +709,7 @@
 }
 .table3d-hand-caption {
   position: absolute;
-  top: 222px;
+  bottom: 18px;
   left: 22px;
   width: min(220px, 35%);
   color: #f4e5c1;
@@ -598,10 +740,6 @@
   left: auto;
   right: max(12px, calc(50% - 300px));
 }
-.table3d-bottom-info {
-  top: 182px;
-  bottom: auto;
-}
 .table3d-targets {
   bottom: 38%;
 }
@@ -619,7 +757,7 @@
     gap: 5px;
   }
   .table3d-hand-caption {
-    top: 197px;
+    bottom: 75px;
     left: 10px;
     width: 42%;
     font-size: 0.62rem;
@@ -632,9 +770,6 @@
   .table3d-hand-step.is-next {
     right: 8px;
   }
-  .table3d-bottom-info {
-    top: 157px;
-  }
 }
 @media (max-height: 540px) and (min-width: 681px) {
   .table3d-keyboard {
@@ -645,14 +780,8 @@
     grid-template-columns: 1fr 1fr;
     gap: 4px 12px;
   }
-  .table3d-hand-caption {
-    top: 187px;
-  }
   .table3d-hand-step {
     bottom: 80px;
-  }
-  .table3d-bottom-info {
-    top: 146px;
   }
   .screen.command-game-screen.is-3d :is(.uno-command-dock, .durak-command-dock) {
     max-width: 35%;

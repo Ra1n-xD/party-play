@@ -110,11 +110,12 @@
   opacity: 0.62;
 }
 .table3d-dossier.is-active {
-  background: #363523f2;
+  background: #123b29f5;
+  border-color: #72f3a5;
 }
 .bunker3d-status {
   position: absolute;
-  top: 63px;
+  top: 185px;
   left: 22px;
   width: 210px;
   display: flex;
@@ -253,7 +254,7 @@
     padding: 8px;
   }
   .bunker3d-status {
-    top: 51px;
+    top: 135px;
     left: 10px;
     width: 144px;
     padding: 9px;
