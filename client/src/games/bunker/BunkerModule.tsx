@@ -124,22 +124,28 @@ function BunkerView() {
   return (
     <>
       {screen}
-      {currentOverlay && (
-        <AccessibleModal
-          labelledBy="bunker-event-title"
-          onClose={dismissOverlays}
-          overlayClassName="bunker-event-overlay"
-          panelClassName="bunker-event-panel"
-        >
-          <h2 id="bunker-event-title" hidden>
-            Игровое событие
-          </h2>
-          <OverlayRenderer item={currentOverlay} />
-          <button type="button" className="btn btn-secondary" onClick={dismissOverlays}>
-            Продолжить игру
-          </button>
-        </AccessibleModal>
-      )}
+      {currentOverlay &&
+        (is3D && currentOverlay.kind === "announcement" && currentOverlay.eliminatedPlayerId ? (
+          <div className="table3d-elimination-notice" role="status">
+            <strong>{currentOverlay.subtitle}</strong>
+            <span>Покидает бункер</span>
+          </div>
+        ) : (
+          <AccessibleModal
+            labelledBy="bunker-event-title"
+            onClose={dismissOverlays}
+            overlayClassName="bunker-event-overlay"
+            panelClassName="bunker-event-panel"
+          >
+            <h2 id="bunker-event-title" hidden>
+              Игровое событие
+            </h2>
+            <OverlayRenderer item={currentOverlay} />
+            <button type="button" className="btn btn-secondary" onClick={dismissOverlays}>
+              Продолжить игру
+            </button>
+          </AccessibleModal>
+        ))}
     </>
   );
 }

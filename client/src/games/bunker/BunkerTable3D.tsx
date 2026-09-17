@@ -94,6 +94,8 @@ export default function BunkerTable3D(props: Props) {
         isBot: player.isBot || Boolean(player.temporaryBot),
         selected: player.id === (props.vote?.selectedId ?? focused),
         muted: !player.alive,
+        eliminated: !player.alive,
+        eliminatedAt: player.eliminatedAt,
         detail: !player.alive
           ? player.kicked
             ? "Покинул игру"

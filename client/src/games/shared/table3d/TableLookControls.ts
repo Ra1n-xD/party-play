@@ -9,7 +9,7 @@ export const TABLE_DEFAULT_PITCH = -0.48;
 
 export function isTableInputBlocked(target: EventTarget | null): boolean {
   return Boolean(
-    document.querySelector('[aria-modal="true"], [role="dialog"]') ||
+    document.querySelector('[aria-modal="true"], [role="dialog"], [data-table-input-block]') ||
     (target instanceof HTMLElement &&
       target.closest('input, textarea, select, [contenteditable="true"]')),
   );
