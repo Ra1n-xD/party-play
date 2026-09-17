@@ -22,7 +22,7 @@ export function useTableHotkeys(
       if (
         ["Space", "Enter"].includes(event.code) &&
         event.target instanceof HTMLElement &&
-        event.target.closest("button, summary")
+        event.target.closest("button:not([data-table-hand-card]), summary")
       )
         return;
       if (state.handle(event.code)) event.preventDefault();

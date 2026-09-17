@@ -1,13 +1,16 @@
 import * as THREE from "three";
+import { makeCardGeometry, type CardMesh } from "./CardGeometry";
+import { makeAvatarHand, limbBetween, roundedPart } from "./AvatarParts";
 import {
   AVATAR_LOOK_INTERVAL_MS,
   AVATAR_LOOK_EXPIRY_MS,
   type AvatarLook,
   type AvatarLookEvent,
 } from "../../../../../shared/platform/avatarLook";
-import { TableLookControls, TABLE_DEFAULT_PITCH } from "./TableLookControls";
+import { TableLookControls, TABLE_DEFAULT_PITCH, isTableInputBlocked } from "./TableLookControls";
 import { TableAvatarAnimator } from "./TableAvatarAnimator";
 import type { RoomReactionEvent } from "../../../../../shared/platform/reactions";
+import { FirstPersonHand, type CardFace, type TableHandCard } from "./FirstPersonHand";
 
 export interface TablePerson {
   id: string;
@@ -23,18 +26,14 @@ export interface TablePerson {
   eliminatedAt?: number;
 }
 
-export interface TableCard {
+export interface TableCard extends CardFace {
   id: string;
-  rank: string;
-  suit: string;
-  red: boolean;
   x: number;
   z: number;
   covered: boolean;
   sourceId: string;
   selectable: boolean;
   focused: boolean;
-  color?: "red" | "yellow" | "green" | "blue" | "wild";
 }
 
 export interface RoundTableState {
@@ -45,10 +44,11 @@ export interface RoundTableState {
   discardCount: number;
   trump: { rank: string; suit: string; red: boolean } | null;
   takeSeatId: string | null;
+  ownHand?: TableHandCard[];
 }
 
 interface MovingCard {
-  mesh: THREE.Mesh<THREE.BoxGeometry, THREE.Material[]>;
+  mesh: CardMesh;
   target: THREE.Vector3;
   removing: boolean;
 }
@@ -56,6 +56,8 @@ interface MovingCard {
 export interface TableSceneOptions {
   variant?: "durak" | "uno" | "bunker";
   onSelectPerson?: (id: string) => void;
+  onFocusHandCard?: (id: string) => void;
+  onSelectHandCard?: (id: string) => void;
 }
 
 const PALETTE = [0x467c87, 0xca8652, 0x887ca5, 0x829d67, 0xba6c73, 0x627eb3];
@@ -63,7 +65,7 @@ const SKIN = [0xd4a07a, 0x9e694e, 0xe6bda0, 0xbc8b69];
 const TABLE_Y = 1.44;
 const RADIUS = 3.05;
 
-/** Shared visual room. Receives only the public table projection, never opponents' hands. */
+/** Public table plus the viewer's own cards. Opponents' hands are represented by counts only. */
 export class RoundTableScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -79,6 +81,7 @@ export class RoundTableScene {
   private readonly seenReactions = new Set<string>();
   private readonly labels = new Map<string, { node: HTMLDivElement; position: THREE.Vector3 }>();
   private readonly controls: TableLookControls;
+  private readonly ownHand: FirstPersonHand;
   private readonly remoteLooks = new Map<string, AvatarLook & { receivedAt: number }>();
   private readonly resizeObserver: ResizeObserver;
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -122,6 +125,13 @@ export class RoundTableScene {
     this.camera.position.set(0, 3.12, 4.4);
     this.pitch = options.variant === "bunker" ? -0.16 : TABLE_DEFAULT_PITCH;
     this.controls = new TableLookControls(this.renderer.domElement, onCursor, this.pitch);
+    this.ownHand = new FirstPersonHand(
+      host,
+      (face) => this.makeCard(face.rank, face.suit, face.red, face.color),
+      (object) => this.disposeObject(object),
+      (id) => this.options.onFocusHandCard?.(id),
+      (id) => this.options.onSelectHandCard?.(id),
+    );
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(host);
     this.resize();
@@ -233,7 +243,7 @@ export class RoundTableScene {
     const key = new THREE.DirectionalLight(0xffdfad, 3.1);
     key.position.set(-1.5, 6, 3.5);
     key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.mapSize.set(2048, 2048);
     key.shadow.camera.left = key.shadow.camera.bottom = -6;
     key.shadow.camera.right = key.shadow.camera.top = 6;
     key.shadow.normalBias = 0.03;
@@ -465,14 +475,17 @@ export class RoundTableScene {
     const cached = this.textures.get(key);
     if (cached) return cached;
     const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 360;
+    canvas.width = 512;
+    canvas.height = 720;
     const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = rank ? "#fff8e9" : "#284c62";
+    ctx.scale(2, 2);
+    ctx.fillStyle = rank ? "#fffcf4" : "#284c62";
     ctx.fillRect(0, 0, 256, 360);
     ctx.strokeStyle = rank ? "#d7cebc" : "#b9a474";
     ctx.lineWidth = 5;
-    ctx.strokeRect(10, 10, 236, 340);
+    ctx.beginPath();
+    ctx.roundRect(10, 10, 236, 340, 13);
+    ctx.stroke();
     if (color || this.options.variant === "uno") {
       const colors = {
         red: "#c83c43",
@@ -482,7 +495,9 @@ export class RoundTableScene {
         wild: "#262b39",
       };
       ctx.fillStyle = colors[color ?? "wild"];
-      ctx.fillRect(13, 13, 230, 334);
+      ctx.beginPath();
+      ctx.roundRect(13, 13, 230, 334, 12);
+      ctx.fill();
       if (color === "wild") {
         ["#c83c43", "#dfb73c", "#359573", "#377dc6"].forEach((fill, index) => {
           ctx.fillStyle = fill;
@@ -570,14 +585,7 @@ export class RoundTableScene {
       map: this.cardTexture("", "", false),
       roughness: 0.85,
     });
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.012, 1.06), [
-      edge,
-      edge,
-      face,
-      back,
-      edge,
-      edge,
-    ]);
+    const mesh = new THREE.Mesh(makeCardGeometry(), [edge, edge, face, back]);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     return mesh;
@@ -614,10 +622,39 @@ export class RoundTableScene {
       this.sphere(model, [0.17, 0.095, 0.31], 0x241f1c, [side * 0.21, 0.18, 0.65]);
       this.box(model, [0.23, 0.025, 0.5], 0x171615, [side * 0.21, 0.12, 0.68]);
     }
-    this.sphere(model, [0.4, 0.53, 0.265], shirt, [0, 1.45, 0]);
-    this.sphere(model, [0.23, 0.41, 0.04], 0xe0d5ba, [0, 1.5, 0.253]);
+    const jacketMaterial = this.material(shirt, 0.94);
+    const jacketProfile = [
+      [0, 0],
+      [0.25, 0],
+      [0.31, 0.08],
+      [0.34, 0.35],
+      [0.37, 0.68],
+      [0.34, 0.82],
+      [0.22, 0.91],
+      [0, 0.91],
+    ];
+    const jacket = new THREE.Mesh(
+      new THREE.LatheGeometry(
+        jacketProfile.map(([r, y]) => new THREE.Vector2(r, y)),
+        32,
+      ),
+      jacketMaterial,
+    );
+    jacket.position.y = 0.99;
+    jacket.scale.z = 0.68;
+    jacket.castShadow = jacket.receiveShadow = true;
+    model.add(jacket);
+    const shirtShape = new THREE.Shape();
+    shirtShape.moveTo(-0.16, 1.87);
+    shirtShape.lineTo(0.16, 1.87);
+    shirtShape.lineTo(0.065, 1.24);
+    shirtShape.lineTo(-0.065, 1.24);
+    shirtShape.closePath();
+    this.mesh(model, new THREE.ShapeGeometry(shirtShape), 0xe8e1d2, [0, 0, 0.25]);
     for (const side of [-1, 1]) {
-      const lapel = this.box(model, [0.12, 0.45, 0.035], shirt, [side * 0.13, 1.65, 0.282]);
+      const lapel = roundedPart([0.095, 0.39, 0.025], jacketMaterial, 0.012);
+      lapel.position.set(side * 0.135, 1.65, 0.255);
+      model.add(lapel);
       lapel.rotation.z = -side * 0.31;
       const collar = this.box(model, [0.11, 0.13, 0.025], 0xf4e8ce, [side * 0.075, 1.89, 0.21]);
       collar.rotation.z = side * 0.43;
@@ -633,33 +670,45 @@ export class RoundTableScene {
     head.position.set(0, 2.29, 0.025);
     head.name = "head";
     model.add(head);
-    this.sphere(head, [0.255, 0.32, 0.245], skin, [0, 0, 0]);
-    this.sphere(head, [0.19, 0.14, 0.195], skin, [0, -0.18, 0.035]);
-    this.sphere(head, [0.042, 0.065, 0.073], skin, [0, -0.015, 0.246]);
+    const headGeometry = new THREE.SphereGeometry(1, 40, 28);
+    const headVertices = headGeometry.getAttribute("position");
+    for (let i = 0; i < headVertices.count; i++) {
+      const y = headVertices.getY(i);
+      const jaw = 1 - Math.max(0, -y) * 0.2;
+      headVertices.setXYZ(
+        i,
+        headVertices.getX(i) * 0.24 * jaw,
+        y * 0.31,
+        headVertices.getZ(i) * 0.222,
+      );
+    }
+    headGeometry.computeVertexNormals();
+    this.mesh(head, headGeometry, skin, [0, 0, 0]);
+    this.sphere(head, [0.031, 0.055, 0.047], skin, [0, -0.02, 0.21]);
     for (const side of [-1, 1]) {
-      this.sphere(head, [0.045, 0.073, 0.05], skin, [side * 0.254, -0.014, 0]);
-      this.sphere(head, [0.021, 0.04, 0.015], 0xa4775e, [side * 0.279, -0.016, 0.023]);
-      this.sphere(head, [0.06, 0.064, 0.019], skin, [side * 0.105, 0.067, 0.222]);
-      this.sphere(head, [0.047, 0.03, 0.024], 0xeee7d8, [side * 0.098, 0.049, 0.234]);
-      this.sphere(head, [0.02, 0.024, 0.011], 0x35433e, [side * 0.098, 0.049, 0.255]);
-      this.sphere(head, [0.01, 0.015, 0.009], 0x141b19, [side * 0.098, 0.049, 0.264]);
-      this.sphere(head, [0.006, 0.007, 0.003], 0xffffff, [side * 0.098 - 0.006, 0.06, 0.272]);
-      const brow = this.sphere(head, [0.062, 0.015, 0.016], hair, [side * 0.099, 0.108, 0.23]);
+      this.sphere(head, [0.035, 0.061, 0.038], skin, [side * 0.23, -0.014, 0]);
+      this.sphere(head, [0.021, 0.04, 0.015], 0xa4775e, [side * 0.249, -0.016, 0.017]);
+      this.sphere(head, [0.056, 0.038, 0.012], skin, [side * 0.095, 0.055, 0.202]);
+      this.sphere(head, [0.038, 0.022, 0.012], 0xeee7d8, [side * 0.092, 0.045, 0.211]);
+      this.sphere(head, [0.017, 0.018, 0.007], 0x554337, [side * 0.092, 0.044, 0.219]);
+      this.sphere(head, [0.009, 0.012, 0.004], 0x141b19, [side * 0.092, 0.044, 0.224]);
+      this.sphere(head, [0.004, 0.004, 0.003], 0xffffff, [side * 0.092 - 0.005, 0.05, 0.228]);
+      const brow = this.sphere(head, [0.045, 0.009, 0.009], hair, [side * 0.094, 0.093, 0.202]);
       brow.rotation.z = side * 0.07;
     }
     const smile = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.06, -0.125, 0.221),
-      new THREE.Vector3(0, -0.14, 0.237),
-      new THREE.Vector3(0.06, -0.125, 0.221),
+      new THREE.Vector3(-0.055, -0.12, 0.192),
+      new THREE.Vector3(0, -0.129, 0.208),
+      new THREE.Vector3(0.055, -0.12, 0.192),
     ]);
     this.mesh(head, new THREE.TubeGeometry(smile, 12, 0.007, 6, false), 0x8f5949, [0, 0, 0]);
     // Sculpted side parts, swept locks and occasional glasses distinguish each seat.
-    this.sphere(head, [0.26, 0.135, 0.24], hair, [0, 0.233, -0.035]);
-    this.sphere(head, [0.255, 0.2, 0.16], hair, [0, 0.1, -0.14]);
+    this.sphere(head, [0.232, 0.107, 0.214], hair, [0, 0.22, -0.025]);
+    this.sphere(head, [0.222, 0.19, 0.11], hair, [0, 0.09, -0.14]);
     for (let i = 0; i < 5; i++) {
-      const lock = this.sphere(head, [0.07, 0.065 + (i % 2) * 0.014, 0.15], hair, [
-        -0.19 + i * 0.08,
-        0.27 - Math.abs(i - 2) * 0.014,
+      const lock = this.sphere(head, [0.072, 0.048 + (i % 2) * 0.007, 0.14], hair, [
+        -0.16 + i * 0.071,
+        0.253 - Math.abs(i - 2) * 0.017,
         0.065,
       ]);
       lock.rotation.z = -0.35;
@@ -667,39 +716,47 @@ export class RoundTableScene {
     }
     if (index % 3 === 0) {
       for (const side of [-1, 1]) {
-        const frame = this.mesh(head, new THREE.TorusGeometry(0.066, 0.009, 8, 24), 0xa28d65, [
-          side * 0.098,
-          0.05,
-          0.27,
+        const frame = this.mesh(head, new THREE.TorusGeometry(0.055, 0.006, 8, 24), 0xa28d65, [
+          side * 0.092,
+          0.045,
+          0.239,
         ]);
         frame.scale.y = 0.85;
       }
-      this.box(head, [0.06, 0.008, 0.01], 0xa28d65, [0, 0.066, 0.28]);
+      this.box(head, [0.06, 0.008, 0.01], 0xa28d65, [0, 0.057, 0.24]);
     }
     if (index % 3 === 1) {
-      this.sphere(head, [0.19, 0.11, 0.095], hair, [0, -0.195, 0.123]);
-      this.sphere(head, [0.065, 0.016, 0.017], hair, [0, -0.086, 0.237]);
+      this.sphere(head, [0.165, 0.072, 0.066], hair, [0, -0.207, 0.126]);
+      this.sphere(head, [0.052, 0.012, 0.01], hair, [0, -0.088, 0.205]);
     }
     const arms: THREE.Group[] = [];
+    const holdsCards = this.options.variant !== "bunker";
     for (const side of [-1, 1]) {
       const arm = new THREE.Group();
-      arm.position.set(side * 0.4, 1.76, 0.1);
+      const shoulder = new THREE.Vector3(side * 0.35, 1.76, 0.06);
+      arm.position.copy(shoulder);
       model.add(arm);
       arms.push(arm);
-      const sleeve = this.sphere(arm, [0.17, 0.31, 0.17], shirt, [side * 0.4, 1.52, 0.12]);
-      sleeve.rotation.x = -0.44;
-      this.sphere(arm, [0.15, 0.145, 0.16], shirt, [side * 0.44, 1.31, 0.31]);
-      const forearm = this.sphere(arm, [0.115, 0.115, 0.3], shirt, [side * 0.36, 1.4, 0.52]);
-      forearm.rotation.y = -side * 0.35;
-      this.sphere(arm, [0.112, 0.083, 0.065], 0xe8ddc7, [side * 0.28, 1.43, 0.73]);
-      this.sphere(arm, [0.12, 0.07, 0.13], skin, [side * 0.26, 1.45, 0.82]);
-      for (let i = 0; i < 3; i++)
-        this.sphere(arm, [0.021, 0.035, 0.062], skin, [side * 0.26 + (i - 1) * 0.039, 1.45, 0.905]);
-      arm.children.forEach((part) => part.position.sub(arm.position));
+      const elbow = new THREE.Vector3(side * 0.43, 1.34, 0.28).sub(shoulder);
+      const wrist = new THREE.Vector3(side * 0.24, 1.46, 0.68).sub(shoulder);
+      limbBetween(arm, new THREE.Vector3(), elbow, 0.125, jacketMaterial);
+      limbBetween(arm, elbow, wrist, 0.088, jacketMaterial);
+      const cuff = roundedPart([0.13, 0.095, 0.09], this.material(0xeee5d4), 0.02);
+      cuff.position.copy(wrist);
+      arm.add(cuff);
+      const palm = makeAvatarHand(skin, -side, holdsCards && side === -1);
+      palm.position
+        .copy(wrist)
+        .add(new THREE.Vector3(0, holdsCards && side === -1 ? 0.09 : 0.005, 0.065));
+      if (!holdsCards || side === 1) palm.rotation.x = Math.PI / 2;
+      arm.add(palm);
     }
     const hand = new THREE.Group();
     hand.name = "hand";
-    model.add(hand);
+    // The fan sits between the curled fingers and thumb of the left hand.
+    hand.position.set(0.11, -0.18, 0.725);
+    hand.rotation.set(-0.08, 0, 0.08);
+    arms[0].add(hand);
     this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
     const animator = new TableAvatarAnimator(body, head, arms[0], arms[1], hand);
     animator.setEliminated(Boolean(person.eliminated), person.eliminatedAt, true);
@@ -727,10 +784,15 @@ export class RoundTableScene {
     hand.userData.count = visibleCount;
     for (let i = 0; i < visibleCount; i++) {
       const card = this.makeCard();
-      card.position.set((i - (visibleCount - 1) / 2) * 0.066, 1.67, 0.62);
-      card.scale.setScalar(0.39);
-      card.rotation.set(-1.1, 0, (i - 2.5) * -0.09);
-      hand.add(card);
+      const offset = i - (visibleCount - 1) / 2;
+      const pivot = new THREE.Group();
+      pivot.position.set(offset * 0.034, 0, -i * 0.001);
+      pivot.rotation.z = -offset * 0.11;
+      card.position.y = 0.11;
+      card.scale.setScalar(0.32);
+      card.rotation.x = Math.PI / 2;
+      pivot.add(card);
+      hand.add(pivot);
     }
   }
 
@@ -804,6 +866,12 @@ export class RoundTableScene {
   }
 
   update(state: RoundTableState) {
+    const ownIndex = state.people.findIndex((person) => person.id === state.viewerId);
+    this.ownHand.update(
+      ownIndex >= 0 ? (state.ownHand ?? []) : [],
+      SKIN[Math.max(0, ownIndex) % SKIN.length],
+      PALETTE[Math.max(0, ownIndex) % PALETTE.length],
+    );
     this.labelHost.style.setProperty(
       "--table3d-dossier-width",
       `${Math.max(88, Math.min(174, (174 * 8) / state.people.length))}px`,
@@ -861,12 +929,12 @@ export class RoundTableScene {
       }
       for (let i = 0; i < Math.min(state.deckCount, 12); i++) {
         const card = this.makeCard();
-        card.position.set(-2.06, TABLE_Y + 0.06 + i * 0.014, -0.12);
+        card.position.set(-2.06, TABLE_Y + 0.06 + i * 0.006, -0.12);
         this.pile.add(card);
       }
       for (let i = 0; i < Math.min(state.discardCount, 7); i++) {
         const card = this.makeCard();
-        card.position.set(2.03, TABLE_Y + 0.05 + i * 0.012, -0.1);
+        card.position.set(2.03, TABLE_Y + 0.05 + i * 0.006, -0.1);
         card.rotation.y = i * 0.12;
         this.pile.add(card);
       }
@@ -935,6 +1003,7 @@ export class RoundTableScene {
     this.camera.fov = width < 600 ? 67 : 60;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.ownHand.resize(width, height);
   }
 
   private frame(time: number) {
@@ -1000,6 +1069,10 @@ export class RoundTableScene {
         node.style.transform = `translate(-50%, -100%) translate(${THREE.MathUtils.clamp((projected.x * 0.5 + 0.5) * this.host.clientWidth, node.offsetWidth / 2 + 6, this.host.clientWidth - node.offsetWidth / 2 - 6)}px, ${THREE.MathUtils.clamp((-projected.y * 0.5 + 0.5) * this.host.clientHeight, node.offsetHeight + 8, this.host.clientHeight - 8)}px)`;
     });
     this.renderer.render(this.scene, this.camera);
+    this.ownHand.setInteractive(
+      this.controls.isCursorVisible && !this.paused && !isTableInputBlocked(null),
+    );
+    this.ownHand.render(this.renderer, smoothing);
   }
 
   private disposeObject(object: THREE.Object3D) {
@@ -1025,6 +1098,7 @@ export class RoundTableScene {
     this.controls.dispose();
     this.resizeObserver.disconnect();
     this.renderer.setAnimationLoop(null);
+    this.ownHand.dispose();
     this.disposeObject(this.scene);
     this.textures.forEach((texture) => texture.dispose());
     this.textures.clear();

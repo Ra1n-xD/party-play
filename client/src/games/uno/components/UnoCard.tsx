@@ -22,7 +22,7 @@ const ACTION_NAMES = {
   "wild-draw-four": "Смена цвета и четыре",
 } as const;
 
-function cardMark(card: UnoCardData): string {
+export function getUnoCardMark(card: UnoCardData): string {
   if (card.kind === "number") return String(card.number);
   if (card.kind === "skip") return "⊘";
   if (card.kind === "reverse") return "↺";
@@ -83,7 +83,7 @@ export function UnoCard({
   ]
     .filter(Boolean)
     .join(" ");
-  const mark = cardMark(card);
+  const mark = getUnoCardMark(card);
   const icon = actionIcon(card);
   const content = (
     <>

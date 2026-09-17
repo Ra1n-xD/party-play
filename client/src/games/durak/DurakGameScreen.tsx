@@ -37,7 +37,13 @@ import { useCardDrag } from "../shared/useCardDrag";
 import { useCardTransferMotion } from "../shared/useCardTransferMotion";
 import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
-import { DurakCard, DurakCardBack, getCardName, getSuitSymbol } from "./components/DurakCard";
+import {
+  DurakCard,
+  DurakCardBack,
+  getCardName,
+  getDurakCardFace,
+  getSuitSymbol,
+} from "./components/DurakCard";
 import { useDurakTransferPresentation } from "./useDurakTransferPresentation";
 import { useDurakKeyboard } from "./useDurakKeyboard";
 
@@ -386,12 +392,13 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
     play: () => {
       if (legalAction?.type === "defend" && selectedCards[0] && focusedTarget)
         defendSelected(focusedTarget);
-      else if (selectedCards[0] ?? focusedCard) activateHandCard(selectedCards[0] ?? focusedCard);
+      else if (selectedCards[0]) activateHandCard(selectedCards[0]);
     },
     secondary: () => {
       if (canAct && secondaryAction) sendGameCommand("durak", { type: secondaryAction });
     },
     sort: () => setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit")),
+    manage: () => openManagement(),
   });
   const interactionKey = JSON.stringify([
     handSortMode,
@@ -814,7 +821,22 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
           >
             <DurakTable3D
               game={game}
+              isHost={isHost}
               viewerSeatId={viewerSeatId}
+              hand={displayedHand.map((card) => ({
+                id: card.id,
+                ...getDurakCardFace(card),
+                label: getCardName(card),
+                focused: focusedCard?.id === card.id,
+                selected: selectedCardIds.includes(card.id),
+                playable: canAct && playableCardIds.has(card.id),
+                selectable: isCardSelectable(card),
+              }))}
+              onFocusCard={setFocusedCardId}
+              onSelectCard={(id) => {
+                const card = displayedHand.find((item) => item.id === id);
+                if (card) selectHandCard(card);
+              }}
               paused={paused && snapshot.lifecycle !== "results"}
               revision={snapshot.revision}
               roomCode={snapshot.roomCode}
@@ -1026,62 +1048,64 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
         )}
 
         {privateGame ? (
-          <section className="card-arena-hand durak-hand-section" aria-label="Карты в вашей руке">
-            <div
-              className="durak-hand"
-              role="group"
-              aria-label="Карты в вашей руке"
-              data-card-motion-anchor="durak:hand"
-              style={{ "--hand-count": presentedHand.length } as CSSProperties}
-            >
-              {presentedHand.map((card, index) => {
-                const selectable = isCardSelectable(card);
-                const playable = playableCardIds.has(card.id) && canAct;
-                const selected = selectedCardIds.includes(card.id);
-                const dragPayload = createDragPayload(card);
-                const dragSource = canDrag
-                  ? bindDragSource(
-                      dragPayload,
-                      dragPayload.kind === "attack" && dragPayload.cards.length > 1
-                        ? `Группа: ${formatCardCount(dragPayload.cards.length)}`
-                        : getCardName(card),
-                    )
-                  : undefined;
-                const { className: dragClassName, ...dragBindings } = dragSource ?? {};
-                return (
-                  <div
-                    key={card.id}
-                    className={`durak-hand-card-shell ${is3D && card.id === focusedCard?.id ? "is-keyboard-focused" : ""} ${dragClassName ?? "card-motion-shell"} ${
-                      transferPresentation.handArrivalPhases[card.id]
-                        ? `is-${transferPresentation.handArrivalPhases[card.id]}`
-                        : ""
-                    }`}
-                    data-durak-hand-card-source={card.id}
-                    style={
-                      {
-                        "--card-index": Math.min(index, 5),
-                        "--fan-angle": `${
-                          (index - (presentedHand.length - 1) / 2) * handFanAngleStep
-                        }deg`,
-                        "--fan-rise": `${Math.abs(index - (presentedHand.length - 1) / 2) * 1.2}px`,
-                      } as CSSProperties
-                    }
-                    {...dragBindings}
-                  >
-                    <DurakCard
-                      card={card}
-                      size="hand"
-                      selected={selected}
-                      playable={playable}
-                      onClick={selectable ? () => selectHandCard(card) : undefined}
-                      onDoubleClick={playable ? () => activateHandCard(card) : undefined}
-                      onKeyboardActivate={playable ? () => activateHandCard(card) : undefined}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          !is3D && (
+            <section className="card-arena-hand durak-hand-section" aria-label="Карты в вашей руке">
+              <div
+                className="durak-hand"
+                role="group"
+                aria-label="Карты в вашей руке"
+                data-card-motion-anchor="durak:hand"
+                style={{ "--hand-count": presentedHand.length } as CSSProperties}
+              >
+                {presentedHand.map((card, index) => {
+                  const selectable = isCardSelectable(card);
+                  const playable = playableCardIds.has(card.id) && canAct;
+                  const selected = selectedCardIds.includes(card.id);
+                  const dragPayload = createDragPayload(card);
+                  const dragSource = canDrag
+                    ? bindDragSource(
+                        dragPayload,
+                        dragPayload.kind === "attack" && dragPayload.cards.length > 1
+                          ? `Группа: ${formatCardCount(dragPayload.cards.length)}`
+                          : getCardName(card),
+                      )
+                    : undefined;
+                  const { className: dragClassName, ...dragBindings } = dragSource ?? {};
+                  return (
+                    <div
+                      key={card.id}
+                      className={`durak-hand-card-shell ${dragClassName ?? "card-motion-shell"} ${
+                        transferPresentation.handArrivalPhases[card.id]
+                          ? `is-${transferPresentation.handArrivalPhases[card.id]}`
+                          : ""
+                      }`}
+                      data-durak-hand-card-source={card.id}
+                      style={
+                        {
+                          "--card-index": Math.min(index, 5),
+                          "--fan-angle": `${
+                            (index - (presentedHand.length - 1) / 2) * handFanAngleStep
+                          }deg`,
+                          "--fan-rise": `${Math.abs(index - (presentedHand.length - 1) / 2) * 1.2}px`,
+                        } as CSSProperties
+                      }
+                      {...dragBindings}
+                    >
+                      <DurakCard
+                        card={card}
+                        size="hand"
+                        selected={selected}
+                        playable={playable}
+                        onClick={selectable ? () => selectHandCard(card) : undefined}
+                        onDoubleClick={playable ? () => activateHandCard(card) : undefined}
+                        onKeyboardActivate={playable ? () => activateHandCard(card) : undefined}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )
         ) : snapshot.viewer.role === "spectator" ? (
           <section className="card-arena-public durak-public-only" role="status">
             <strong>Режим наблюдателя</strong>
@@ -1108,6 +1132,16 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
             />
           )}
           <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
+          {is3D && legalAction?.type === "defend" && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!canAct || !selectedCards[0] || !focusedTarget}
+              onClick={() => focusedTarget && defendSelected(focusedTarget)}
+            >
+              Побить <kbd>E</kbd>
+            </button>
+          )}
           {(legalAction?.type === "attack" || legalAction?.type === "throw-in") && (
             <button
               type="button"

@@ -15,6 +15,7 @@ interface Options {
   play: () => void;
   secondary: () => void;
   sort: () => void;
+  manage: () => void;
 }
 
 export function useDurakKeyboard(options: Options) {
@@ -47,6 +48,7 @@ export function useDurakKeyboard(options: Options) {
           "Enter",
           "KeyF",
           "KeyC",
+          "KeyH",
         ].includes(code)
       )
         return;
@@ -54,7 +56,7 @@ export function useDurakKeyboard(options: Options) {
       if (
         ["Space", "Enter"].includes(code) &&
         event.target instanceof HTMLElement &&
-        event.target.closest("button, summary")
+        event.target.closest("button:not([data-table-hand-card]), summary")
       )
         return;
       event.preventDefault();
@@ -78,6 +80,10 @@ export function useDurakKeyboard(options: Options) {
         return;
       }
       if (event.repeat) return;
+      if (code === "KeyH") {
+        state.manage();
+        return;
+      }
       if (code === "KeyC") {
         state.sort();
         return;

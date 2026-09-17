@@ -19,7 +19,7 @@ export function isTableInputBlocked(target: EventTarget | null): boolean {
 export class TableLookControls {
   readonly target: AvatarLook = { yaw: 0, pitch: TABLE_DEFAULT_PITCH };
   private readonly abort = new AbortController();
-  private cursorVisible = false;
+  private cursorVisible = window.matchMedia("(pointer: coarse)").matches;
   private previous: { x: number; y: number } | null = null;
   private touch: { id: number; x: number; y: number } | null = null;
   private readonly root: HTMLElement;
@@ -33,7 +33,7 @@ export class TableLookControls {
     this.target.pitch = defaultPitch;
     this.root = canvas.closest<HTMLElement>(".is-3d") ?? canvas;
     const options = { signal: this.abort.signal };
-    this.onCursor(false);
+    this.onCursor(this.cursorVisible);
     document.addEventListener(
       "mousemove",
       (event) => {
@@ -177,6 +177,10 @@ export class TableLookControls {
       AVATAR_PITCH_MIN,
       Math.min(AVATAR_PITCH_MAX, this.target.pitch - dy * 0.0025),
     );
+  }
+
+  get isCursorVisible() {
+    return this.cursorVisible;
   }
 
   private capturePointer() {

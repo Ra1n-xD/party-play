@@ -1,21 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import type { DurakCard, DurakPublicState } from "../../../../../shared/games/durak/types";
+import type { DurakPublicState } from "../../../../../shared/games/durak/types";
 import { RoundTableScene, type RoundTableState } from "../../shared/table3d/RoundTableScene";
-import { getSuitSymbol } from "./DurakCard";
+import { getDurakCardFace, getSuitSymbol } from "./DurakCard";
+import type { TableHandCard } from "../../shared/table3d/FirstPersonHand";
 
 import { useTablePresence } from "../../shared/table3d/useTablePresence";
 
-const RANKS: Record<string, string> = { jack: "В", queen: "Д", king: "К", ace: "Т" };
-function face(card: DurakCard) {
-  return {
-    rank: RANKS[card.rank] ?? card.rank,
-    suit: getSuitSymbol(card.suit),
-    red: card.suit === "hearts" || card.suit === "diamonds",
-  };
-}
-
 interface Props {
   game: DurakPublicState;
+  isHost: boolean;
   viewerSeatId: string | null;
   targetIds: string[];
   onDefend: (attackCardId: string) => void;
@@ -28,10 +21,14 @@ interface Props {
   onClassic: () => void;
   paused: boolean;
   revision: number;
+  hand: TableHandCard[];
+  onFocusCard: (id: string) => void;
+  onSelectCard: (id: string) => void;
 }
 
 export default function DurakTable3D({
   game,
+  isHost,
   viewerSeatId,
   targetIds,
   onDefend,
@@ -44,12 +41,17 @@ export default function DurakTable3D({
   onCursorChange,
   focusedTargetId,
   secondaryLabel,
+  hand,
+  onFocusCard,
+  onSelectCard,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
   const scene = useRef<RoundTableScene | null>(null);
   const cursorCallback = useRef(onCursorChange);
   cursorCallback.current = onCursorChange;
+  const handCallbacks = useRef({ onFocusCard, onSelectCard });
+  handCallbacks.current = { onFocusCard, onSelectCard };
   const [failed, setFailed] = useState(false);
   const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 600px)").matches);
   const sendLook = useTablePresence(
@@ -78,6 +80,10 @@ export default function DurakTable3D({
         () => {
           setFailed(true);
           cursorCallback.current(true);
+        },
+        {
+          onFocusHandCard: (id) => handCallbacks.current.onFocusCard(id),
+          onSelectHandCard: (id) => handCallbacks.current.onSelectCard(id),
         },
       );
     } catch {
@@ -110,6 +116,7 @@ export default function DurakTable3D({
   useEffect(() => {
     const state: RoundTableState = {
       viewerId: viewerSeatId,
+      ownHand: hand,
       people: game.players.map((player) => ({
         id: player.seatId,
         name: player.name,
@@ -150,7 +157,7 @@ export default function DurakTable3D({
         return [
           {
             id: pair.attack.id,
-            ...face(pair.attack),
+            ...getDurakCardFace(pair.attack),
             x,
             z,
             covered: false,
@@ -162,7 +169,7 @@ export default function DurakTable3D({
             ? [
                 {
                   id: pair.defense.id,
-                  ...face(pair.defense),
+                  ...getDurakCardFace(pair.defense),
                   x: x + 0.25,
                   z: z + 0.25,
                   covered: true,
@@ -176,7 +183,10 @@ export default function DurakTable3D({
       }),
       deckCount: game.deckCount,
       discardCount: game.discardCount,
-      trump: game.trumpCard && game.trumpCardLocation === "deck" ? face(game.trumpCard) : null,
+      trump:
+        game.trumpCard && game.trumpCardLocation === "deck"
+          ? getDurakCardFace(game.trumpCard)
+          : null,
       takeSeatId: null,
     };
     const resolution = [...game.visualEvents]
@@ -185,7 +195,7 @@ export default function DurakTable3D({
     if (resolution?.type === "transfer" && resolution.target.kind === "player")
       state.takeSeatId = resolution.target.seatId;
     scene.current?.update(state);
-  }, [game, viewerSeatId, targetIds, focusedTargetId, narrow]);
+  }, [game, viewerSeatId, targetIds, focusedTargetId, narrow, hand]);
 
   const actor = game.players.find((player) => player.isCurrentActor);
   return (
@@ -208,38 +218,52 @@ export default function DurakTable3D({
           {cursorVisible ? "ВЗГЛЯД ЗАКРЕПЛЁН" : "СВОБОДНЫЙ ВЗГЛЯД"}
         </span>
         <ul>
+          <li>
+            <span>Правила</span>
+            <kbd>L</kbd>
+          </li>
+          {isHost && (
+            <li>
+              <span>Управление</span>
+              <kbd>H</kbd>
+            </li>
+          )}
           {canSendLook && (
             <li>
               <span>Эмоции</span>
               <kbd>V</kbd>
             </li>
           )}
-          <li>
-            <span>Карта</span>
-            <span>
-              <kbd>A</kbd>
-              <kbd>D</kbd>
-            </span>
-          </li>
-          <li>
-            <span>Выбрать</span>
-            <kbd>Пробел</kbd>
-          </li>
-          <li className={targetIds.length ? "is-available" : ""}>
-            <span>Цель защиты</span>
-            <span>
-              <kbd>W</kbd>
-              <kbd>S</kbd>
-            </span>
-          </li>
-          <li>
-            <span>Сыграть</span>
-            <kbd>E</kbd>
-          </li>
-          <li>
-            <span>{secondaryLabel}</span>
-            <kbd>F</kbd>
-          </li>
+          {viewerSeatId && (
+            <>
+              <li>
+                <span>Карта</span>
+                <span>
+                  <kbd>A</kbd>
+                  <kbd>D</kbd>
+                </span>
+              </li>
+              <li>
+                <span>Выбрать</span>
+                <kbd>Пробел</kbd>
+              </li>
+              <li className={targetIds.length ? "is-available" : ""}>
+                <span>Цель защиты</span>
+                <span>
+                  <kbd>W</kbd>
+                  <kbd>S</kbd>
+                </span>
+              </li>
+              <li>
+                <span>Сыграть</span>
+                <kbd>E</kbd>
+              </li>
+              <li>
+                <span>{secondaryLabel}</span>
+                <kbd>F</kbd>
+              </li>
+            </>
+          )}
           <li>
             <span>{cursorVisible ? "Свободный взгляд" : "Показать курсор"}</span>
             <kbd>Q</kbd>
@@ -248,10 +272,12 @@ export default function DurakTable3D({
             <span>К столу</span>
             <kbd>R</kbd>
           </li>
-          <li>
-            <span>Сортировка</span>
-            <kbd>C</kbd>
-          </li>
+          {viewerSeatId && (
+            <li>
+              <span>Сортировка</span>
+              <kbd>C</kbd>
+            </li>
+          )}
         </ul>
       </aside>
       <div className="table3d-information">
@@ -321,7 +347,7 @@ export default function DurakTable3D({
                 onClick={() => onDefend(pair.attack.id)}
               >
                 <span>
-                  {face(pair.attack).rank}
+                  {getDurakCardFace(pair.attack).rank}
                   {getSuitSymbol(pair.attack.suit)}
                 </span>
                 {focusedTargetId === pair.attack.id && <kbd>E</kbd>}
