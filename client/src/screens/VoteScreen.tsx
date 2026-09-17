@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { FiSettings } from "react-icons/fi";
 import { Timer } from "../components/Timer";
 import { VoteProgressBar } from "../components/VoteProgressBar";
@@ -9,7 +9,16 @@ import { GameRoomHeader } from "./game/GameRoomHeader";
 import { GameDockTools } from "./game/GameDockTools";
 import { HostControlDialog } from "./game/HostControlDialog";
 
-export function VoteScreen() {
+const BunkerTable3D = lazy(() => import("../games/bunker/BunkerTable3D"));
+
+export function VoteScreen({
+  is3D = false,
+  onToggle3D = () => {},
+}: {
+  is3D?: boolean;
+  onToggle3D?: () => void;
+}) {
+  const [cursorVisible, setCursorVisible] = useState(false);
   const {
     gameState,
     playerId,
@@ -125,27 +134,48 @@ export function VoteScreen() {
 
   if (isSpectator) {
     return (
-      <main className="screen command-game-screen vote-screen has-vote-command-bar">
+      <main
+        className={`screen command-game-screen vote-screen has-vote-command-bar ${is3D ? "is-3d bunker3d-screen" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
+      >
         <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
-        <div className="sticky-top-bar">
-          <div className="top-bar-content">
-            <div className="top-bar-left">
-              <span className="top-bar-phase">
-                {isTiebreak ? "Переголосование" : "Голосование"}
-              </span>
-              <span className="top-bar-desc">Вы наблюдаете</span>
+        {is3D ? (
+          <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
+            <BunkerTable3D
+              cursorVisible={cursorVisible}
+              onCursorChange={setCursorVisible}
+              onClassic={onToggle3D}
+            />
+          </Suspense>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="bunker3d-return btn btn-secondary"
+              onClick={onToggle3D}
+            >
+              3D-стол
+            </button>
+            <div className="sticky-top-bar">
+              <div className="top-bar-content">
+                <div className="top-bar-left">
+                  <span className="top-bar-phase">
+                    {isTiebreak ? "Переголосование" : "Голосование"}
+                  </span>
+                  <span className="top-bar-desc">Вы наблюдаете</span>
+                </div>
+                <div className="top-bar-right">
+                  <Timer endTime={gameState.phaseEndTime} size="large" />
+                </div>
+              </div>
             </div>
-            <div className="top-bar-right">
-              <Timer endTime={gameState.phaseEndTime} size="large" />
+            <div className="vote-container">
+              <VoteProgressBar
+                votesCount={gameState.votesCount}
+                totalVotesExpected={gameState.totalVotesExpected}
+              />
             </div>
-          </div>
-        </div>
-        <div className="vote-container">
-          <VoteProgressBar
-            votesCount={gameState.votesCount}
-            totalVotesExpected={gameState.totalVotesExpected}
-          />
-        </div>
+          </>
+        )}
         <aside className="vote-command-bar is-tools-only" aria-label="Правила и эмоции">
           <GameDockTools gameId="bunker" />
         </aside>
@@ -181,7 +211,9 @@ export function VoteScreen() {
   };
 
   return (
-    <main className="screen command-game-screen vote-screen has-vote-command-bar">
+    <main
+      className={`screen command-game-screen vote-screen has-vote-command-bar ${is3D ? "is-3d bunker3d-screen" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
+    >
       <GameRoomHeader
         roomCode={roomCode}
         connected={connected}
@@ -189,133 +221,174 @@ export function VoteScreen() {
         confirmActiveLeave
       />
 
-      <div className="sticky-top-bar vote-top-bar">
-        <div className="top-bar-content">
-          <div className="top-bar-left">
-            <span className="top-bar-phase">
-              {!canVote || voted
-                ? isTiebreak
-                  ? "Переголосование"
-                  : "Голосование"
-                : isTiebreak
-                  ? "Переголосование"
-                  : "Кого изгнать?"}
-            </span>
-            <span className="top-bar-desc">
-              {!canVote
-                ? "Вы изгнаны"
-                : voted
-                  ? "Голос принят"
-                  : voteSubmitting
-                    ? "Голос отправляется…"
-                    : voteUnavailable
-                      ? "Голосование приостановлено до восстановления связи"
-                      : isTiebreak
-                        ? "Ничья! Выберите одного из кандидатов"
-                        : "Выберите игрока для изгнания"}
-            </span>
-          </div>
-          <div className="top-bar-right">
-            <Timer endTime={gameState.phaseEndTime} size="large" />
-          </div>
-        </div>
-      </div>
-
-      <div className="vote-container">
-        {!canVote ? (
-          <>
-            <div className="vote-waiting-card">
-              <p>Вы были изгнаны и не можете голосовать</p>
-            </div>
-            <VoteProgressBar
-              votesCount={gameState.votesCount}
-              totalVotesExpected={gameState.totalVotesExpected}
-            />
-          </>
-        ) : voted ? (
-          <>
-            <div className="vote-waiting-card vote-accepted">
-              <p>Ваш голос принят! Ожидаем остальных...</p>
-              {isLastEliminated && !me?.alive && (
-                <p className="last-elim-note">Вы голосуете как последний изгнанный</p>
-              )}
-            </div>
-            <VoteProgressBar
-              votesCount={gameState.votesCount}
-              totalVotesExpected={gameState.totalVotesExpected}
-            />
-          </>
-        ) : (
-          <>
-            {isLastEliminated && !me?.alive && (
-              <div className="last-elim-banner">
-                Вы голосуете как последний изгнанный — от лица всех изгнанных
+      {is3D ? (
+        <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
+          <BunkerTable3D
+            cursorVisible={cursorVisible}
+            onCursorChange={setCursorVisible}
+            onClassic={onToggle3D}
+            onSpecial={
+              canUseRoomActions && canRevealAction && !voteLocked
+                ? () => setConfirmRevealAction(true)
+                : undefined
+            }
+            onManage={isCurrentHost && canUseRoomActions ? openAdminPanel : undefined}
+            vote={{
+              candidates: candidates.map((player) => player.id),
+              selectedId: selectedTarget,
+              canVote: canUseRoomActions && canVote && !voted && !voteLocked,
+              onSelect: handleVote,
+              onConfirm: (id) => {
+                if (
+                  canUseRoomActions &&
+                  canVote &&
+                  !voted &&
+                  !voteLocked &&
+                  candidates.some((player) => player.id === id)
+                )
+                  setConfirmTarget(id);
+              },
+            }}
+          />
+        </Suspense>
+      ) : (
+        <>
+          <button type="button" className="bunker3d-return btn btn-secondary" onClick={onToggle3D}>
+            3D-стол
+          </button>
+          <div className="sticky-top-bar vote-top-bar">
+            <div className="top-bar-content">
+              <div className="top-bar-left">
+                <span className="top-bar-phase">
+                  {!canVote || voted
+                    ? isTiebreak
+                      ? "Переголосование"
+                      : "Голосование"
+                    : isTiebreak
+                      ? "Переголосование"
+                      : "Кого изгнать?"}
+                </span>
+                <span className="top-bar-desc">
+                  {!canVote
+                    ? "Вы изгнаны"
+                    : voted
+                      ? "Голос принят"
+                      : voteSubmitting
+                        ? "Голос отправляется…"
+                        : voteUnavailable
+                          ? "Голосование приостановлено до восстановления связи"
+                          : isTiebreak
+                            ? "Ничья! Выберите одного из кандидатов"
+                            : "Выберите игрока для изгнания"}
+                </span>
               </div>
-            )}
-
-            <div className="vote-candidates">
-              {candidates.map((player) => {
-                const playerNumber =
-                  gameState.players.findIndex((candidate) => candidate.id === player.id) + 1;
-                return (
-                  <label
-                    key={player.id}
-                    className={`vote-candidate ${selectedTarget === player.id ? "is-selected" : ""}`}
-                  >
-                    <input
-                      className="vote-candidate-radio"
-                      type="radio"
-                      name="vote-target"
-                      value={player.id}
-                      checked={selectedTarget === player.id}
-                      disabled={voteLocked}
-                      onChange={() => handleVote(player.id)}
-                    />
-                    <div className="candidate-info">
-                      <span className="candidate-name">
-                        <span className="player-number">{playerNumber}</span>
-                        {player.isBot && <span className="bot-badge">BOT</span>}
-                        {player.name}
-                      </span>
-                      <div className="candidate-attrs">
-                        {player.revealedAttributes.map((attribute, index) => (
-                          <span key={index} className="mini-tag" data-attr-type={attribute.type}>
-                            <span className="mini-tag-label">{attribute.label}:</span>{" "}
-                            {attribute.value}
-                          </span>
-                        ))}
-                        {player.actionCard && (
-                          <span className="mini-tag" data-attr-type="action">
-                            <span className="mini-tag-label">Особое условие:</span>{" "}
-                            {player.actionCard.title}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="vote-candidate-mark" aria-hidden="true">
-                      {selectedTarget === player.id ? "Выбрано" : "Выбрать"}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-
-            <div className="vote-progress-bar">
-              <div className="vote-progress-label">
-                Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+              <div className="top-bar-right">
+                <Timer endTime={gameState.phaseEndTime} size="large" />
               </div>
-              <div className="vote-progress-track">
-                <div
-                  className="vote-progress-fill"
-                  style={{
-                    width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%`,
-                  }}
+            </div>
+          </div>
+
+          <div className="vote-container">
+            {!canVote ? (
+              <>
+                <div className="vote-waiting-card">
+                  <p>Вы были изгнаны и не можете голосовать</p>
+                </div>
+                <VoteProgressBar
+                  votesCount={gameState.votesCount}
+                  totalVotesExpected={gameState.totalVotesExpected}
                 />
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+              </>
+            ) : voted ? (
+              <>
+                <div className="vote-waiting-card vote-accepted">
+                  <p>Ваш голос принят! Ожидаем остальных...</p>
+                  {isLastEliminated && !me?.alive && (
+                    <p className="last-elim-note">Вы голосуете как последний изгнанный</p>
+                  )}
+                </div>
+                <VoteProgressBar
+                  votesCount={gameState.votesCount}
+                  totalVotesExpected={gameState.totalVotesExpected}
+                />
+              </>
+            ) : (
+              <>
+                {isLastEliminated && !me?.alive && (
+                  <div className="last-elim-banner">
+                    Вы голосуете как последний изгнанный — от лица всех изгнанных
+                  </div>
+                )}
+
+                <div className="vote-candidates">
+                  {candidates.map((player) => {
+                    const playerNumber =
+                      gameState.players.findIndex((candidate) => candidate.id === player.id) + 1;
+                    return (
+                      <label
+                        key={player.id}
+                        className={`vote-candidate ${selectedTarget === player.id ? "is-selected" : ""}`}
+                      >
+                        <input
+                          className="vote-candidate-radio"
+                          type="radio"
+                          name="vote-target"
+                          value={player.id}
+                          checked={selectedTarget === player.id}
+                          disabled={voteLocked}
+                          onChange={() => handleVote(player.id)}
+                        />
+                        <div className="candidate-info">
+                          <span className="candidate-name">
+                            <span className="player-number">{playerNumber}</span>
+                            {player.isBot && <span className="bot-badge">BOT</span>}
+                            {player.name}
+                          </span>
+                          <div className="candidate-attrs">
+                            {player.revealedAttributes.map((attribute, index) => (
+                              <span
+                                key={index}
+                                className="mini-tag"
+                                data-attr-type={attribute.type}
+                              >
+                                <span className="mini-tag-label">{attribute.label}:</span>{" "}
+                                {attribute.value}
+                              </span>
+                            ))}
+                            {player.actionCard && (
+                              <span className="mini-tag" data-attr-type="action">
+                                <span className="mini-tag-label">Особое условие:</span>{" "}
+                                {player.actionCard.title}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="vote-candidate-mark" aria-hidden="true">
+                          {selectedTarget === player.id ? "Выбрано" : "Выбрать"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="vote-progress-bar">
+                  <div className="vote-progress-label">
+                    Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
+                  </div>
+                  <div className="vote-progress-track">
+                    <div
+                      className="vote-progress-fill"
+                      style={{
+                        width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       <aside className="vote-command-bar" aria-label="Действия голосования">
         <div className="vote-command-status" role="status" aria-live="polite">

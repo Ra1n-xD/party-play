@@ -1,0 +1,110 @@
+.uno-screen.is-3d .uno-hand {
+  min-height: 0;
+  height: 100%;
+  align-items: flex-end;
+  padding: 8px 25px 6px;
+}
+.uno-screen.is-3d .uno-card.is-hand {
+  width: 79px;
+  height: 112px;
+  border-radius: 7px;
+  box-shadow: 0 7px 18px #0007;
+}
+.uno-screen.is-3d .uno-command-dock {
+  border-color: #d0bc8b25;
+  background: #17251dde;
+}
+.uno-screen.is-3d .is-keyboard-focused .uno-card {
+  outline: 2px solid #f2dba2;
+  outline-offset: 4px;
+  transform: translateY(-10px);
+}
+.uno3d-color.is-red {
+  color: #ff8e88;
+}
+.uno3d-color.is-yellow {
+  color: #efd778;
+}
+.uno3d-color.is-green {
+  color: #86d2a9;
+}
+.uno3d-color.is-blue {
+  color: #9cc6ff;
+}
+.uno3d-information strong {
+  font-size: 0.85rem;
+}
+.uno3d-discard-label {
+  position: absolute;
+  bottom: calc(var(--card-arena-dock-space) + var(--card-arena-hand-height) + 26px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  color: #e8dfc8;
+  background: #14241bcc;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  text-align: center;
+  pointer-events: none;
+}
+.uno3d-notice {
+  position: absolute;
+  left: 22px;
+  top: 140px;
+  max-width: 220px;
+  padding: 10px 12px;
+  background: #1d2928dd;
+  border: 1px solid #c6b58140;
+  color: #ecd8a5;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+.uno3d-return {
+  position: absolute;
+  z-index: 5;
+  bottom: calc(var(--card-arena-dock-space) + 12px);
+  left: 16px;
+}
+.uno-color-choice kbd {
+  margin-left: auto;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font: inherit;
+}
+@media (max-width: 680px) {
+  .uno-screen.is-3d .uno-card.is-hand {
+    width: 68px;
+    height: 96px;
+  }
+  .uno-screen.is-3d .uno-hand {
+    padding-inline: 22px;
+  }
+  .uno3d-information {
+    gap: 10px;
+  }
+  .uno3d-information strong {
+    font-size: 0.68rem;
+  }
+  .uno3d-notice {
+    left: 10px;
+    top: 123px;
+    max-width: 47%;
+    font-size: 0.6rem;
+    padding: 7px;
+  }
+  .uno3d-discard-label {
+    left: auto;
+    right: 10px;
+    max-width: 50%;
+    transform: none;
+    font-size: 0.6rem;
+  }
+}
+@media (max-height: 540px) and (min-width: 681px) {
+  .uno-screen.is-3d .uno-card.is-hand {
+    width: 48px;
+    height: 68px;
+  }
+}

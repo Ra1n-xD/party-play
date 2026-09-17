@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FiSettings } from "react-icons/fi";
 import type {
   UnoCard as UnoCardData,
@@ -25,6 +25,9 @@ import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
 import { UnoCard, UnoCardBack, getUnoCardName } from "./components/UnoCard";
 import { UnoColorDialog } from "./components/UnoColorDialog";
+
+import { useTableHotkeys } from "../shared/table3d/useTableHotkeys";
+const UnoTable3D = lazy(() => import("./components/UnoTable3D"));
 
 interface UnoGameScreenProps {
   snapshot: RoomSnapshot<"uno">;
@@ -107,6 +110,9 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     setAdminPause,
   } = usePlatform();
   const game = snapshot.game;
+  const [is3D, setIs3D] = useState(true);
+  const [cursorVisible, setCursorVisible] = useState(false);
+  const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
   const [colorChoice, setColorChoice] = useState<ColorChoice | null>(null);
   const [declareWithPlay, setDeclareWithPlay] = useState(false);
   const [handSortMode, setHandSortMode] = useState<HandSortMode>("suit");
@@ -143,7 +149,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   );
   const tableFlights = useMemo(
     () =>
-      game?.topDiscard && game.lastPlayedBySeatId
+      !is3D && game?.topDiscard && game.lastPlayedBySeatId
         ? [
             {
               key: `discard:${game.topDiscard.id}`,
@@ -152,7 +158,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
             },
           ]
         : [],
-    [game?.lastPlayedBySeatId, game?.topDiscard?.id],
+    [game?.lastPlayedBySeatId, game?.topDiscard?.id, is3D],
   );
   const transferEvents = useMemo<CardTransferVisualEvent[]>(
     () => [
@@ -201,8 +207,8 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   useCardTransferMotion({
     gameId: "uno",
     revision: snapshot.revision,
-    events: transferEvents,
-    animateInitial: animateInitialDeal,
+    events: is3D ? [] : transferEvents,
+    animateInitial: animateInitialDeal && !is3D,
   });
   const actionIndicators = usePlayerActionIndicators(
     actionEvents,
@@ -282,11 +288,54 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
 
   const { session, announcement, bindDragSource, isDragging, activeTargetId } =
     useCardDrag<UnoDragPayload>({
-      disabled: !canAct,
+      disabled: !canAct || is3D,
       resetKey: JSON.stringify([handSortMode, legalActions, displayedHand.map((card) => card.id)]),
       canDrop: (_payload, targetId) => targetId === "uno-discard",
       onDrop: ({ card }) => playCard(card),
     });
+
+  const focusedCard = displayedHand.find((card) => card.id === focusedCardId) ?? displayedHand[0];
+  useTableHotkeys(is3D && !managementOpen && !colorChoice, (code) => {
+    if (["KeyA", "KeyD", "ArrowLeft", "ArrowRight"].includes(code)) {
+      const index = Math.max(
+        0,
+        displayedHand.findIndex((card) => card.id === focusedCard?.id),
+      );
+      const step = code === "KeyA" || code === "ArrowLeft" ? -1 : 1;
+      if (displayedHand.length)
+        setFocusedCardId(
+          displayedHand[(index + step + displayedHand.length) % displayedHand.length].id,
+        );
+      return true;
+    }
+    if (code === "KeyC") {
+      setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit"));
+      return true;
+    }
+    if (!canAct) return false;
+    if (code === "KeyE" || code === "Enter" || code === "Space") {
+      if (legalActions?.canChooseInitialColor) setColorChoice({ mode: "initial" });
+      else if (focusedCard) playCard(focusedCard);
+    } else if (code === "KeyF") {
+      if (legalActions?.canAcceptWildDrawFour) respondToWildDrawFour("accept");
+      else if (legalActions?.canEndTurn) sendGameCommand("uno", { type: "end-turn" });
+      else if (legalActions?.canDraw) sendGameCommand("uno", { type: "draw-card" });
+    } else if (code === "KeyG" && legalActions?.canChallengeWildDrawFour)
+      respondToWildDrawFour("challenge");
+    else if (code === "KeyU") {
+      if (canOfferAtomicUnoIntent) setDeclareWithPlay((value) => !value);
+      else if (legalActions?.canDeclareUno)
+        sendGameCommand("uno", {
+          type: "declare-uno",
+          ...(legalActions.declareUnoWindowId != null
+            ? { windowId: legalActions.declareUnoWindowId }
+            : {}),
+        });
+    } else if (code === "KeyX" && legalActions?.catchUno)
+      sendGameCommand("uno", { type: "catch-uno", windowId: legalActions.catchUno.windowId });
+    else return false;
+    return true;
+  });
 
   if (!game) {
     return (
@@ -409,7 +458,9 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                 : `Сейчас ходит: ${actorName}`;
 
   return (
-    <main className="screen command-game-screen card-game-screen uno-screen has-uno-command-dock">
+    <main
+      className={`screen command-game-screen card-game-screen uno-screen has-uno-command-dock ${is3D ? "is-3d" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
+    >
       <GameRoomHeader
         roomCode={snapshot.roomCode}
         connected={connected}
@@ -419,141 +470,182 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
         brandIcon="◆"
       />
 
-      <p className="card-game-action-hint" role="status">
-        {actionHint}
-      </p>
+      {!is3D && (
+        <p className="card-game-action-hint" role="status">
+          {actionHint}
+        </p>
+      )}
 
       <div className="card-game-arena uno-arena">
-        <section className="card-arena-opponents" aria-label="Соперники">
-          {opponentPlayers.map(renderPlayerSeat)}
-        </section>
+        {is3D ? (
+          <Suspense fallback={<div className="table3d-loading">Готовим 3D-стол…</div>}>
+            <UnoTable3D
+              game={game}
+              viewerSeatId={viewerSeatId}
+              roomCode={snapshot.roomCode}
+              canSendLook={Boolean(viewerSeatId && canUseConnection)}
+              cursorVisible={cursorVisible}
+              onCursorChange={setCursorVisible}
+              onClassic={() => setIs3D(false)}
+              paused={paused}
+              revision={snapshot.revision}
+              secondary={
+                legalActions?.canAcceptWildDrawFour
+                  ? "Принять +4"
+                  : legalActions?.canEndTurn
+                    ? "Завершить ход"
+                    : "Взять карту"
+              }
+            />
+          </Suspense>
+        ) : (
+          <>
+            <section className="card-arena-opponents" aria-label="Соперники">
+              {opponentPlayers.map(renderPlayerSeat)}
+            </section>
 
-        <section className="card-arena-table-zone uno-arena-table-zone" aria-label="Игровой стол">
-          <section
-            className="uno-table"
-            aria-label={`Карты на столе. Активный цвет: ${
-              game.activeColor ? COLOR_LABELS[game.activeColor] : "не выбран"
-            }`}
-            data-card-motion-anchor="uno:table"
-          >
-            <div className="uno-arena-status">
-              <span
-                className={`uno-active-color is-${game.activeColor ?? "none"}`}
-                aria-label={`Активный цвет: ${
+            <section
+              className="card-arena-table-zone uno-arena-table-zone"
+              aria-label="Игровой стол"
+            >
+              <section
+                className="uno-table"
+                aria-label={`Карты на столе. Активный цвет: ${
                   game.activeColor ? COLOR_LABELS[game.activeColor] : "не выбран"
                 }`}
+                data-card-motion-anchor="uno:table"
               >
-                {game.activeColor ? COLOR_LABELS[game.activeColor] : "Цвет"}
-              </span>
-              <span
-                className={`uno-direction is-${game.direction}`}
-                aria-label={
-                  game.direction === "clockwise" ? "По часовой стрелке" : "Против часовой стрелки"
-                }
-              >
-                <span className="uno-direction-label">
-                  {game.direction === "clockwise" ? "По часовой" : "Против часовой"}
-                </span>
-              </span>
-            </div>
-
-            <div className="uno-piles">
-              <div
-                className={`uno-pile uno-draw-pile ${
-                  game.drawPileCount > 0 ? "has-cards" : "is-empty"
-                }`}
-                aria-label={
-                  game.drawPileCount > 0
-                    ? `В колоде ${formatCardCount(game.drawPileCount)}`
-                    : "Колода пуста"
-                }
-                data-card-motion-anchor="uno:deck"
-              >
-                {game.drawPileCount > 0 ? (
-                  <UnoCardBack label={`Колода, осталось ${formatCardCount(game.drawPileCount)}`} />
-                ) : (
-                  <div className="uno-empty-card" aria-hidden="true">
-                    ∅
-                  </div>
-                )}
-                <span>{game.drawPileCount}</span>
-              </div>
-              <div
-                className={`uno-pile ${isDragging ? "is-drag-target" : ""} ${
-                  activeTargetId === "uno-discard" ? "is-drag-over" : ""
-                }`}
-                role="group"
-                aria-label={`Отбой. ${game.discardPileCount} карт`}
-                data-card-drop-target="uno-discard"
-                data-card-motion-anchor="uno:discard"
-              >
-                {game.topDiscard ? (
-                  <div
-                    className="uno-discard-card-shell"
-                    key={game.topDiscard.id}
-                    style={
-                      {
-                        "--discard-tilt": `${game.discardPileCount % 2 === 0 ? -1.4 : 1.4}deg`,
-                      } as CSSProperties
+                <div className="uno-arena-status">
+                  <span
+                    className={`uno-active-color is-${game.activeColor ?? "none"}`}
+                    aria-label={`Активный цвет: ${
+                      game.activeColor ? COLOR_LABELS[game.activeColor] : "не выбран"
+                    }`}
+                  >
+                    {game.activeColor ? COLOR_LABELS[game.activeColor] : "Цвет"}
+                  </span>
+                  <span
+                    className={`uno-direction is-${game.direction}`}
+                    aria-label={
+                      game.direction === "clockwise"
+                        ? "По часовой стрелке"
+                        : "Против часовой стрелки"
                     }
                   >
-                    <div
-                      className="uno-discard-flight-target"
-                      data-table-card-flight={`uno-discard-flight:${game.topDiscard.id}`}
-                    >
-                      <UnoCard card={game.topDiscard} />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="uno-empty-card">—</div>
-                )}
-                <span>{game.discardPileCount}</span>
-              </div>
-            </div>
-
-            {pendingWildDrawFour && (
-              <section className="uno-wdf-panel" aria-labelledby="uno-wdf-title">
-                <div>
-                  <span className="uno-eyebrow">Wild +4</span>
-                  <h3 id="uno-wdf-title">Проверка рискованного хода</h3>
-                  <p>
-                    {playersById.get(pendingWildDrawFour.sourceSeatId)?.name ?? "Игрок"} объявил
-                    цвет «{COLOR_LABELS[pendingWildDrawFour.declaredColor]}».
-                  </p>
-                  <p>
-                    Проверка выяснит, была ли у него карта прежнего цвета:{" "}
-                    {COLOR_LABELS[pendingWildDrawFour.previousActiveColor]}.
-                  </p>
+                    <span className="uno-direction-label">
+                      {game.direction === "clockwise" ? "По часовой" : "Против часовой"}
+                    </span>
+                  </span>
                 </div>
-                <span className="uno-wdf-wait">
-                  {ownWdfResponse ? "Решение — внизу" : "Ждём решения"}
-                </span>
+
+                <div className="uno-piles">
+                  <div
+                    className={`uno-pile uno-draw-pile ${
+                      game.drawPileCount > 0 ? "has-cards" : "is-empty"
+                    }`}
+                    aria-label={
+                      game.drawPileCount > 0
+                        ? `В колоде ${formatCardCount(game.drawPileCount)}`
+                        : "Колода пуста"
+                    }
+                    data-card-motion-anchor="uno:deck"
+                  >
+                    {game.drawPileCount > 0 ? (
+                      <UnoCardBack
+                        label={`Колода, осталось ${formatCardCount(game.drawPileCount)}`}
+                      />
+                    ) : (
+                      <div className="uno-empty-card" aria-hidden="true">
+                        ∅
+                      </div>
+                    )}
+                    <span>{game.drawPileCount}</span>
+                  </div>
+                  <div
+                    className={`uno-pile ${isDragging ? "is-drag-target" : ""} ${
+                      activeTargetId === "uno-discard" ? "is-drag-over" : ""
+                    }`}
+                    role="group"
+                    aria-label={`Отбой. ${game.discardPileCount} карт`}
+                    data-card-drop-target="uno-discard"
+                    data-card-motion-anchor="uno:discard"
+                  >
+                    {game.topDiscard ? (
+                      <div
+                        className="uno-discard-card-shell"
+                        key={game.topDiscard.id}
+                        style={
+                          {
+                            "--discard-tilt": `${game.discardPileCount % 2 === 0 ? -1.4 : 1.4}deg`,
+                          } as CSSProperties
+                        }
+                      >
+                        <div
+                          className="uno-discard-flight-target"
+                          data-table-card-flight={`uno-discard-flight:${game.topDiscard.id}`}
+                        >
+                          <UnoCard card={game.topDiscard} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="uno-empty-card">—</div>
+                    )}
+                    <span>{game.discardPileCount}</span>
+                  </div>
+                </div>
+
+                {pendingWildDrawFour && (
+                  <section className="uno-wdf-panel" aria-labelledby="uno-wdf-title">
+                    <div>
+                      <span className="uno-eyebrow">Wild +4</span>
+                      <h3 id="uno-wdf-title">Проверка рискованного хода</h3>
+                      <p>
+                        {playersById.get(pendingWildDrawFour.sourceSeatId)?.name ?? "Игрок"} объявил
+                        цвет «{COLOR_LABELS[pendingWildDrawFour.declaredColor]}».
+                      </p>
+                      <p>
+                        Проверка выяснит, была ли у него карта прежнего цвета:{" "}
+                        {COLOR_LABELS[pendingWildDrawFour.previousActiveColor]}.
+                      </p>
+                    </div>
+                    <span className="uno-wdf-wait">
+                      {ownWdfResponse ? "Решение — внизу" : "Ждём решения"}
+                    </span>
+                  </section>
+                )}
+                {game.lastChallengeResolution && (
+                  <p className="uno-resolution" role="status">
+                    {game.lastChallengeResolution.outcome === "challenge-succeeded"
+                      ? "Оспаривание удалось."
+                      : game.lastChallengeResolution.outcome === "challenge-failed"
+                        ? "Оспаривание не удалось."
+                        : "Штраф +4 принят."}{" "}
+                    {playersById.get(
+                      game.lastChallengeResolution.outcome === "challenge-succeeded"
+                        ? game.lastChallengeResolution.sourceSeatId
+                        : game.lastChallengeResolution.targetSeatId,
+                    )?.name ?? "Игрок"}
+                    : штраф +{game.lastChallengeResolution.drawCount}.
+                  </p>
+                )}
               </section>
-            )}
-            {game.lastChallengeResolution && (
-              <p className="uno-resolution" role="status">
-                {game.lastChallengeResolution.outcome === "challenge-succeeded"
-                  ? "Оспаривание удалось."
-                  : game.lastChallengeResolution.outcome === "challenge-failed"
-                    ? "Оспаривание не удалось."
-                    : "Штраф +4 принят."}{" "}
-                {playersById.get(
-                  game.lastChallengeResolution.outcome === "challenge-succeeded"
-                    ? game.lastChallengeResolution.sourceSeatId
-                    : game.lastChallengeResolution.targetSeatId,
-                )?.name ?? "Игрок"}
-                : штраф +{game.lastChallengeResolution.drawCount}.
-              </p>
-            )}
-          </section>
-        </section>
+            </section>
 
-        {viewerPlayer && (
-          <div className="card-arena-self-seat" aria-label="Ваше место за столом">
-            {renderPlayerSeat(viewerPlayer)}
-          </div>
+            {viewerPlayer && (
+              <div className="card-arena-self-seat" aria-label="Ваше место за столом">
+                {renderPlayerSeat(viewerPlayer)}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="uno3d-return btn btn-secondary"
+              onClick={() => setIs3D(true)}
+            >
+              3D-стол
+            </button>
+          </>
         )}
-
         {privateGame ? (
           <section className="card-arena-hand uno-hand-section" aria-label="Карты в вашей руке">
             <div
@@ -568,12 +660,14 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                 const isDrawnCard = legalActions?.drawnCardId === card.id;
                 const allowed = playable || bluffable;
                 const dragSource =
-                  allowed && canAct ? bindDragSource({ card }, getUnoCardName(card)) : undefined;
+                  allowed && canAct && !is3D
+                    ? bindDragSource({ card }, getUnoCardName(card))
+                    : undefined;
                 const { className: dragClassName, ...dragBindings } = dragSource ?? {};
                 return (
                   <div
                     key={card.id}
-                    className={`uno-hand-card-shell ${dragClassName ?? "card-motion-shell"}`}
+                    className={`uno-hand-card-shell ${dragClassName ?? "card-motion-shell"} ${is3D && focusedCard?.id === card.id ? "is-keyboard-focused" : ""}`}
                     style={
                       {
                         "--card-index": Math.min(index, 5),
@@ -591,6 +685,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                       playable={playable && canAct}
                       bluffable={bluffable && canAct}
                       disabled={!canAct || !allowed}
+                      onClick={is3D ? () => setFocusedCardId(card.id) : undefined}
                       onDoubleClick={() => playCard(card)}
                       onKeyboardActivate={() => playCard(card)}
                       ariaLabel={`${getUnoCardName(card)}${bluffable ? ". Рискованный Wild +4" : ""}${isDrawnCard ? ". Добрана сейчас" : ""}`}

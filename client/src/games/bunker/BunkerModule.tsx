@@ -1,4 +1,4 @@
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useState } from "react";
 import type { AttributeType } from "../../../../shared/games/bunker/types";
 import BackgroundParticles from "../../components/BackgroundParticles";
 import { CardImage } from "../../components/CardImage";
@@ -9,6 +9,9 @@ import { LobbyScreen } from "../../platform/screens/LobbyScreen";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { AccessibleModal } from "../../platform/components/AccessibleModal";
 import { BunkerGameProvider, useBunkerGame, type OverlayItem } from "./context/BunkerGameContext";
+
+import "../shared/table3d/table3d.css";
+import "./bunker-3d.css";
 
 const ATTRIBUTE_LABELS: Record<AttributeType, string> = {
   profession: "раскрывает профессию",
@@ -69,6 +72,7 @@ function OverlayRenderer({ item }: { item: OverlayItem }) {
 }
 
 function BunkerView() {
+  const [is3D, setIs3D] = useState(true);
   const { snapshot } = usePlatform();
   const { gameState, currentOverlay, dismissOverlays } = useBunkerGame();
   const isVoteScreen =
@@ -100,11 +104,11 @@ function BunkerView() {
     case "ROUND_REVEAL":
     case "ROUND_DISCUSSION":
     case "ROUND_RESULT":
-      screen = <GameScreen />;
+      screen = <GameScreen is3D={is3D} onToggle3D={() => setIs3D((value) => !value)} />;
       break;
     case "ROUND_VOTE":
     case "ROUND_VOTE_TIEBREAK":
-      screen = <VoteScreen />;
+      screen = <VoteScreen is3D={is3D} onToggle3D={() => setIs3D((value) => !value)} />;
       break;
     case "GAME_OVER":
       screen = <ResultsScreen />;

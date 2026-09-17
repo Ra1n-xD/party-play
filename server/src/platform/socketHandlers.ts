@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "crypto";
 import { Server, Socket } from "socket.io";
 import { isRoomReactionId } from "../../../shared/platform/reactions.js";
+import { isAvatarLook, AVATAR_LOOK_INTERVAL_MS } from "../../../shared/platform/avatarLook.js";
 import { normalizeRoomCode } from "../../../shared/roomCode.js";
 import {
   ClientEvents,
@@ -99,6 +100,7 @@ const REACTION_COOLDOWN_MS = 1_200;
 const REACTION_RATE_WINDOW_MS = 10_000;
 const MAX_REACTIONS_PER_WINDOW = 6;
 const reactionRateBySocket = new Map<string, { lastAcceptedAt: number; acceptedAt: number[] }>();
+const lastLookAtBySocket = new Map<string, number>();
 
 // --- Per-action rate limiting ---
 const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
@@ -208,6 +210,7 @@ function rejectRateLimitedAction(socket: IOSocket, action: string): boolean {
 function cleanupRateLimitEntry(socketId: string): void {
   socketActionCounts.delete(socketId);
   reactionRateBySocket.delete(socketId);
+  lastLookAtBySocket.delete(socketId);
 }
 
 // --- Progressive backoff for failed rejoin attempts (per client network identity) ---
@@ -260,6 +263,7 @@ export function resetSocketHandlerStateForTests(): void {
   socketRoomMap.clear();
   socketActionCounts.clear();
   reactionRateBySocket.clear();
+  lastLookAtBySocket.clear();
   ipActionCounts.clear();
   nextIpActionPruneAt = 0;
   rejoinThrottle.reset();
@@ -1318,6 +1322,36 @@ export function registerHandlers(io: IOServer): void {
         socket.emit("room:commandResult", result);
       }).catch(() => {
         socket.emit("room:error", { message: "Не удалось обработать команду" });
+      });
+    });
+
+    // Ephemeral visual presence does not change the room revision or enter the command queue.
+    socket.on("room:look", (data) => {
+      if (!isAvatarLook(data)) return;
+      const now = Date.now();
+      if (now - (lastLookAtBySocket.get(socket.id) ?? 0) < AVATAR_LOOK_INTERVAL_MS - 15) return;
+      const info = getCurrentSocketMembership(socket);
+      if (!info || info.role !== "player") return;
+      const room = getRoom(info.roomCode);
+      const player = room?.players.get(info.playerId);
+      if (
+        !room ||
+        !["durak", "uno", "bunker"].includes(room.gameId) ||
+        room.lifecycle !== "playing" ||
+        !player ||
+        player.kicked ||
+        !player.connected ||
+        player.owner.kind !== "human" ||
+        player.controller.kind !== "human" ||
+        player.controller.socketId !== socket.id
+      )
+        return;
+      lastLookAtBySocket.set(socket.id, now);
+      socket.to(room.code).volatile.emit("room:look", {
+        roomCode: room.code,
+        seatId: player.id,
+        yaw: data.yaw,
+        pitch: data.pitch,
       });
     });
 

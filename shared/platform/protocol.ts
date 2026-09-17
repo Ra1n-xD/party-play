@@ -9,6 +9,7 @@ import type {
 } from "../games/bunker/types.js";
 import type { AnyGameEvent, GameId } from "./gameContract.js";
 import type { RoomReactionEvent, RoomReactionId } from "./reactions.js";
+import type { AvatarLook, AvatarLookEvent } from "./avatarLook.js";
 import type {
   AnyPublicRoomDirectorySnapshot,
   PublicRoomCountsSnapshot,
@@ -79,6 +80,7 @@ export interface ClientEvents {
   "room:cancelSeatClaim": (data: { requestId: string }) => void;
   "room:command": (data: AnyRoomCommandEnvelope) => void;
   "room:sendReaction": (data: { reactionId: RoomReactionId }) => void;
+  "room:look": (data: AvatarLook) => void;
   "publicRooms:subscribe": (data: { gameId: GameId }) => void;
   "publicRooms:unsubscribe": (data: { gameId: GameId }) => void;
   "publicRooms:join": (data: { gameId: GameId; publicRoomId: string; playerName: string }) => void;
@@ -151,6 +153,7 @@ export interface ServerEvents {
   "room:snapshot": (data: AnyRoomSnapshot) => void;
   "room:commandResult": (data: RoomCommandResult) => void;
   "room:reaction": (data: RoomReactionEvent) => void;
+  "room:look": (data: AvatarLookEvent) => void;
   "publicRooms:counts": (data: PublicRoomCountsSnapshot) => void;
   "publicRooms:directory": (data: AnyPublicRoomDirectorySnapshot) => void;
   "publicRooms:error": (data: PublicRoomErrorPayload) => void;

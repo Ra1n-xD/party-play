@@ -1,0 +1,325 @@
+.screen.bunker3d-screen {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+  background: #17231f;
+  position: relative;
+  isolation: isolate;
+}
+.bunker3d-screen > .table3d-scene {
+  top: 54px;
+  bottom: 94px;
+}
+.bunker3d-screen .gs-action-bar,
+.bunker3d-screen .vote-command-bar {
+  z-index: 20;
+  background: #17251df5;
+  border-color: #d0bc8b35;
+}
+.bunker3d-screen .gs-command-status {
+  max-width: 300px;
+}
+.bunker3d-screen .gs-command-status-copy > span {
+  display: none;
+}
+.bunker3d-screen .gs-command-actions {
+  gap: 7px;
+}
+.bunker3d-screen .gs-command-button {
+  min-height: 38px;
+  font-size: 0.7rem;
+  padding: 8px 10px;
+}
+.table3d-dossier {
+  width: var(--table3d-dossier-width, 174px);
+  max-width: 174px;
+  padding: 0;
+  max-height: min(360px, calc(100% - 20px));
+  overflow: auto;
+  scrollbar-width: thin;
+  border: 1px solid #bba47760;
+  background: #15251dea;
+  text-align: left;
+  box-shadow: 0 7px 22px #0005;
+}
+.table3d-dossier-content {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+  color: #eae3cf;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.table3d-dossier strong {
+  display: block;
+  font-size: 0.77rem;
+  padding-bottom: 2px;
+}
+.table3d-dossier-status {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.table3d-dossier dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+.table3d-trait {
+  padding: 5px 6px;
+  border-left: 2px solid var(--gs-attribute-color, #b6b095);
+  border-radius: 0 4px 4px 0;
+  background: color-mix(in srgb, var(--gs-attribute-color, #b6b095) 8%, transparent);
+}
+.table3d-trait-icon,
+.bunker-attribute-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+.table3d-dossier dt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: var(--gs-attribute-color, #b6b095);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+  overflow-wrap: anywhere;
+}
+.table3d-dossier dd {
+  margin: 0;
+  color: #fff4db;
+  font-size: 0.66rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.table3d-dossier.is-selected {
+  width: 174px;
+  border-color: #ffe0a1;
+  box-shadow:
+    0 0 0 2px #dbbc7450,
+    0 7px 22px #0006;
+  z-index: 2;
+}
+.table3d-dossier.is-muted {
+  opacity: 0.62;
+}
+.table3d-dossier.is-active {
+  background: #363523f2;
+}
+.bunker3d-status {
+  position: absolute;
+  top: 63px;
+  left: 22px;
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  background: #15241be8;
+  border: 1px solid #c0b07c40;
+  border-radius: 5px;
+  color: #d5dac9;
+  pointer-events: none;
+}
+.bunker3d-status strong {
+  font-size: 0.85rem;
+  color: #f1e2bc;
+}
+.bunker3d-status > span:not(.bunker3d-eyebrow) {
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+.bunker3d-eyebrow {
+  font-size: 0.52rem;
+  letter-spacing: 0.09em;
+  color: #baa77b;
+}
+.bunker3d-status .timer {
+  align-self: flex-start;
+}
+.bunker3d-table-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 115px;
+  transform: translateX(-50%);
+  width: min(380px, 50%);
+  text-align: center;
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+  text-shadow: 0 2px 8px #000;
+}
+.bunker3d-table-caption span {
+  color: #c2b887;
+  letter-spacing: 0.18em;
+  font-size: 0.55rem;
+}
+.bunker3d-table-caption strong {
+  color: #ecdfbf;
+  font:
+    500 1.15rem Georgia,
+    serif;
+}
+.bunker3d-tools {
+  position: absolute;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  left: 12px;
+  right: 12px;
+  bottom: 18px;
+}
+.bunker3d-tools button {
+  border: 1px solid #c4b28455;
+  border-radius: 5px;
+  background: #17291fec;
+  color: #e5dcc3;
+  padding: 9px 12px;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+.bunker3d-tools kbd {
+  margin-left: 6px;
+  color: #c9b981;
+}
+.bunker3d-detail-modal {
+  width: min(820px, 95vw);
+}
+.bunker3d-detail-modal > h2 {
+  margin-bottom: 20px;
+}
+.bunker3d-public-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.bunker3d-public-details article {
+  padding: 15px;
+  background: color-mix(in srgb, var(--gs-attribute-color, #b6b095) 8%, #1b2b21);
+  border: 1px solid #a8915d35;
+  border-left: 3px solid var(--gs-attribute-color, #b6b095);
+  border-radius: 8px;
+}
+.bunker3d-public-details strong,
+.bunker3d-public-details small {
+  display: block;
+  margin-bottom: 8px;
+}
+.bunker3d-public-details small {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--gs-attribute-color, #b6b095);
+  font-weight: 700;
+}
+.bunker3d-public-details .bunker-attribute-icon {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+}
+.bunker3d-public-details p {
+  font-size: 0.85rem;
+}
+.bunker3d-roster-list {
+  display: grid;
+  gap: 8px;
+  margin: 15px 0;
+}
+.bunker3d-return {
+  display: block;
+  margin: 8px auto;
+}
+@media (max-width: 680px) {
+  .bunker3d-screen > .table3d-scene {
+    bottom: 130px;
+  }
+  .bunker3d-screen .gs-command-status {
+    max-width: none;
+  }
+  .bunker3d-screen .gs-command-actions {
+    flex-wrap: nowrap;
+    overflow: auto;
+    justify-content: flex-start;
+  }
+  .bunker3d-screen .gs-command-button {
+    flex-shrink: 0;
+    padding: 8px;
+  }
+  .bunker3d-status {
+    top: 51px;
+    left: 10px;
+    width: 144px;
+    padding: 9px;
+    gap: 5px;
+  }
+  .bunker3d-status strong {
+    font-size: 0.68rem;
+  }
+  .bunker3d-status > span:not(.bunker3d-eyebrow) {
+    font-size: 0.58rem;
+  }
+  .bunker3d-eyebrow {
+    font-size: 0.42rem;
+  }
+  .bunker3d-table-caption {
+    width: 65%;
+    bottom: 105px;
+  }
+  .bunker3d-table-caption strong {
+    font-size: 0.9rem;
+  }
+  .bunker3d-tools {
+    bottom: 8px;
+    gap: 4px;
+  }
+  .bunker3d-tools button {
+    padding: 8px;
+    font-size: 0.6rem;
+  }
+  .table3d-dossier {
+    width: min(146px, var(--table3d-dossier-width, 174px));
+    max-width: 146px;
+  }
+  .table3d-dossier-content {
+    padding: 8px;
+  }
+  .table3d-dossier dd {
+    font-size: 0.61rem;
+  }
+}
+@media (max-height: 540px) and (min-width: 681px) {
+  .bunker3d-screen > .table3d-scene {
+    bottom: 70px;
+  }
+  .bunker3d-screen .gs-command-status {
+    display: none;
+  }
+  .bunker3d-status {
+    width: 165px;
+    font-size: 0.6rem;
+  }
+  .bunker3d-table-caption {
+    bottom: 65px;
+  }
+  .table3d-dossier {
+    width: 150px;
+  }
+  .table3d-dossier dl {
+    max-height: 145px;
+    overflow: auto;
+  }
+}
