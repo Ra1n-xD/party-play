@@ -47,6 +47,7 @@ export class FirstPersonHand {
   private height = 1;
   private gripKey = "";
   private enabled = true;
+  private overview = false;
 
   constructor(
     host: HTMLElement,
@@ -178,6 +179,13 @@ export class FirstPersonHand {
     this.layout();
   }
 
+  setOverview(overview: boolean) {
+    this.overview = overview;
+    this.camera.fov = overview ? 62 : 48;
+    this.camera.updateProjectionMatrix();
+    this.layout();
+  }
+
   private layout() {
     const maxVisible = this.width <= 680 ? 5 : 9;
     const count = Math.min(this.hand.length, maxVisible);
@@ -188,9 +196,10 @@ export class FirstPersonHand {
     const start = Math.max(0, Math.min(this.hand.length - count, focus - Math.floor(count / 2)));
     const scale = Math.min(1, this.camera.aspect * 1.1);
     const spacing = Math.min(0.105, 0.7 / Math.max(count - 1, 1)) * scale;
-    const centerY = -0.57;
+    const offsetY = this.overview ? -0.2 : 0;
+    const centerY = -0.57 + offsetY;
     this.grip.scale.setScalar(scale);
-    this.grip.position.set(0, -0.57 * (1 - scale), -1.5 * (1 - scale));
+    this.grip.position.set(0, -0.57 * (1 - scale) + offsetY, -1.5 * (1 - scale));
     const gripSpread = Math.min(
       0.23,
       Math.max(0.085, ((count - 1) * spacing) / (2 * scale) - 0.01),

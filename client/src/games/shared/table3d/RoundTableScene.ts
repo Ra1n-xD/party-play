@@ -58,6 +58,8 @@ export interface TableSceneOptions {
   onSelectPerson?: (id: string) => void;
   onFocusHandCard?: (id: string) => void;
   onSelectHandCard?: (id: string) => void;
+  onMenuRequest: (error?: string) => void;
+  onOverviewChange: (overview: boolean) => void;
 }
 
 const PALETTE = [0x467c87, 0xca8652, 0x887ca5, 0x829d67, 0xba6c73, 0x627eb3];
@@ -96,6 +98,10 @@ export class RoundTableScene {
   private disposed = false;
   private paused = false;
   private seatRadius = 3.55;
+  private readonly seatedPosition = new THREE.Vector3(0, 2.85, 3.65);
+  private readonly viewPosition = new THREE.Vector3();
+  private readonly viewRotation = new THREE.Quaternion();
+  private overview = false;
 
   constructor(
     private readonly host: HTMLDivElement,
@@ -103,7 +109,7 @@ export class RoundTableScene {
     private readonly onLook: (look: AvatarLook) => void,
     onCursor: (visible: boolean) => void,
     private readonly onFailure: () => void,
-    private readonly options: TableSceneOptions = {},
+    private readonly options: TableSceneOptions,
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "low-power" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
@@ -113,15 +119,25 @@ export class RoundTableScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.domElement.tabIndex = 0;
-    this.renderer.domElement.setAttribute("aria-label", "Круглый 3D-стол. R — посмотреть на стол.");
+    this.renderer.domElement.setAttribute(
+      "aria-label",
+      "Круглый 3D-стол. R — вид сверху, Esc — меню.",
+    );
     this.host.append(this.renderer.domElement);
     this.scene.background = new THREE.Color(0x172521);
     this.scene.fog = new THREE.Fog(0x172521, 12, 28);
     this.scene.add(this.room, this.players, this.pile, this.table);
     this.makeRoom();
-    this.camera.position.set(0, 3.12, 4.4);
+    if (options.variant === "bunker") this.seatedPosition.set(0, 3.12, 4.4);
+    this.camera.position.copy(this.seatedPosition);
     this.pitch = options.variant === "bunker" ? -0.16 : TABLE_DEFAULT_PITCH;
-    this.controls = new TableLookControls(this.renderer.domElement, onCursor, this.pitch);
+    this.controls = new TableLookControls(
+      this.renderer.domElement,
+      onCursor,
+      options.onMenuRequest,
+      () => this.toggleOverview(),
+      this.pitch,
+    );
     this.ownHand = new FirstPersonHand(
       host,
       (face) => this.makeCard(face.rank, face.suit, face.red, face.color),
@@ -858,7 +874,8 @@ export class RoundTableScene {
   focusPerson(id: string) {
     const position = this.seatPositions.get(id);
     if (!position) return;
-    this.controls.target.yaw = Math.atan2(-position.x, this.camera.position.z - position.z);
+    if (this.overview) this.toggleOverview();
+    this.controls.target.yaw = Math.atan2(-position.x, this.seatedPosition.z - position.z);
     this.controls.target.pitch = -0.12;
   }
 
@@ -876,7 +893,7 @@ export class RoundTableScene {
     const radius = Math.max(RADIUS, state.people.length * 0.28);
     this.seatRadius = radius + 0.5;
     this.table.scale.set(radius / RADIUS, 1, radius / RADIUS);
-    this.camera.position.z = this.seatRadius + 0.85;
+    this.seatedPosition.z = this.seatRadius + (this.options.variant === "bunker" ? 0.85 : 0.1);
     const peopleKey = JSON.stringify([state.people.map((person) => person.id), state.viewerId]);
     if (peopleKey !== this.peopleKey) {
       this.peopleKey = peopleKey;
@@ -987,12 +1004,27 @@ export class RoundTableScene {
     this.paused = paused;
   }
 
+  resumeLook() {
+    this.controls.resume();
+  }
+
+  releaseLook() {
+    this.controls.release();
+  }
+
+  toggleOverview() {
+    this.overview = !this.overview;
+    this.ownHand.setOverview(this.overview);
+    this.options.onOverviewChange(this.overview);
+  }
+
   private resize() {
     const width = this.host.clientWidth;
     const height = this.host.clientHeight;
     if (!width || !height) return;
     this.camera.aspect = width / height;
-    this.camera.fov = width < 600 ? 67 : 60;
+    this.camera.fov =
+      this.options.variant === "bunker" ? (width < 600 ? 67 : 60) : width < 600 ? 58 : 48;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
     this.ownHand.resize(width, height);
@@ -1006,9 +1038,38 @@ export class RoundTableScene {
     const dt = Math.min((time - this.lastTime) / 1000, 0.05);
     this.lastTime = time;
     const smoothing = this.reducedMotion.matches ? 1 : 1 - Math.exp(-14 * dt);
-    this.yaw += (this.controls.target.yaw - this.yaw) * smoothing;
-    this.pitch += (this.controls.target.pitch - this.pitch) * smoothing;
-    this.camera.rotation.set(this.pitch, this.yaw, 0, "YXZ");
+    // Overhead inspection is local; keep the seated head pose for other players.
+    if (!this.overview) {
+      this.yaw += (this.controls.target.yaw - this.yaw) * smoothing;
+      this.pitch += (this.controls.target.pitch - this.pitch) * smoothing;
+    } else {
+      this.controls.target.yaw = this.yaw;
+      this.controls.target.pitch = this.pitch;
+    }
+    if (this.overview) {
+      const halfWidth = this.options.variant === "bunker" ? this.seatRadius : 2.8;
+      const halfDepth = this.options.variant === "bunker" ? this.seatRadius : 2.55;
+      const height =
+        Math.max(halfDepth, halfWidth / this.camera.aspect) /
+        Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+      this.viewPosition.set(0, TABLE_Y + height, this.options.variant === "bunker" ? 0 : 0.6);
+      this.viewRotation.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0, "YXZ"));
+    } else {
+      this.viewPosition.copy(this.seatedPosition);
+      this.viewRotation.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, "YXZ"));
+    }
+    this.camera.position.lerp(this.viewPosition, smoothing);
+    this.camera.quaternion.slerp(this.viewRotation, smoothing);
+    // Slice away the ceiling and pendant lamps when inspecting the table from above.
+    const near = Math.max(0.08, this.camera.position.y - 3.65);
+    if (Math.abs(this.camera.near - near) > 0.001) {
+      this.camera.near = near;
+      this.camera.updateProjectionMatrix();
+    }
+    if (this.scene.fog instanceof THREE.Fog) {
+      this.scene.fog.near = this.overview ? 50 : 12;
+      this.scene.fog.far = this.overview ? 60 : 28;
+    }
     this.cards.forEach((entry, id) => {
       entry.mesh.position.lerp(
         entry.target,
@@ -1052,6 +1113,7 @@ export class RoundTableScene {
     this.labels.forEach(({ node, position }) => {
       projected.copy(position).project(this.camera);
       const visible =
+        !this.overview &&
         projected.z > -1 &&
         projected.z < 1 &&
         Math.abs(projected.x) < 1.08 &&

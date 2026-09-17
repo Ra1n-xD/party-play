@@ -506,6 +506,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
           <Suspense fallback={<div className="table3d-loading">Готовим 3D-стол…</div>}>
             <UnoTable3D
               game={game}
+              onManage={openManagement}
               isHost={isHost}
               viewerSeatId={viewerSeatId}
               hand={displayedHand.map((card) => ({

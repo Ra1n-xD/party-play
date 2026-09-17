@@ -174,6 +174,16 @@ export default function BunkerTable3D(props: Props) {
         paused={game.paused}
         onCursorChange={props.onCursorChange}
         onClassic={props.onClassic}
+        menuActions={[
+          { label: "Участники", key: "P", onSelect: () => setRoster(true) },
+          { label: "Ситуация", key: "B", onSelect: () => setScenario(true) },
+          ...(!isSpectator
+            ? [{ label: "Мой персонаж", key: "I", onSelect: () => setDetails(playerId) }]
+            : []),
+          ...(props.onManage
+            ? [{ label: "Управление комнатой", key: "H", onSelect: props.onManage }]
+            : []),
+        ]}
         title="СОВЕТ УБЕЖИЩА"
         shortcuts={shortcuts}
         onSelectPerson={selectPerson}
