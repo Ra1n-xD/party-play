@@ -16,6 +16,7 @@ import { DurakLobbySettings, getTurnTimeoutLabel } from "./DurakLobbySettings";
 import { DurakResultsScreen } from "./DurakResultsScreen";
 import "./durak.css";
 import "../shared/card-game-arena.css";
+import "../shared/table3d/table3d.css";
 
 function isTableResolutionTransfer(event: DurakVisualEvent): event is CardTransferVisualEvent {
   return (

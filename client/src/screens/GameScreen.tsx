@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CardImage } from "../components/CardImage";
 import { useGame } from "../context/GameContext";
 import "../styles/game-screen.css";
@@ -18,7 +18,17 @@ import {
   type MobileGameTab,
 } from "./game/gameScreenViewModel";
 
-export function GameScreen() {
+import { useTableHotkeys } from "../games/shared/table3d/useTableHotkeys";
+const BunkerTable3D = lazy(() => import("../games/bunker/BunkerTable3D"));
+
+export function GameScreen({
+  is3D = false,
+  onToggle3D = () => {},
+}: {
+  is3D?: boolean;
+  onToggle3D?: () => void;
+}) {
+  const [cursorVisible, setCursorVisible] = useState(false);
   const {
     gameState,
     playerId,
@@ -140,6 +150,21 @@ export function GameScreen() {
     }
   }, [hasLiveConnection, isCurrentHost]);
 
+  useTableHotkeys(
+    is3D && showAttrPicker && canUseRoomActions,
+    (code) => {
+      const index = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6"].indexOf(code);
+      if (index < 0 || !gameState || !myCharacter || gameState.paused) return false;
+      const view = buildGameScreenViewModel({ gameState, playerId, isSpectator, myCharacter });
+      if (view.canReveal && view.unrevealedIndices.includes(index)) {
+        revealAttribute(index);
+        closeLocalModals();
+      }
+      return true;
+    },
+    true,
+  );
+
   if (!gameState) return null;
   if (!isSpectator && !myCharacter) {
     return <CharacterLoadingState error={error} />;
@@ -177,51 +202,84 @@ export function GameScreen() {
     ) : null;
 
   return (
-    <main className="screen command-game-screen has-game-command-bar">
+    <main
+      className={`screen command-game-screen has-game-command-bar ${is3D ? "is-3d bunker3d-screen" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
+    >
       <GameRoomHeader
         roomCode={roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
         confirmActiveLeave={!isSpectator}
       />
-      <GameStatusHeader
-        gameState={gameState}
-        phaseLabel={view.phaseLabel}
-        phaseDescription={view.phaseDescription}
-        isMyTurn={view.isMyTurn}
-      />
+      {!is3D && (
+        <GameStatusHeader
+          gameState={gameState}
+          phaseLabel={view.phaseLabel}
+          phaseDescription={view.phaseDescription}
+          isMyTurn={view.isMyTurn}
+        />
+      )}
 
-      {isSpectator && (
+      {!is3D && isSpectator && (
         <div className="gs-spectator-status" role="status">
           Режим наблюдателя
         </div>
       )}
 
-      <div className="gs-desktop-layout">
-        <div className="gs-workspace">
-          {playerBoard}
-          {characterDossier && <div className="gs-dossier-column">{characterDossier}</div>}
-        </div>
-      </div>
+      {is3D ? (
+        <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
+          <BunkerTable3D
+            cursorVisible={cursorVisible}
+            onCursorChange={setCursorVisible}
+            onClassic={onToggle3D}
+            onReveal={
+              canUseRoomActions && view.canReveal
+                ? () => (gameState.roundNumber === 1 ? revealAttribute(0) : openAttributePicker())
+                : undefined
+            }
+            onSpecial={
+              canUseRoomActions && view.canRevealAction ? openRevealActionConfirmation : undefined
+            }
+            onManage={canUseRoomActions && view.me?.isHost ? openHostControls : undefined}
+            onSkip={
+              canUseRoomActions && view.me?.isHost && view.canSkipDiscussion
+                ? adminSkipDiscussion
+                : undefined
+            }
+          />
+        </Suspense>
+      ) : (
+        <>
+          <button type="button" className="bunker3d-return btn btn-secondary" onClick={onToggle3D}>
+            3D-стол
+          </button>
+          <div className="gs-desktop-layout">
+            <div className="gs-workspace">
+              {playerBoard}
+              {characterDossier && <div className="gs-dossier-column">{characterDossier}</div>}
+            </div>
+          </div>
 
-      <div className="gs-mobile-layout">
-        <MobileGameTabs
-          activeTab={activeMobileTab}
-          showCharacter={!isSpectator}
-          onChange={setActiveMobileTab}
-          players={playerBoard}
-          character={characterDossier}
-          situation={
-            <ScenarioSummary
-              idPrefix="gs-scenario-mobile"
-              gameState={gameState}
-              expanded
-              alwaysExpanded
-              onToggle={() => undefined}
+          <div className="gs-mobile-layout">
+            <MobileGameTabs
+              activeTab={activeMobileTab}
+              showCharacter={!isSpectator}
+              onChange={setActiveMobileTab}
+              players={playerBoard}
+              character={characterDossier}
+              situation={
+                <ScenarioSummary
+                  idPrefix="gs-scenario-mobile"
+                  gameState={gameState}
+                  expanded
+                  alwaysExpanded
+                  onToggle={() => undefined}
+                />
+              }
             />
-          }
-        />
-      </div>
+          </div>
+        </>
+      )}
 
       <GameCommandBar
         currentTurnPlayer={view.currentTurnPlayer}
@@ -283,7 +341,8 @@ export function GameScreen() {
                   className="btn btn-target"
                   onClick={() => handleReveal(index)}
                 >
-                  {myCharacter.attributes[index].label}: {myCharacter.attributes[index].value}
+                  {myCharacter.attributes[index].label}: {myCharacter.attributes[index].value}{" "}
+                  {is3D && <kbd>{index + 1}</kbd>}
                 </button>
               ))}
           </div>

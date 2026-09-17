@@ -7,6 +7,8 @@ import { UnoGameScreen } from "./UnoGameScreen";
 import { UnoLobbySettings, getUnoTurnTimeoutLabel } from "./UnoLobbySettings";
 import { UnoResultsScreen } from "./UnoResultsScreen";
 import "./uno.css";
+import "../shared/table3d/table3d.css";
+import "./uno-3d.css";
 import "../shared/card-game-arena.css";
 
 export default function UnoModule() {
