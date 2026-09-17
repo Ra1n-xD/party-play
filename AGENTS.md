@@ -33,6 +33,8 @@ There is no automated test suite, test script, naming convention, or coverage th
 
 ## Commit & Pull Request Guidelines
 
+Every completed development change must include an application version bump, once per logical set of changes. Use semantic versioning: `patch` for fixes, small UI refinements, and maintenance; `minor` for new backward-compatible features; `major` for breaking changes or a substantial new product generation. Choose the highest applicable level and reset lower components when raising `minor` or `major`. Follow an exact version requested by the user. The root `package.json` is the source of the application version; keep the top-level `version` and `packages[""].version` in `package-lock.json` synchronized with it.
+
 History predominantly uses Conventional Commits, e.g. `fix(durak): preserve throw-in turns`. PRs should explain behavior changes, link relevant issues, list validation, and include screenshots for UI changes.
 
 Agents must preserve existing changes, leave edits unstaged, never stage/commit/push/merge/rebase, and suggest an English commit message. Branch or destructive Git operations require explicit requests.
