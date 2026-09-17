@@ -74,6 +74,9 @@
   border-color: #d9b675;
   background: #463c26de;
 }
+.table3d-person-label.is-muted {
+  opacity: 0.62;
+}
 
 .table3d-toolbar {
   position: absolute;
@@ -500,4 +503,39 @@
   .table3d-keyboard kbd {
     min-height: 17px;
   }
+}
+.room-reactions-shortcut {
+  display: none;
+}
+.is-3d .room-reactions-option {
+  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  gap: 5px;
+}
+.is-3d .room-reactions-shortcut {
+  display: inline-grid;
+  place-items: center;
+  padding: 2px 4px;
+  border: 1px solid #d6cbb354;
+  border-radius: 3px;
+  color: #f0e7d1;
+  font-size: 0.65rem;
+}
+.table3d-elimination-notice {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  bottom: 165px;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 4px;
+  padding: 12px 24px;
+  border: 1px solid #d38a7266;
+  border-radius: 8px;
+  background: #201e19e8;
+  text-align: center;
+  color: #f1d7bf;
+  pointer-events: none;
+}
+.table3d-elimination-notice span {
+  font-size: 0.75rem;
 }

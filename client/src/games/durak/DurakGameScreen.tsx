@@ -581,10 +581,10 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
   }, [interactionKey]);
 
   useEffect(() => {
-    if (isHost || !managementOpen) return;
+    if (!managementOpen || (isHost && snapshot.lifecycle !== "results")) return;
     adminPauseActiveRef.current = false;
     setManagementOpen(false);
-  }, [isHost, managementOpen]);
+  }, [isHost, managementOpen, snapshot.lifecycle]);
 
   useEffect(
     () => () => {
@@ -815,7 +815,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
             <DurakTable3D
               game={game}
               viewerSeatId={viewerSeatId}
-              paused={paused}
+              paused={paused && snapshot.lifecycle !== "results"}
               revision={snapshot.revision}
               roomCode={snapshot.roomCode}
               canSendLook={Boolean(viewerSeatId && canUseConnection)}

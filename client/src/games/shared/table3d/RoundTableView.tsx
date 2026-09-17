@@ -31,8 +31,11 @@ export default function RoundTableView(props: Props) {
   const latest = useRef(props);
   latest.current = props;
   const [failed, setFailed] = useState(false);
-  const sendLook = useTablePresence(props.roomCode, props.canSendLook, (event) =>
-    scene.current?.receiveLook(event),
+  const sendLook = useTablePresence(
+    props.roomCode,
+    props.canSendLook,
+    (event) => scene.current?.receiveLook(event),
+    (event) => scene.current?.receiveReaction(event),
   );
   useEffect(() => {
     if (!host.current || !labels.current) return;
@@ -61,7 +64,7 @@ export default function RoundTableView(props: Props) {
     scene.current?.update(props.state);
   }, [props.state]);
   useEffect(() => {
-    if (props.paused) scene.current?.releaseCursor();
+    scene.current?.setPaused(props.paused);
   }, [props.paused]);
   useEffect(() => {
     if (props.focusedPerson) scene.current?.focusPerson(props.focusedPerson);
@@ -95,6 +98,7 @@ export default function RoundTableView(props: Props) {
         <ul>
           {[
             ...props.shortcuts,
+            ...(props.canSendLook ? [{ label: "Эмоции", keys: ["V"] }] : []),
             { label: props.cursorVisible ? "Свободный взгляд" : "Показать курсор", keys: ["Q"] },
             { label: "К столу", keys: ["R"] },
           ].map((item) => (

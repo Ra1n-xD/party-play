@@ -10,11 +10,21 @@ import "./uno.css";
 import "../shared/table3d/table3d.css";
 import "./uno-3d.css";
 import "../shared/card-game-arena.css";
+import { useTableExitTransition } from "../shared/table3d/useTableExitTransition";
 
 export default function UnoModule() {
   const { snapshot } = usePlatform();
   const previousLifecycleRef = useRef<RoomLifecycle | null>(null);
   const currentLifecycle = snapshot?.gameId === "uno" ? snapshot.lifecycle : null;
+  const holdAvatarExit = useTableExitTransition(
+    snapshot?.gameId === "uno" ? snapshot.roomCode : undefined,
+    snapshot?.gameId === "uno" ? snapshot.lifecycle : undefined,
+    snapshot?.gameId === "uno"
+      ? (snapshot.game?.players
+          .filter((player) => player.status === "excluded")
+          .map((player) => player.seatId) ?? [])
+      : [],
+  );
   const animateInitialDeal =
     previousLifecycleRef.current === "lobby" && currentLifecycle === "playing";
 
@@ -42,7 +52,10 @@ export default function UnoModule() {
     );
   }
 
-  if (unoSnapshot.lifecycle === "results" || unoSnapshot.game?.phase === "GAME_OVER") {
+  if (
+    !holdAvatarExit &&
+    (unoSnapshot.lifecycle === "results" || unoSnapshot.game?.phase === "GAME_OVER")
+  ) {
     return <UnoResultsScreen snapshot={unoSnapshot} />;
   }
 

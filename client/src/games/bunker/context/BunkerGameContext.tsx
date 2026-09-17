@@ -20,7 +20,10 @@ import type {
 import type { SeatClaimInfo } from "../../../../../shared/platform/protocol";
 import { usePlatform, type HostChangeNotice } from "../../../platform/context/PlatformContext";
 
-export type ClientGameState = BunkerPublicState & { phaseEndTime: number | null };
+export type ClientGameState = Omit<BunkerPublicState, "players"> & {
+  phaseEndTime: number | null;
+  players: (BunkerPlayerInfo & { eliminatedAt?: number })[];
+};
 
 export type OverlayItem =
   | {
@@ -29,6 +32,7 @@ export type OverlayItem =
       subtitle?: string;
       description?: string;
       duration: number;
+      eliminatedPlayerId?: string;
     }
   | { kind: "attribute"; playerName: string; attribute: Attribute; duration: number }
   | { kind: "actionCard"; playerName: string; actionCard: ActionCard; duration: number };
@@ -135,17 +139,34 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
   const [pendingAdminOpen, setPendingAdminOpen] = useState(false);
   const previousPhaseRef = useRef<BunkerGamePhase | null>(null);
   const processedEventSequenceRef = useRef(0);
+  const previousPlayersRef = useRef<ClientGameState["players"]>([]);
 
   const bunkerSnapshot = platform.snapshot?.gameId === "bunker" ? platform.snapshot : null;
 
   const gameState = useMemo<ClientGameState | null>(() => {
     const game = bunkerSnapshot?.game;
-    if (!game) return null;
+    if (!game || bunkerSnapshot.lifecycle === "lobby") {
+      previousPlayersRef.current = [];
+      if (!game) return null;
+    }
+
+    // This provider survives vote/result screen swaps; keep a fresh fall running across them.
+    // A reconnect's first snapshot positions already eliminated players without replaying it.
+    const previous = new Map(previousPlayersRef.current.map((player) => [player.id, player]));
+    const players = mergePlatformPlayers(game.players, bunkerSnapshot.seats).map((player) => ({
+      ...player,
+      eliminatedAt: player.alive
+        ? undefined
+        : previous.get(player.id)?.alive
+          ? performance.now()
+          : previous.get(player.id)?.eliminatedAt,
+    }));
+    previousPlayersRef.current = players;
 
     const disconnectedPlayerIds = [...bunkerSnapshot.pause.disconnectedSeatIds];
     return {
       ...game,
-      players: mergePlatformPlayers(game.players, bunkerSnapshot.seats),
+      players,
       paused: bunkerSnapshot.pause.active,
       pauseKind: getPauseKind(bunkerSnapshot.pause.admin, disconnectedPlayerIds),
       disconnectedPlayerIds,
@@ -281,6 +302,7 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
         kind: "announcement",
         duration: 3000,
         title: "Изгнан!",
+        eliminatedPlayerId: gameState.eliminatedPlayerId,
         subtitle: eliminated?.name ?? "Игрок",
       });
     }

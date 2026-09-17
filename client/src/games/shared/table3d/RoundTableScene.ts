@@ -6,6 +6,8 @@ import {
   type AvatarLookEvent,
 } from "../../../../../shared/platform/avatarLook";
 import { TableLookControls, TABLE_DEFAULT_PITCH } from "./TableLookControls";
+import { TableAvatarAnimator } from "./TableAvatarAnimator";
+import type { RoomReactionEvent } from "../../../../../shared/platform/reactions";
 
 export interface TablePerson {
   id: string;
@@ -17,6 +19,8 @@ export interface TablePerson {
   traits?: { label: string; value: string; detail?: string; kind?: string; iconPath?: string }[];
   selected?: boolean;
   muted?: boolean;
+  eliminated?: boolean;
+  eliminatedAt?: number;
 }
 
 export interface TableCard {
@@ -71,6 +75,8 @@ export class RoundTableScene {
   private readonly cards = new Map<string, MovingCard>();
   private readonly textures = new Map<string, THREE.CanvasTexture>();
   private readonly seatPositions = new Map<string, THREE.Vector3>();
+  private readonly avatars = new Map<string, TableAvatarAnimator>();
+  private readonly seenReactions = new Set<string>();
   private readonly labels = new Map<string, { node: HTMLDivElement; position: THREE.Vector3 }>();
   private readonly controls: TableLookControls;
   private readonly remoteLooks = new Map<string, AvatarLook & { receivedAt: number }>();
@@ -85,6 +91,7 @@ export class RoundTableScene {
   private lastSentLook: AvatarLook = { yaw: 0, pitch: TABLE_DEFAULT_PITCH };
   private lastTime = 0;
   private disposed = false;
+  private paused = false;
   private seatRadius = 3.55;
 
   constructor(
@@ -593,33 +600,39 @@ export class RoundTableScene {
     for (const x of [-0.24, 0, 0.24])
       for (const y of [1.1, 1.45])
         this.sphere(group, [0.025, 0.025, 0.016], 0x2c211b, [x, y, -0.254]);
+    const body = new THREE.Group();
+    body.position.y = 0.92;
+    const model = new THREE.Group();
+    model.position.y = -0.92;
+    body.add(model);
+    group.add(body);
     for (const side of [-1, 1]) {
       for (const z of [-0.28, 0.27])
         this.box(group, [0.055, 0.72, 0.055], 0x997847, [side * 0.35, 0.36, z]);
-      this.sphere(group, [0.17, 0.16, 0.4], 0x252f33, [side * 0.21, 0.92, 0.28]);
-      this.box(group, [0.23, 0.64, 0.22], 0x252f33, [side * 0.21, 0.54, 0.56]);
-      this.sphere(group, [0.17, 0.095, 0.31], 0x241f1c, [side * 0.21, 0.18, 0.65]);
-      this.box(group, [0.23, 0.025, 0.5], 0x171615, [side * 0.21, 0.12, 0.68]);
+      this.sphere(model, [0.17, 0.16, 0.4], 0x252f33, [side * 0.21, 0.92, 0.28]);
+      this.box(model, [0.23, 0.64, 0.22], 0x252f33, [side * 0.21, 0.54, 0.56]);
+      this.sphere(model, [0.17, 0.095, 0.31], 0x241f1c, [side * 0.21, 0.18, 0.65]);
+      this.box(model, [0.23, 0.025, 0.5], 0x171615, [side * 0.21, 0.12, 0.68]);
     }
-    this.sphere(group, [0.4, 0.53, 0.265], shirt, [0, 1.45, 0]);
-    this.sphere(group, [0.23, 0.41, 0.04], 0xe0d5ba, [0, 1.5, 0.253]);
+    this.sphere(model, [0.4, 0.53, 0.265], shirt, [0, 1.45, 0]);
+    this.sphere(model, [0.23, 0.41, 0.04], 0xe0d5ba, [0, 1.5, 0.253]);
     for (const side of [-1, 1]) {
-      const lapel = this.box(group, [0.12, 0.45, 0.035], shirt, [side * 0.13, 1.65, 0.282]);
+      const lapel = this.box(model, [0.12, 0.45, 0.035], shirt, [side * 0.13, 1.65, 0.282]);
       lapel.rotation.z = -side * 0.31;
-      const collar = this.box(group, [0.11, 0.13, 0.025], 0xf4e8ce, [side * 0.075, 1.89, 0.21]);
+      const collar = this.box(model, [0.11, 0.13, 0.025], 0xf4e8ce, [side * 0.075, 1.89, 0.21]);
       collar.rotation.z = side * 0.43;
     }
     if (index % 2 === 0) {
-      this.box(group, [0.065, 0.32, 0.025], index % 4 ? 0x8c6742 : 0x67464b, [0, 1.65, 0.309]);
-      this.sphere(group, [0.04, 0.045, 0.022], 0x785748, [0, 1.84, 0.278]);
+      this.box(model, [0.065, 0.32, 0.025], index % 4 ? 0x8c6742 : 0x67464b, [0, 1.65, 0.309]);
+      this.sphere(model, [0.04, 0.045, 0.022], 0x785748, [0, 1.84, 0.278]);
     }
-    for (const y of [1.23, 1.39]) this.sphere(group, [0.018, 0.018, 0.01], 0xb79764, [0, y, 0.275]);
-    this.box(group, [0.12, 0.032, 0.023], 0xe0ce9e, [-0.24, 1.67, 0.235]);
-    this.cylinder(group, 0.115, 0.24, skin, [0, 1.99, 0.02]);
+    for (const y of [1.23, 1.39]) this.sphere(model, [0.018, 0.018, 0.01], 0xb79764, [0, y, 0.275]);
+    this.box(model, [0.12, 0.032, 0.023], 0xe0ce9e, [-0.24, 1.67, 0.235]);
+    this.cylinder(model, 0.115, 0.24, skin, [0, 1.99, 0.02]);
     const head = new THREE.Group();
     head.position.set(0, 2.29, 0.025);
     head.name = "head";
-    group.add(head);
+    model.add(head);
     this.sphere(head, [0.255, 0.32, 0.245], skin, [0, 0, 0]);
     this.sphere(head, [0.19, 0.14, 0.195], skin, [0, -0.18, 0.035]);
     this.sphere(head, [0.042, 0.065, 0.073], skin, [0, -0.015, 0.246]);
@@ -667,25 +680,30 @@ export class RoundTableScene {
       this.sphere(head, [0.19, 0.11, 0.095], hair, [0, -0.195, 0.123]);
       this.sphere(head, [0.065, 0.016, 0.017], hair, [0, -0.086, 0.237]);
     }
+    const arms: THREE.Group[] = [];
     for (const side of [-1, 1]) {
-      const sleeve = this.sphere(group, [0.17, 0.31, 0.17], shirt, [side * 0.4, 1.52, 0.12]);
+      const arm = new THREE.Group();
+      arm.position.set(side * 0.4, 1.76, 0.1);
+      model.add(arm);
+      arms.push(arm);
+      const sleeve = this.sphere(arm, [0.17, 0.31, 0.17], shirt, [side * 0.4, 1.52, 0.12]);
       sleeve.rotation.x = -0.44;
-      this.sphere(group, [0.15, 0.145, 0.16], shirt, [side * 0.44, 1.31, 0.31]);
-      const forearm = this.sphere(group, [0.115, 0.115, 0.3], shirt, [side * 0.36, 1.4, 0.52]);
+      this.sphere(arm, [0.15, 0.145, 0.16], shirt, [side * 0.44, 1.31, 0.31]);
+      const forearm = this.sphere(arm, [0.115, 0.115, 0.3], shirt, [side * 0.36, 1.4, 0.52]);
       forearm.rotation.y = -side * 0.35;
-      this.sphere(group, [0.112, 0.083, 0.065], 0xe8ddc7, [side * 0.28, 1.43, 0.73]);
-      this.sphere(group, [0.12, 0.07, 0.13], skin, [side * 0.26, 1.45, 0.82]);
+      this.sphere(arm, [0.112, 0.083, 0.065], 0xe8ddc7, [side * 0.28, 1.43, 0.73]);
+      this.sphere(arm, [0.12, 0.07, 0.13], skin, [side * 0.26, 1.45, 0.82]);
       for (let i = 0; i < 3; i++)
-        this.sphere(group, [0.021, 0.035, 0.062], skin, [
-          side * 0.26 + (i - 1) * 0.039,
-          1.45,
-          0.905,
-        ]);
+        this.sphere(arm, [0.021, 0.035, 0.062], skin, [side * 0.26 + (i - 1) * 0.039, 1.45, 0.905]);
+      arm.children.forEach((part) => part.position.sub(arm.position));
     }
     const hand = new THREE.Group();
     hand.name = "hand";
-    group.add(hand);
+    model.add(hand);
     this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
+    const animator = new TableAvatarAnimator(body, head, arms[0], arms[1], hand);
+    animator.setEliminated(Boolean(person.eliminated), person.eliminatedAt, true);
+    this.avatars.set(person.id, animator);
     const ring = this.ring(group, 0.6, 0.024, 0xe3b868, 0.04);
     ring.name = "turn-marker";
     ring.visible = person.active;
@@ -798,6 +816,7 @@ export class RoundTableScene {
     if (peopleKey !== this.peopleKey) {
       this.peopleKey = peopleKey;
       this.disposeGroup(this.players);
+      this.avatars.clear();
       this.labels.forEach(({ node }) => node.remove());
       this.labels.clear();
       this.seatPositions.clear();
@@ -821,11 +840,12 @@ export class RoundTableScene {
       const person = state.people.find((candidate) => candidate.id === group.userData.seatId);
       if (!person) return;
       group.userData.isBot = person.isBot;
+      this.avatars.get(person.id)?.setEliminated(Boolean(person.eliminated), person.eliminatedAt);
       const hand = group.getObjectByName("hand");
       if (hand instanceof THREE.Group)
         this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
       const marker = group.getObjectByName("turn-marker");
-      if (marker) marker.visible = person.active;
+      if (marker) marker.visible = person.active && !person.eliminated;
       const label = this.labels.get(person.id)?.node;
       if (label) this.updatePersonLabel(label, person);
     });
@@ -890,8 +910,21 @@ export class RoundTableScene {
     });
   }
 
+  receiveReaction(event: RoomReactionEvent) {
+    if (this.seenReactions.has(event.eventId)) return;
+    this.seenReactions.add(event.eventId);
+    if (this.seenReactions.size > 64)
+      this.seenReactions.delete(this.seenReactions.values().next().value!);
+    this.avatars.get(event.senderSeatId)?.react(event.reactionId, performance.now());
+  }
+
   releaseCursor() {
     this.controls.setCursor(true);
+  }
+
+  setPaused(paused: boolean) {
+    this.paused = paused;
+    if (paused) this.releaseCursor();
   }
 
   private resize() {
@@ -935,8 +968,8 @@ export class RoundTableScene {
       this.onLook(this.lastSentLook);
     }
     this.players.children.forEach((group, index) => {
-      const head = group.getObjectByName("head");
-      if (!head) return;
+      const avatar = this.avatars.get(group.userData.seatId);
+      if (!avatar) return;
       const look = this.remoteLooks.get(group.userData.seatId);
       const fresh = look && performance.now() - look.receivedAt < AVATAR_LOOK_EXPIRY_MS;
       const targetYaw = fresh
@@ -945,8 +978,14 @@ export class RoundTableScene {
           ? Math.sin(time * 0.00025 + index * 2) * 0.2
           : 0;
       const targetPitch = fresh ? -look.pitch : 0.18;
-      head.rotation.y += (targetYaw - head.rotation.y) * smoothing;
-      head.rotation.x += (targetPitch - head.rotation.x) * smoothing;
+      avatar.frame(
+        time,
+        smoothing,
+        targetYaw,
+        targetPitch,
+        this.reducedMotion.matches,
+        this.paused,
+      );
     });
     const projected = new THREE.Vector3();
     this.labels.forEach(({ node, position }) => {
@@ -989,6 +1028,8 @@ export class RoundTableScene {
     this.disposeObject(this.scene);
     this.textures.forEach((texture) => texture.dispose());
     this.textures.clear();
+    this.avatars.clear();
+    this.seenReactions.clear();
     this.labels.forEach(({ node }) => node.remove());
     this.renderer.dispose();
     this.renderer.forceContextLoss();

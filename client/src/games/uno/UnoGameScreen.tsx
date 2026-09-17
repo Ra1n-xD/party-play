@@ -253,10 +253,10 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   ]);
 
   useEffect(() => {
-    if (isHost || !managementOpen) return;
+    if (!managementOpen || (isHost && snapshot.lifecycle !== "results")) return;
     adminPauseActiveRef.current = false;
     setManagementOpen(false);
-  }, [isHost, managementOpen]);
+  }, [isHost, managementOpen, snapshot.lifecycle]);
 
   useEffect(
     () => () => {
@@ -487,7 +487,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
               cursorVisible={cursorVisible}
               onCursorChange={setCursorVisible}
               onClassic={() => setIs3D(false)}
-              paused={paused}
+              paused={paused && snapshot.lifecycle !== "results"}
               revision={snapshot.revision}
               secondary={
                 legalActions?.canAcceptWildDrawFour

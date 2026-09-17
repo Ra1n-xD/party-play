@@ -66,6 +66,14 @@ export function RoomReactions() {
     if (!eligible) setPopoverOpen(false);
   }, [eligible]);
 
+  const restoreFocus = useCallback(() => {
+    requestAnimationFrame(() => {
+      const table = rootRef.current?.closest(".is-3d")?.querySelector<HTMLCanvasElement>("canvas");
+      // Return Space/Enter to the game after choosing an emotion in 3D.
+      (table ?? triggerRef.current)?.focus({ preventScroll: true });
+    });
+  }, []);
+
   useLayoutEffect(() => {
     setOverlayRoot(rootRef.current?.closest<HTMLElement>(".command-game-screen") ?? null);
   }, []);
@@ -130,7 +138,7 @@ export function RoomReactions() {
       if (event.key !== "Escape") return;
       event.preventDefault();
       setPopoverOpen(false);
-      triggerRef.current?.focus();
+      restoreFocus();
     };
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -139,7 +147,7 @@ export function RoomReactions() {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [popoverOpen]);
+  }, [popoverOpen, restoreFocus]);
 
   useEffect(
     () => () => {
@@ -148,20 +156,56 @@ export function RoomReactions() {
     [],
   );
 
-  const chooseReaction = (reactionId: RoomReactionId) => {
-    if (!eligible || cooldownActiveRef.current || !sendReaction(reactionId)) return;
+  const chooseReaction = useCallback(
+    (reactionId: RoomReactionId) => {
+      if (!eligible || cooldownActiveRef.current || !sendReaction(reactionId)) return;
 
-    cooldownActiveRef.current = true;
-    setCooldownActive(true);
-    setPopoverOpen(false);
-    requestAnimationFrame(() => triggerRef.current?.focus());
-    if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
-    cooldownTimerRef.current = setTimeout(() => {
-      cooldownTimerRef.current = null;
-      cooldownActiveRef.current = false;
-      setCooldownActive(false);
-    }, LOCAL_COOLDOWN_MS);
-  };
+      cooldownActiveRef.current = true;
+      setCooldownActive(true);
+      setPopoverOpen(false);
+      restoreFocus();
+      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+      cooldownTimerRef.current = setTimeout(() => {
+        cooldownTimerRef.current = null;
+        cooldownActiveRef.current = false;
+        setCooldownActive(false);
+      }, LOCAL_COOLDOWN_MS);
+    },
+    [eligible, sendReaction, restoreFocus],
+  );
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (
+        !eligible ||
+        !rootRef.current?.closest(".is-3d") ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        document.querySelector('[aria-modal="true"], [role="dialog"]') ||
+        (event.target instanceof HTMLElement &&
+          event.target.closest("input, textarea, select, [contenteditable]"))
+      )
+        return;
+      if (event.code === "KeyV") {
+        event.preventDefault();
+        if (!cooldownActiveRef.current) {
+          setPopoverOpen((open) => !open);
+          if (popoverOpen) restoreFocus();
+        }
+      } else if (popoverOpen && /^(Digit|Numpad)[1-6]$/.test(event.code)) {
+        event.preventDefault();
+        chooseReaction(REACTION_CATALOG[Number(event.code.slice(-1)) - 1].id);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [eligible, popoverOpen, chooseReaction, restoreFocus]);
+
+  useEffect(() => {
+    if (popoverOpen) popoverRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, [popoverOpen, popoverPosition]);
 
   const liveRegion = (
     <div
@@ -196,6 +240,7 @@ export function RoomReactions() {
       className="room-reactions-popover"
       role="group"
       aria-label="Быстрые реакции"
+      data-table-input-block="reactions"
       style={{
         position: "fixed",
         top: popoverPosition.top ?? "auto",
@@ -204,7 +249,7 @@ export function RoomReactions() {
         left: popoverPosition.left,
       }}
     >
-      {REACTION_CATALOG.map((reaction) => (
+      {REACTION_CATALOG.map((reaction, index) => (
         <button
           type="button"
           className="room-reactions-option"
@@ -216,6 +261,7 @@ export function RoomReactions() {
             {reaction.emoji}
           </span>
           <span className="room-reactions-option-label">{reaction.label}</span>
+          <kbd className="room-reactions-shortcut">{index + 1}</kbd>
         </button>
       ))}
     </div>

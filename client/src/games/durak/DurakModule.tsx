@@ -17,6 +17,7 @@ import { DurakResultsScreen } from "./DurakResultsScreen";
 import "./durak.css";
 import "../shared/card-game-arena.css";
 import "../shared/table3d/table3d.css";
+import { useTableExitTransition } from "../shared/table3d/useTableExitTransition";
 
 function isTableResolutionTransfer(event: DurakVisualEvent): event is CardTransferVisualEvent {
   return (
@@ -92,6 +93,13 @@ export default function DurakModule() {
   const [resultTransitionActive, setResultTransitionActive] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const durakSnapshot = snapshot?.gameId === "durak" ? (snapshot as RoomSnapshot<"durak">) : null;
+  const holdAvatarExit = useTableExitTransition(
+    durakSnapshot?.roomCode,
+    durakSnapshot?.lifecycle,
+    durakSnapshot?.game?.players
+      .filter((player) => player.status !== "active")
+      .map((player) => player.seatId) ?? [],
+  );
   const currentLifecycle = durakSnapshot?.lifecycle ?? null;
   const visualEvents = durakSnapshot?.game?.visualEvents ?? [];
   const animateInitialDeal =
@@ -183,7 +191,7 @@ export default function DurakModule() {
   ) {
     if (
       !prefersReducedMotion &&
-      (immediateResultTransitionDurationMs > 0 || resultTransitionActive)
+      (holdAvatarExit || immediateResultTransitionDurationMs > 0 || resultTransitionActive)
     ) {
       return <DurakGameScreen snapshot={currentDurakSnapshot} />;
     }

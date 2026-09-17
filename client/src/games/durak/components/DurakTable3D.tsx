@@ -52,8 +52,11 @@ export default function DurakTable3D({
   cursorCallback.current = onCursorChange;
   const [failed, setFailed] = useState(false);
   const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 600px)").matches);
-  const sendLook = useTablePresence(roomCode, canSendLook, (event) =>
-    scene.current?.receiveLook(event),
+  const sendLook = useTablePresence(
+    roomCode,
+    canSendLook,
+    (event) => scene.current?.receiveLook(event),
+    (event) => scene.current?.receiveReaction(event),
   );
   const [seconds, setSeconds] = useState<number | null>(null);
 
@@ -101,7 +104,7 @@ export default function DurakTable3D({
   }, [game.turnRemainingMs, paused, revision]);
 
   useEffect(() => {
-    if (paused) scene.current?.releaseCursor();
+    scene.current?.setPaused(paused);
   }, [paused]);
 
   useEffect(() => {
@@ -113,6 +116,8 @@ export default function DurakTable3D({
         count: player.cardCount,
         active: player.isCurrentActor,
         isBot: player.controllerKind === "bot",
+        eliminated: player.status !== "active",
+        muted: player.status !== "active",
         detail:
           player.status === "out"
             ? "вышел"
@@ -203,6 +208,12 @@ export default function DurakTable3D({
           {cursorVisible ? "ВЗГЛЯД ЗАКРЕПЛЁН" : "СВОБОДНЫЙ ВЗГЛЯД"}
         </span>
         <ul>
+          {canSendLook && (
+            <li>
+              <span>Эмоции</span>
+              <kbd>V</kbd>
+            </li>
+          )}
           <li>
             <span>Карта</span>
             <span>

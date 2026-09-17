@@ -48,6 +48,8 @@ export default function UnoTable3D(props: Props) {
         count: player.cardCount,
         active: player.isCurrentActor,
         isBot: player.controllerKind === "bot",
+        eliminated: player.status === "excluded",
+        muted: player.status === "excluded",
         detail:
           player.status === "excluded"
             ? "покинул игру"
