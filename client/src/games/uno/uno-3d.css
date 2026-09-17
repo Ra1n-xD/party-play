@@ -15,21 +15,21 @@
 }
 .uno3d-discard-label {
   position: absolute;
-  bottom: 40%;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 253px;
+  left: 22px;
+  max-width: 220px;
   padding: 6px 12px;
   color: #e8dfc8;
   background: #14241bcc;
   border-radius: 4px;
   font-size: 0.7rem;
-  text-align: center;
+  text-align: left;
   pointer-events: none;
 }
 .uno3d-notice {
   position: absolute;
   left: 22px;
-  top: 140px;
+  top: 297px;
   max-width: 220px;
   padding: 10px 12px;
   background: #1d2928dd;
@@ -61,16 +61,15 @@
   }
   .uno3d-notice {
     left: 10px;
-    top: 123px;
+    top: 245px;
     max-width: 47%;
     font-size: 0.6rem;
     padding: 7px;
   }
   .uno3d-discard-label {
-    left: auto;
-    right: 10px;
-    max-width: 50%;
-    transform: none;
+    top: 201px;
+    left: 10px;
+    max-width: calc(100% - 154px);
     font-size: 0.6rem;
   }
 }

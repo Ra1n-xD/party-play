@@ -66,6 +66,7 @@ const PALETTE = [0x467c87, 0xca8652, 0x887ca5, 0x829d67, 0xba6c73, 0x627eb3];
 const SKIN = [0xd4a07a, 0x9e694e, 0xe6bda0, 0xbc8b69];
 const TABLE_Y = 1.44;
 const RADIUS = 3.05;
+const TABLE_CARD_SCALE = 0.82;
 
 /** Public table plus the viewer's own cards. Opponents' hands are represented by counts only. */
 export class RoundTableScene {
@@ -604,6 +605,12 @@ export class RoundTableScene {
     return mesh;
   }
 
+  private makeTableCard(rank = "", suit = "", red = false, color?: TableCard["color"]) {
+    const mesh = this.makeCard(rank, suit, red, color);
+    mesh.scale.setScalar(TABLE_CARD_SCALE);
+    return mesh;
+  }
+
   private makePerson(person: TablePerson, index: number, angle: number) {
     const group = new THREE.Group();
     group.position.set(Math.sin(angle) * this.seatRadius, 0, Math.cos(angle) * this.seatRadius);
@@ -774,17 +781,12 @@ export class RoundTableScene {
     const animator = new TableAvatarAnimator(body, head, arms[0], arms[1], hand);
     animator.setEliminated(Boolean(person.eliminated), person.eliminatedAt, true);
     this.avatars.set(person.id, animator);
-    const ring = this.ring(group, 0.6, 0.024, 0xe3b868, 0.04);
+    const ring = this.ring(group, 0.6, 0.024, 0x68ed9e, 0.04);
     ring.name = "turn-marker";
     ring.visible = person.active;
-    (ring.material as THREE.MeshStandardMaterial).emissive.set(0x806127);
+    (ring.material as THREE.MeshStandardMaterial).emissive.set(0x226a40);
     const node = document.createElement("div");
     node.className = `table3d-person-label${person.active ? " is-active" : ""}`;
-    const name = document.createElement("strong");
-    name.textContent = person.name;
-    const detail = document.createElement("span");
-    detail.textContent = `${person.count} карт · ${person.detail}`;
-    node.append(name, detail);
     this.labelHost.append(node);
     this.updatePersonLabel(node, person);
     this.labels.set(person.id, { node, position: group.position.clone().setY(2.87) });
@@ -810,15 +812,23 @@ export class RoundTableScene {
   }
 
   private updatePersonLabel(node: HTMLDivElement, person: TablePerson) {
-    node.classList.toggle("is-active", person.active);
+    const active = person.active && !person.eliminated;
+    node.classList.toggle("is-active", active);
     node.classList.toggle("is-selected", Boolean(person.selected));
     node.classList.toggle("is-muted", Boolean(person.muted));
-    const key = JSON.stringify([person.name, person.count, person.detail, person.traits]);
+    const key = JSON.stringify([person.name, person.count, person.detail, person.traits, active]);
     if (node.dataset.content === key) return;
     node.dataset.content = key;
+    const turn = document.createElement("span");
+    turn.className = "table3d-person-turn";
+    turn.textContent = "Ходит";
+    turn.hidden = !active;
+    const name = document.createElement("strong");
+    name.textContent = person.name;
     if (!person.traits) {
-      node.children[0].textContent = person.name;
-      node.children[1].textContent = `${person.count} карт · ${person.detail}`;
+      const detail = document.createElement("span");
+      detail.textContent = `${person.count} карт · ${person.detail}`;
+      node.replaceChildren(turn, name, detail);
       return;
     }
     node.classList.add("table3d-dossier");
@@ -827,12 +837,10 @@ export class RoundTableScene {
     button.className = "table3d-dossier-content";
     button.setAttribute("aria-label", `Характеристики: ${person.name}`);
     button.onclick = () => this.options.onSelectPerson?.(person.id);
-    const name = document.createElement("strong");
-    name.textContent = person.name;
     const status = document.createElement("span");
     status.className = "table3d-dossier-status";
     status.textContent = person.detail;
-    button.append(name, status);
+    button.append(turn, name, status);
     const traits = document.createElement("dl");
     person.traits.forEach((trait) => {
       const row = document.createElement("div");
@@ -936,18 +944,18 @@ export class RoundTableScene {
       this.pileKey = pileKey;
       this.disposeGroup(this.pile);
       if (state.trump && state.deckCount > 0) {
-        const trump = this.makeCard(state.trump.rank, state.trump.suit, state.trump.red);
+        const trump = this.makeTableCard(state.trump.rank, state.trump.suit, state.trump.red);
         trump.position.set(-1.86, TABLE_Y + 0.046, 0.1);
         trump.rotation.y = Math.PI / 2;
         this.pile.add(trump);
       }
       for (let i = 0; i < Math.min(state.deckCount, 12); i++) {
-        const card = this.makeCard();
+        const card = this.makeTableCard();
         card.position.set(-2.06, TABLE_Y + 0.06 + i * 0.006, -0.12);
         this.pile.add(card);
       }
       for (let i = 0; i < Math.min(state.discardCount, 7); i++) {
-        const card = this.makeCard();
+        const card = this.makeTableCard();
         card.position.set(2.03, TABLE_Y + 0.05 + i * 0.006, -0.1);
         card.rotation.y = i * 0.12;
         this.pile.add(card);
@@ -966,7 +974,7 @@ export class RoundTableScene {
     state.cards.forEach((card) => {
       let entry = this.cards.get(card.id);
       if (!entry) {
-        const mesh = this.makeCard(card.rank, card.suit, card.red, card.color);
+        const mesh = this.makeTableCard(card.rank, card.suit, card.red, card.color);
         mesh.position.copy(this.seatPositions.get(card.sourceId) ?? new THREE.Vector3(0, 2, 3.4));
         entry = { mesh, target: new THREE.Vector3(), removing: false };
         this.cards.set(card.id, entry);
@@ -1120,7 +1128,7 @@ export class RoundTableScene {
         Math.abs(projected.y) < 1.1;
       node.hidden = !visible;
       if (visible)
-        node.style.transform = `translate(-50%, -100%) translate(${THREE.MathUtils.clamp((projected.x * 0.5 + 0.5) * this.host.clientWidth, node.offsetWidth / 2 + 6, this.host.clientWidth - node.offsetWidth / 2 - 6)}px, ${THREE.MathUtils.clamp((-projected.y * 0.5 + 0.5) * this.host.clientHeight, node.offsetHeight + 8, this.host.clientHeight - 8)}px)`;
+        node.style.transform = `translate(-50%, -100%) translate(${THREE.MathUtils.clamp((projected.x * 0.5 + 0.5) * this.host.clientWidth, node.offsetWidth / 2 + 6, this.host.clientWidth - node.offsetWidth / 2 - 6)}px, ${THREE.MathUtils.clamp((-projected.y * 0.5 + 0.5) * this.host.clientHeight, node.offsetHeight + (this.host.clientWidth <= 680 ? 86 : 8), this.host.clientHeight - 8)}px)`;
     });
     this.renderer.render(this.scene, this.camera);
     this.ownHand.setInteractive(

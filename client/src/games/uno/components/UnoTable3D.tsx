@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { UnoPublicState } from "../../../../../shared/games/uno/types";
 import RoundTableView from "../../shared/table3d/RoundTableView";
 import type { RoundTableState } from "../../shared/table3d/RoundTableScene";
 import { getUnoCardMark, getUnoCardName } from "./UnoCard";
 import type { TableHandCard } from "../../shared/table3d/FirstPersonHand";
+
+import { TableTurnIndicator } from "../../shared/table3d/TableTurnIndicator";
 
 const COLORS = { red: "Красный", yellow: "Жёлтый", green: "Зелёный", blue: "Синий" };
 interface Props {
@@ -24,19 +26,6 @@ interface Props {
 }
 export default function UnoTable3D(props: Props) {
   const { game, viewerSeatId } = props;
-  const [seconds, setSeconds] = useState<number | null>(null);
-  useEffect(() => {
-    if (game.turnRemainingMs === null) {
-      setSeconds(null);
-      return;
-    }
-    const end = Date.now() + game.turnRemainingMs;
-    const update = () => setSeconds(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
-    update();
-    if (props.paused) return;
-    const timer = window.setInterval(update, 250);
-    return () => window.clearInterval(timer);
-  }, [game.turnRemainingMs, props.paused, props.revision]);
   const state = useMemo<RoundTableState>(() => {
     const card = game.topDiscard;
     const rank = card ? getUnoCardMark(card) : "";
@@ -45,7 +34,7 @@ export default function UnoTable3D(props: Props) {
         id: player.seatId,
         name: player.name,
         count: player.cardCount,
-        active: player.isCurrentActor,
+        active: player.isCurrentActor && !props.paused,
         isBot: player.controllerKind === "bot",
         eliminated: player.status === "excluded",
         muted: player.status === "excluded",
@@ -86,7 +75,7 @@ export default function UnoTable3D(props: Props) {
       trump: null,
       takeSeatId: null,
     };
-  }, [game, viewerSeatId, props.hand]);
+  }, [game, viewerSeatId, props.hand, props.paused]);
   const actor = game.players.find((player) => player.seatId === game.currentActorSeatId);
   return (
     <RoundTableView
@@ -136,16 +125,22 @@ export default function UnoTable3D(props: Props) {
       <div className="uno3d-discard-label">
         {game.topDiscard ? getUnoCardName(game.topDiscard) : "Выбор начального цвета"}
       </div>
-      <div className="table3d-bottom-info">
-        <span className={`table3d-turn ${actor?.seatId === viewerSeatId ? "is-yours" : ""}`}>
-          {props.paused
-            ? "Пауза"
-            : actor?.seatId === viewerSeatId
-              ? "Ваш ход"
-              : (actor?.name ?? "Раздача")}
-          {seconds !== null && ` · ${seconds} с`}
-        </span>
-      </div>
+      <TableTurnIndicator
+        label={
+          actor?.seatId === viewerSeatId ? "Ваш ход" : actor ? `Ход: ${actor.name}` : "Смена хода"
+        }
+        detail={
+          game.pendingWildDrawFour
+            ? "Решение по карте +4"
+            : game.activeColor
+              ? `Активный цвет: ${COLORS[game.activeColor]}`
+              : "Выбор начального цвета"
+        }
+        isYourTurn={Boolean(actor && actor.seatId === viewerSeatId)}
+        paused={props.paused}
+        remainingMs={game.turnRemainingMs}
+        revision={props.revision}
+      />
       {(game.pendingWildDrawFour || game.lastChallengeResolution) && (
         <div className="uno3d-notice" role="status">
           {game.pendingWildDrawFour

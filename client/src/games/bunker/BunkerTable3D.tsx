@@ -8,7 +8,7 @@ import { AccessibleModal } from "../../platform/components/AccessibleModal";
 import { CharacterDossier } from "../../screens/game/CharacterDossier";
 import { ScenarioSummary } from "../../screens/game/ScenarioSummary";
 import { buildGameScreenViewModel } from "../../screens/game/gameScreenViewModel";
-import { Timer } from "../../components/Timer";
+import { TableTurnIndicator } from "../shared/table3d/TableTurnIndicator";
 import { BUNKER_ATTRIBUTE_ICONS, BunkerAttributeIcon } from "./BunkerAttributeIcon";
 
 interface Props {
@@ -89,7 +89,7 @@ export default function BunkerTable3D(props: Props) {
         id: player.id,
         name: player.name,
         count: 0,
-        active: game?.currentTurnPlayerId === player.id,
+        active: game?.currentTurnPlayerId === player.id && !game.paused,
         isBot: player.isBot || Boolean(player.temporaryBot),
         selected: player.id === (props.vote?.selectedId ?? focused),
         muted: !player.alive,
@@ -193,24 +193,34 @@ export default function BunkerTable3D(props: Props) {
           <span className="bunker3d-eyebrow">
             РАУНД {game.roundNumber} / {game.totalRounds} · МЕСТ {game.bunkerCapacity}
           </span>
-          <strong>
-            {game.paused
-              ? "Пауза"
-              : voting
-                ? game.phase === "ROUND_VOTE_TIEBREAK"
-                  ? "Переголосование"
-                  : "Голосование"
-                : view.phaseLabel}
-          </strong>
-          <span>
-            {voting
+        </div>
+        <TableTurnIndicator
+          label={
+            voting
+              ? game.phase === "ROUND_VOTE_TIEBREAK"
+                ? "Переголосование"
+                : "Голосование"
+              : view.isMyTurn
+                ? "Ваш ход"
+                : view.currentTurnPlayer
+                  ? `Ход: ${view.currentTurnPlayer.name}`
+                  : view.phaseLabel
+          }
+          detail={
+            voting
               ? myHasVoted
                 ? "Ваш голос принят"
                 : `${game.votesCount} / ${game.totalVotesExpected} голосов`
-              : view.phaseDescription}
-          </span>
-          {game.phaseEndTime && <Timer endTime={game.phaseEndTime} />}
-        </div>
+              : view.isMyTurn && view.canReveal
+                ? game.roundNumber === 1
+                  ? "Раскройте профессию"
+                  : "Раскройте характеристику"
+                : view.phaseDescription
+          }
+          isYourTurn={view.isMyTurn || Boolean(voting && props.vote?.canVote)}
+          paused={game.paused}
+          deadline={game.phaseEndTime}
+        />
         <div className="bunker3d-table-caption">
           <span>СЦЕНАРИЙ КАТАСТРОФЫ</span>
           <strong>{game.catastrophe?.title ?? "Изучаем обстановку"}</strong>

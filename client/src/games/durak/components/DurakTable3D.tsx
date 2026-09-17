@@ -6,6 +6,7 @@ import type { TableHandCard } from "../../shared/table3d/FirstPersonHand";
 
 import { useTablePresence } from "../../shared/table3d/useTablePresence";
 import { TableSessionMenu, type TableMenuHandle } from "../../shared/table3d/TableSessionMenu";
+import { TableTurnIndicator } from "../../shared/table3d/TableTurnIndicator";
 
 interface Props {
   game: DurakPublicState;
@@ -63,7 +64,6 @@ export default function DurakTable3D({
     (event) => scene.current?.receiveLook(event),
     (event) => scene.current?.receiveReaction(event),
   );
-  const [seconds, setSeconds] = useState<number | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 600px)");
@@ -102,19 +102,6 @@ export default function DurakTable3D({
   }, []);
 
   useEffect(() => {
-    if (game.turnRemainingMs === null) {
-      setSeconds(null);
-      return;
-    }
-    const end = Date.now() + game.turnRemainingMs;
-    const update = () => setSeconds(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
-    update();
-    if (paused) return;
-    const timer = window.setInterval(update, 250);
-    return () => window.clearInterval(timer);
-  }, [game.turnRemainingMs, paused, revision]);
-
-  useEffect(() => {
     scene.current?.setPaused(paused);
   }, [paused]);
 
@@ -126,7 +113,7 @@ export default function DurakTable3D({
         id: player.seatId,
         name: player.name,
         count: player.cardCount,
-        active: player.isCurrentActor,
+        active: player.isCurrentActor && !paused,
         isBot: player.controllerKind === "bot",
         eliminated: player.status !== "active",
         muted: player.status !== "active",
@@ -200,7 +187,7 @@ export default function DurakTable3D({
     if (resolution?.type === "transfer" && resolution.target.kind === "player")
       state.takeSeatId = resolution.target.seatId;
     scene.current?.update(state);
-  }, [game, viewerSeatId, targetIds, focusedTargetId, narrow, hand]);
+  }, [game, viewerSeatId, targetIds, focusedTargetId, narrow, hand, paused]);
 
   const actor = game.players.find((player) => player.isCurrentActor);
   return (
@@ -347,18 +334,24 @@ export default function DurakTable3D({
           ))}
         </ul>
       </details>
-      <div className="table3d-bottom-info">
-        <span
-          className={`table3d-turn ${actor?.seatId === viewerSeatId ? "is-yours" : ""}`}
-          role="status"
-        >
-          {paused
-            ? "Пауза"
-            : actor
-              ? `${actor.seatId === viewerSeatId ? "Ваш ход" : actor.name}${seconds !== null ? ` · ${seconds} с` : ""}`
-              : "Раскладываем карты…"}
-        </span>
-      </div>
+      <TableTurnIndicator
+        label={
+          actor?.seatId === viewerSeatId ? "Ваш ход" : actor ? `Ход: ${actor.name}` : "Смена хода"
+        }
+        detail={
+          actor
+            ? actor.isDefender && !game.takeDeclared
+              ? "Защита"
+              : game.table.length
+                ? "Подкидывание карт"
+                : "Атака"
+            : "Карты перемещаются"
+        }
+        isYourTurn={Boolean(actor && actor.seatId === viewerSeatId)}
+        paused={paused}
+        remainingMs={game.turnRemainingMs}
+        revision={revision}
+      />
       {targetIds.length > 0 && (
         <div className="table3d-targets" aria-label="Цель защиты">
           {game.table
