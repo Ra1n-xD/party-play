@@ -26,6 +26,7 @@ export class TableLookControls {
   private requestPending = false;
   private disposed = false;
   private cursorPlay = false;
+  private inputBlocked = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -40,7 +41,9 @@ export class TableLookControls {
     document.addEventListener(
       "mousemove",
       (event) => {
-        if (document.pointerLockElement !== canvas || isTableInputBlocked(event.target)) return;
+        // High polling-rate mice can send thousands of events per second. Dialog state is
+        // refreshed on DOM/focus changes instead of searching the entire page for each event.
+        if (document.pointerLockElement !== canvas || this.inputBlocked) return;
         this.move(event.movementX, event.movementY);
       },
       options,
@@ -93,6 +96,11 @@ export class TableLookControls {
     const syncCursor = () => this.syncCursor();
     window.addEventListener("focus", syncCursor, options);
     document.addEventListener("visibilitychange", syncCursor, options);
+    const syncInput = () => {
+      this.inputBlocked = isTableInputBlocked(document.activeElement);
+    };
+    document.addEventListener("focusin", syncInput, options);
+    document.addEventListener("focusout", syncInput, options);
     this.coarse.addEventListener("change", syncCursor, options);
     canvas.addEventListener(
       "pointerdown",
@@ -110,7 +118,7 @@ export class TableLookControls {
     canvas.addEventListener(
       "pointermove",
       (event) => {
-        if (this.touch?.id !== event.pointerId || isTableInputBlocked(event.target)) return;
+        if (this.touch?.id !== event.pointerId || this.inputBlocked) return;
         this.move(event.clientX - this.touch.x, event.clientY - this.touch.y);
         this.touch.x = event.clientX;
         this.touch.y = event.clientY;
@@ -200,6 +208,7 @@ export class TableLookControls {
   private syncCursor() {
     if (this.disposed) return;
     const blocked = isTableInputBlocked(document.activeElement);
+    this.inputBlocked = blocked;
     // Keyboard dialogs suspend camera motion but retain capture. Esc/the main menu releases it.
     if (document.hidden || !document.hasFocus()) this.release();
     else this.setCursor(document.pointerLockElement !== this.canvas);

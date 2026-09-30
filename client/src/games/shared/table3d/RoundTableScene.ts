@@ -12,6 +12,16 @@ import { TableLookControls, TABLE_DEFAULT_PITCH, isTableInputBlocked } from "./T
 import { TableAvatarAnimator } from "./TableAvatarAnimator";
 import type { RoomReactionEvent } from "../../../../../shared/platform/reactions";
 import { FirstPersonHand, type CardFace, type TableHandCard } from "./FirstPersonHand";
+import { mergeRigidParts } from "./mergeRigidParts";
+
+export interface TablePerformance {
+  fps: number;
+  frameMs: number;
+  drawCalls: number;
+  triangles: number;
+  resolution: string;
+  renderer: string;
+}
 
 export interface TablePerson {
   id: string;
@@ -120,6 +130,19 @@ export class RoundTableScene {
   private readonly viewRotation = new THREE.Quaternion();
   private readonly viewEuler = new THREE.Euler(0, 0, 0, "YXZ");
   private readonly projectedLabel = new THREE.Vector3();
+  private readonly performanceLabel = document.createElement("div");
+  private performanceVisible = false;
+  private sampleStartedAt = 0;
+  private sampleFrames = 0;
+  private sampleWorkMs = 0;
+  private graphicsRenderer: string | null = null;
+  private performance: Omit<TablePerformance, "renderer"> = {
+    fps: 0,
+    frameMs: 0,
+    drawCalls: 0,
+    triangles: 0,
+    resolution: "",
+  };
   private overview = false;
 
   constructor(
@@ -139,12 +162,17 @@ export class RoundTableScene {
     this.renderer.toneMappingExposure = 1.18;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // Keep world, shadow and first-person hand counters in the same frame sample.
+    this.renderer.info.autoReset = false;
     this.renderer.domElement.tabIndex = 0;
     this.renderer.domElement.setAttribute(
       "aria-label",
       "Круглый 3D-стол. R — вид сверху, Esc — меню.",
     );
     this.host.append(this.renderer.domElement);
+    this.performanceLabel.className = "table3d-performance";
+    this.performanceLabel.hidden = true;
+    this.host.append(this.performanceLabel);
     this.scene.background = new THREE.Color(0x172521);
     this.scene.fog = new THREE.Fog(0x172521, 12, 28);
     this.scene.add(this.room, this.players, this.pile, this.table);
@@ -352,6 +380,7 @@ export class RoundTableScene {
     badge.rotation.x = -Math.PI / 2;
     badge.position.set(0, TABLE_Y + 0.032, -1.38);
     this.table.add(badge);
+    mergeRigidParts(this.table);
   }
 
   private textTexture(key: string, title: string, subtitle: string) {
@@ -672,6 +701,9 @@ export class RoundTableScene {
     hand.name = "hand";
     leftArm.grip.add(hand);
     this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
+    mergeRigidParts(head);
+    mergeRigidParts(model);
+    mergeRigidParts(group);
     const animator = new TableAvatarAnimator(
       body,
       head,
@@ -930,6 +962,32 @@ export class RoundTableScene {
     this.paused = paused;
   }
 
+  getPerformance(): TablePerformance {
+    if (this.graphicsRenderer === null) {
+      const gl = this.renderer.getContext();
+      const debug = gl.getExtension("WEBGL_debug_renderer_info");
+      this.graphicsRenderer = String(
+        gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
+      );
+    }
+    return { ...this.performance, renderer: this.graphicsRenderer };
+  }
+
+  get isPerformanceVisible() {
+    return this.performanceVisible;
+  }
+
+  setPerformanceVisible(visible: boolean) {
+    this.performanceVisible = visible;
+    this.performanceLabel.hidden = !visible;
+    if (visible) this.updatePerformanceLabel();
+  }
+
+  private updatePerformanceLabel() {
+    const { fps, frameMs, drawCalls } = this.performance;
+    this.performanceLabel.textContent = `${fps} FPS · кадр ${frameMs.toFixed(1)} мс · ${drawCalls} команд`;
+  }
+
   resumeLook(capture = true) {
     this.controls.resume(capture);
   }
@@ -968,9 +1026,15 @@ export class RoundTableScene {
     if (this.disposed || document.hidden) {
       this.lastTime = time;
       this.nextFrameAt = 0;
+      this.sampleStartedAt = 0;
+      this.sampleFrames = 0;
+      this.sampleWorkMs = 0;
       return;
     }
     if (time + 0.25 < this.nextFrameAt) return;
+    const frameStartedAt = performance.now();
+    this.renderer.info.reset();
+    if (!this.sampleStartedAt) this.sampleStartedAt = time - FRAME_INTERVAL_MS;
     // Follow a 60 Hz schedule even on 240/500 Hz displays, without catching up after a stall.
     const scheduledAt = this.nextFrameAt || time;
     this.nextFrameAt =
@@ -1083,6 +1147,22 @@ export class RoundTableScene {
       this.controls.isCursorVisible && !this.paused && !isTableInputBlocked(null),
     );
     this.ownHand.render(this.renderer, smoothing);
+    this.sampleFrames++;
+    this.sampleWorkMs += performance.now() - frameStartedAt;
+    const sampleDuration = time - this.sampleStartedAt;
+    if (sampleDuration >= 1000) {
+      this.performance = {
+        fps: Math.round((this.sampleFrames * 1000) / sampleDuration),
+        frameMs: this.sampleWorkMs / this.sampleFrames,
+        drawCalls: this.renderer.info.render.calls,
+        triangles: this.renderer.info.render.triangles,
+        resolution: `${this.renderer.domElement.width} × ${this.renderer.domElement.height}`,
+      };
+      this.sampleStartedAt = time;
+      this.sampleFrames = 0;
+      this.sampleWorkMs = 0;
+      if (this.performanceVisible) this.updatePerformanceLabel();
+    }
   }
 
   private disposeObject(object: THREE.Object3D) {
@@ -1118,5 +1198,6 @@ export class RoundTableScene {
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
+    this.performanceLabel.remove();
   }
 }
