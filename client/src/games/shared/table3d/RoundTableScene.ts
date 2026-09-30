@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { makeCardGeometry, type CardMesh } from "./CardGeometry";
-import { makeAvatarHand, limbBetween, roundedPart } from "./AvatarParts";
+import { CARD_HEIGHT, makeCardGeometry, type CardMesh } from "./CardGeometry";
+import { HAND_CARD_EDGE_Y, makeSeatedArm, roundedPart } from "./AvatarParts";
 import {
   AVATAR_LOOK_INTERVAL_MS,
   AVATAR_LOOK_EXPIRY_MS,
@@ -81,6 +81,7 @@ export class RoundTableScene {
   private readonly textures = new Map<string, THREE.CanvasTexture>();
   private readonly seatPositions = new Map<string, THREE.Vector3>();
   private readonly avatars = new Map<string, TableAvatarAnimator>();
+  private readonly cardArms = new Map<string, ReturnType<typeof makeSeatedArm>>();
   private readonly seenReactions = new Set<string>();
   private readonly labels = new Map<string, { node: HTMLDivElement; position: THREE.Vector3 }>();
   private readonly controls: TableLookControls;
@@ -646,12 +647,12 @@ export class RoundTableScene {
     const jacketProfile = [
       [0, 0],
       [0.25, 0],
-      [0.31, 0.08],
-      [0.34, 0.35],
-      [0.37, 0.68],
-      [0.34, 0.82],
-      [0.22, 0.91],
-      [0, 0.91],
+      [0.3, 0.08],
+      [0.32, 0.35],
+      [0.35, 0.67],
+      [0.32, 0.79],
+      [0.2, 0.86],
+      [0, 0.86],
     ];
     const jacket = new THREE.Mesh(
       new THREE.LatheGeometry(
@@ -676,7 +677,9 @@ export class RoundTableScene {
       lapel.position.set(side * 0.135, 1.65, 0.255);
       model.add(lapel);
       lapel.rotation.z = -side * 0.31;
-      const collar = this.box(model, [0.11, 0.13, 0.025], 0xf4e8ce, [side * 0.075, 1.89, 0.21]);
+      const collar = roundedPart([0.1, 0.12, 0.027], this.material(0xf4e8ce), 0.009);
+      collar.position.set(side * 0.065, 1.845, 0.215);
+      model.add(collar);
       collar.rotation.z = side * 0.43;
     }
     if (index % 2 === 0) {
@@ -685,9 +688,9 @@ export class RoundTableScene {
     }
     for (const y of [1.23, 1.39]) this.sphere(model, [0.018, 0.018, 0.01], 0xb79764, [0, y, 0.275]);
     this.box(model, [0.12, 0.032, 0.023], 0xe0ce9e, [-0.24, 1.67, 0.235]);
-    this.cylinder(model, 0.115, 0.24, skin, [0, 1.99, 0.02]);
+    this.cylinder(model, 0.105, 0.18, skin, [0, 1.94, 0.02]);
     const head = new THREE.Group();
-    head.position.set(0, 2.29, 0.025);
+    head.position.set(0, 2.25, 0.025);
     head.name = "head";
     model.add(head);
     const headGeometry = new THREE.SphereGeometry(1, 40, 28);
@@ -698,7 +701,7 @@ export class RoundTableScene {
       headVertices.setXYZ(
         i,
         headVertices.getX(i) * 0.24 * jaw,
-        y * 0.31,
+        y * 0.3,
         headVertices.getZ(i) * 0.222,
       );
     }
@@ -709,10 +712,10 @@ export class RoundTableScene {
       this.sphere(head, [0.035, 0.061, 0.038], skin, [side * 0.23, -0.014, 0]);
       this.sphere(head, [0.021, 0.04, 0.015], 0xa4775e, [side * 0.249, -0.016, 0.017]);
       this.sphere(head, [0.056, 0.038, 0.012], skin, [side * 0.095, 0.055, 0.202]);
-      this.sphere(head, [0.038, 0.022, 0.012], 0xeee7d8, [side * 0.092, 0.045, 0.211]);
-      this.sphere(head, [0.017, 0.018, 0.007], 0x554337, [side * 0.092, 0.044, 0.219]);
-      this.sphere(head, [0.009, 0.012, 0.004], 0x141b19, [side * 0.092, 0.044, 0.224]);
-      this.sphere(head, [0.004, 0.004, 0.003], 0xffffff, [side * 0.092 - 0.005, 0.05, 0.228]);
+      this.sphere(head, [0.034, 0.021, 0.008], 0xeee7d8, [side * 0.092, 0.045, 0.211]);
+      this.sphere(head, [0.014, 0.016, 0.005], 0x554337, [side * 0.092, 0.044, 0.218]);
+      this.sphere(head, [0.007, 0.01, 0.003], 0x141b19, [side * 0.092, 0.044, 0.222]);
+      this.sphere(head, [0.003, 0.003, 0.002], 0xffffff, [side * 0.092 - 0.004, 0.05, 0.225]);
       const brow = this.sphere(head, [0.045, 0.009, 0.009], hair, [side * 0.094, 0.093, 0.202]);
       brow.rotation.z = side * 0.07;
     }
@@ -722,17 +725,40 @@ export class RoundTableScene {
       new THREE.Vector3(0.055, -0.12, 0.192),
     ]);
     this.mesh(head, new THREE.TubeGeometry(smile, 12, 0.007, 6, false), 0x8f5949, [0, 0, 0]);
-    // Sculpted side parts, swept locks and occasional glasses distinguish each seat.
-    this.sphere(head, [0.232, 0.107, 0.214], hair, [0, 0.22, -0.025]);
-    this.sphere(head, [0.222, 0.19, 0.11], hair, [0, 0.09, -0.14]);
-    for (let i = 0; i < 5; i++) {
-      const lock = this.sphere(head, [0.072, 0.048 + (i % 2) * 0.007, 0.14], hair, [
-        -0.16 + i * 0.071,
-        0.253 - Math.abs(i - 2) * 0.017,
-        0.065,
-      ]);
-      lock.rotation.z = -0.35;
-      lock.rotation.y = -0.3;
+    // A fitted hair cap follows the skull; a raised front hairline keeps the eyes uncovered.
+    const hairCap = new THREE.SphereGeometry(1, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2 + 0.08);
+    const hairVertices = hairCap.getAttribute("position");
+    for (let i = 0; i < hairVertices.count; i++) {
+      const front = Math.max(0, hairVertices.getZ(i));
+      const y = hairVertices.getY(i);
+      hairVertices.setXYZ(
+        i,
+        hairVertices.getX(i) * 0.247,
+        y * 0.292 + front * front * (1 - Math.max(0, y)) * 0.1,
+        hairVertices.getZ(i) * 0.232,
+      );
+    }
+    hairCap.computeVertexNormals();
+    this.mesh(head, hairCap, hair, [0, 0.013, -0.005]);
+    this.sphere(head, [0.222, 0.15, 0.09], hair, [0, 0.07, -0.155]);
+    const hairStyle = index % 3;
+    if (hairStyle === 0) {
+      for (const side of [-1, 1])
+        this.sphere(head, [0.042, 0.16, 0.14], hair, [side * 0.218, -0.022, -0.025]);
+    } else {
+      for (let i = 0; i < (hairStyle === 1 ? 3 : 6); i++) {
+        const lock = this.sphere(
+          head,
+          hairStyle === 1 ? [0.083, 0.042, 0.1] : [0.053, 0.047, 0.067],
+          hair,
+          [
+            -0.135 + i * (hairStyle === 1 ? 0.11 : 0.054),
+            0.265 - Math.abs(i - (hairStyle === 1 ? 1 : 2.5)) * 0.012,
+            0.078,
+          ],
+        );
+        lock.rotation.z = -0.26;
+      }
     }
     if (index % 3 === 0) {
       for (const side of [-1, 1]) {
@@ -749,43 +775,23 @@ export class RoundTableScene {
       this.sphere(head, [0.165, 0.072, 0.066], hair, [0, -0.207, 0.126]);
       this.sphere(head, [0.052, 0.012, 0.01], hair, [0, -0.088, 0.205]);
     }
-    const arms: THREE.Group[] = [];
-    const holdsCards = this.options.variant !== "bunker";
-    for (const side of [-1, 1]) {
-      const arm = new THREE.Group();
-      const shoulder = new THREE.Vector3(side * 0.35, 1.76, 0.06);
-      arm.position.copy(shoulder);
-      model.add(arm);
-      arms.push(arm);
-      // Forearms pass above the padded rim, then the hands reach inside the felt edge.
-      const elbow = new THREE.Vector3(side * 0.43, TABLE_Y + 0.28, 0.28).sub(shoulder);
-      const wrist = new THREE.Vector3(side * 0.24, TABLE_Y + 0.23, 0.86).sub(shoulder);
-      limbBetween(arm, new THREE.Vector3(), elbow, 0.125, jacketMaterial);
-      limbBetween(arm, elbow, wrist, 0.088, jacketMaterial);
-      const cuff = roundedPart([0.13, 0.095, 0.09], this.material(0xeee5d4), 0.02);
-      cuff.position.copy(wrist);
-      arm.add(cuff);
-      const palm = makeAvatarHand(skin, -side, holdsCards && side === -1);
-      palm.position
-        .copy(wrist)
-        .add(
-          new THREE.Vector3(
-            0,
-            holdsCards && side === -1 ? 0.09 : -0.035,
-            holdsCards && side === -1 ? -0.01 : 0.075,
-          ),
-        );
-      if (!holdsCards || side === 1) palm.rotation.x = Math.PI / 2 + 0.2;
-      arm.add(palm);
-    }
+    const holdsCards = this.options.variant !== "bunker" && person.count > 0;
+    const leftArm = makeSeatedArm(skin, jacketMaterial, -1, holdsCards);
+    const rightArm = makeSeatedArm(skin, jacketMaterial, 1, false);
+    model.add(leftArm.root, rightArm.root);
+    this.cardArms.set(person.id, leftArm);
     const hand = new THREE.Group();
     hand.name = "hand";
-    // The fan sits between the curled fingers and thumb of the left hand.
-    hand.position.set(0.11, TABLE_Y + 0.35 - 1.76, 0.93 - 0.06);
-    hand.rotation.set(-0.08, 0, 0.08);
-    arms[0].add(hand);
+    leftArm.grip.add(hand);
     this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
-    const animator = new TableAvatarAnimator(body, head, arms[0], arms[1], hand);
+    const animator = new TableAvatarAnimator(
+      body,
+      head,
+      leftArm.root,
+      rightArm.root,
+      hand,
+      index * 1.7,
+    );
     animator.setEliminated(Boolean(person.eliminated), person.eliminatedAt, true);
     this.avatars.set(person.id, animator);
     const ring = this.ring(group, 0.6, 0.024, 0x68ed9e, 0.04);
@@ -808,9 +814,10 @@ export class RoundTableScene {
       const card = this.makeCard();
       const offset = i - (visibleCount - 1) / 2;
       const pivot = new THREE.Group();
-      pivot.position.set(offset * 0.034, 0, -i * 0.001);
-      pivot.rotation.z = -offset * 0.11;
-      card.position.y = 0.11;
+      // All lower card edges meet at the pinch, instead of spreading beyond the fingers.
+      pivot.position.z = -i * 0.0009;
+      pivot.rotation.z = -offset * 0.14;
+      card.position.y = HAND_CARD_EDGE_Y + (CARD_HEIGHT * 0.32) / 2;
       card.scale.setScalar(0.32);
       card.rotation.x = Math.PI / 2;
       pivot.add(card);
@@ -914,6 +921,7 @@ export class RoundTableScene {
       this.peopleKey = peopleKey;
       this.disposeGroup(this.players);
       this.avatars.clear();
+      this.cardArms.clear();
       this.labels.forEach(({ node }) => node.remove());
       this.labels.clear();
       this.seatPositions.clear();
@@ -938,6 +946,9 @@ export class RoundTableScene {
       if (!person) return;
       group.userData.isBot = person.isBot;
       this.avatars.get(person.id)?.setEliminated(Boolean(person.eliminated), person.eliminatedAt);
+      this.cardArms
+        .get(person.id)
+        ?.setHolding(this.options.variant !== "bunker" && person.count > 0);
       const hand = group.getObjectByName("hand");
       if (hand instanceof THREE.Group)
         this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
