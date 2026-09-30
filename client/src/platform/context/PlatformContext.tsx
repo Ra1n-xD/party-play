@@ -136,6 +136,8 @@ interface PlatformContextValue {
   isSpectator: boolean;
   snapshot: AnyRoomSnapshot | null;
   error: string | null;
+  deploymentNotice: string | null;
+  dismissDeploymentNotice: () => void;
   reconnectState: ReconnectState;
   reconnectableSeats: ReconnectableSeat[];
   reconnectableSeatsRoomCode: string | null;
@@ -231,6 +233,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   const [isSpectator, setIsSpectator] = useState(false);
   const [snapshot, setSnapshot] = useState<AnyRoomSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deploymentNotice, setDeploymentNotice] = useState<string | null>(null);
   const [reconnectState, setReconnectState] = useState<ReconnectState>("idle");
   const [reconnectableSeats, setReconnectableSeats] = useState<ReconnectableSeat[]>([]);
   const [reconnectableSeatsRoomCode, setReconnectableSeatsRoomCode] = useState<string | null>(null);
@@ -875,8 +878,14 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       setTimedError(message);
     };
 
-    const handleKicked: ServerEvents["room:kicked"] = ({ message }) => {
+    const handleKicked: ServerEvents["room:kicked"] = ({ message, reason }) => {
       clearStoredSession();
+      if (reason === "deployment") {
+        if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+        setError(null);
+        setDeploymentNotice(message);
+        return;
+      }
       setTimedError(message);
     };
 
@@ -1620,6 +1629,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   }, [armControlRequest, ensureSocketConnected, pendingSeatClaim?.requestId]);
 
   const clearError = useCallback(() => setError(null), []);
+  const dismissDeploymentNotice = useCallback(() => setDeploymentNotice(null), []);
   const clearHostChangeNotice = useCallback(() => setHostChangeNotice(null), []);
 
   return (
@@ -1634,6 +1644,8 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         isSpectator,
         snapshot,
         error,
+        deploymentNotice,
+        dismissDeploymentNotice,
         reconnectState,
         reconnectableSeats,
         reconnectableSeatsRoomCode,

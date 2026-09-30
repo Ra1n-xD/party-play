@@ -115,7 +115,7 @@ export interface Room<G extends GameId = GameId> {
 
 const rooms = new Map<string, Room>();
 const roomLastActivity = new Map<string, number>();
-export type RoomDisposalReason = "empty" | "inactive" | "reset";
+export type RoomDisposalReason = "empty" | "inactive" | "reset" | "deployment";
 type RoomDisposalHandler = (room: Room, reason: RoomDisposalReason) => void;
 const roomDisposalHandlers = new WeakMap<Room, RoomDisposalHandler>();
 
@@ -138,6 +138,14 @@ export function disposeRoomIfVacant(room: Room): boolean {
   );
   if (hasRetainedHumanSeat || room.spectators.size > 0) return false;
   return disposeRoom(room, "empty");
+}
+
+export function disposeRoomsForDeployment(): number {
+  let disposed = 0;
+  for (const room of Array.from(rooms.values())) {
+    if (disposeRoom(room, "deployment")) disposed++;
+  }
+  return disposed;
 }
 
 export function disposeInactiveRooms(now = Date.now()): number {

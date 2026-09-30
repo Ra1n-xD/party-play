@@ -31,4 +31,4 @@ jobs:
             deploy_script=$(mktemp)
             trap 'rm -f "$deploy_script"' EXIT
             git show "${{ github.sha }}:deploy.sh" > "$deploy_script"
-            PARTYPLAY_TARGET_COMMIT="${{ github.sha }}" bash "$deploy_script"
+            PARTYPLAY_ALLOW_LEGACY_ROOM_STOP=1 PARTYPLAY_TARGET_COMMIT="${{ github.sha }}" bash "$deploy_script"

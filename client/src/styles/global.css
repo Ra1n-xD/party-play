@@ -3147,6 +3147,45 @@ textarea {
 }
 
 /* ============ EXPANDED PLAYER MODAL ============ */
+.deployment-notice {
+  max-width: 460px;
+  padding: 32px;
+  background: #fff8e8;
+  color: #201530;
+  border: 2px solid #201530;
+  border-radius: 24px;
+  font-family: "Golos Text", sans-serif;
+}
+
+.deployment-notice-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  background: #ffc95c;
+  font-size: 36px;
+}
+
+.deployment-notice h2 {
+  margin-bottom: 12px;
+  font-size: 26px;
+}
+
+.deployment-notice p {
+  color: #50445d;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.deployment-notice .btn {
+  width: 100%;
+  background: #ffc95c;
+  color: #201530;
+}
+
 .expanded-player-modal {
   max-width: 600px;
   max-height: 80vh;

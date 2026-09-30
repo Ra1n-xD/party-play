@@ -149,7 +149,7 @@ export interface ServerEvents {
     code: ReconnectErrorCode;
     terminal: boolean;
   }) => void;
-  "room:kicked": (data: { message: string }) => void;
+  "room:kicked": (data: { message: string; reason?: "deployment" }) => void;
   "room:snapshot": (data: AnyRoomSnapshot) => void;
   "room:commandResult": (data: RoomCommandResult) => void;
   "room:reaction": (data: RoomReactionEvent) => void;
