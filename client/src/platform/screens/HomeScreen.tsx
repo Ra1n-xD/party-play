@@ -1,28 +1,26 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BiDonateHeart } from "react-icons/bi";
 import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
-import { ROOM_CODE_LENGTH, sanitizeRoomCodeInput } from "../../../../shared/roomCode";
+import { FiArrowLeft, FiArrowRight, FiBookOpen, FiRefreshCw, FiUsers } from "react-icons/fi";
+import { ROOM_CODE_LENGTH } from "../../../../shared/roomCode";
 import {
   PUBLIC_ROOM_SPECTATOR_LIMIT,
   type AnyPublicRoomDirectorySnapshot,
   type RoomVisibility,
 } from "../../../../shared/platform/publicRooms";
 import { AccessibleModal } from "../components/AccessibleModal";
+import { GameMenuArtwork } from "../components/GameMenuArtwork";
 import { GameRulesModal } from "../components/GameRulesModal";
+import { RoomEntryForm, type RoomEntryMode } from "../components/RoomEntryForm";
 import { usePlatform } from "../context/PlatformContext";
-import {
-  clientGameRegistry,
-  type GameCatalogMetadata,
-  type RegisteredClientGameId,
-} from "../gameRegistry";
+import { clientGameRegistry, type RegisteredClientGameId } from "../gameRegistry";
+import { gameMenuPresentation } from "../gameMenuPresentation";
 import { ReconnectScreen } from "./ReconnectScreen";
+import "../../styles/show-menu.css";
 
-const CATALOG_SLOT_COUNT = 8;
-type CatalogSlot = {
-  id: RegisteredClientGameId;
-  metadata: GameCatalogMetadata;
-};
-
+const catalogGames = Object.values(clientGameRegistry).sort(
+  (a, b) => a.metadata.catalogSlot - b.metadata.catalogSlot,
+);
 type PublicRoomListItem = AnyPublicRoomDirectorySnapshot["rooms"][number];
 
 function roomStatus(room: PublicRoomListItem): string {
@@ -53,6 +51,7 @@ export function HomeScreen() {
     createRoom,
     joinRoom,
     joinAsSpectator,
+    clearError,
     subscribePublicRooms,
     unsubscribePublicRooms,
     joinPublicRoom,
@@ -68,14 +67,27 @@ export function HomeScreen() {
   } = usePlatform();
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
+  const [featuredGameId, setFeaturedGameId] = useState<RegisteredClientGameId>(catalogGames[0].id);
   const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(null);
-  const [createName, setCreateName] = useState("");
+  const [entryMode, setEntryMode] = useState<RoomEntryMode>("join");
+  const [howToOpen, setHowToOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [rulesGameId, setRulesGameId] = useState<RegisteredClientGameId | null>(null);
   const [createVisibility, setCreateVisibility] = useState<RoomVisibility>("private");
   const [publicRoomsGameId, setPublicRoomsGameId] = useState<RegisteredClientGameId | null>(null);
   const [publicRoomName, setPublicRoomName] = useState("");
   const [directoryClock, setDirectoryClock] = useState(() => Date.now());
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const initialRender = useRef(true);
+
+  useEffect(() => {
+    if (initialRender.current) {
+      initialRender.current = false;
+      return;
+    }
+    titleRef.current?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [selectedGameId]);
 
   useEffect(() => {
     if (!publicRoomsGameId) return;
@@ -90,86 +102,67 @@ export function HomeScreen() {
     return () => window.clearInterval(timer);
   }, [publicRoomsGameId]);
 
-  const catalogSlots = useMemo(() => {
-    const slots: Array<CatalogSlot | null> = Array.from({ length: CATALOG_SLOT_COUNT }, () => null);
-    for (const game of Object.values(clientGameRegistry)) {
-      slots[game.metadata.catalogSlot] = {
-        id: game.id,
-        metadata: game.metadata,
-      };
-    }
-    return slots;
-  }, []);
   const selectedGame = selectedGameId ? clientGameRegistry[selectedGameId] : null;
+  const featuredGame = clientGameRegistry[featuredGameId];
+  const currentGame = selectedGame ?? featuredGame;
+  const presentation = gameMenuPresentation[currentGame.id];
   const rulesGame = rulesGameId ? clientGameRegistry[rulesGameId] : null;
   const publicRoomsGame = publicRoomsGameId ? clientGameRegistry[publicRoomsGameId] : null;
   const selectedDirectory =
     publicRoomDirectory?.gameId === publicRoomsGameId ? publicRoomDirectory : null;
-  const availableGameCount = Object.keys(clientGameRegistry).length;
   const recoveryTransitionLocked =
     pendingSeatClaim !== null &&
     ["submitting", "waiting", "cancelling", "approved"].includes(pendingSeatClaim.status);
-
   const canEnterRoom =
-    connected && name.trim().length > 0 && joinCode.length === ROOM_CODE_LENGTH && !sessionPending;
+    connected && !!name.trim() && joinCode.length === ROOM_CODE_LENGTH && !sessionPending;
 
   const handleJoin = (event: FormEvent) => {
     event.preventDefault();
-    if (!canEnterRoom) return;
-    joinRoom(joinCode, name.trim());
+    if (canEnterRoom) joinRoom(joinCode, name.trim());
   };
-
   const handleSpectate = () => {
-    if (!canEnterRoom) return;
-    joinAsSpectator(joinCode, name.trim());
+    if (canEnterRoom) joinAsSpectator(joinCode, name.trim());
   };
-
-  const openCreateModal = (gameId: RegisteredClientGameId) => {
-    setRulesGameId(null);
-    setRecoveryOpen(false);
-    setPublicRoomsGameId(null);
-    setCreateName(name);
-    setCreateVisibility("private");
+  const openGame = (gameId: RegisteredClientGameId) => {
+    clearError();
+    setFeaturedGameId(gameId);
     setSelectedGameId(gameId);
+    setEntryMode("join");
+    setCreateVisibility("private");
   };
-
-  const openRulesModal = (gameId: RegisteredClientGameId) => {
+  const backToCatalog = () => {
+    clearError();
     setSelectedGameId(null);
+  };
+  const openRulesModal = (gameId: RegisteredClientGameId) => {
     setRecoveryOpen(false);
     setPublicRoomsGameId(null);
     setRulesGameId(gameId);
   };
-
   const openRecoveryModal = () => {
-    setSelectedGameId(null);
     setRulesGameId(null);
     setPublicRoomsGameId(null);
     setRecoveryOpen(true);
   };
-
   const closeRecoveryModal = () => {
     if (recoveryTransitionLocked) return;
     resetSeatRecovery();
     setRecoveryOpen(false);
   };
-
   const openPublicRoomsModal = (gameId: RegisteredClientGameId) => {
-    setSelectedGameId(null);
     setRulesGameId(null);
     setRecoveryOpen(false);
     clearPublicRoomError();
     setPublicRoomName(name);
     setPublicRoomsGameId(gameId);
   };
-
   const handleCreate = (event: FormEvent) => {
     event.preventDefault();
-    const normalizedName = createName.trim();
+    const normalizedName = name.trim();
     if (!selectedGameId || !normalizedName || sessionPending || !connected) return;
     setName(normalizedName);
     createRoom(selectedGameId, normalizedName, createVisibility);
   };
-
   const enterPublicRoom = (room: PublicRoomListItem) => {
     const normalizedName = publicRoomName.trim();
     if (!publicRoomsGameId || !normalizedName || sessionPending || !connected) return;
@@ -181,269 +174,307 @@ export function HomeScreen() {
     }
   };
 
+  const entryForm = (
+    <RoomEntryForm
+      compact={!selectedGame}
+      mode={selectedGame ? entryMode : "join"}
+      name={name}
+      code={joinCode}
+      connected={connected}
+      pending={sessionPending}
+      error={error}
+      visibility={createVisibility}
+      onNameChange={(value) => {
+        setName(value);
+        if (error) clearError();
+      }}
+      onCodeChange={(value) => {
+        setJoinCode(value);
+        if (error) clearError();
+      }}
+      onVisibilityChange={setCreateVisibility}
+      onSubmit={selectedGame && entryMode === "create" ? handleCreate : handleJoin}
+      onSpectate={handleSpectate}
+      onModeChange={
+        selectedGame
+          ? (mode) => {
+              clearError();
+              setEntryMode(mode);
+            }
+          : undefined
+      }
+    />
+  );
+  const roomCount = publicRoomCounts?.counts[currentGame.id].publicRooms;
+  const publicRoomsButton = (
+    <button
+      className="show-quiet"
+      type="button"
+      onClick={() => openPublicRoomsModal(currentGame.id)}
+      aria-haspopup="dialog"
+    >
+      <FiUsers aria-hidden="true" /> Открытые комнаты
+      {connected && roomCount !== undefined && <span className="show-room-count">{roomCount}</span>}
+    </button>
+  );
+  const rulesButton = (
+    <button
+      className="show-quiet"
+      type="button"
+      onClick={() => openRulesModal(currentGame.id)}
+      aria-haspopup="dialog"
+    >
+      <FiBookOpen aria-hidden="true" /> Правила игры
+    </button>
+  );
+
   return (
-    <main className="platform-home">
-      <div className="platform-home-shell">
-        <header className="platform-home-header">
-          <a className="platform-home-brand" href="/" aria-label="PartyPlay — на главную">
-            <span aria-hidden="true">◆</span>
-            PartyPlay
-          </a>
-          <nav className="platform-home-socials" aria-label="Ссылки проекта">
-            <a href="https://t.me/Ra1n_xD" target="_blank" rel="noopener noreferrer">
-              <FaTelegramPlane aria-hidden="true" />
-              Сообщить о проблеме
-            </a>
+    <main
+      className={`show-menu${selectedGame ? " is-game-menu" : " is-main-menu"}`}
+      data-game={selectedGame?.id}
+    >
+      <div className="show-menu-shell">
+        <header className="show-menu-header">
+          {selectedGame ? (
+            <>
+              <button className="show-quiet show-back" type="button" onClick={backToCatalog}>
+                <FiArrowLeft aria-hidden="true" /> Ко всем играм
+              </button>
+              <nav className="show-game-switch" aria-label="Выберите игру">
+                {catalogGames.map((game) => (
+                  <button
+                    type="button"
+                    key={game.id}
+                    aria-pressed={selectedGameId === game.id}
+                    onClick={() => openGame(game.id)}
+                  >
+                    {game.metadata.title}
+                  </button>
+                ))}
+              </nav>
+              <button
+                className="show-brand show-brand-small"
+                type="button"
+                onClick={backToCatalog}
+                aria-label="PartyPlay — на главную"
+              >
+                partyplay
+              </button>
+            </>
+          ) : (
+            <>
+              <a className="show-brand" href="/" aria-label="PartyPlay — на главную">
+                <b aria-hidden="true">p</b>partyplay
+              </a>
+              <nav className="show-header-actions" aria-label="Помощь">
+                <button
+                  className="show-quiet"
+                  type="button"
+                  onClick={() => setHowToOpen(true)}
+                  aria-haspopup="dialog"
+                >
+                  Как играть
+                </button>
+                <button
+                  className="show-outline"
+                  type="button"
+                  onClick={openRecoveryModal}
+                  disabled={sessionPending}
+                  aria-haspopup="dialog"
+                >
+                  <FiRefreshCw aria-hidden="true" /> Вернуться в игру
+                </button>
+              </nav>
+            </>
+          )}
+        </header>
+
+        {selectedGame ? (
+          <>
+            <section className="show-game-title" aria-labelledby="show-menu-title">
+              <p className="show-kicker">{presentation.kicker}</p>
+              <h1 id="show-menu-title" ref={titleRef} tabIndex={-1}>
+                {selectedGame.metadata.title}
+              </h1>
+              <p>{presentation.tagline}</p>
+            </section>
+            <div className="show-stage">
+              <div className="show-stage-art">
+                <GameMenuArtwork gameId={selectedGame.id} />
+              </div>
+              {entryForm}
+              <aside className="show-stage-aside" aria-label="Об игре">
+                <p className="show-bubble">
+                  {presentation.punchline.map((line) => (
+                    <span key={line}>{line}</span>
+                  ))}
+                </p>
+                <p className="show-player-summary">
+                  <FiUsers aria-hidden="true" />
+                  {selectedGame.metadata.playerSummary}
+                </p>
+                {rulesButton}
+                {publicRoomsButton}
+              </aside>
+            </div>
+            <div className="show-game-help">
+              <p>{selectedGame.metadata.playerSummary}. Каждый играет со своего устройства.</p>
+              <button
+                className="show-quiet"
+                type="button"
+                onClick={openRecoveryModal}
+                disabled={sessionPending}
+                aria-haspopup="dialog"
+              >
+                <FiRefreshCw aria-hidden="true" /> Вернуться в игру
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <section className="show-headline" aria-labelledby="show-menu-title">
+              <h1 id="show-menu-title" ref={titleRef} tabIndex={-1}>
+                ВЕЧЕР НАЧИНАЕТСЯ.
+              </h1>
+              <div className="show-headline-tools">
+                <span className="show-tag">Ваша компания. Ваше шоу.</span>
+                <a className="show-mobile-join" href="#show-room-entry">
+                  Есть код? Войти ↓
+                </a>
+              </div>
+            </section>
+            <div className="show-main-layout">
+              <nav className="show-lineup" aria-label="Выберите игру">
+                {catalogGames.map((game, index) => (
+                  <button
+                    type="button"
+                    key={game.id}
+                    aria-pressed={featuredGameId === game.id}
+                    onClick={() => setFeaturedGameId(game.id)}
+                  >
+                    <span className="show-lineup-number">0{index + 1}</span>
+                    <strong>{game.metadata.title}</strong>
+                    <small>
+                      {game.metadata.minPlayers}–{game.metadata.maxPlayers} игроков
+                    </small>
+                  </button>
+                ))}
+                <p className="show-lineup-note">
+                  Один код.
+                  <br />
+                  Вся компания.
+                </p>
+              </nav>
+              <article className="show-feature" aria-labelledby="show-feature-title">
+                <div className={`show-feature-art is-${featuredGameId}`}>
+                  <GameMenuArtwork gameId={featuredGameId} />
+                </div>
+                <div className="show-feature-copy">
+                  <span className="show-feature-kicker">{presentation.kicker}</span>
+                  <h2 id="show-feature-title">{featuredGame.metadata.title}</h2>
+                  <p>{presentation.description}</p>
+                  <span className="show-player-summary">
+                    <FiUsers aria-hidden="true" />
+                    {featuredGame.metadata.playerSummary}
+                  </span>
+                  <button
+                    className="show-primary"
+                    type="button"
+                    onClick={() => openGame(featuredGameId)}
+                  >
+                    Играть в {featuredGame.metadata.title}
+                    <FiArrowRight aria-hidden="true" />
+                  </button>
+                  <div className="show-feature-links">
+                    {publicRoomsButton}
+                    {rulesButton}
+                  </div>
+                </div>
+              </article>
+              <div className="show-join-column">
+                {entryForm}
+                <ol className="show-steps" aria-label="Как начать">
+                  <li>
+                    <span>01</span>Выберите игру
+                  </li>
+                  <li>
+                    <span>02</span>Поделитесь кодом
+                  </li>
+                  <li>
+                    <span>03</span>Играйте вместе
+                  </li>
+                </ol>
+              </div>
+            </div>
+          </>
+        )}
+
+        <footer className="show-menu-footer">
+          <div className={`show-server-status${connected ? " is-online" : ""}`} role="status">
+            <span aria-hidden="true" />
+            {connected ? "Готовы к игре" : "Подключаемся к серверу…"}
+          </div>
+          <nav aria-label="Ссылки проекта">
             <a href="https://t.me/fronted_engineer" target="_blank" rel="noopener noreferrer">
               <FaTelegramPlane aria-hidden="true" />
-              Telegram-канал
+              Telegram
             </a>
             <a href="https://www.twitch.tv/fronted_ra1n" target="_blank" rel="noopener noreferrer">
               <FaTwitch aria-hidden="true" />
               Twitch
             </a>
+            <a href="https://t.me/Ra1n_xD" target="_blank" rel="noopener noreferrer">
+              Сообщить о проблеме
+            </a>
+            <a
+              href="https://www.donationalerts.com/r/fronted_ra1n"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <BiDonateHeart aria-hidden="true" />
+              Поддержать
+            </a>
           </nav>
-          <a
-            className="platform-home-support"
-            href="https://www.donationalerts.com/r/fronted_ra1n"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <BiDonateHeart aria-hidden="true" />
-            Поддержать проект
-          </a>
-        </header>
-
-        <section className="platform-home-hero" aria-labelledby="platform-home-title">
-          <p className="platform-home-eyebrow">Онлайн-игры для компании</p>
-          <h1 id="platform-home-title">Соберите друзей в одной комнате</h1>
-          <p className="platform-home-description">
-            Выберите игру, создайте комнату и пригласите друзей.
-          </p>
-        </section>
-
-        <section className="platform-home-entry" aria-labelledby="room-entry-title">
-          <div className="platform-home-section-heading">
-            <div>
-              <h2 id="room-entry-title">Уже есть код комнаты?</h2>
-              <p>Игра определится на сервере автоматически.</p>
-            </div>
-          </div>
-          <form className="platform-home-entry-form" onSubmit={handleJoin}>
-            <label className="platform-home-field">
-              <span>Ваше имя</span>
-              <input
-                className="input"
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={20}
-                autoComplete="nickname"
-                placeholder="Как вас зовут"
-              />
-            </label>
-            <label className="platform-home-field">
-              <span>Код комнаты</span>
-              <input
-                className="input input-code platform-home-code-input"
-                type="text"
-                value={joinCode}
-                onChange={(event) => setJoinCode(sanitizeRoomCodeInput(event.target.value))}
-                maxLength={ROOM_CODE_LENGTH}
-                autoCapitalize="characters"
-                placeholder="КОД"
-              />
-            </label>
-            <button className="btn btn-primary" type="submit" disabled={!canEnterRoom}>
-              Войти как игрок
-            </button>
-            <button
-              className="btn btn-secondary"
-              type="button"
-              onClick={handleSpectate}
-              disabled={!canEnterRoom}
-            >
-              Наблюдать
-            </button>
-            <button
-              type="button"
-              className="btn btn-reconnect platform-home-return"
-              onClick={openRecoveryModal}
-              disabled={sessionPending}
-            >
-              Вернуться в игру
-            </button>
-          </form>
-          {error && (
-            <div className="platform-home-error" role="alert">
-              {error}
-            </div>
-          )}
-        </section>
-
-        <section className="platform-home-catalog" aria-labelledby="game-catalog-title">
-          <div className="platform-home-section-heading platform-home-catalog-heading">
-            <div>
-              <h2 id="game-catalog-title">Выберите игру</h2>
-              <p>Новые игры будут появляться здесь</p>
-            </div>
-            <span>
-              {availableGameCount} из 8 {availableGameCount === 1 ? "доступна" : "доступны"}
-            </span>
-          </div>
-
-          <div className="platform-game-grid">
-            {catalogSlots.map((game, index) =>
-              game ? (
-                <article className="platform-game-card is-active" key={game.id}>
-                  <span className="platform-game-cover">
-                    <img src={game.metadata.coverImage} alt={game.metadata.coverAlt} />
-                  </span>
-                  <div className="platform-game-copy">
-                    <div className="platform-game-title-row">
-                      <strong>{game.metadata.title}</strong>
-                      <span
-                        className={`platform-game-room-counts${!connected && publicRoomCounts ? " is-stale" : ""}`}
-                        aria-live="polite"
-                        title={
-                          !connected && publicRoomCounts ? "Данные временно недоступны" : undefined
-                        }
-                      >
-                        {publicRoomCounts ? (
-                          <span>
-                            Открытых комнат: <b>{publicRoomCounts.counts[game.id].publicRooms}</b>
-                          </span>
-                        ) : (
-                          <span>Считаем комнаты…</span>
-                        )}
-                      </span>
-                    </div>
-                    <span>{game.metadata.description}</span>
-                    <small>{game.metadata.playerSummary}</small>
-                  </div>
-                  <div className="platform-game-actions">
-                    <button
-                      type="button"
-                      className="platform-game-play"
-                      onClick={() => openCreateModal(game.id)}
-                      aria-haspopup="dialog"
-                      aria-label={`Создать комнату для игры ${game.metadata.title}`}
-                    >
-                      Создать комнату
-                    </button>
-                    <button
-                      type="button"
-                      className="platform-game-open-rooms"
-                      onClick={() => openPublicRoomsModal(game.id)}
-                      aria-haspopup="dialog"
-                      aria-label={`Комнаты игры ${game.metadata.title}`}
-                    >
-                      Комнаты
-                    </button>
-                    <button
-                      type="button"
-                      className="platform-game-rules"
-                      onClick={() => openRulesModal(game.id)}
-                      aria-haspopup="dialog"
-                      aria-label={`Правила игры ${game.metadata.title}`}
-                    >
-                      Правила
-                    </button>
-                  </div>
-                </article>
-              ) : (
-                <article className="platform-game-card is-placeholder" key={`placeholder-${index}`}>
-                  <div className="platform-game-cover" aria-hidden="true" />
-                  <div className="platform-game-copy">
-                    <strong>Скоро что-то будет</strong>
-                  </div>
-                </article>
-              ),
-            )}
-          </div>
-        </section>
+        </footer>
       </div>
 
-      {selectedGame && (
+      {howToOpen && (
         <AccessibleModal
-          labelledBy="create-game-room-title"
-          onClose={() => setSelectedGameId(null)}
+          labelledBy="show-how-to-title"
+          onClose={() => setHowToOpen(false)}
           overlayClassName="platform-create-modal"
-          panelClassName="platform-create-panel"
+          panelClassName="show-how-to-panel"
         >
-          <div className="platform-create-heading">
-            <div>
-              <span>{selectedGame.metadata.title}</span>
-              <h2 id="create-game-room-title">Создать комнату</h2>
-            </div>
+          <div className="show-how-to-heading">
+            <h2 id="show-how-to-title">Соберите компанию</h2>
             <button
-              type="button"
               className="platform-modal-close"
-              onClick={() => setSelectedGameId(null)}
+              type="button"
+              onClick={() => setHowToOpen(false)}
               aria-label="Закрыть"
             >
               ×
             </button>
           </div>
-          <p>Введите имя и выберите, как другие игроки смогут найти комнату.</p>
-          {error && (
-            <div className="platform-home-error" role="alert">
-              {error}
-            </div>
-          )}
-          <form className="platform-create-form" onSubmit={handleCreate}>
-            <label className="platform-home-field">
-              <span>Ваше имя</span>
-              <input
-                className="input"
-                type="text"
-                value={createName}
-                onChange={(event) => setCreateName(event.target.value)}
-                maxLength={20}
-                autoComplete="nickname"
-                autoFocus
-                placeholder="Как вас зовут"
-              />
-            </label>
-            <fieldset className="platform-create-visibility">
-              <legend>Доступ к комнате</legend>
-              <div className="platform-create-visibility-options">
-                <label className={createVisibility === "private" ? "is-selected" : ""}>
-                  <input
-                    type="radio"
-                    name="room-visibility"
-                    value="private"
-                    checked={createVisibility === "private"}
-                    onChange={() => setCreateVisibility("private")}
-                  />
-                  <span>
-                    <strong>Закрытая по коду</strong>
-                    <small>Войдут только те, кому вы отправите код</small>
-                  </span>
-                </label>
-                <label className={createVisibility === "public" ? "is-selected" : ""}>
-                  <input
-                    type="radio"
-                    name="room-visibility"
-                    value="public"
-                    checked={createVisibility === "public"}
-                    onChange={() => setCreateVisibility("public")}
-                  />
-                  <span>
-                    <strong>Открытая</strong>
-                    <small>Появится в общем списке без показа кода</small>
-                  </span>
-                </label>
-              </div>
-            </fieldset>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={!connected || !createName.trim() || sessionPending}
-            >
-              {sessionPending ? "Создаём…" : "Создать комнату"}
-            </button>
-          </form>
+          <ol>
+            <li>
+              <strong>Выберите игру</strong>
+              <p>
+                Откройте её меню и нажмите «Создать». Можно играть с друзьями или добавить ботов.
+              </p>
+            </li>
+            <li>
+              <strong>Отправьте код друзьям</strong>
+              <p>
+                Каждый открывает PartyPlay на своём устройстве и вводит четыре буквы кода и своё
+                имя.
+              </p>
+            </li>
+            <li>
+              <strong>Начинайте!</strong>
+              <p>Все собрались? Ведущий запускает игру. Правила доступны в меню каждой игры.</p>
+            </li>
+          </ol>
         </AccessibleModal>
       )}
 
