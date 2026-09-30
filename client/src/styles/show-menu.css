@@ -772,7 +772,17 @@
 }
 
 .is-game-menu .show-menu-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   padding-bottom: calc(16 * var(--show-unit));
+}
+
+.is-game-menu .show-back {
+  justify-self: start;
+}
+
+.is-game-menu .show-brand-small {
+  justify-self: end;
 }
 
 .is-game-menu .show-entry-panel {
