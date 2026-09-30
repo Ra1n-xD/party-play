@@ -904,6 +904,61 @@
   color: #b9c4b9;
   font-size: 0.8rem;
 }
+.table3d-performance {
+  position: absolute;
+  z-index: 7;
+  right: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  padding: 7px 10px;
+  border: 1px solid #d6c39930;
+  border-radius: 6px;
+  background: #101e1aee;
+  color: #eee4ce;
+  font:
+    0.7rem ui-monospace,
+    monospace;
+  pointer-events: none;
+}
+.table3d-performance[hidden] {
+  display: none;
+}
+.table3d-performance-help {
+  margin-bottom: 18px;
+  color: #b9c4b9;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.table3d-fps-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  cursor: pointer;
+}
+.table3d-fps-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #d6b771;
+}
+.table3d-performance-data {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 24px;
+  font-size: 0.8rem;
+}
+.table3d-performance-data div {
+  display: grid;
+  gap: 4px;
+}
+.table3d-performance-data dt {
+  color: #b9c4b9;
+}
+.table3d-performance-data dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
 @media (pointer: coarse) {
   .table3d-overview-touch {
     display: inline-block;

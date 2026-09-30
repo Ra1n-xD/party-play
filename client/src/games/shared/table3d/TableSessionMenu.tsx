@@ -12,7 +12,7 @@ import { AccessibleModal } from "../../../platform/components/AccessibleModal";
 import { GameRulesModal } from "../../../platform/components/GameRulesModal";
 import { usePlatform } from "../../../platform/context/PlatformContext";
 import { clientGameRegistry, type RegisteredClientGameId } from "../../../platform/gameRegistry";
-import type { RoundTableScene } from "./RoundTableScene";
+import type { RoundTableScene, TablePerformance } from "./RoundTableScene";
 import { isTableInputBlocked } from "./TableLookControls";
 
 export interface TableMenuHandle {
@@ -30,7 +30,7 @@ interface Props {
   actions?: TableMenuAction[];
   people: { id: string; name: string; detail: string }[];
 }
-type Page = "main" | "rules" | "people" | "leave" | null;
+type Page = "main" | "rules" | "people" | "performance" | "leave" | null;
 
 export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function TableSessionMenu(
   { scene, gameId, onClassic, actions = [], people },
@@ -39,6 +39,8 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
   const { leaveRoom, snapshot } = usePlatform();
   const [page, setPage] = useState<Page>(null);
   const [error, setError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<TablePerformance | null>(null);
+  const [showFps, setShowFps] = useState(false);
   const buttons = useRef<HTMLDivElement>(null);
   const openedAt = useRef(0);
   const game = clientGameRegistry[gameId];
@@ -77,6 +79,16 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
     if (snapshot?.viewer.role === "player") setPage("leave");
     else leaveRoom();
   };
+  useEffect(() => {
+    if (page !== "performance") return;
+    const update = () => {
+      setMetrics(scene.current?.getPerformance() ?? null);
+      setShowFps(scene.current?.isPerformanceVisible ?? false);
+    };
+    update();
+    const interval = window.setInterval(update, 1000);
+    return () => window.clearInterval(interval);
+  }, [page, scene]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey)
@@ -140,7 +152,13 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
     >
       <span className="table3d-menu-eyebrow">PARTYPLAY · {game.metadata.title}</span>
       <h2 id="table-session-title">
-        {page === "leave" ? "Выйти из комнаты?" : page === "people" ? "Участники" : "Меню игры"}
+        {page === "leave"
+          ? "Выйти из комнаты?"
+          : page === "people"
+            ? "Участники"
+            : page === "performance"
+              ? "Диагностика 3D"
+              : "Меню игры"}
       </h2>
       {page === "main" && (
         <>
@@ -184,6 +202,9 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
                 <kbd>{action.key}</kbd>
               </button>
             ))}
+            <button type="button" onClick={() => setPage("performance")}>
+              <span>Диагностика 3D</span>
+            </button>
             <button type="button" className="is-danger" onClick={requestLeave}>
               <span>Выйти из комнаты</span>
               <kbd>X</kbd>
@@ -204,6 +225,60 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
               </li>
             ))}
           </ul>
+          <button type="button" className="btn btn-secondary" onClick={() => setPage("main")}>
+            Назад в меню
+          </button>
+        </>
+      )}
+      {page === "performance" && (
+        <>
+          <p className="table3d-performance-help">
+            Если игра дёргается, эти данные помогут найти причину. FPS можно оставить на экране во
+            время игры.
+          </p>
+          <label className="table3d-fps-toggle">
+            <input
+              type="checkbox"
+              checked={showFps}
+              onChange={(event) => {
+                setShowFps(event.target.checked);
+                scene.current?.setPerformanceVisible(event.target.checked);
+              }}
+            />
+            Показывать FPS
+          </label>
+          {metrics && (
+            <dl className="table3d-performance-data">
+              <div>
+                <dt>Версия</dt>
+                <dd>{__APP_VERSION__}</dd>
+              </div>
+              <div>
+                <dt>FPS / лимит</dt>
+                <dd>{metrics.fps} / 60</dd>
+              </div>
+              <div>
+                <dt>Подготовка кадра</dt>
+                <dd>{metrics.frameMs.toFixed(1)} мс</dd>
+              </div>
+              <div>
+                <dt>Команды отрисовки</dt>
+                <dd>{metrics.drawCalls}</dd>
+              </div>
+              <div>
+                <dt>Треугольники</dt>
+                <dd>{metrics.triangles.toLocaleString("ru-RU")}</dd>
+              </div>
+              <div>
+                <dt>Разрешение рендера</dt>
+                <dd>{metrics.resolution || "Измеряем…"}</dd>
+              </div>
+              <div>
+                <dt>Графический рендерер</dt>
+                <dd>{metrics.renderer}</dd>
+              </div>
+            </dl>
+          )}
           <button type="button" className="btn btn-secondary" onClick={() => setPage("main")}>
             Назад в меню
           </button>
