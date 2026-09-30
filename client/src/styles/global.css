@@ -347,8 +347,11 @@ textarea {
   white-space: nowrap;
 }
 
-.platform-home-brand span {
-  color: #ed9650;
+.platform-brand-dice {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex: none;
 }
 
 .platform-home-socials {
