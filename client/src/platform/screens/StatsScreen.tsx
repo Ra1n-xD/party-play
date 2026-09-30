@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ProjectStatsSnapshot } from "../../../../shared/platform/projectStats";
 import { socket } from "../../socket";
+import { BrandDice } from "../components/BrandDice";
 import { clientGameRegistry } from "../gameRegistry";
 
 const numberFormatter = new Intl.NumberFormat("ru-RU");
@@ -53,7 +54,7 @@ export function StatsScreen() {
       <div className="platform-stats-shell">
         <header className="platform-stats-header">
           <a className="platform-home-brand" href="/" aria-label="PartyPlay — на главную">
-            <span aria-hidden="true">◆</span>
+            <BrandDice className="platform-brand-dice" />
             PartyPlay
           </a>
           <a className="platform-stats-back" href="/">

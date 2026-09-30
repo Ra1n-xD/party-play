@@ -16,6 +16,7 @@ import {
   type RoomVisibility,
 } from "../../../../shared/platform/publicRooms";
 import { AccessibleModal } from "../components/AccessibleModal";
+import { BrandDice } from "../components/BrandDice";
 import { GameMenuArtwork } from "../components/GameMenuArtwork";
 import { GameRulesModal } from "../components/GameRulesModal";
 import { RoomEntryForm, type RoomEntryMode } from "../components/RoomEntryForm";
@@ -265,13 +266,15 @@ export function HomeScreen() {
                 onClick={backToCatalog}
                 aria-label="PartyPlay — на главную"
               >
+                <BrandDice className="show-brand-dice" />
                 partyplay
               </button>
             </>
           ) : (
             <>
               <a className="show-brand" href="/" aria-label="PartyPlay — на главную">
-                <b aria-hidden="true">p</b>partyplay
+                <BrandDice className="show-brand-dice" />
+                partyplay
               </a>
               <nav className="show-header-actions" aria-label="Помощь">
                 <button
