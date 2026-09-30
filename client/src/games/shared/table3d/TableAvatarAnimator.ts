@@ -76,7 +76,7 @@ export class TableAvatarAnimator {
       const landing = ease((progress - 0.72) / 0.28);
       this.body.position.y += recoil * 0.09 + Math.sin(fall * Math.PI) * 0.58 - landing * 0.32;
       this.body.position.z = -fall * 1.15;
-      this.body.rotation.x = recoil * 0.14 - fall * 1.72;
+      this.body.rotation.x = -recoil * 0.08 - fall * 1.72;
       this.body.rotation.z = Math.sin(fall * Math.PI) * 0.12;
       this.head.rotation.set(-0.18 * fall, 0.1 * fall, 0.12 * fall);
       this.leftArm.rotation.set(-Math.sin(fall * Math.PI) * 1.8 - fall * 0.2, 0, fall * 0.4);
@@ -115,7 +115,7 @@ export class TableAvatarAnimator {
         this.rightArm.rotation.set(-1.35 * envelope, -0.55 * envelope, 0);
         break;
       case "nice":
-        this.body.rotation.x = 0.1 * envelope;
+        this.body.rotation.x = -0.06 * envelope;
         this.body.position.y += Math.abs(pulse) * 0.065 * envelope;
         this.body.rotation.z = Math.sin(t * 6) * 0.055 * envelope;
         this.head.rotation.x += (0.12 + pulse * 0.1) * envelope;

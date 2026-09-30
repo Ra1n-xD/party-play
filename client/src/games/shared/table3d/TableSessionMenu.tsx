@@ -40,9 +40,11 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
   const [page, setPage] = useState<Page>(null);
   const [error, setError] = useState<string | null>(null);
   const buttons = useRef<HTMLDivElement>(null);
+  const openedAt = useRef(0);
   const game = clientGameRegistry[gameId];
   const open = useCallback(
     (message?: string) => {
+      openedAt.current = performance.now();
       scene.current?.releaseLook();
       setError(message ?? null);
       setPage("main");
@@ -61,6 +63,15 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
   const runAction = (action: () => void) => {
     flushSync(() => setPage(null));
     action();
+  };
+  const dismissWithCursor = () => {
+    // Native pointer-lock loss can open this dialog before the same Esc reaches the page.
+    if (performance.now() - openedAt.current < 160) return;
+    flushSync(() => {
+      setPage(null);
+      setError(null);
+    });
+    scene.current?.resumeLook(false);
   };
   const requestLeave = () => {
     if (snapshot?.viewer.role === "player") setPage("leave");
@@ -123,6 +134,7 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
       key={page}
       labelledBy="table-session-title"
       onClose={page === "main" ? resume : () => setPage("main")}
+      onEscape={page === "main" ? dismissWithCursor : () => setPage("main")}
       overlayClassName="table3d-menu-overlay"
       panelClassName="table3d-menu-panel"
     >
@@ -177,7 +189,9 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
               <kbd>X</kbd>
             </button>
           </div>
-          <p className="table3d-menu-help">↑ ↓ или Tab — выбор · Enter — подтвердить</p>
+          <p className="table3d-menu-help">
+            ↑ ↓ или Tab — выбор · Enter — подтвердить · Esc — вернуться с курсором
+          </p>
         </>
       )}
       {page === "people" && (

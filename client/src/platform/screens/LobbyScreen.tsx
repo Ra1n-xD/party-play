@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { FiArrowLeft, FiCheck, FiCopy, FiUsers } from "react-icons/fi";
+import "../../styles/show-menu.css";
 import { AccessibleModal } from "../components/AccessibleModal";
 import { ReconnectHostControls, type RecoverySeat } from "../components/ReconnectHostControls";
 import { usePlatform } from "../context/PlatformContext";
@@ -85,121 +87,168 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
   };
 
   return (
-    <div className="screen lobby-screen">
-      <div className="lobby-container">
-        <div className="lobby-header">
-          <span className="platform-lobby-game-name">{gameModule.metadata.title}</span>
-          <h2>Комната ожидания</h2>
-          <button type="button" className="room-code-display" onClick={copyCode}>
-            <span className="room-code-label">Код:</span>
-            <span className="room-code-value">{snapshot.roomCode}</span>
-            <span className="copy-hint">
-              {copied ? "Скопировано!" : "Нажмите, чтобы скопировать"}
-            </span>
+    <div className="show-menu is-game-menu show-lobby" data-game={snapshot.gameId}>
+      <div className="show-menu-shell">
+        <header className="show-menu-header">
+          <button type="button" className="show-quiet show-back" onClick={leaveRoom}>
+            <FiArrowLeft aria-hidden="true" />
+            Ко всем играм
           </button>
-        </div>
-
-        <div className="lobby-info">
-          <span>
-            Игроков: {activeSeats.length}/{gameModule.metadata.maxPlayers}
+          <span className="show-lobby-brand">PARTYPLAY</span>
+          <span className={`show-server-status ${connected ? "is-online" : ""}`} role="status">
+            <span aria-hidden="true" />
+            {connected ? "Вы в комнате" : "Восстанавливаем связь"}
           </span>
-          {extraInfo}
-          {botCount > 0 && <span>Ботов: {botCount}</span>}
-          {snapshot.spectatorCount > 0 && <span>Зрителей: {snapshot.spectatorCount}</span>}
+        </header>
+
+        <div className="show-lobby-heading">
+          <p className="show-kicker">{gameModule.metadata.title} · Собираем компанию</p>
+          <h1>Комната ожидания</h1>
+          <p>Поделитесь кодом с друзьями и дождитесь их готовности.</p>
         </div>
 
-        {settingsPanel}
-
-        {isSpectator && <div className="spectator-badge">Вы наблюдаете</div>}
-
-        <div className="player-list">
-          {activeSeats.map((seat, index) => (
-            <div
-              key={seat.seatId}
-              className={`player-item ${seat.seatId === playerId ? "is-me" : ""} ${seat.controllerKind === "bot" ? "is-bot" : ""} ${!seat.connected && seat.controllerKind !== "bot" ? "is-disconnected" : ""}`}
-            >
-              <span className="player-name">
-                <span className="player-number">{index + 1}</span>
-                {seat.isHost && <span className="host-badge">H</span>}
-                {seat.occupantKind === "bot" && <span className="bot-badge">BOT</span>}
-                {seat.temporaryBot && <span className="bot-badge">ВРЕМЕННО BOT</span>}
-                {seat.name}
-                {seat.seatId === playerId && <span className="me-badge">(вы)</span>}
-                {!seat.connected && seat.controllerKind !== "bot" && (
-                  <span className="player-presence-badge">Отключён</span>
-                )}
-              </span>
-              <span className="player-item-right">
-                <span className={`ready-status ${seat.ready || seat.isHost ? "ready" : ""}`}>
-                  {seat.ready || seat.isHost ? "Готов" : "Не готов"}
-                </span>
-                {isHost && seat.occupantKind === "bot" && !seat.temporaryBot && (
-                  <button
-                    type="button"
-                    className="btn-remove-bot"
-                    onClick={() => removeBot(seat.seatId)}
-                    disabled={!canMutateRoom}
-                    aria-label={`Удалить бота ${seat.name}`}
-                  >
-                    ×
-                  </button>
-                )}
+        <div className="show-lobby-layout">
+          <section className="show-lobby-guests" aria-labelledby="lobby-guests-title">
+            <div className="show-lobby-guests-heading">
+              <h2 id="lobby-guests-title">Ваша компания</h2>
+              <span>
+                <FiUsers aria-hidden="true" /> {activeSeats.length}/{gameModule.metadata.maxPlayers}
               </span>
             </div>
-          ))}
-        </div>
+            <div className="show-lobby-meta">
+              {extraInfo}
+              {botCount > 0 && <span>Ботов: {botCount}</span>}
+              {snapshot.spectatorCount > 0 && <span>Зрителей: {snapshot.spectatorCount}</span>}
+              {isSpectator && <span className="show-lobby-spectator">Вы наблюдаете</span>}
+            </div>
 
-        <div className="lobby-actions">
-          {!isSpectator && isHost && canAddBot && (
-            <button
-              type="button"
-              className="btn btn-bot"
-              onClick={addBot}
-              disabled={!canMutateRoom}
-            >
-              + Добавить бота
-            </button>
-          )}
-          {!isSpectator && isHost && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setManagementOpen(true)}
-            >
-              Управление комнатой
-              {hostSeatClaims.length > 0 && ` · ${hostSeatClaims.length}`}
-            </button>
-          )}
-          {!isSpectator && !isHost && (
-            <button
-              type="button"
-              className={`btn ${me?.ready ? "btn-secondary" : "btn-primary"}`}
-              onClick={() => setReady(!me?.ready)}
-              disabled={!canMutateRoom}
-            >
-              {me?.ready ? "Не готов" : "Готов!"}
-            </button>
-          )}
-          {!isSpectator && isHost && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={startGame}
-              disabled={!canMutateRoom || !enoughPlayers || !allReady}
-            >
-              {!enoughPlayers
-                ? `Нужно минимум ${gameModule.metadata.minPlayers} игрока`
-                : !allReady
-                  ? "Ждём готовности всех"
-                  : "Начать игру!"}
-            </button>
-          )}
-          <button type="button" className="btn btn-text" onClick={leaveRoom}>
-            {isSpectator ? "Перестать наблюдать" : "Покинуть комнату"}
-          </button>
-        </div>
+            <ul className="show-lobby-players">
+              {activeSeats.map((seat, index) => (
+                <li
+                  key={seat.seatId}
+                  className={`show-lobby-player ${seat.seatId === playerId ? "is-me" : ""} ${seat.controllerKind === "bot" ? "is-bot" : ""} ${!seat.connected && seat.controllerKind !== "bot" ? "is-disconnected" : ""}`}
+                >
+                  <span className="show-lobby-avatar" aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <div className="show-lobby-player-copy">
+                    <strong>{seat.name}</strong>
+                    <span className="show-lobby-badges">
+                      {seat.isHost && <span>Хост</span>}
+                      {seat.occupantKind === "bot" && <span>Бот</span>}
+                      {seat.temporaryBot && <span>Временный бот</span>}
+                      {seat.seatId === playerId && <span>Это вы</span>}
+                      {!seat.connected && seat.controllerKind !== "bot" && <span>Нет связи</span>}
+                    </span>
+                    <span
+                      className={`show-lobby-ready ${seat.ready || seat.isHost ? "is-ready" : ""}`}
+                    >
+                      {seat.ready || seat.isHost ? (
+                        <>
+                          <FiCheck aria-hidden="true" /> Готов
+                        </>
+                      ) : (
+                        "Ждём готовности"
+                      )}
+                    </span>
+                  </div>
+                  {isHost && seat.occupantKind === "bot" && !seat.temporaryBot && (
+                    <button
+                      type="button"
+                      className="show-lobby-remove"
+                      onClick={() => removeBot(seat.seatId)}
+                      disabled={!canMutateRoom}
+                      aria-label={`Удалить бота ${seat.name}`}
+                    >
+                      ×
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {canAddBot && (
+              <p className="show-lobby-invite-hint">
+                Места ещё есть. Позовите друзей или добавьте ботов.
+              </p>
+            )}
+            {settingsPanel && <div className="show-lobby-settings">{settingsPanel}</div>}
+          </section>
 
-        {error && <div className="error-toast">{error}</div>}
+          <aside className="show-entry-panel show-lobby-setup" aria-label="Подготовка игры">
+            <h2>Код вашей компании</h2>
+            <p className="show-entry-description">
+              Отправьте его друзьям, чтобы они присоединились.
+            </p>
+            <button type="button" className="show-lobby-code" onClick={copyCode}>
+              <strong>{snapshot.roomCode}</strong>
+              <span aria-live="polite">
+                <FiCopy aria-hidden="true" /> {copied ? "Скопировано!" : "Скопировать код"}
+              </span>
+            </button>
+            <div className="show-lobby-actions">
+              {!isSpectator && isHost && canAddBot && (
+                <button
+                  type="button"
+                  className="show-lobby-secondary"
+                  onClick={addBot}
+                  disabled={!canMutateRoom}
+                >
+                  + Добавить бота
+                </button>
+              )}
+              {!isSpectator && isHost && (
+                <button
+                  type="button"
+                  className="show-lobby-secondary"
+                  onClick={() => setManagementOpen(true)}
+                >
+                  Управление комнатой
+                  {hostSeatClaims.length > 0 && ` · ${hostSeatClaims.length}`}
+                </button>
+              )}
+              {!isSpectator && !isHost && (
+                <button
+                  type="button"
+                  className={me?.ready ? "show-lobby-secondary" : "show-primary"}
+                  onClick={() => setReady(!me?.ready)}
+                  disabled={!canMutateRoom}
+                >
+                  {me?.ready ? "Не готов" : "Готов!"}
+                </button>
+              )}
+              {!isSpectator && isHost && (
+                <button
+                  type="button"
+                  className="show-primary"
+                  onClick={startGame}
+                  disabled={!canMutateRoom || !enoughPlayers || !allReady}
+                >
+                  {!enoughPlayers
+                    ? `Нужно минимум ${gameModule.metadata.minPlayers} игрока`
+                    : !allReady
+                      ? "Ждём готовности всех"
+                      : "Начать игру!"}
+                </button>
+              )}
+              <button type="button" className="show-quiet" onClick={leaveRoom}>
+                {isSpectator ? "Перестать наблюдать" : "Покинуть комнату"}
+              </button>
+            </div>
+            {error && (
+              <p className="show-entry-error" role="alert">
+                {error}
+              </p>
+            )}
+          </aside>
+        </div>
+        <footer className="show-menu-footer">
+          <span>{gameModule.metadata.playerSummary}</span>
+          <span>
+            {enoughPlayers && allReady
+              ? "Все готовы. Можно начинать!"
+              : "Каждый играет со своего устройства."}
+          </span>
+        </footer>
       </div>
 
       {isHost && managementOpen && (

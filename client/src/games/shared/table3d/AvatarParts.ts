@@ -12,7 +12,7 @@ export function roundedPart(
   return mesh;
 }
 
-/** Palm faces +Z, fingers point +Y. A closed grip keeps fingertips behind the cards. */
+/** Palm faces +Z, fingers point +Y and curl towards the palm; the thumb opposes them. */
 export function makeAvatarHand(skin: number, side: number, holding: boolean) {
   const hand = new THREE.Group();
   const material = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.68 });
@@ -38,14 +38,14 @@ export function makeAvatarHand(skin: number, side: number, holding: boolean) {
     hand.add(tip);
   };
   for (let i = 0; i < 4; i++) {
-    const x = -0.051 + i * 0.034;
+    const x = side * (0.051 - i * 0.034);
     const length = [0.09, 0.105, 0.098, 0.078][i];
     finger(
       [
         new THREE.Vector3(x, 0.052, 0),
-        new THREE.Vector3(x, 0.077 + length * 0.35, holding ? -0.006 : 0.005),
-        new THREE.Vector3(x, 0.067 + length * 0.65, holding ? -0.035 : 0.006),
-        new THREE.Vector3(x, holding ? 0.07 : 0.052 + length, holding ? -0.056 : -0.009),
+        new THREE.Vector3(x, 0.077 + length * 0.35, holding ? 0.01 : 0.005),
+        new THREE.Vector3(x, 0.067 + length * 0.65, holding ? 0.045 : 0.014),
+        new THREE.Vector3(x, holding ? 0.07 : 0.052 + length, holding ? 0.064 : 0.024),
       ],
       0.014 - (i === 3 ? 0.002 : 0),
     );
@@ -53,9 +53,9 @@ export function makeAvatarHand(skin: number, side: number, holding: boolean) {
   finger(
     [
       new THREE.Vector3(side * 0.052, -0.037, 0.014),
-      new THREE.Vector3(side * 0.08, -0.002, 0.032),
-      new THREE.Vector3(side * 0.061, 0.037, 0.047),
-      new THREE.Vector3(side * 0.025, 0.055, 0.043),
+      new THREE.Vector3(side * (holding ? 0.088 : 0.095), -0.002, holding ? 0.035 : 0.018),
+      new THREE.Vector3(side * (holding ? 0.078 : 0.108), 0.03, holding ? 0.065 : 0.026),
+      new THREE.Vector3(side * (holding ? 0.04 : 0.098), 0.055, holding ? 0.083 : 0.03),
     ],
     0.019,
   );
