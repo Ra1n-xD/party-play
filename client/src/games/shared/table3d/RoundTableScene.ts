@@ -54,6 +54,14 @@ interface MovingCard {
   removing: boolean;
 }
 
+interface PersonLabel {
+  node: HTMLDivElement;
+  position: THREE.Vector3;
+  width: number;
+  height: number;
+  transform: string;
+}
+
 export interface TableSceneOptions {
   variant?: "durak" | "uno" | "bunker";
   onSelectPerson?: (id: string) => void;
@@ -68,6 +76,8 @@ const SKIN = [0xd4a07a, 0x9e694e, 0xe6bda0, 0xbc8b69];
 const TABLE_Y = 1.44;
 const RADIUS = 3.05;
 const TABLE_CARD_SCALE = 0.82;
+const FRAME_INTERVAL_MS = 1000 / 60;
+const MAX_RENDER_PIXELS = 2560 * 1440;
 
 /** Public table plus the viewer's own cards. Opponents' hands are represented by counts only. */
 export class RoundTableScene {
@@ -84,7 +94,8 @@ export class RoundTableScene {
   private readonly avatars = new Map<string, TableAvatarAnimator>();
   private readonly cardArms = new Map<string, ReturnType<typeof makeSeatedArm>>();
   private readonly seenReactions = new Set<string>();
-  private readonly labels = new Map<string, { node: HTMLDivElement; position: THREE.Vector3 }>();
+  private readonly labels = new Map<string, PersonLabel>();
+  private readonly labelSizes = new WeakMap<Element, PersonLabel>();
   private readonly controls: TableLookControls;
   private readonly ownHand: FirstPersonHand;
   private readonly remoteLooks = new Map<string, AvatarLook & { receivedAt: number }>();
@@ -98,12 +109,17 @@ export class RoundTableScene {
   private lastLookSentAt = 0;
   private lastSentLook: AvatarLook = { yaw: 0, pitch: TABLE_DEFAULT_PITCH };
   private lastTime = 0;
+  private nextFrameAt = 0;
+  private viewportWidth = 1;
+  private viewportHeight = 1;
   private disposed = false;
   private paused = false;
   private seatRadius = 3.55;
   private readonly seatedPosition = new THREE.Vector3(0, 2.85, 3.65);
   private readonly viewPosition = new THREE.Vector3();
   private readonly viewRotation = new THREE.Quaternion();
+  private readonly viewEuler = new THREE.Euler(0, 0, 0, "YXZ");
+  private readonly projectedLabel = new THREE.Vector3();
   private overview = false;
 
   constructor(
@@ -114,8 +130,10 @@ export class RoundTableScene {
     private readonly onFailure: () => void,
     private readonly options: TableSceneOptions,
   ) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "low-power" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+    });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.18;
@@ -148,7 +166,22 @@ export class RoundTableScene {
       (id) => this.options.onFocusHandCard?.(id),
       (id) => this.options.onSelectHandCard?.(id),
     );
-    this.resizeObserver = new ResizeObserver(() => this.resize());
+    this.resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === host) {
+          this.resize();
+          continue;
+        }
+        const label = this.labelSizes.get(entry.target);
+        if (!label) continue;
+        const box = entry.borderBoxSize[0];
+        const width = box?.inlineSize ?? label.node.offsetWidth;
+        const height = box?.blockSize ?? label.node.offsetHeight;
+        // Hidden labels report zero size; keep their last visible dimensions.
+        if (width > 0) label.width = width;
+        if (height > 0) label.height = height;
+      }
+    });
     this.resizeObserver.observe(host);
     this.resize();
     this.renderer.domElement.addEventListener(
@@ -657,7 +690,16 @@ export class RoundTableScene {
     node.className = `table3d-person-label${person.active ? " is-active" : ""}`;
     this.labelHost.append(node);
     this.updatePersonLabel(node, person);
-    this.labels.set(person.id, { node, position: group.position.clone().setY(2.87) });
+    const label: PersonLabel = {
+      node,
+      position: group.position.clone().setY(2.87),
+      width: 0,
+      height: 0,
+      transform: "",
+    };
+    this.labels.set(person.id, label);
+    this.labelSizes.set(node, label);
+    this.resizeObserver.observe(node, { box: "border-box" });
   }
 
   private updatePersonHand(hand: THREE.Group, count: number) {
@@ -777,7 +819,10 @@ export class RoundTableScene {
       this.disposeGroup(this.players);
       this.avatars.clear();
       this.cardArms.clear();
-      this.labels.forEach(({ node }) => node.remove());
+      this.labels.forEach(({ node }) => {
+        this.resizeObserver.unobserve(node);
+        node.remove();
+      });
       this.labels.clear();
       this.seatPositions.clear();
       const viewerIndex = state.people.findIndex((p) => p.id === state.viewerId);
@@ -903,10 +948,18 @@ export class RoundTableScene {
     const width = this.host.clientWidth;
     const height = this.host.clientHeight;
     if (!width || !height) return;
+    this.viewportWidth = width;
+    this.viewportHeight = height;
     this.camera.aspect = width / height;
     this.camera.fov =
       this.options.variant === "bunker" ? (width < 600 ? 67 : 60) : width < 600 ? 58 : 48;
     this.camera.updateProjectionMatrix();
+    const pixelRatio = Math.min(
+      window.devicePixelRatio || 1,
+      1.75,
+      Math.sqrt(MAX_RENDER_PIXELS / (width * height)),
+    );
+    if (this.renderer.getPixelRatio() !== pixelRatio) this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(width, height);
     this.ownHand.resize(width, height);
   }
@@ -914,8 +967,15 @@ export class RoundTableScene {
   private frame(time: number) {
     if (this.disposed || document.hidden) {
       this.lastTime = time;
+      this.nextFrameAt = 0;
       return;
     }
+    if (time + 0.25 < this.nextFrameAt) return;
+    // Follow a 60 Hz schedule even on 240/500 Hz displays, without catching up after a stall.
+    const scheduledAt = this.nextFrameAt || time;
+    this.nextFrameAt =
+      scheduledAt +
+      (Math.floor(Math.max(0, time - scheduledAt) / FRAME_INTERVAL_MS) + 1) * FRAME_INTERVAL_MS;
     const dt = Math.min((time - this.lastTime) / 1000, 0.05);
     this.lastTime = time;
     const smoothing = this.reducedMotion.matches ? 1 : 1 - Math.exp(-14 * dt);
@@ -934,10 +994,10 @@ export class RoundTableScene {
         Math.max(halfDepth, halfWidth / this.camera.aspect) /
         Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
       this.viewPosition.set(0, TABLE_Y + height, this.options.variant === "bunker" ? 0 : 0.6);
-      this.viewRotation.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0, "YXZ"));
+      this.viewRotation.setFromEuler(this.viewEuler.set(-Math.PI / 2, 0, 0, "YXZ"));
     } else {
       this.viewPosition.copy(this.seatedPosition);
-      this.viewRotation.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, "YXZ"));
+      this.viewRotation.setFromEuler(this.viewEuler.set(this.pitch, this.yaw, 0, "YXZ"));
     }
     this.camera.position.lerp(this.viewPosition, smoothing);
     this.camera.quaternion.slerp(this.viewRotation, smoothing);
@@ -974,7 +1034,7 @@ export class RoundTableScene {
       const avatar = this.avatars.get(group.userData.seatId);
       if (!avatar) return;
       const look = this.remoteLooks.get(group.userData.seatId);
-      const fresh = look && performance.now() - look.receivedAt < AVATAR_LOOK_EXPIRY_MS;
+      const fresh = look && time - look.receivedAt < AVATAR_LOOK_EXPIRY_MS;
       const targetYaw = fresh
         ? look.yaw
         : group.userData.isBot && !this.reducedMotion.matches
@@ -990,8 +1050,9 @@ export class RoundTableScene {
         this.paused,
       );
     });
-    const projected = new THREE.Vector3();
-    this.labels.forEach(({ node, position }) => {
+    const projected = this.projectedLabel;
+    this.labels.forEach((label) => {
+      const { node, position, width, height } = label;
       projected.copy(position).project(this.camera);
       const visible =
         !this.overview &&
@@ -999,9 +1060,23 @@ export class RoundTableScene {
         projected.z < 1 &&
         Math.abs(projected.x) < 1.08 &&
         Math.abs(projected.y) < 1.1;
-      node.hidden = !visible;
-      if (visible)
-        node.style.transform = `translate(-50%, -100%) translate(${THREE.MathUtils.clamp((projected.x * 0.5 + 0.5) * this.host.clientWidth, node.offsetWidth / 2 + 6, this.host.clientWidth - node.offsetWidth / 2 - 6)}px, ${THREE.MathUtils.clamp((-projected.y * 0.5 + 0.5) * this.host.clientHeight, node.offsetHeight + (this.host.clientWidth <= 680 ? 86 : 8), this.host.clientHeight - 8)}px)`;
+      if (node.hidden === visible) node.hidden = !visible;
+      if (!visible) return;
+      const x = THREE.MathUtils.clamp(
+        (projected.x * 0.5 + 0.5) * this.viewportWidth,
+        width / 2 + 6,
+        this.viewportWidth - width / 2 - 6,
+      );
+      const y = THREE.MathUtils.clamp(
+        (-projected.y * 0.5 + 0.5) * this.viewportHeight,
+        height + (this.viewportWidth <= 680 ? 86 : 8),
+        this.viewportHeight - 8,
+      );
+      const transform = `translate(-50%, -100%) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      if (label.transform !== transform) {
+        node.style.transform = transform;
+        label.transform = transform;
+      }
     });
     this.renderer.render(this.scene, this.camera);
     this.ownHand.setInteractive(

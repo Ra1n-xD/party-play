@@ -38,6 +38,9 @@ export class FirstPersonHand {
   private readonly caption = document.createElement("div");
   private readonly previous = document.createElement("button");
   private readonly next = document.createElement("button");
+  private readonly projectedPoint = new THREE.Vector3();
+  private readonly gripPoint = new THREE.Vector3();
+  private readonly gripOffset = new THREE.Vector3();
   private readonly corners = [
     new THREE.Vector3(-CARD_WIDTH / 2, CARD_THICKNESS / 2, -CARD_HEIGHT / 2),
     new THREE.Vector3(CARD_WIDTH / 2, CARD_THICKNESS / 2, -CARD_HEIGHT / 2),
@@ -50,6 +53,7 @@ export class FirstPersonHand {
   private gripKey = "";
   private enabled = true;
   private overview = false;
+  private hitAreasDirty = true;
 
   constructor(
     host: HTMLElement,
@@ -194,6 +198,7 @@ export class FirstPersonHand {
   }
 
   private layout() {
+    this.hitAreasDirty = true;
     const maxVisible = this.width <= 680 ? 5 : 9;
     const count = Math.min(this.hand.length, maxVisible);
     const focus = Math.max(
@@ -234,6 +239,7 @@ export class FirstPersonHand {
   }
 
   setInteractive(enabled: boolean) {
+    if (this.enabled === enabled) return;
     this.enabled = enabled;
     this.inputs.style.pointerEvents = enabled ? "" : "none";
     this.inputs.inert = !enabled;
@@ -241,51 +247,65 @@ export class FirstPersonHand {
 
   render(renderer: THREE.WebGLRenderer, smoothing: number) {
     if (!this.hand.length) return;
+    let moved = this.hitAreasDirty;
     this.cards.forEach((entry) => {
       if (!entry.pivot.visible) return;
-      entry.pivot.position.lerp(entry.target, smoothing);
-      entry.pivot.rotation.z += (entry.angle - entry.pivot.rotation.z) * smoothing;
+      const distance = entry.pivot.position.distanceToSquared(entry.target);
+      const angle = Math.abs(entry.angle - entry.pivot.rotation.z);
+      if (distance > 0.00000001 || angle > 0.0001) {
+        entry.pivot.position.lerp(entry.target, smoothing);
+        entry.pivot.rotation.z += (entry.angle - entry.pivot.rotation.z) * smoothing;
+        moved = true;
+      } else if (distance > 0 || angle > 0) {
+        entry.pivot.position.copy(entry.target);
+        entry.pivot.rotation.z = entry.angle;
+        moved = true;
+      }
     });
-    this.scene.updateMatrixWorld(true);
-    const visible = this.hand
-      .map((card) => this.cards.get(card.id)!)
-      .filter((entry) => entry.pivot.visible);
-    for (const { root, side } of this.grips) {
-      const card = side < 0 ? visible[0] : visible[visible.length - 1];
-      if (!card) continue;
-      // Grip the outer corner: lifting an edge card must not push the thumb into its neighbour.
-      root.quaternion.copy(card.pivot.quaternion);
-      root.scale.setScalar(this.gripScale);
-      root.position.copy(
-        card.mesh.localToWorld(
-          new THREE.Vector3(
-            side * (CARD_WIDTH / 2 + 0.028 / 0.34),
-            CARD_THICKNESS / 2,
-            CARD_HEIGHT / 2,
-          ),
-        ),
-      );
-      root.position.sub(
-        new THREE.Vector3(0, HAND_CARD_EDGE_Y * this.gripScale, 0).applyQuaternion(root.quaternion),
-      );
-    }
-    this.grip.updateMatrixWorld(true);
-    this.camera.updateMatrixWorld(true);
-    this.cards.forEach((entry) => {
-      if (!entry.pivot.visible) return;
-      const points = this.corners.map((corner) => {
-        const point = entry.mesh.localToWorld(corner.clone()).project(this.camera);
-        return { x: ((point.x + 1) * this.width) / 2, y: ((1 - point.y) * this.height) / 2 };
+    // The hand has its own camera: settled cards keep the same hit areas while looking around.
+    if (moved) {
+      this.scene.updateMatrixWorld(true);
+      const visible = this.hand
+        .map((card) => this.cards.get(card.id)!)
+        .filter((entry) => entry.pivot.visible);
+      for (const { root, side } of this.grips) {
+        const card = side < 0 ? visible[0] : visible[visible.length - 1];
+        if (!card) continue;
+        // Grip the outer corner: lifting an edge card must not push the thumb into its neighbour.
+        root.quaternion.copy(card.pivot.quaternion);
+        root.scale.setScalar(this.gripScale);
+        this.gripPoint.set(
+          side * (CARD_WIDTH / 2 + 0.028 / 0.34),
+          CARD_THICKNESS / 2,
+          CARD_HEIGHT / 2,
+        );
+        root.position.copy(card.mesh.localToWorld(this.gripPoint));
+        this.gripOffset
+          .set(0, HAND_CARD_EDGE_Y * this.gripScale, 0)
+          .applyQuaternion(root.quaternion);
+        root.position.sub(this.gripOffset);
+      }
+      this.grip.updateMatrixWorld(true);
+      this.camera.updateMatrixWorld(true);
+      this.cards.forEach((entry) => {
+        if (!entry.pivot.visible) return;
+        const points = this.corners.map((corner) => {
+          const point = entry.mesh
+            .localToWorld(this.projectedPoint.copy(corner))
+            .project(this.camera);
+          return { x: ((point.x + 1) * this.width) / 2, y: ((1 - point.y) * this.height) / 2 };
+        });
+        const left = Math.min(...points.map((point) => point.x));
+        const top = Math.min(...points.map((point) => point.y));
+        const width = Math.max(...points.map((point) => point.x)) - left;
+        const height = Math.max(...points.map((point) => point.y)) - top;
+        entry.button.style.transform = `translate(${left}px, ${top}px)`;
+        entry.button.style.width = `${width}px`;
+        entry.button.style.height = `${height}px`;
+        entry.button.style.clipPath = `polygon(${points.map((point) => `${point.x - left}px ${point.y - top}px`).join(",")})`;
       });
-      const left = Math.min(...points.map((point) => point.x));
-      const top = Math.min(...points.map((point) => point.y));
-      const width = Math.max(...points.map((point) => point.x)) - left;
-      const height = Math.max(...points.map((point) => point.y)) - top;
-      entry.button.style.transform = `translate(${left}px, ${top}px)`;
-      entry.button.style.width = `${width}px`;
-      entry.button.style.height = `${height}px`;
-      entry.button.style.clipPath = `polygon(${points.map((point) => `${point.x - left}px ${point.y - top}px`).join(",")})`;
-    });
+      this.hitAreasDirty = false;
+    }
     renderer.autoClear = false;
     renderer.clearDepth();
     renderer.render(this.scene, this.camera);
