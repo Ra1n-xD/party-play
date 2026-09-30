@@ -647,6 +647,22 @@
   text-decoration: underline;
 }
 
+.show-menu-footer .show-support-link {
+  padding: 0 calc(13 * var(--show-unit));
+  border: calc(2 * var(--show-unit)) solid #17131e;
+  border-radius: calc(8 * var(--show-unit));
+  background: #ffac48;
+  box-shadow: calc(3 * var(--show-unit)) calc(3 * var(--show-unit)) 0 #17131e;
+  color: #221930;
+  font-weight: 800;
+}
+
+.show-menu-footer .show-support-link:hover {
+  background: #ffc477;
+  color: #221930;
+  text-decoration: none;
+}
+
 .show-server-status {
   display: inline-flex;
   align-items: center;

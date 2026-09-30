@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BiDonateHeart } from "react-icons/bi";
 import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
-import { FiArrowLeft, FiArrowRight, FiBookOpen, FiRefreshCw, FiUsers } from "react-icons/fi";
+import {
+  FiAlertCircle,
+  FiArrowLeft,
+  FiArrowRight,
+  FiBookOpen,
+  FiRefreshCw,
+  FiUsers,
+} from "react-icons/fi";
 import { ROOM_CODE_LENGTH } from "../../../../shared/roomCode";
 import {
   PUBLIC_ROOM_SPECTATOR_LIMIT,
@@ -424,9 +431,11 @@ export function HomeScreen() {
               Twitch
             </a>
             <a href="https://t.me/Ra1n_xD" target="_blank" rel="noopener noreferrer">
+              <FiAlertCircle aria-hidden="true" />
               Сообщить о проблеме
             </a>
             <a
+              className="show-support-link"
               href="https://www.donationalerts.com/r/fronted_ra1n"
               target="_blank"
               rel="noopener noreferrer"
