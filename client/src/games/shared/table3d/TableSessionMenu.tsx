@@ -255,7 +255,9 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
               </div>
               <div>
                 <dt>FPS / лимит</dt>
-                <dd>{metrics.fps} / 60</dd>
+                <dd>
+                  {metrics.fps} / {metrics.fpsLimit}
+                </dd>
               </div>
               <div>
                 <dt>Подготовка кадра</dt>

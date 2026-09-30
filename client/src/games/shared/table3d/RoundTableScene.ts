@@ -16,6 +16,7 @@ import { mergeRigidParts } from "./mergeRigidParts";
 
 export interface TablePerformance {
   fps: number;
+  fpsLimit: number;
   frameMs: number;
   drawCalls: number;
   triangles: number;
@@ -86,7 +87,8 @@ const SKIN = [0xd4a07a, 0x9e694e, 0xe6bda0, 0xbc8b69];
 const TABLE_Y = 1.44;
 const RADIUS = 3.05;
 const TABLE_CARD_SCALE = 0.82;
-const FRAME_INTERVAL_MS = 1000 / 60;
+const FPS_LIMIT = 120;
+const FRAME_INTERVAL_MS = 1000 / FPS_LIMIT;
 const MAX_RENDER_PIXELS = 2560 * 1440;
 
 /** Public table plus the viewer's own cards. Opponents' hands are represented by counts only. */
@@ -136,7 +138,7 @@ export class RoundTableScene {
   private sampleFrames = 0;
   private sampleWorkMs = 0;
   private graphicsRenderer: string | null = null;
-  private performance: Omit<TablePerformance, "renderer"> = {
+  private performance: Omit<TablePerformance, "renderer" | "fpsLimit"> = {
     fps: 0,
     frameMs: 0,
     drawCalls: 0,
@@ -970,7 +972,7 @@ export class RoundTableScene {
         gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
       );
     }
-    return { ...this.performance, renderer: this.graphicsRenderer };
+    return { ...this.performance, fpsLimit: FPS_LIMIT, renderer: this.graphicsRenderer };
   }
 
   get isPerformanceVisible() {
@@ -1035,7 +1037,7 @@ export class RoundTableScene {
     const frameStartedAt = performance.now();
     this.renderer.info.reset();
     if (!this.sampleStartedAt) this.sampleStartedAt = time - FRAME_INTERVAL_MS;
-    // Follow a 60 Hz schedule even on 240/500 Hz displays, without catching up after a stall.
+    // Keep the render limit on 240/500 Hz displays, without catching up after a stall.
     const scheduledAt = this.nextFrameAt || time;
     this.nextFrameAt =
       scheduledAt +
