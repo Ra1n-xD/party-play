@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { makeRoomEnvironment } from "./RoomEnvironment";
 import { CARD_HEIGHT, makeCardGeometry, type CardMesh } from "./CardGeometry";
 import { HAND_CARD_EDGE_Y, makeSeatedArm, roundedPart } from "./AvatarParts";
 import {
@@ -254,176 +255,30 @@ export class RoundTableScene {
   }
 
   private makeRoom() {
-    this.scene.add(new THREE.HemisphereLight(0xd6d7de, 0x553728, 1.45));
-    const key = new THREE.DirectionalLight(0xffdfad, 3.1);
-    key.position.set(-1.5, 6, 3.5);
-    key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
-    key.shadow.camera.left = key.shadow.camera.bottom = -6;
-    key.shadow.camera.right = key.shadow.camera.top = 6;
-    key.shadow.normalBias = 0.03;
-    this.scene.add(key);
-    const blue = new THREE.PointLight(0xa5c5e2, 24, 14, 2);
-    blue.position.set(4.5, 4, -4);
-    this.scene.add(blue);
-
-    const floor = this.box(this.room, [22, 0.15, 22], 0xffffff, [0, -0.12, 0]);
-    (floor.material as THREE.MeshStandardMaterial).map = this.surfaceTexture("wood");
-    for (let i = -12; i <= 12; i++)
-      this.box(this.room, [0.014, 0.003, 22], 0x211913, [i * 0.55, -0.043, 0]);
-    this.cylinder(this.room, 4.65, 0.025, 0x4f3433, [0, -0.02, 0]);
-    for (const radius of [4.25, 4.36, 4.54]) this.ring(this.room, radius, 0.013, 0xb28e61, 0);
-    for (let i = 0; i < 48; i++) {
-      const angle = (i * Math.PI) / 24;
-      const ornament = this.box(this.room, [0.1, 0.012, 0.19], 0x9e7954, [
-        Math.sin(angle) * 4.4,
-        0.012,
-        Math.cos(angle) * 4.4,
-      ]);
-      ornament.rotation.y = -angle;
-    }
-    this.box(this.room, [18, 6.5, 0.25], 0x243c38, [0, 3.2, -7]);
-    for (const side of [-1, 1])
-      this.box(this.room, [0.25, 6.5, 20], 0x263c39, [side * 7.6, 3.2, 0]);
-    this.box(this.room, [18, 0.2, 20], 0x26302d, [0, 6.5, 0]);
-    for (let i = -5; i <= 5; i++) {
-      this.box(this.room, [1.1, 1.6, 0.1], 0x392c26, [i * 1.35, 0.84, -6.8]);
-      this.box(this.room, [1.01, 1.43, 0.08], 0x463a30, [i * 1.35, 0.84, -6.7]);
-      this.box(this.room, [0.035, 4.65, 0.08], 0x827252, [i * 1.35 + 0.66, 3.95, -6.8]);
-    }
-    for (const y of [0.12, 1.69, 1.77, 6.15])
-      this.box(this.room, [17, 0.055, 0.16], 0xb08b55, [0, y, -6.65]);
-    for (const side of [-1, 1]) {
-      const wall = new THREE.Group();
-      wall.position.x = side * 7.42;
-      wall.rotation.y = (-side * Math.PI) / 2;
-      this.room.add(wall);
-      for (let i = -5; i <= 6; i++) {
-        this.box(wall, [1.1, 1.6, 0.1], 0x392c26, [i * 1.35, 0.84, 0]);
-        this.box(wall, [1.01, 1.43, 0.08], 0x463a30, [i * 1.35, 0.84, 0.09]);
-        this.box(wall, [0.035, 4.65, 0.08], 0x827252, [i * 1.35 + 0.66, 3.95, 0]);
-      }
-      for (const y of [0.12, 1.69, 1.77, 6.15])
-        this.box(wall, [19, 0.055, 0.16], 0xb08b55, [0, y, 0.12]);
-      for (const [index, x] of [-4.1, 0, 4.1].entries()) {
-        this.box(wall, [1.56, 2.05, 0.14], 0x99784c, [x, 3.48, 0.16]);
-        this.box(wall, [1.38, 1.86, 0.1], 0x182f2d, [x, 3.48, 0.25]);
-        const artwork = new THREE.Mesh(
-          new THREE.PlaneGeometry(1.22, 0.85),
-          new THREE.MeshBasicMaterial({
-            map: this.textTexture(`wall-art-${index}`, ["♠", "♣", "♦"][index], "PARTYPLAY"),
-            transparent: true,
-          }),
-        );
-        artwork.position.set(x, 3.45, 0.31);
-        wall.add(artwork);
-      }
-      for (const x of [-2.05, 2.05, 6.15]) {
-        this.box(wall, [0.13, 0.74, 0.16], 0x997443, [x, 3.7, 0.16]);
-        const shade = this.cylinder(wall, 0.2, 0.48, 0xeac996, [x, 3.88, 0.39]);
-        (shade.material as THREE.MeshStandardMaterial).emissive.set(0x9d5c23);
-        const glow = new THREE.PointLight(0xffbb70, 8, 5, 2);
-        glow.position.set(x, 3.88, 0.8);
-        wall.add(glow);
-      }
-    }
-    for (const x of [-5.4, -1.8, 1.8, 5.4])
-      this.box(this.room, [0.16, 0.2, 18], 0x4b3a2b, [x, 6.28, 0]);
-
-    // Moonlit windows with brass mullions and gathered velvet curtains.
-    for (const x of [-4.65, 4.65]) {
-      this.box(this.room, [2.25, 3.28, 0.2], 0x97784e, [x, 3.62, -6.65]);
-      const glass = this.box(this.room, [2.03, 3.06, 0.1], 0x193546, [x, 3.62, -6.49]);
-      (glass.material as THREE.MeshStandardMaterial).emissive.set(0x1d354b);
-      (glass.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.6;
-      for (let i = 0; i < 12; i++) {
-        const skyline = this.box(
-          this.room,
-          [0.13 + (i % 3) * 0.07, 0.25 + (i % 4) * 0.19, 0.02],
-          0x0b1e2c,
-          [x - 0.94 + i * 0.17, 2.26 + (i % 4) * 0.06, -6.39],
-        );
-        skyline.castShadow = false;
-      }
-      const moon = this.sphere(this.room, [0.26, 0.26, 0.025], 0xb7d2da, [x + 0.48, 4.45, -6.37]);
-      (moon.material as THREE.MeshStandardMaterial).emissive.set(0x6c8a96);
-      this.box(this.room, [0.05, 3.12, 0.08], 0x9e8559, [x, 3.62, -6.32]);
-      this.box(this.room, [2.08, 0.06, 0.08], 0x9e8559, [x, 3.6, -6.31]);
-      for (const side of [-1, 1])
-        for (let i = 0; i < 4; i++) {
-          this.sphere(this.room, [0.12, 1.73, 0.15], i % 2 ? 0x56363b : 0x69424a, [
-            x + side * (1.17 + i * 0.17),
-            3.62,
-            -6.25,
-          ]);
-        }
-      this.box(this.room, [3.4, 0.07, 0.12], 0xb9975c, [x, 5.38, -6.18]);
-    }
-
-    // A lit cabinet, books, ceramics and the club sign anchor the back wall.
-    this.box(this.room, [3.05, 2.3, 0.45], 0x372a22, [0, 2.45, -6.56]);
-    for (const y of [1.34, 2.04, 2.76, 3.58])
-      this.box(this.room, [3.16, 0.075, 0.62], 0x79583a, [0, y, -6.33]);
-    const bookColors = [0x7e5144, 0x476559, 0xb39462, 0x3b4e67, 0x6d4858];
-    for (let row = 0; row < 3; row++)
-      for (let i = 0; i < 11; i++) {
-        const height = 0.37 + ((i + row) % 3) * 0.085;
-        const book = this.box(
-          this.room,
-          [0.12, height, 0.3],
-          bookColors[(i + row) % bookColors.length],
-          [-1.29 + i * 0.245, 1.4 + row * 0.72 + height / 2, -6.17],
-        );
-        book.rotation.z = (i % 4 === 0 ? 1 : 0) * 0.12;
-        this.box(this.room, [0.095, 0.025, 0.014], 0xc6a26e, [
-          book.position.x,
-          book.position.y + height * 0.28,
-          -6.008,
-        ]);
-      }
-    const sign = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.3, 0.72),
-      new THREE.MeshBasicMaterial({
-        map: this.textTexture("club-sign", "PARTYPLAY", "THE ROUND TABLE CLUB"),
-        transparent: true,
-      }),
+    this.room.add(
+      makeRoomEnvironment(
+        this.options.variant ?? "durak",
+        this.textures,
+        Math.min(this.renderer.capabilities.getMaxAnisotropy(), 8),
+      ),
     );
-    sign.position.set(0, 4.45, -6.64);
-    this.room.add(sign);
-    for (const x of [-2.45, 2.45]) {
-      this.box(this.room, [0.13, 0.8, 0.16], 0x997443, [x, 3.85, -6.65]);
-      const shade = this.cylinder(this.room, 0.22, 0.52, 0xeac996, [x, 4.06, -6.4]);
-      (shade.material as THREE.MeshStandardMaterial).emissive.set(0x9d5c23);
-      const glow = new THREE.PointLight(0xffbb70, 12, 5, 2);
-      glow.position.set(x, 4.2, -5.8);
-      this.scene.add(glow);
-    }
-    for (const x of [-6.3, 6.3]) {
-      this.cylinder(this.room, 0.35, 0.65, 0x9b7850, [x, 0.34, -4.8]);
-      for (let i = 0; i < 7; i++) {
-        const leaf = this.sphere(this.room, [0.15, 0.83, 0.3], i % 2 ? 0x3c6750 : 0x587451, [
-          x + Math.sin(i * 2) * 0.3,
-          1.22 + (i % 2) * 0.25,
-          -4.8 + Math.cos(i * 2) * 0.3,
-        ]);
-        leaf.rotation.z = Math.sin(i * 2) * 0.4;
-      }
-    }
-    // Pendants stay above the sightline and do not cast a solid shadow onto the cards.
-    for (const x of [-1.4, 1.4]) {
-      this.cylinder(this.room, 0.018, 1.32, 0x322a23, [x, 5.76, 0]);
-      const shade = this.mesh(
-        this.room,
-        new THREE.ConeGeometry(0.53, 0.35, 48, 1, true),
-        0x9d7d4e,
-        [x, 5, 0],
-      );
-      shade.castShadow = false;
-      const glow = this.cylinder(this.room, 0.47, 0.025, 0xffddb0, [x, 4.83, 0]);
-      glow.castShadow = false;
-      (glow.material as THREE.MeshStandardMaterial).emissive.set(0xffc477);
-      (glow.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.2;
-    }
+    this.scene.add(new THREE.HemisphereLight(0xe5e7e4, 0x6c4e3d, 1.85));
+    const key = new THREE.DirectionalLight(0xffe3b9, 1.65);
+    key.position.set(-3, 6, 4);
+    this.scene.add(key);
+    const tableLight = new THREE.SpotLight(0xffe5bd, 65, 16, Math.PI / 3, 0.65, 2);
+    tableLight.position.set(-1.2, 6.05, 1.6);
+    tableLight.target.position.set(0, TABLE_Y, 0);
+    tableLight.castShadow = true;
+    tableLight.shadow.mapSize.set(2048, 2048);
+    tableLight.shadow.camera.near = 0.5;
+    tableLight.shadow.camera.far = 16;
+    tableLight.shadow.normalBias = 0.025;
+    tableLight.shadow.bias = -0.0002;
+    this.scene.add(tableLight, tableLight.target);
+    const moonlight = new THREE.PointLight(0xa1c6e2, 22, 17, 2);
+    moonlight.position.set(4.7, 4.2, -5.9);
+    this.scene.add(moonlight);
 
     this.cylinder(this.table, 0.58, 1.25, 0x352720, [0, 0.62, 0]);
     this.cylinder(this.table, 1.2, 0.12, 0x352720, [0, 0.1, 0]);
