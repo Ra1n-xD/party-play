@@ -25,6 +25,7 @@ export class TableAvatarAnimator {
     private readonly leftArm: THREE.Group,
     private readonly rightArm: THREE.Group,
     private readonly cards: THREE.Group,
+    private readonly idlePhase = 0,
   ) {}
 
   setEliminated(eliminated: boolean, startedAt?: number, initial = false) {
@@ -84,7 +85,15 @@ export class TableAvatarAnimator {
       return;
     }
 
-    if (!this.reaction) return;
+    if (!this.reaction) {
+      if (!reducedMotion && !paused) {
+        const breath = Math.sin(time * 0.0016 + this.idlePhase);
+        this.body.position.y += breath * 0.005;
+        this.head.rotation.z = Math.sin(time * 0.0008 + this.idlePhase) * 0.009;
+        this.rightArm.rotation.x = -(0.5 + breath * 0.5) * 0.012;
+      }
+      return;
+    }
     const reactionElapsed = time - this.reaction.startedAt;
     if (reactionElapsed >= REACTION_DURATION_MS) {
       this.reaction = null;

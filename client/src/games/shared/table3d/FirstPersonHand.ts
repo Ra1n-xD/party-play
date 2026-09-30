@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CARD_WIDTH, CARD_HEIGHT, CARD_THICKNESS, type CardMesh } from "./CardGeometry";
-import { makeAvatarHand, limbBetween, roundedPart } from "./AvatarParts";
+import { HAND_CARD_EDGE_Y, makeAvatarHand, limbBetween, roundedPart } from "./AvatarParts";
 
 export interface CardFace {
   rank: string;
@@ -31,6 +31,8 @@ export class FirstPersonHand {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(48, 1, 0.05, 10);
   private readonly grip = new THREE.Group();
+  private readonly grips: { root: THREE.Group; side: number }[] = [];
+  private gripScale = 1;
   private readonly cards = new Map<string, HeldCard>();
   private readonly inputs = document.createElement("div");
   private readonly caption = document.createElement("div");
@@ -93,22 +95,27 @@ export class FirstPersonHand {
     this.gripKey = key;
     this.disposeObject(this.grip);
     this.grip.clear();
+    this.grips.length = 0;
     const sleeveMaterial = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.9 });
     const cuffMaterial = new THREE.MeshStandardMaterial({ color: 0xeee9dc, roughness: 0.85 });
     for (const side of [-1, 1]) {
-      const arm = new THREE.Group();
-      arm.position.x = side * 0.23;
-      this.grip.add(arm);
+      const anchor = new THREE.Group();
+      this.grip.add(anchor);
+      this.grips.push({ root: anchor, side });
       const hand = makeAvatarHand(skin, -side, true);
-      hand.position.set(0, -0.64, -1.6);
-      hand.rotation.z = -side * 0.16;
-      arm.add(hand);
-      const wrist = new THREE.Vector3(side * 0.02, -0.73, -1.59);
-      limbBetween(arm, new THREE.Vector3(side * 0.2, -1.04, -1.26), wrist, 0.074, sleeveMaterial);
-      const cuff = roundedPart([0.113, 0.055, 0.095], cuffMaterial, 0.014);
+      anchor.add(hand);
+      const wrist = new THREE.Vector3(0, -0.155, -0.045);
+      limbBetween(
+        anchor,
+        new THREE.Vector3(side * 0.15, -0.45, 0.22),
+        wrist,
+        0.078,
+        sleeveMaterial,
+        0.051,
+      );
+      const cuff = roundedPart([0.1, 0.058, 0.082], cuffMaterial, 0.015);
       cuff.position.copy(wrist);
-      cuff.rotation.z = -side * 0.36;
-      arm.add(cuff);
+      anchor.add(cuff);
     }
   }
 
@@ -198,15 +205,7 @@ export class FirstPersonHand {
     const spacing = Math.min(0.105, 0.7 / Math.max(count - 1, 1)) * scale;
     const offsetY = this.overview ? -0.2 : 0;
     const centerY = -0.57 + offsetY;
-    this.grip.scale.setScalar(scale);
-    this.grip.position.set(0, -0.57 * (1 - scale) + offsetY, -1.5 * (1 - scale));
-    const gripSpread = Math.min(
-      0.23,
-      Math.max(0.085, ((count - 1) * spacing) / (2 * scale) - 0.01),
-    );
-    this.grip.children.forEach((part) => {
-      if (part instanceof THREE.Group) part.position.x = Math.sign(part.position.x) * gripSpread;
-    });
+    this.gripScale = scale;
     this.hand.forEach((card, index) => {
       const entry = this.cards.get(card.id)!;
       const visible = index >= start && index < start + count;
@@ -248,6 +247,29 @@ export class FirstPersonHand {
       entry.pivot.rotation.z += (entry.angle - entry.pivot.rotation.z) * smoothing;
     });
     this.scene.updateMatrixWorld(true);
+    const visible = this.hand
+      .map((card) => this.cards.get(card.id)!)
+      .filter((entry) => entry.pivot.visible);
+    for (const { root, side } of this.grips) {
+      const card = side < 0 ? visible[0] : visible[visible.length - 1];
+      if (!card) continue;
+      // Grip the outer corner: lifting an edge card must not push the thumb into its neighbour.
+      root.quaternion.copy(card.pivot.quaternion);
+      root.scale.setScalar(this.gripScale);
+      root.position.copy(
+        card.mesh.localToWorld(
+          new THREE.Vector3(
+            side * (CARD_WIDTH / 2 + 0.028 / 0.34),
+            CARD_THICKNESS / 2,
+            CARD_HEIGHT / 2,
+          ),
+        ),
+      );
+      root.position.sub(
+        new THREE.Vector3(0, HAND_CARD_EDGE_Y * this.gripScale, 0).applyQuaternion(root.quaternion),
+      );
+    }
+    this.grip.updateMatrixWorld(true);
     this.camera.updateMatrixWorld(true);
     this.cards.forEach((entry) => {
       if (!entry.pivot.visible) return;
