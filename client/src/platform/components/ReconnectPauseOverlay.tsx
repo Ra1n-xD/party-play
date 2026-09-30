@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { AnyRoomSnapshot } from "../../../../shared/platform/room";
 import { AccessibleModal } from "./AccessibleModal";
 
@@ -12,7 +13,13 @@ function playerWord(count: number): string {
 }
 
 export function ReconnectPauseOverlay({ snapshot }: ReconnectPauseOverlayProps) {
-  if (!snapshot.pause.active || snapshot.pause.disconnectedSeatIds.length === 0) return null;
+  const [dismissed, setDismissed] = useState(false);
+  const missingSeatKey = [...snapshot.pause.disconnectedSeatIds].sort().join("|");
+  useEffect(() => {
+    setDismissed(false);
+  }, [snapshot.pause.active, missingSeatKey]);
+  if (dismissed || !snapshot.pause.active || snapshot.pause.disconnectedSeatIds.length === 0)
+    return null;
 
   const viewerSeatId = snapshot.viewer.role === "player" ? snapshot.viewer.seatId : null;
   const viewerSeat = viewerSeatId
@@ -28,7 +35,7 @@ export function ReconnectPauseOverlay({ snapshot }: ReconnectPauseOverlayProps) 
   return (
     <AccessibleModal
       labelledBy="reconnect-pause-title"
-      onClose={() => undefined}
+      onClose={() => setDismissed(true)}
       overlayClassName="pause-overlay reconnect-pause-overlay"
       panelClassName="pause-content reconnect-pause-content"
     >
@@ -52,6 +59,9 @@ export function ReconnectPauseOverlay({ snapshot }: ReconnectPauseOverlayProps) 
       <span className="reconnect-pause-hint">
         Хост может временно передать место боту, восстановить или исключить игрока.
       </span>
+      <button type="button" className="btn btn-secondary" onClick={() => setDismissed(true)}>
+        Закрыть уведомление · Esc
+      </button>
     </AccessibleModal>
   );
 }

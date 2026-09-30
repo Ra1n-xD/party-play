@@ -12,6 +12,7 @@ const FOCUSABLE_SELECTOR = [
 interface AccessibleModalProps {
   labelledBy: string;
   onClose: () => void;
+  onEscape?: () => void;
   children: ReactNode;
   overlayClassName?: string;
   panelClassName?: string;
@@ -63,6 +64,7 @@ function getFocusableElements(panel: HTMLElement): HTMLElement[] {
 export function AccessibleModal({
   labelledBy,
   onClose,
+  onEscape,
   children,
   overlayClassName = "",
   panelClassName = "",
@@ -70,10 +72,12 @@ export function AccessibleModal({
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
+  const onEscapeRef = useRef(onEscape);
 
   useEffect(() => {
     onCloseRef.current = onClose;
-  }, [onClose]);
+    onEscapeRef.current = onEscape;
+  }, [onClose, onEscape]);
 
   useEffect(() => {
     const overlay = overlayRef.current;
@@ -96,8 +100,8 @@ export function AccessibleModal({
       if (modalLayers.at(-1) !== layer) return;
       if (event.key === "Escape") {
         event.preventDefault();
-        event.stopPropagation();
-        onCloseRef.current();
+        event.stopImmediatePropagation();
+        if (!event.repeat) (onEscapeRef.current ?? onCloseRef.current)();
         return;
       }
 

@@ -757,8 +757,9 @@ export class RoundTableScene {
       arm.position.copy(shoulder);
       model.add(arm);
       arms.push(arm);
-      const elbow = new THREE.Vector3(side * 0.43, 1.34, 0.28).sub(shoulder);
-      const wrist = new THREE.Vector3(side * 0.24, 1.46, 0.68).sub(shoulder);
+      // Forearms pass above the padded rim, then the hands reach inside the felt edge.
+      const elbow = new THREE.Vector3(side * 0.43, TABLE_Y + 0.28, 0.28).sub(shoulder);
+      const wrist = new THREE.Vector3(side * 0.24, TABLE_Y + 0.23, 0.86).sub(shoulder);
       limbBetween(arm, new THREE.Vector3(), elbow, 0.125, jacketMaterial);
       limbBetween(arm, elbow, wrist, 0.088, jacketMaterial);
       const cuff = roundedPart([0.13, 0.095, 0.09], this.material(0xeee5d4), 0.02);
@@ -767,14 +768,20 @@ export class RoundTableScene {
       const palm = makeAvatarHand(skin, -side, holdsCards && side === -1);
       palm.position
         .copy(wrist)
-        .add(new THREE.Vector3(0, holdsCards && side === -1 ? 0.09 : 0.005, 0.065));
-      if (!holdsCards || side === 1) palm.rotation.x = Math.PI / 2;
+        .add(
+          new THREE.Vector3(
+            0,
+            holdsCards && side === -1 ? 0.09 : -0.035,
+            holdsCards && side === -1 ? -0.01 : 0.075,
+          ),
+        );
+      if (!holdsCards || side === 1) palm.rotation.x = Math.PI / 2 + 0.2;
       arm.add(palm);
     }
     const hand = new THREE.Group();
     hand.name = "hand";
     // The fan sits between the curled fingers and thumb of the left hand.
-    hand.position.set(0.11, -0.18, 0.725);
+    hand.position.set(0.11, TABLE_Y + 0.35 - 1.76, 0.93 - 0.06);
     hand.rotation.set(-0.08, 0, 0.08);
     arms[0].add(hand);
     this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
@@ -1012,8 +1019,8 @@ export class RoundTableScene {
     this.paused = paused;
   }
 
-  resumeLook() {
-    this.controls.resume();
+  resumeLook(capture = true) {
+    this.controls.resume(capture);
   }
 
   releaseLook() {

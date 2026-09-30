@@ -15,7 +15,7 @@ export function isTableInputBlocked(target: EventTarget | null): boolean {
   );
 }
 
-/** Desktop play requires pointer lock; losing it returns to the keyboard-accessible menu. */
+/** Esc releases the camera; a trusted click/Enter can capture it again. */
 export class TableLookControls {
   readonly target: AvatarLook = { yaw: 0, pitch: TABLE_DEFAULT_PITCH };
   private readonly abort = new AbortController();
@@ -25,6 +25,7 @@ export class TableLookControls {
   private readonly modalObserver: MutationObserver;
   private requestPending = false;
   private disposed = false;
+  private cursorPlay = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -71,6 +72,10 @@ export class TableLookControls {
       "pointerlockchange",
       () => {
         this.requestPending = false;
+        if (this.cursorPlay && document.pointerLockElement === canvas) {
+          this.release();
+          return;
+        }
         if (document.pointerLockElement === canvas) canvas.focus({ preventScroll: true });
         this.syncCursor();
       },
@@ -92,7 +97,11 @@ export class TableLookControls {
     canvas.addEventListener(
       "pointerdown",
       (event) => {
-        if (event.pointerType !== "touch" || isTableInputBlocked(event.target)) return;
+        if (isTableInputBlocked(event.target)) return;
+        if (event.pointerType !== "touch") {
+          if (this.cursorPlay) this.resume();
+          return;
+        }
         this.touch = { id: event.pointerId, x: event.clientX, y: event.clientY };
         canvas.setPointerCapture(event.pointerId);
       },
@@ -140,8 +149,15 @@ export class TableLookControls {
   }
 
   /** Call synchronously from a trusted click/key, after removing the menu. */
-  resume() {
+  resume(capture = true) {
     if (this.disposed) return;
+    this.cursorPlay = !capture;
+    if (!capture) {
+      this.requestPending = false;
+      this.release();
+      this.canvas.focus({ preventScroll: true });
+      return;
+    }
     if (this.coarse.matches) {
       this.canvas.focus({ preventScroll: true });
       return;
@@ -168,7 +184,7 @@ export class TableLookControls {
   }
 
   private captureFailed(error?: unknown) {
-    if (this.disposed) return;
+    if (this.disposed || this.cursorPlay) return;
     if (error && import.meta.env.DEV) console.debug("3D mouse capture was denied", error);
     this.requestPending = false;
     this.setCursor(true);
@@ -187,7 +203,13 @@ export class TableLookControls {
     // Keyboard dialogs suspend camera motion but retain capture. Esc/the main menu releases it.
     if (document.hidden || !document.hasFocus()) this.release();
     else this.setCursor(document.pointerLockElement !== this.canvas);
-    if (!this.coarse.matches && this.cursorVisible && !blocked && !this.requestPending)
+    if (
+      !this.coarse.matches &&
+      this.cursorVisible &&
+      !blocked &&
+      !this.requestPending &&
+      !this.cursorPlay
+    )
       this.onMenu();
   }
 

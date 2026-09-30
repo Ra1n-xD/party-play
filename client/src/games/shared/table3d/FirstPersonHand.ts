@@ -100,10 +100,10 @@ export class FirstPersonHand {
       arm.position.x = side * 0.23;
       this.grip.add(arm);
       const hand = makeAvatarHand(skin, -side, true);
-      hand.position.set(0, -0.64, -1.555);
+      hand.position.set(0, -0.64, -1.6);
       hand.rotation.z = -side * 0.16;
       arm.add(hand);
-      const wrist = new THREE.Vector3(side * 0.02, -0.73, -1.54);
+      const wrist = new THREE.Vector3(side * 0.02, -0.73, -1.59);
       limbBetween(arm, new THREE.Vector3(side * 0.2, -1.04, -1.26), wrist, 0.074, sleeveMaterial);
       const cuff = roundedPart([0.113, 0.055, 0.095], cuffMaterial, 0.014);
       cuff.position.copy(wrist);
