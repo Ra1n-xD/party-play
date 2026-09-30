@@ -30,7 +30,7 @@ import {
   Player,
   Spectator,
 } from "./roomManager.js";
-import { isDeploymentDraining } from "./deploymentState.js";
+import { DEPLOYMENT_STOP_MESSAGE, isDeploymentDraining } from "./deploymentState.js";
 import { bunkerModule, executeBunkerCommand } from "../games/bunker/module.js";
 import { asBunkerRoom } from "../games/bunker/runtime.js";
 import { CONFIG } from "../config.js";
@@ -101,6 +101,17 @@ const REACTION_RATE_WINDOW_MS = 10_000;
 const MAX_REACTIONS_PER_WINDOW = 6;
 const reactionRateBySocket = new Map<string, { lastAcceptedAt: number; acceptedAt: number[] }>();
 const lastLookAtBySocket = new Map<string, number>();
+const deploymentMembershipEvents = new Set<string>([
+  "room:create",
+  "room:join",
+  "room:joinSpectator",
+  "room:rejoin",
+  "room:rejoinSpectator",
+  "room:listReconnectableSeats",
+  "room:requestSeatClaim",
+  "publicRooms:join",
+  "publicRooms:watch",
+]);
 
 // --- Per-action rate limiting ---
 const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
@@ -236,12 +247,26 @@ function installGameLifecycleHooks(): void {
 
 function attachRoomDisposalHandler(room: Room, io: IOServer): void {
   setRoomDisposalHandler(room, (disposedRoom, reason) => {
+    if (reason === "deployment") {
+      const claimantSocketIds = Array.from(
+        disposedRoom.pendingSeatClaims.values(),
+        (claim) => claim.socketId,
+      );
+      io.to([disposedRoom.code, ...claimantSocketIds]).emit("room:kicked", {
+        message: DEPLOYMENT_STOP_MESSAGE,
+        reason: "deployment",
+      });
+    }
     getServerGameModule(disposedRoom.gameId)?.dispose(disposedRoom);
     disposeRoomExecutor(disposedRoom.code);
     cancelAllSeatClaims(
       disposedRoom,
       io,
-      reason === "inactive" ? "Комната закрыта из-за неактивности" : "Комната закрыта",
+      reason === "deployment"
+        ? DEPLOYMENT_STOP_MESSAGE
+        : reason === "inactive"
+          ? "Комната закрыта из-за неактивности"
+          : "Комната закрыта",
     );
     for (const spectator of disposedRoom.spectators.values()) {
       clearSpectatorGraceTimer(spectator.id);
@@ -623,6 +648,16 @@ export function registerHandlers(io: IOServer): void {
     syncPublishedRoomWithProjectStats(room, publishedIo);
   });
   io.on("connection", (socket: IOSocket) => {
+    socket.use(([event], next) => {
+      if (isDeploymentDraining() && deploymentMembershipEvents.has(event)) {
+        socket.emit("room:kicked", {
+          message: DEPLOYMENT_STOP_MESSAGE,
+          reason: "deployment",
+        });
+        return;
+      }
+      next();
+    });
     if (process.env.NODE_ENV !== "production") {
       console.log(`Connected: ${socket.id}`);
     }
@@ -866,12 +901,6 @@ export function registerHandlers(io: IOServer): void {
     });
 
     socket.on("room:create", (data) => {
-      if (isDeploymentDraining()) {
-        socket.emit("room:error", {
-          message: "Сервер обновляется. Создание комнат временно приостановлено",
-        });
-        return;
-      }
       if (!isExactObject(data, ["playerName"], ["gameId", "visibility"])) {
         socket.emit("room:error", { message: "Некорректные параметры комнаты" });
         return;

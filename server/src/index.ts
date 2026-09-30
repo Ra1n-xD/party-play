@@ -9,7 +9,7 @@ import { CONFIG } from "./config.js";
 import { registerHandlers } from "./socketHandlers.js";
 import { createNamespaceConnectionLimiter } from "./namespaceConnectionLimiter.js";
 import { isDeploymentDraining, setDeploymentDraining } from "./platform/deploymentState.js";
-import { getAllRooms } from "./platform/roomManager.js";
+import { disposeRoomsForDeployment, getAllRooms } from "./platform/roomManager.js";
 
 const app = express();
 
@@ -133,6 +133,7 @@ app.get("/deployz", (req, res) => {
   res.status(safe ? 200 : 409).json({
     status: safe ? "drained" : isDeploymentDraining() ? "busy" : "open",
     retainedRooms,
+    deploymentMode: "stop-rooms",
   });
 });
 
@@ -142,14 +143,15 @@ app.post("/deployz/drain", (req, res) => {
     return;
   }
   const retainedRooms = getAllRooms().size;
-  if (!ready || shuttingDown || retainedRooms > 0) {
+  if (!ready || shuttingDown) {
     res.set("Cache-Control", "no-store");
-    res.status(409).json({ status: "busy", retainedRooms });
+    res.status(409).json({ status: "busy", retainedRooms, deploymentMode: "stop-rooms" });
     return;
   }
   setDeploymentDraining(true);
+  const stoppedRooms = disposeRoomsForDeployment();
   res.set("Cache-Control", "no-store");
-  res.json({ status: "drained", retainedRooms: 0 });
+  res.json({ status: "drained", retainedRooms: 0, stoppedRooms, deploymentMode: "stop-rooms" });
 });
 
 app.post("/deployz/resume", (req, res) => {
