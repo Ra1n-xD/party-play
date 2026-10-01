@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { usePlatform } from "../../../platform/context/PlatformContext";
+import { getAvatar } from "../../../../../shared/platform/avatars";
 import type { DurakPublicState } from "../../../../../shared/games/durak/types";
 import { RoundTableScene, type RoundTableState } from "../../shared/table3d/RoundTableScene";
 import { getDurakCardFace, getSuitSymbol } from "./DurakCard";
@@ -47,6 +49,7 @@ export default function DurakTable3D({
   onFocusCard,
   onSelectCard,
 }: Props) {
+  const { snapshot } = usePlatform();
   const host = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
   const scene = useRef<RoundTableScene | null>(null);
@@ -111,6 +114,8 @@ export default function DurakTable3D({
       ownHand: hand,
       people: game.players.map((player) => ({
         id: player.seatId,
+        avatarId: getAvatar(snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.avatarId)
+          .id,
         name: player.name,
         count: player.cardCount,
         active: player.isCurrentActor && !paused,
@@ -187,7 +192,7 @@ export default function DurakTable3D({
     if (resolution?.type === "transfer" && resolution.target.kind === "player")
       state.takeSeatId = resolution.target.seatId;
     scene.current?.update(state);
-  }, [game, viewerSeatId, targetIds, focusedTargetId, narrow, hand, paused]);
+  }, [game, viewerSeatId, targetIds, focusedTargetId, narrow, hand, paused, snapshot?.seats]);
 
   const actor = game.players.find((player) => player.isCurrentActor);
   return (

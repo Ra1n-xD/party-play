@@ -5,6 +5,9 @@ import { AccessibleModal } from "../components/AccessibleModal";
 import { ReconnectHostControls, type RecoverySeat } from "../components/ReconnectHostControls";
 import { usePlatform } from "../context/PlatformContext";
 import { getClientGameModule } from "../gameRegistry";
+import { AvatarPicker } from "../components/AvatarPicker";
+import { AvatarPortrait } from "../components/AvatarPortrait";
+import { getAvatar } from "../../../../shared/platform/avatars";
 
 interface LobbyScreenProps {
   extraInfo?: ReactNode;
@@ -20,6 +23,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
     playerId,
     isSpectator,
     setReady,
+    setAvatar,
     startGame,
     leaveRoom,
     addBot,
@@ -95,16 +99,16 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
             Ко всем играм
           </button>
           <span className="show-lobby-brand">PARTYPLAY</span>
-          <span className={`show-server-status ${connected ? "is-online" : ""}`} role="status">
-            <span aria-hidden="true" />
-            {connected ? "Вы в комнате" : "Восстанавливаем связь"}
-          </span>
+          {!connected && (
+            <span className="show-server-status" role="status">
+              Восстанавливаем связь
+            </span>
+          )}
         </header>
 
         <div className="show-lobby-heading">
           <p className="show-kicker">{gameModule.metadata.title} · Собираем компанию</p>
           <h1>Комната ожидания</h1>
-          <p>Поделитесь кодом с друзьями и дождитесь их готовности.</p>
         </div>
 
         <div className="show-lobby-layout">
@@ -123,16 +127,17 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
             </div>
 
             <ul className="show-lobby-players">
-              {activeSeats.map((seat, index) => (
+              {activeSeats.map((seat) => (
                 <li
                   key={seat.seatId}
                   className={`show-lobby-player ${seat.seatId === playerId ? "is-me" : ""} ${seat.controllerKind === "bot" ? "is-bot" : ""} ${!seat.connected && seat.controllerKind !== "bot" ? "is-disconnected" : ""}`}
                 >
                   <span className="show-lobby-avatar" aria-hidden="true">
-                    {String(index + 1).padStart(2, "0")}
+                    <AvatarPortrait avatarId={getAvatar(seat.avatarId).id} />
                   </span>
                   <div className="show-lobby-player-copy">
                     <strong>{seat.name}</strong>
+                    <span className="show-lobby-character">{getAvatar(seat.avatarId).name}</span>
                     <span className="show-lobby-badges">
                       {seat.isHost && <span>Хост</span>}
                       {seat.occupantKind === "bot" && <span>Бот</span>}
@@ -172,13 +177,17 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
               </p>
             )}
             {settingsPanel && <div className="show-lobby-settings">{settingsPanel}</div>}
+            {me && (
+              <AvatarPicker
+                avatarId={getAvatar(me.avatarId).id}
+                disabled={!canMutateRoom || snapshot.lifecycle !== "lobby"}
+                onSelect={setAvatar}
+              />
+            )}
           </section>
 
           <aside className="show-entry-panel show-lobby-setup" aria-label="Подготовка игры">
-            <h2>Код вашей компании</h2>
-            <p className="show-entry-description">
-              Отправьте его друзьям, чтобы они присоединились.
-            </p>
+            <h2>Код вашей комнаты</h2>
             <button type="button" className="show-lobby-code" onClick={copyCode}>
               <strong>{snapshot.roomCode}</strong>
               <span aria-live="polite">

@@ -12,6 +12,7 @@ import {
 } from "./reconnectManager.js";
 import { getServerGameModule } from "./gameRegistry.js";
 import type { GameCommandExecution, IOServer } from "./gameModule.js";
+import { isAvatarId } from "../../../shared/platform/avatars.js";
 
 const MAX_PROCESSED_COMMANDS = 128;
 type AnyPlatformCommand = AnyRoomCommandEnvelope["command"];
@@ -89,6 +90,8 @@ function isPlatformCommand(value: unknown): value is AnyPlatformCommand {
   switch (value.type) {
     case "seat:set-ready":
       return typeof value.ready === "boolean";
+    case "seat:set-avatar":
+      return isAvatarId(value.avatarId);
     case "room:start":
     case "room:play-again":
     case "room:add-bot":
@@ -125,6 +128,25 @@ function applyCommand(
   }
 
   switch (command.type) {
+    case "seat:set-avatar": {
+      const player = room.players.get(actorSeatId);
+      if (
+        !player ||
+        player.kicked ||
+        player.owner.kind !== "human" ||
+        player.controller.kind !== "human" ||
+        module.lifecycle(room) !== "lobby"
+      ) {
+        return {
+          success: false,
+          code: "CONFLICT",
+          error: "Персонажа можно выбрать до начала игры",
+        };
+      }
+      player.avatarId = command.avatarId;
+      module.publish(room, io);
+      return { success: true };
+    }
     case "seat:set-ready": {
       const player = room.players.get(actorSeatId);
       if (!player || player.kicked || module.lifecycle(room) !== "lobby") {

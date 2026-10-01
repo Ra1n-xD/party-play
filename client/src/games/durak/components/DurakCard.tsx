@@ -130,11 +130,11 @@ export function DurakCard({
         }
         onDoubleClick={onDoubleClick}
         onKeyDown={handleKeyDown}
+        onContextMenu={(event) => event.preventDefault()}
         disabled={disabled}
         aria-pressed={selected}
         aria-label={accessibleName}
         aria-describedby={ariaDescribedBy}
-        title={accessibleName}
       >
         {content}
       </button>
@@ -142,7 +142,12 @@ export function DurakCard({
   }
 
   return (
-    <div className={className} aria-label={accessibleName} role="img" title={accessibleName}>
+    <div
+      className={className}
+      aria-label={accessibleName}
+      role="img"
+      onContextMenu={(event) => event.preventDefault()}
+    >
       {content}
     </div>
   );

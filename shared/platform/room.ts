@@ -4,6 +4,7 @@ import type {
   GamePublicProjection,
   GameSettings,
 } from "./gameContract.js";
+import type { AvatarId } from "./avatars.js";
 
 export type SeatId = string;
 export type ParticipantId = string;
@@ -16,6 +17,7 @@ export type RoomLifecycle = "lobby" | "playing" | "results";
 export interface PublicSeat {
   seatId: SeatId;
   name: string;
+  avatarId: AvatarId;
   occupantKind: "human" | "bot";
   controllerKind: "human" | "bot" | "none";
   temporaryBot: boolean;
@@ -67,6 +69,7 @@ export type AnyRoomSnapshot = {
 
 export type PlatformCommand<G extends GameId> =
   | { type: "seat:set-ready"; ready: boolean }
+  | { type: "seat:set-avatar"; avatarId: AvatarId }
   | { type: "room:start" }
   | { type: "room:play-again" }
   | { type: "room:update-settings"; settings: GameSettings<G> }

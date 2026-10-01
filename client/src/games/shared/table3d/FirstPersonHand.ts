@@ -151,6 +151,7 @@ export class FirstPersonHand {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "table3d-hand-card";
+        button.oncontextmenu = (event) => event.preventDefault();
         button.dataset.tableHandCard = card.id;
         button.onpointermove = (event) => {
           if (
