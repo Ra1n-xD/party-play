@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { FiCheck } from "react-icons/fi";
+import { FiCheck, FiX } from "react-icons/fi";
 import { AVATARS, getAvatar, type AvatarId } from "../../../../shared/platform/avatars";
 import { AvatarPortrait } from "./AvatarPortrait";
 
@@ -9,10 +9,12 @@ export function AvatarPicker({
   avatarId,
   disabled,
   onSelect,
+  onClose,
 }: {
   avatarId: AvatarId;
   disabled: boolean;
   onSelect: (avatarId: AvatarId) => void;
+  onClose: () => void;
 }) {
   const chosen = getAvatar(avatarId);
   return (
@@ -20,6 +22,14 @@ export function AvatarPicker({
       <div className="show-avatar-heading">
         <h2 id="avatar-picker-title">Ваш персонаж</h2>
         <span>10 на выбор</span>
+        <button
+          type="button"
+          className="show-avatar-close"
+          onClick={onClose}
+          aria-label="Закрыть выбор персонажа"
+        >
+          <FiX aria-hidden="true" />
+        </button>
       </div>
       <div className="show-avatar-content">
         <div className="show-avatar-stage">
@@ -46,6 +56,12 @@ export function AvatarPicker({
             </button>
           ))}
         </div>
+      </div>
+      <div className="show-avatar-footer">
+        <span>Выбор сохраняется сразу</span>
+        <button type="button" className="show-primary" onClick={onClose}>
+          Готово
+        </button>
       </div>
     </section>
   );

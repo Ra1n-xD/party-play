@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { FiArrowLeft, FiCheck, FiCopy, FiUsers } from "react-icons/fi";
+import { FiArrowLeft, FiCheck, FiCopy, FiEdit2, FiUsers } from "react-icons/fi";
 import "../../styles/show-menu.css";
 import { AccessibleModal } from "../components/AccessibleModal";
 import { ReconnectHostControls, type RecoverySeat } from "../components/ReconnectHostControls";
@@ -36,6 +36,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
   } = usePlatform();
   const [copied, setCopied] = useState(false);
   const [managementOpen, setManagementOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
   const activeSeats = snapshot?.seats.filter((seat) => !seat.closed) ?? [];
   const viewerSeatId = snapshot?.viewer.role === "player" ? snapshot.viewer.seatId : null;
@@ -49,6 +50,10 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
   useEffect(() => {
     if (!isHost) setManagementOpen(false);
   }, [isHost]);
+
+  useEffect(() => {
+    if (!me || snapshot?.lifecycle !== "lobby") setAvatarOpen(false);
+  }, [me?.seatId, snapshot?.lifecycle]);
 
   if (!snapshot) {
     return (
@@ -126,6 +131,27 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
               {isSpectator && <span className="show-lobby-spectator">Вы наблюдаете</span>}
             </div>
 
+            {me && (
+              <button
+                type="button"
+                className="show-lobby-avatar-trigger"
+                onClick={() => setAvatarOpen(true)}
+                disabled={!connected || reconnectState !== "connected"}
+                aria-haspopup="dialog"
+                aria-expanded={avatarOpen}
+                aria-label={`Выбрать персонажа, сейчас ${getAvatar(me.avatarId).name}`}
+              >
+                <AvatarPortrait avatarId={getAvatar(me.avatarId).id} />
+                <span>
+                  <small>Ваш персонаж</small>
+                  <strong>{getAvatar(me.avatarId).name}</strong>
+                </span>
+                <span className="show-lobby-avatar-edit">
+                  Сменить <FiEdit2 aria-hidden="true" />
+                </span>
+              </button>
+            )}
+
             <ul className="show-lobby-players">
               {activeSeats.map((seat) => (
                 <li
@@ -171,19 +197,6 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
                 </li>
               ))}
             </ul>
-            {canAddBot && (
-              <p className="show-lobby-invite-hint">
-                Места ещё есть. Позовите друзей или добавьте ботов.
-              </p>
-            )}
-            {settingsPanel && <div className="show-lobby-settings">{settingsPanel}</div>}
-            {me && (
-              <AvatarPicker
-                avatarId={getAvatar(me.avatarId).id}
-                disabled={!canMutateRoom || snapshot.lifecycle !== "lobby"}
-                onSelect={setAvatar}
-              />
-            )}
           </section>
 
           <aside className="show-entry-panel show-lobby-setup" aria-label="Подготовка игры">
@@ -194,6 +207,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
                 <FiCopy aria-hidden="true" /> {copied ? "Скопировано!" : "Скопировать код"}
               </span>
             </button>
+            {settingsPanel && <div className="show-lobby-settings">{settingsPanel}</div>}
             <div className="show-lobby-actions">
               {!isSpectator && isHost && canAddBot && (
                 <button
@@ -210,8 +224,9 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
                   type="button"
                   className="show-lobby-secondary"
                   onClick={() => setManagementOpen(true)}
+                  aria-label="Управление комнатой"
                 >
-                  Управление комнатой
+                  Управление
                   {hostSeatClaims.length > 0 && ` · ${hostSeatClaims.length}`}
                 </button>
               )}
@@ -239,9 +254,6 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
                       : "Начать игру!"}
                 </button>
               )}
-              <button type="button" className="show-quiet" onClick={leaveRoom}>
-                {isSpectator ? "Перестать наблюдать" : "Покинуть комнату"}
-              </button>
             </div>
             {error && (
               <p className="show-entry-error" role="alert">
@@ -252,13 +264,27 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
         </div>
         <footer className="show-menu-footer">
           <span>{gameModule.metadata.playerSummary}</span>
-          <span>
-            {enoughPlayers && allReady
-              ? "Все готовы. Можно начинать!"
-              : "Каждый играет со своего устройства."}
-          </span>
+          <button type="button" className="show-quiet" onClick={leaveRoom}>
+            {isSpectator ? "Перестать наблюдать" : "Покинуть комнату"}
+          </button>
         </footer>
       </div>
+
+      {me && avatarOpen && (
+        <AccessibleModal
+          labelledBy="avatar-picker-title"
+          onClose={() => setAvatarOpen(false)}
+          overlayClassName="show-avatar-modal"
+          panelClassName="show-avatar-panel"
+        >
+          <AvatarPicker
+            avatarId={getAvatar(me.avatarId).id}
+            disabled={!canMutateRoom || snapshot.lifecycle !== "lobby"}
+            onSelect={setAvatar}
+            onClose={() => setAvatarOpen(false)}
+          />
+        </AccessibleModal>
+      )}
 
       {isHost && managementOpen && (
         <AccessibleModal
