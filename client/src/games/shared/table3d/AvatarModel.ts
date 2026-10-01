@@ -94,9 +94,21 @@ export function makeAvatarHead(avatarId: AvatarId) {
       sphere(head, [0.036, 0.036, 0.036], 0xf2d58b, [side * 0.13, 0.417, -0.045]);
     }
     smile(head, accent, -0.14, 0.2);
+  } else if (id === "monkey") {
+    for (const side of [-1, 1]) {
+      sphere(head, [0.11, 0.13, 0.065], skin, [side * 0.265, 0.025, -0.01]);
+      sphere(head, [0.069, 0.089, 0.025], accent, [side * 0.28, 0.025, 0.048]);
+      sphere(head, [0.112, 0.13, 0.034], accent, [side * 0.086, 0.04, 0.208]);
+    }
+    sphere(head, [0.145, 0.094, 0.065], accent, [0, -0.09, 0.208]);
+    for (const side of [-1, 1])
+      sphere(head, [0.009, 0.007, 0.006], 0x66402d, [side * 0.018, -0.049, 0.269]);
+    for (const x of [-0.04, 0, 0.04])
+      sphere(head, [0.047, 0.055, 0.045], skin, [x, 0.253 + (x === 0 ? 0.02 : 0), -0.01]);
+    smile(head, 0x66402d, -0.128, 0.269);
   } else {
     for (const side of [-1, 1]) {
-      if (id === "cat" || id === "fox") {
+      if (id === "cat") {
         const shape = new THREE.Shape();
         shape.moveTo(-0.085, 0);
         shape.lineTo(0.085, 0);
@@ -172,7 +184,7 @@ export function makeAvatarHead(avatarId: AvatarId) {
 
   if (!alien)
     for (const side of [-1, 1]) {
-      const z = id === "panda" ? 0.228 : 0.212;
+      const z = id === "monkey" ? 0.249 : id === "panda" ? 0.228 : 0.212;
       sphere(head, [0.035, 0.028, 0.011], 0xfff8e6, [side * 0.095, 0.045, z]);
       sphere(head, [0.017, 0.02, 0.007], id === "cat" ? 0x687a44 : 0x514236, [
         side * 0.095,

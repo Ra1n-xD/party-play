@@ -13,7 +13,7 @@ export function AvatarPortrait({ avatarId }: { avatarId: AvatarId }) {
       <circle cx="60" cy="61" r="51" fill="#fff4d5" opacity=".12" />
       <path d="M17 120v-10c0-24 16-36 43-36s43 12 43 36v10" fill={hex(avatar.outfit)} />
       <path d="m47 80 13 28 13-28" fill="#f8eed8" />
-      {(id === "cat" || id === "fox") && (
+      {id === "cat" && (
         <>
           <path d="M30 45 27 12 52 35M68 35 93 12 90 45" fill={skin} />
           <path d="m34 32-1-10 12 14m30 0 12-14-1 10" fill={accent} />
@@ -31,6 +31,13 @@ export function AvatarPortrait({ avatarId }: { avatarId: AvatarId }) {
           <g key={x}>
             <circle cx={x} cy="34" r="14" fill={id === "panda" ? accent : skin} />
             <circle cx={x} cy="34" r="8" fill={id === "panda" ? "#71655b" : accent} />
+          </g>
+        ))}
+      {id === "monkey" &&
+        [25, 95].map((x) => (
+          <g key={x}>
+            <ellipse cx={x} cy="55" rx="15" ry="17" fill={skin} />
+            <ellipse cx={x} cy="55" rx="9" ry="11" fill={accent} />
           </g>
         ))}
       {id === "alien" && (
@@ -65,6 +72,13 @@ export function AvatarPortrait({ avatarId }: { avatarId: AvatarId }) {
           />
           {human && (
             <path d="M29 52c-9-38 55-48 64-15l-5 19-7-15c-9 7-26 5-33-1l-14 7Z" fill="#48322b" />
+          )}
+          {id === "monkey" && (
+            <>
+              <path d="M45 34q0-11 10-10l5-9 6 9q11-1 10 10" fill={skin} />
+              <ellipse cx="46" cy="55" rx="14" ry="18" fill={accent} />
+              <ellipse cx="74" cy="55" rx="14" ry="18" fill={accent} />
+            </>
           )}
           {id === "dog" && (
             <g fill={accent}>
@@ -104,6 +118,11 @@ export function AvatarPortrait({ avatarId }: { avatarId: AvatarId }) {
           )}
           {human ? (
             <path d="M60 60v6" stroke="#c58970" strokeWidth="5" strokeLinecap="round" />
+          ) : id === "monkey" ? (
+            <g fill="#66402d">
+              <circle cx="56" cy="68" r="2" />
+              <circle cx="64" cy="68" r="2" />
+            </g>
           ) : (
             id !== "alien" && (
               <path
