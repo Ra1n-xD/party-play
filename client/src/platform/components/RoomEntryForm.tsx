@@ -47,18 +47,17 @@ export function RoomEntryForm({
     <section
       id="show-room-entry"
       className={`show-entry-panel${compact ? " is-compact" : ""}`}
-      aria-labelledby={`${id}-title`}
+      aria-labelledby={compact && !creating ? `${id}-title` : undefined}
+      aria-label={
+        compact && !creating ? undefined : creating ? "Создание комнаты" : "Вход в комнату"
+      }
     >
-      <h2 id={`${id}-title`}>
-        {creating ? "Ваше шоу!" : compact ? "Уже есть код?" : "Вы в игре?"}
-      </h2>
-      <p className="show-entry-description">
-        {creating
-          ? "Создайте комнату и пригласите компанию."
-          : compact
-            ? "Введите код от друга — и присоединяйтесь."
-            : "Всего один код до первого хода."}
-      </p>
+      {compact && !creating && (
+        <>
+          <h2 id={`${id}-title`}>Уже есть код?</h2>
+          <p className="show-entry-description">Введите код от друга — и присоединяйтесь.</p>
+        </>
+      )}
       <form className="show-entry-form" onSubmit={onSubmit}>
         {!creating && (
           <label className="show-field">

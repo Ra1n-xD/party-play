@@ -678,6 +678,9 @@
   pointer-events: none;
 }
 .table3d-hand-card {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   position: absolute;
   top: 0;
   left: 0;
@@ -708,6 +711,9 @@
   display: none;
 }
 .table3d-hand-caption {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   position: absolute;
   bottom: 18px;
   left: 22px;

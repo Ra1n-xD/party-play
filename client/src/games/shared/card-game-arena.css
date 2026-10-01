@@ -313,6 +313,19 @@
   flex: 0 0 auto;
 }
 
+.card-game-screen .durak-command-actions .durak-finish-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 5.5em;
+  min-height: 44px;
+  padding: 8px 14px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
 .card-game-screen .durak-manage-button,
 .card-game-screen .uno-manage-button {
   position: relative;

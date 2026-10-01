@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { makeRoomEnvironment } from "./RoomEnvironment";
 import { CARD_HEIGHT, makeCardGeometry, type CardMesh } from "./CardGeometry";
 import { HAND_CARD_EDGE_Y, makeSeatedArm, roundedPart } from "./AvatarParts";
+import { getAvatar, type AvatarId } from "../../../../../shared/platform/avatars";
+import { makeSeatedAvatar } from "./AvatarModel";
 import {
   AVATAR_LOOK_INTERVAL_MS,
   AVATAR_LOOK_EXPIRY_MS,
@@ -26,6 +28,7 @@ export interface TablePerformance {
 
 export interface TablePerson {
   id: string;
+  avatarId: AvatarId;
   name: string;
   count: number;
   active: boolean;
@@ -82,8 +85,6 @@ export interface TableSceneOptions {
   onOverviewChange: (overview: boolean) => void;
 }
 
-const PALETTE = [0x467c87, 0xca8652, 0x887ca5, 0x829d67, 0xba6c73, 0x627eb3];
-const SKIN = [0xd4a07a, 0x9e694e, 0xe6bda0, 0xbc8b69];
 const TABLE_Y = 1.44;
 const RADIUS = 3.05;
 const TABLE_CARD_SCALE = 0.82;
@@ -539,172 +540,20 @@ export class RoundTableScene {
     group.userData.isBot = person.isBot;
     this.players.add(group);
     this.seatPositions.set(person.id, group.position.clone().setY(2));
-    const shirt = PALETTE[index % PALETTE.length];
-    const skin = SKIN[index % SKIN.length];
-    const hair = [0x392b24, 0x33251f, 0xb48a52, 0x2c282a, 0x694136, 0x74716a][index % 6];
     // Rounded, tufted leather chair with brass feet.
     this.sphere(group, [0.52, 0.16, 0.47], 0x47372f, [0, 0.76, -0.02]);
     this.sphere(group, [0.52, 0.7, 0.14], 0x493830, [0, 1.3, -0.4]);
     for (const x of [-0.24, 0, 0.24])
       for (const y of [1.1, 1.45])
         this.sphere(group, [0.025, 0.025, 0.016], 0x2c211b, [x, y, -0.254]);
-    const body = new THREE.Group();
-    body.position.y = 0.92;
-    const model = new THREE.Group();
-    model.position.y = -0.92;
-    body.add(model);
-    group.add(body);
-    for (const side of [-1, 1]) {
+    for (const side of [-1, 1])
       for (const z of [-0.28, 0.27])
         this.box(group, [0.055, 0.72, 0.055], 0x997847, [side * 0.35, 0.36, z]);
-      this.sphere(model, [0.17, 0.16, 0.4], 0x252f33, [side * 0.21, 0.92, 0.28]);
-      this.box(model, [0.23, 0.64, 0.22], 0x252f33, [side * 0.21, 0.54, 0.56]);
-      this.sphere(model, [0.17, 0.095, 0.31], 0x241f1c, [side * 0.21, 0.18, 0.65]);
-      this.box(model, [0.23, 0.025, 0.5], 0x171615, [side * 0.21, 0.12, 0.68]);
-    }
-    const jacketMaterial = this.material(shirt, 0.94);
-    const jacketProfile = [
-      [0, 0],
-      [0.25, 0],
-      [0.3, 0.08],
-      [0.32, 0.35],
-      [0.35, 0.67],
-      [0.32, 0.79],
-      [0.2, 0.86],
-      [0, 0.86],
-    ];
-    const jacket = new THREE.Mesh(
-      new THREE.LatheGeometry(
-        jacketProfile.map(([r, y]) => new THREE.Vector2(r, y)),
-        32,
-      ),
-      jacketMaterial,
-    );
-    jacket.position.y = 0.99;
-    jacket.scale.z = 0.68;
-    jacket.castShadow = jacket.receiveShadow = true;
-    model.add(jacket);
-    const shirtShape = new THREE.Shape();
-    shirtShape.moveTo(-0.16, 1.87);
-    shirtShape.lineTo(0.16, 1.87);
-    shirtShape.lineTo(0.065, 1.24);
-    shirtShape.lineTo(-0.065, 1.24);
-    shirtShape.closePath();
-    this.mesh(model, new THREE.ShapeGeometry(shirtShape), 0xe8e1d2, [0, 0, 0.25]);
-    for (const side of [-1, 1]) {
-      const lapel = roundedPart([0.095, 0.39, 0.025], jacketMaterial, 0.012);
-      lapel.position.set(side * 0.135, 1.65, 0.255);
-      model.add(lapel);
-      lapel.rotation.z = -side * 0.31;
-      const collar = roundedPart([0.1, 0.12, 0.027], this.material(0xf4e8ce), 0.009);
-      collar.position.set(side * 0.065, 1.845, 0.215);
-      model.add(collar);
-      collar.rotation.z = side * 0.43;
-    }
-    if (index % 2 === 0) {
-      this.box(model, [0.065, 0.32, 0.025], index % 4 ? 0x8c6742 : 0x67464b, [0, 1.65, 0.309]);
-      this.sphere(model, [0.04, 0.045, 0.022], 0x785748, [0, 1.84, 0.278]);
-    }
-    for (const y of [1.23, 1.39]) this.sphere(model, [0.018, 0.018, 0.01], 0xb79764, [0, y, 0.275]);
-    this.box(model, [0.12, 0.032, 0.023], 0xe0ce9e, [-0.24, 1.67, 0.235]);
-    this.cylinder(model, 0.105, 0.18, skin, [0, 1.94, 0.02]);
-    const head = new THREE.Group();
-    head.position.set(0, 2.25, 0.025);
-    head.name = "head";
-    model.add(head);
-    const headGeometry = new THREE.SphereGeometry(1, 40, 28);
-    const headVertices = headGeometry.getAttribute("position");
-    for (let i = 0; i < headVertices.count; i++) {
-      const y = headVertices.getY(i);
-      const jaw = 1 - Math.max(0, -y) * 0.2;
-      headVertices.setXYZ(
-        i,
-        headVertices.getX(i) * 0.24 * jaw,
-        y * 0.3,
-        headVertices.getZ(i) * 0.222,
-      );
-    }
-    headGeometry.computeVertexNormals();
-    this.mesh(head, headGeometry, skin, [0, 0, 0]);
-    this.sphere(head, [0.031, 0.055, 0.047], skin, [0, -0.02, 0.21]);
-    for (const side of [-1, 1]) {
-      this.sphere(head, [0.035, 0.061, 0.038], skin, [side * 0.23, -0.014, 0]);
-      this.sphere(head, [0.021, 0.04, 0.015], 0xa4775e, [side * 0.249, -0.016, 0.017]);
-      this.sphere(head, [0.056, 0.038, 0.012], skin, [side * 0.095, 0.055, 0.202]);
-      this.sphere(head, [0.034, 0.021, 0.008], 0xeee7d8, [side * 0.092, 0.045, 0.211]);
-      this.sphere(head, [0.014, 0.016, 0.005], 0x554337, [side * 0.092, 0.044, 0.218]);
-      this.sphere(head, [0.007, 0.01, 0.003], 0x141b19, [side * 0.092, 0.044, 0.222]);
-      this.sphere(head, [0.003, 0.003, 0.002], 0xffffff, [side * 0.092 - 0.004, 0.05, 0.225]);
-      const brow = this.sphere(head, [0.045, 0.009, 0.009], hair, [side * 0.094, 0.093, 0.202]);
-      brow.rotation.z = side * 0.07;
-    }
-    const smile = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.055, -0.12, 0.192),
-      new THREE.Vector3(0, -0.129, 0.208),
-      new THREE.Vector3(0.055, -0.12, 0.192),
-    ]);
-    this.mesh(head, new THREE.TubeGeometry(smile, 12, 0.007, 6, false), 0x8f5949, [0, 0, 0]);
-    // A fitted hair cap follows the skull; a raised front hairline keeps the eyes uncovered.
-    const hairCap = new THREE.SphereGeometry(1, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2 + 0.08);
-    const hairVertices = hairCap.getAttribute("position");
-    for (let i = 0; i < hairVertices.count; i++) {
-      const front = Math.max(0, hairVertices.getZ(i));
-      const y = hairVertices.getY(i);
-      hairVertices.setXYZ(
-        i,
-        hairVertices.getX(i) * 0.247,
-        y * 0.292 + front * front * (1 - Math.max(0, y)) * 0.1,
-        hairVertices.getZ(i) * 0.232,
-      );
-    }
-    hairCap.computeVertexNormals();
-    this.mesh(head, hairCap, hair, [0, 0.013, -0.005]);
-    this.sphere(head, [0.222, 0.15, 0.09], hair, [0, 0.07, -0.155]);
-    const hairStyle = index % 3;
-    if (hairStyle === 0) {
-      for (const side of [-1, 1])
-        this.sphere(head, [0.042, 0.16, 0.14], hair, [side * 0.218, -0.022, -0.025]);
-    } else {
-      for (let i = 0; i < (hairStyle === 1 ? 3 : 6); i++) {
-        const lock = this.sphere(
-          head,
-          hairStyle === 1 ? [0.083, 0.042, 0.1] : [0.053, 0.047, 0.067],
-          hair,
-          [
-            -0.135 + i * (hairStyle === 1 ? 0.11 : 0.054),
-            0.265 - Math.abs(i - (hairStyle === 1 ? 1 : 2.5)) * 0.012,
-            0.078,
-          ],
-        );
-        lock.rotation.z = -0.26;
-      }
-    }
-    if (index % 3 === 0) {
-      for (const side of [-1, 1]) {
-        const frame = this.mesh(head, new THREE.TorusGeometry(0.055, 0.006, 8, 24), 0xa28d65, [
-          side * 0.092,
-          0.045,
-          0.239,
-        ]);
-        frame.scale.y = 0.85;
-      }
-      this.box(head, [0.06, 0.008, 0.01], 0xa28d65, [0, 0.057, 0.24]);
-    }
-    if (index % 3 === 1) {
-      this.sphere(head, [0.165, 0.072, 0.066], hair, [0, -0.207, 0.126]);
-      this.sphere(head, [0.052, 0.012, 0.01], hair, [0, -0.088, 0.205]);
-    }
     const holdsCards = this.options.variant !== "bunker" && person.count > 0;
-    const leftArm = makeSeatedArm(skin, jacketMaterial, -1, holdsCards);
-    const rightArm = makeSeatedArm(skin, jacketMaterial, 1, false);
-    model.add(leftArm.root, rightArm.root);
+    const { body, head, leftArm, rightArm, hand } = makeSeatedAvatar(person.avatarId, holdsCards);
+    group.add(body);
     this.cardArms.set(person.id, leftArm);
-    const hand = new THREE.Group();
-    hand.name = "hand";
-    leftArm.grip.add(hand);
     this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
-    mergeRigidParts(head);
-    mergeRigidParts(model);
     mergeRigidParts(group);
     const animator = new TableAvatarAnimator(
       body,
@@ -834,10 +683,11 @@ export class RoundTableScene {
 
   update(state: RoundTableState) {
     const ownIndex = state.people.findIndex((person) => person.id === state.viewerId);
+    const ownAvatar = getAvatar(state.people[ownIndex]?.avatarId);
     this.ownHand.update(
       ownIndex >= 0 ? (state.ownHand ?? []) : [],
-      SKIN[Math.max(0, ownIndex) % SKIN.length],
-      PALETTE[Math.max(0, ownIndex) % PALETTE.length],
+      ownAvatar.skin,
+      ownAvatar.outfit,
     );
     this.labelHost.style.setProperty(
       "--table3d-dossier-width",
@@ -847,7 +697,10 @@ export class RoundTableScene {
     this.seatRadius = radius + 0.5;
     this.table.scale.set(radius / RADIUS, 1, radius / RADIUS);
     this.seatedPosition.z = this.seatRadius + (this.options.variant === "bunker" ? 0.85 : 0.1);
-    const peopleKey = JSON.stringify([state.people.map((person) => person.id), state.viewerId]);
+    const peopleKey = JSON.stringify([
+      state.people.map((person) => [person.id, person.avatarId]),
+      state.viewerId,
+    ]);
     if (peopleKey !== this.peopleKey) {
       this.peopleKey = peopleKey;
       this.disposeGroup(this.players);

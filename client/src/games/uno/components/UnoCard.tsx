@@ -91,7 +91,7 @@ export function UnoCard({
         {mark}
       </span>
       <span className="uno-card-core" aria-hidden="true">
-        {icon ? <img src={icon} alt="" /> : mark}
+        {icon ? <img src={icon} alt="" draggable={false} /> : mark}
       </span>
       <span className="uno-card-corner is-bottom" aria-hidden="true">
         {mark}
@@ -119,6 +119,7 @@ export function UnoCard({
         }
         onDoubleClick={onDoubleClick}
         onKeyDown={handleKeyDown}
+        onContextMenu={(event) => event.preventDefault()}
         aria-pressed={selected || undefined}
         aria-label={ariaLabel ?? getUnoCardName(card)}
         aria-describedby={ariaDescribedBy}
@@ -129,7 +130,12 @@ export function UnoCard({
   }
 
   return (
-    <div className={className} role="img" aria-label={ariaLabel ?? getUnoCardName(card)}>
+    <div
+      className={className}
+      role="img"
+      aria-label={ariaLabel ?? getUnoCardName(card)}
+      onContextMenu={(event) => event.preventDefault()}
+    >
       {content}
     </div>
   );
@@ -138,7 +144,7 @@ export function UnoCard({
 export function UnoCardBack({ label = "Карта рубашкой вверх" }: { label?: string }) {
   return (
     <div className="uno-card uno-card-back is-table" role="img" aria-label={label}>
-      <img src={cardBack} alt="" aria-hidden="true" />
+      <img src={cardBack} alt="" aria-hidden="true" draggable={false} />
     </div>
   );
 }

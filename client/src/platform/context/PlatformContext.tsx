@@ -20,6 +20,7 @@ import type {
   ServerEvents,
 } from "../../../../shared/platform/protocol";
 import type { RoomReactionEvent, RoomReactionId } from "../../../../shared/platform/reactions";
+import type { AvatarId } from "../../../../shared/platform/avatars";
 import type {
   AnyPublicRoomDirectorySnapshot,
   PublicRoomCountsSnapshot,
@@ -165,6 +166,7 @@ interface PlatformContextValue {
   leaveRoom: () => void;
   clearError: () => void;
   setReady: (ready: boolean) => boolean;
+  setAvatar: (avatarId: AvatarId) => boolean;
   startGame: () => boolean;
   playAgain: () => boolean;
   addBot: () => boolean;
@@ -1673,6 +1675,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         leaveRoom,
         clearError,
         setReady: (ready) => emitCommonCommand({ type: "seat:set-ready", ready }),
+        setAvatar: (avatarId) => emitCommonCommand({ type: "seat:set-avatar", avatarId }),
         startGame: () => emitCommonCommand({ type: "room:start" }),
         playAgain: () => emitCommonCommand({ type: "room:play-again" }),
         addBot: () => emitCommonCommand({ type: "room:add-bot" }),

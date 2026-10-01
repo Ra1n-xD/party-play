@@ -365,15 +365,11 @@ export function HomeScreen() {
                     <span className="show-lineup-number">0{index + 1}</span>
                     <strong>{game.metadata.title}</strong>
                     <small>
+                      <FiUsers aria-hidden="true" />
                       {game.metadata.minPlayers}–{game.metadata.maxPlayers} игроков
                     </small>
                   </button>
                 ))}
-                <p className="show-lineup-note">
-                  Один код.
-                  <br />
-                  Вся компания.
-                </p>
               </nav>
               <article className="show-feature" aria-labelledby="show-feature-title">
                 <div className={`show-feature-art is-${featuredGameId}`}>

@@ -14,12 +14,14 @@ import {
   randomPick,
 } from "../utils.js";
 import { CONFIG } from "../config.js";
+import { AVATARS, DEFAULT_AVATAR_ID, type AvatarId } from "../../../shared/platform/avatars.js";
 
 export interface Player {
   id: string;
   socketId: string;
   sessionToken: string;
   name: string;
+  avatarId: AvatarId;
   ready: boolean;
   connected: boolean;
   alive: boolean;
@@ -227,6 +229,7 @@ export function createRoom<G extends GameId = "bunker">(
     socketId,
     sessionToken,
     name: playerName,
+    avatarId: DEFAULT_AVATAR_ID,
     ready: false,
     connected: true,
     alive: true,
@@ -302,6 +305,7 @@ export function joinRoom(
     socketId,
     sessionToken,
     name: playerName,
+    avatarId: DEFAULT_AVATAR_ID,
     ready: false,
     connected: true,
     alive: true,
@@ -423,6 +427,7 @@ export function addBotToRoom(room: Room, maxSeats = room.seatLimit): Player | nu
     socketId: "",
     sessionToken: "",
     name,
+    avatarId: AVATARS[room.players.size % AVATARS.length].id,
     ready: true,
     connected: true,
     alive: true,

@@ -87,6 +87,7 @@ export default function BunkerTable3D(props: Props) {
     () => ({
       people: (game?.players ?? []).map((player) => ({
         id: player.id,
+        avatarId: snapshot?.seats.find((seat) => seat.seatId === player.id)?.avatarId ?? "human",
         name: player.name,
         count: 0,
         active: game?.currentTurnPlayerId === player.id && !game.paused,
@@ -136,7 +137,7 @@ export default function BunkerTable3D(props: Props) {
       trump: null,
       takeSeatId: null,
     }),
-    [game, playerId, isSpectator, focused, props.vote?.selectedId],
+    [game, playerId, isSpectator, focused, props.vote?.selectedId, snapshot?.seats],
   );
   if (!game) return null;
   const view = buildGameScreenViewModel({ gameState: game, playerId, isSpectator, myCharacter });

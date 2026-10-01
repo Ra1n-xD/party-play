@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { usePlatform } from "../../../platform/context/PlatformContext";
+import { getAvatar } from "../../../../../shared/platform/avatars";
 import type { UnoPublicState } from "../../../../../shared/games/uno/types";
 import RoundTableView from "../../shared/table3d/RoundTableView";
 import type { RoundTableState } from "../../shared/table3d/RoundTableScene";
@@ -25,6 +27,7 @@ interface Props {
   onSelectCard: (id: string) => void;
 }
 export default function UnoTable3D(props: Props) {
+  const { snapshot } = usePlatform();
   const { game, viewerSeatId } = props;
   const state = useMemo<RoundTableState>(() => {
     const card = game.topDiscard;
@@ -32,6 +35,8 @@ export default function UnoTable3D(props: Props) {
     return {
       people: game.players.map((player) => ({
         id: player.seatId,
+        avatarId: getAvatar(snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.avatarId)
+          .id,
         name: player.name,
         count: player.cardCount,
         active: player.isCurrentActor && !props.paused,
@@ -75,7 +80,7 @@ export default function UnoTable3D(props: Props) {
       trump: null,
       takeSeatId: null,
     };
-  }, [game, viewerSeatId, props.hand, props.paused]);
+  }, [game, viewerSeatId, props.hand, props.paused, snapshot?.seats]);
   const actor = game.players.find((player) => player.seatId === game.currentActorSeatId);
   return (
     <RoundTableView
