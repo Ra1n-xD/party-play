@@ -2,6 +2,8 @@ import { lazy, Suspense } from "react";
 import { FiCheck, FiX } from "react-icons/fi";
 import { AVATARS, getAvatar, type AvatarId } from "../../../../shared/platform/avatars";
 import { AvatarPortrait } from "./AvatarPortrait";
+import { getCosmetic, RARITIES } from "../../../../shared/platform/cosmetics";
+import { useProfile } from "../context/ProfileContext";
 
 const AvatarPreview = lazy(() => import("./AvatarPreview"));
 
@@ -17,11 +19,15 @@ export function AvatarPicker({
   onClose: () => void;
 }) {
   const chosen = getAvatar(avatarId);
+  const { profile } = useProfile();
   return (
     <section className="show-avatar-picker" aria-labelledby="avatar-picker-title">
       <div className="show-avatar-heading">
         <h2 id="avatar-picker-title">Ваш персонаж</h2>
-        <span>10 на выбор</span>
+        <span>
+          {AVATARS.filter((avatar) => profile?.inventory[`avatar:${avatar.id}`]).length} / 10
+          открыто
+        </span>
         <button
           type="button"
           className="show-avatar-close"
@@ -44,12 +50,17 @@ export function AvatarPicker({
               type="button"
               key={avatar.id}
               onClick={() => onSelect(avatar.id)}
-              disabled={disabled}
+              disabled={disabled || !profile?.inventory[`avatar:${avatar.id}`]}
               aria-pressed={chosen.id === avatar.id}
               aria-label={`Выбрать персонажа: ${avatar.name}`}
             >
               <AvatarPortrait avatarId={avatar.id} />
               <span>{avatar.name}</span>
+              <small style={{ color: RARITIES[getCosmetic(`avatar:${avatar.id}`)!.rarity].color }}>
+                {profile?.inventory[`avatar:${avatar.id}`]
+                  ? RARITIES[getCosmetic(`avatar:${avatar.id}`)!.rarity].name
+                  : "В кейсе"}
+              </small>
               {chosen.id === avatar.id && (
                 <FiCheck className="show-avatar-check" aria-hidden="true" />
               )}

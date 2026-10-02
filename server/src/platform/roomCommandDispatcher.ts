@@ -12,6 +12,7 @@ import {
 } from "./reconnectManager.js";
 import { getServerGameModule } from "./gameRegistry.js";
 import type { GameCommandExecution, IOServer } from "./gameModule.js";
+import { equipProfileItem } from "./profiles.js";
 import { isAvatarId } from "../../../shared/platform/avatars.js";
 
 const MAX_PROCESSED_COMMANDS = 128;
@@ -143,7 +144,13 @@ function applyCommand(
           error: "Персонажа можно выбрать до начала игры",
         };
       }
-      player.avatarId = command.avatarId;
+      if (!player.profileKey)
+        return { success: false, code: "FORBIDDEN", error: "Войдите в профиль" };
+      try {
+        equipProfileItem(player.profileKey, `avatar:${command.avatarId}`, io);
+      } catch (error) {
+        return { success: false, code: "FORBIDDEN", error: (error as Error).message };
+      }
       module.publish(room, io);
       return { success: true };
     }

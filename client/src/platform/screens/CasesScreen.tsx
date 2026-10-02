@@ -1,0 +1,242 @@
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  CASE_ITEMS,
+  COSMETIC_KIND_NAMES,
+  RARITIES,
+  getCosmetic,
+  type CaseOpening,
+  type Cosmetic,
+} from "../../../../shared/platform/cosmetics";
+import { CosmeticPreview } from "../components/CosmeticPreview";
+import { useProfile } from "../context/ProfileContext";
+
+const WINNER_INDEX = 38;
+function randomItem() {
+  return CASE_ITEMS[Math.floor(Math.random() * CASE_ITEMS.length)];
+}
+function ReelItem({ item }: { item: Cosmetic }) {
+  return (
+    <div
+      className="case-reel-item"
+      style={{ "--rarity-color": RARITIES[item.rarity].color } as CSSProperties}
+    >
+      <CosmeticPreview item={item} />
+      <strong>{item.name}</strong>
+      <small>{COSMETIC_KIND_NAMES[item.kind]}</small>
+    </div>
+  );
+}
+export function CasesScreen() {
+  const { profile, openCase, equip, busy, connected, error } = useProfile();
+  const [opening, setOpening] = useState<CaseOpening | null>(null);
+  const [reel, setReel] = useState<Cosmetic[]>(() => Array.from({ length: 8 }, randomItem));
+  const [phase, setPhase] = useState<"idle" | "request" | "spin" | "result">("idle");
+  const [offset, setOffset] = useState(0);
+  const [animated, setAnimated] = useState(false);
+  const viewport = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const timer = useRef<number>();
+  const frame = useRef<number>();
+  const mounted = useRef(true);
+  const openingLock = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      window.clearTimeout(timer.current);
+      window.cancelAnimationFrame(frame.current ?? 0);
+    };
+  }, []);
+  const finish = () => {
+    if (mounted.current) {
+      setPhase("result");
+      openingLock.current = false;
+    }
+  };
+  const start = async () => {
+    if (openingLock.current || !connected) return;
+    openingLock.current = true;
+    setPhase("request");
+    setOpening(null);
+    const result = await openCase();
+    if (!mounted.current) return;
+    if (!result) {
+      setPhase("idle");
+      openingLock.current = false;
+      return;
+    }
+    const winner = getCosmetic(result.itemId)!;
+    const items = Array.from({ length: 46 }, randomItem);
+    items[WINNER_INDEX] = winner;
+    setReel(items);
+    setOpening(result);
+    setAnimated(false);
+    setOffset(0);
+    setPhase("spin");
+    frame.current = requestAnimationFrame(() => {
+      frame.current = requestAnimationFrame(() => {
+        if (!viewport.current || !track.current) return finish();
+        const card = track.current.children[WINNER_INDEX] as HTMLElement;
+        setOffset(viewport.current.clientWidth / 2 - card.offsetLeft - card.offsetWidth / 2);
+        setAnimated(true);
+        timer.current = window.setTimeout(
+          finish,
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 100 : 6200,
+        );
+      });
+    });
+  };
+  const skip = () => {
+    window.clearTimeout(timer.current);
+    setAnimated(false);
+    finish();
+  };
+  const winner = opening ? getCosmetic(opening.itemId) : null;
+  if (!profile) return null;
+  const equipped = winner && `${winner.kind}:${profile.equipped[winner.kind]}` === winner.id;
+  return (
+    <main className="cases-page">
+      <div className="collection-heading">
+        <div>
+          <span className="profile-eyebrow">PARTY CASE / 01</span>
+          <h1>Вечер с сюрпризом</h1>
+          <p>Персонажи и карты. Один кейс, один новый повод сыграть.</p>
+        </div>
+        <span className="case-price">◉ 1 монета за открытие</span>
+      </div>
+      <section className={`case-stage phase-${phase}`}>
+        <div className="case-stage-light" />
+        <div className="case-caption">
+          <span>
+            {phase === "spin"
+              ? "Ищем ваш стиль…"
+              : phase === "result"
+                ? "Ваша награда"
+                : "Коллекция PartyPlay"}
+          </span>
+          <small>{CASE_ITEMS.length} предметов · 4 редкости</small>
+        </div>
+        <div className="case-reel-window" ref={viewport} aria-hidden="true">
+          <div className="case-pointer" />
+          <div
+            className={`case-reel-track${animated ? " is-rolling" : ""}`}
+            ref={track}
+            style={{ transform: `translateX(${offset}px)` }}
+            onTransitionEnd={(event) => {
+              if (event.target === track.current && phase === "spin") finish();
+            }}
+          >
+            {reel.map((item, index) => (
+              <ReelItem key={`${index}:${item.id}`} item={item} />
+            ))}
+          </div>
+        </div>
+        <div className="case-controls">
+          {phase === "spin" ? (
+            <button className="profile-text-button" onClick={skip}>
+              Пропустить анимацию
+            </button>
+          ) : (
+            <button
+              className="profile-primary"
+              onClick={start}
+              disabled={phase === "request" || busy || !connected || profile.coins < 1}
+            >
+              {phase === "request"
+                ? "Открываем…"
+                : profile.coins < 1
+                  ? "Нужна 1 монета"
+                  : "Открыть кейс · ◉ 1"}
+            </button>
+          )}
+          <span>Ваш баланс: ◉ {profile.coins}</span>
+        </div>
+        {phase === "result" && winner && (
+          <div
+            className="case-result"
+            role="status"
+            style={{ "--rarity-color": RARITIES[winner.rarity].color } as CSSProperties}
+          >
+            <span className="cosmetic-rarity">
+              {RARITIES[winner.rarity].name} · {COSMETIC_KIND_NAMES[winner.kind]}
+            </span>
+            <strong>{winner.name}</strong>
+            <p>
+              {opening?.duplicate
+                ? "Повторный предмет добавлен в коллекцию."
+                : "Новый предмет уже в вашей коллекции."}
+            </p>
+            <button
+              onClick={() => equip(winner.id)}
+              disabled={busy || !connected || !!equipped}
+              className="collection-equip"
+            >
+              {equipped ? "✓ Выбран" : "Использовать"}
+            </button>
+          </div>
+        )}
+        {error && (
+          <p className="profile-error" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+      <div className="case-info">
+        <p>
+          ◉ +1 монета каждому игроку за полностью завершённую партию в любой игре. Зрители и
+          прерванные партии без награды.
+        </p>
+        <a href="/profile">Открыть коллекцию →</a>
+      </div>
+      <section className="case-contents">
+        <h2>Что внутри</h2>
+        <div className="case-chances">
+          {Object.entries(RARITIES)
+            .filter(([, rarity]) => rarity.chance)
+            .map(([id, rarity]) => (
+              <span key={id} style={{ color: rarity.color }}>
+                {rarity.name} · {rarity.chance}%
+              </span>
+            ))}
+        </div>
+        <p>Внутри одной редкости все предметы равновероятны. Повторы возможны.</p>
+        <div className="collection-grid">
+          {CASE_ITEMS.map((item) => (
+            <article
+              key={item.id}
+              className="collection-item"
+              style={{ "--rarity-color": RARITIES[item.rarity].color } as CSSProperties}
+            >
+              <span className="cosmetic-rarity">{RARITIES[item.rarity].name}</span>
+              <CosmeticPreview item={item} />
+              <h3>{item.name}</h3>
+              <small>{COSMETIC_KIND_NAMES[item.kind]}</small>
+            </article>
+          ))}
+        </div>
+      </section>
+      {profile.recentOpenings.length > 0 && (
+        <section className="case-history">
+          <h2>Последние открытия</h2>
+          <ul>
+            {profile.recentOpenings
+              .filter((entry) => phase !== "spin" || entry.requestId !== opening?.requestId)
+              .slice(0, 8)
+              .map((entry) => {
+                const item = getCosmetic(entry.itemId)!;
+                return (
+                  <li key={entry.requestId}>
+                    <span style={{ color: RARITIES[item.rarity].color }}>{item.name}</span>
+                    <small>
+                      {COSMETIC_KIND_NAMES[item.kind]}
+                      {entry.duplicate ? " · повтор" : ""}
+                    </small>
+                  </li>
+                );
+              })}
+          </ul>
+        </section>
+      )}
+    </main>
+  );
+}

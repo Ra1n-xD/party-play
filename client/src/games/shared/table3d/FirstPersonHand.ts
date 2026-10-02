@@ -1,8 +1,10 @@
+import type { CardSkinId } from "../../../../../shared/platform/cosmetics";
 import * as THREE from "three";
 import { CARD_WIDTH, CARD_HEIGHT, CARD_THICKNESS, type CardMesh } from "./CardGeometry";
 import { HAND_CARD_EDGE_Y, makeAvatarHand, limbBetween, roundedPart } from "./AvatarParts";
 
 export interface CardFace {
+  skinId?: CardSkinId;
   rank: string;
   suit: string;
   red: boolean;

@@ -1,3 +1,4 @@
+import { useCardSkin } from "../../../platform/useCardSkin";
 import type {
   DurakCard as DurakCardData,
   DurakRank,
@@ -84,6 +85,7 @@ export function DurakCard({
   ariaLabel,
   ariaDescribedBy,
 }: DurakCardProps) {
+  const { props: skinProps } = useCardSkin("durak");
   const accessibleName = ariaLabel ?? getCardName(card);
   const className = [
     "durak-card",
@@ -121,6 +123,7 @@ export function DurakCard({
       <button
         type="button"
         className={className}
+        {...skinProps}
         onClick={
           onClick
             ? (event) => {
@@ -144,6 +147,7 @@ export function DurakCard({
   return (
     <div
       className={className}
+      {...skinProps}
       aria-label={accessibleName}
       role="img"
       onContextMenu={(event) => event.preventDefault()}
@@ -154,9 +158,15 @@ export function DurakCard({
 }
 
 export function DurakCardBack({ label = "Карта рубашкой вверх" }: { label?: string }) {
+  const { skin, props: skinProps } = useCardSkin("durak");
   return (
-    <div className="durak-card durak-card-back is-table" role="img" aria-label={label}>
-      <span aria-hidden="true">◆</span>
+    <div
+      {...skinProps}
+      className="durak-card durak-card-back is-table"
+      role="img"
+      aria-label={label}
+    >
+      <span aria-hidden="true">{skin.mark}</span>
     </div>
   );
 }

@@ -1,0 +1,240 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { socket } from "../../socket";
+import type {
+  CaseOpening,
+  ProfileSnapshot,
+  ProfileReply,
+} from "../../../../shared/platform/cosmetics";
+
+const STORAGE_KEY = "partyplay_nickname_v1";
+const OPENING_KEY = "partyplay_pending_case_v1";
+function pendingCase(name: string): string | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(OPENING_KEY) ?? "null");
+    return saved?.nickname === name ? saved.requestId : null;
+  } catch {
+    return null;
+  }
+}
+function savePendingCase(name: string, requestId: string | null) {
+  try {
+    if (requestId) localStorage.setItem(OPENING_KEY, JSON.stringify({ nickname: name, requestId }));
+    else localStorage.removeItem(OPENING_KEY);
+  } catch {
+    /* The in-memory key still prevents retry charges. */
+  }
+}
+function savedNickname() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+function saveNickname(name: string) {
+  try {
+    if (name) localStorage.setItem(STORAGE_KEY, name);
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* Login still works without browser storage. */
+  }
+}
+interface ProfileContextValue {
+  profile: ProfileSnapshot | null;
+  busy: boolean;
+  connected: boolean;
+  error: string | null;
+  login(name: string): void;
+  logout(): void;
+  equip(itemId: string): void;
+  openCase(): Promise<CaseOpening | null>;
+  clearError(): void;
+}
+const Context = createContext<ProfileContextValue | null>(null);
+export function ProfileProvider({ children }: { children: ReactNode }) {
+  const [profile, setProfile] = useState<ProfileSnapshot | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [connected, setConnected] = useState(socket.connected);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const nickname = useRef(savedNickname());
+  const pendingOpening = useRef<string | null>(null);
+  const requestBusy = useRef(false);
+  const accept = useCallback((next: ProfileSnapshot) => {
+    nickname.current = next.nickname;
+    saveNickname(next.nickname);
+    setProfile(next);
+  }, []);
+  const login = useCallback(
+    (name: string) => {
+      if (!socket.connected || requestBusy.current) return;
+      requestBusy.current = true;
+      setBusy(true);
+      setError(null);
+      const connectionId = socket.id;
+      socket
+        .timeout(8000)
+        .emit(
+          "profile:login",
+          { nickname: name },
+          (timeout: Error | null, result: ProfileReply<ProfileSnapshot>) => {
+            requestBusy.current = false;
+            setBusy(false);
+            if (socket.id !== connectionId) return;
+            setReady(true);
+            if (timeout) {
+              setProfile(null);
+              setError("Сервер не ответил. Попробуйте войти ещё раз");
+            } else if (!result.ok) {
+              setProfile(null);
+              setError(result.error);
+            } else {
+              accept(result.value);
+              pendingOpening.current = pendingCase(result.value.nickname);
+            }
+          },
+        );
+    },
+    [accept],
+  );
+  useEffect(() => {
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const restore = () => {
+      if (!socket.connected) return;
+      if (requestBusy.current) {
+        retry = setTimeout(restore, 150);
+        return;
+      }
+      if (nickname.current) login(nickname.current);
+      else setReady(true);
+    };
+    const connect = () => {
+      setConnected(true);
+      setReady(false);
+      clearTimeout(retry);
+      restore();
+    };
+    const disconnect = () => {
+      setConnected(false);
+      setReady(false);
+    };
+    socket.on("connect", connect);
+    socket.on("disconnect", disconnect);
+    socket.on("profile:snapshot", accept);
+    if (socket.connected) connect();
+    return () => {
+      clearTimeout(retry);
+      socket.off("connect", connect);
+      socket.off("disconnect", disconnect);
+      socket.off("profile:snapshot", accept);
+    };
+  }, [accept, login]);
+  const logout = () => {
+    if (!socket.connected || requestBusy.current) return;
+    requestBusy.current = true;
+    setBusy(true);
+    setError(null);
+    socket
+      .timeout(8000)
+      .emit("profile:logout", (timeout: Error | null, result: ProfileReply<null>) => {
+        requestBusy.current = false;
+        setBusy(false);
+        if (timeout) setError("Сервер не ответил");
+        else if (!result.ok) setError(result.error);
+        else {
+          nickname.current = "";
+          saveNickname("");
+          pendingOpening.current = null;
+          savePendingCase("", null);
+          setProfile(null);
+        }
+      });
+  };
+  const equip = (itemId: string) => {
+    if (!socket.connected || requestBusy.current) return;
+    requestBusy.current = true;
+    setBusy(true);
+    setError(null);
+    socket
+      .timeout(8000)
+      .emit(
+        "profile:equip",
+        { itemId },
+        (timeout: Error | null, result: ProfileReply<ProfileSnapshot>) => {
+          requestBusy.current = false;
+          setBusy(false);
+          if (timeout) setError("Сервер не ответил. Обновите профиль перед повторной попыткой");
+          else if (!result.ok) setError(result.error);
+          else accept(result.value);
+        },
+      );
+  };
+  const openCase = (): Promise<CaseOpening | null> => {
+    if (!socket.connected || requestBusy.current) return Promise.resolve(null);
+    requestBusy.current = true;
+    setBusy(true);
+    setError(null);
+    const requestId = pendingOpening.current ?? crypto.randomUUID();
+    pendingOpening.current = requestId;
+    savePendingCase(nickname.current, requestId);
+    return new Promise((resolve) =>
+      socket
+        .timeout(8000)
+        .emit(
+          "profile:open-case",
+          { requestId },
+          (
+            timeout: Error | null,
+            result: ProfileReply<{ profile: ProfileSnapshot; opening: CaseOpening }>,
+          ) => {
+            requestBusy.current = false;
+            setBusy(false);
+            if (timeout) {
+              setError("Ответ потерялся. Повторите запрос: повторного списания не будет");
+              resolve(null);
+            } else if (!result.ok) {
+              pendingOpening.current = null;
+              savePendingCase(nickname.current, null);
+              setError(result.error);
+              resolve(null);
+            } else {
+              pendingOpening.current = null;
+              savePendingCase(nickname.current, null);
+              accept(result.value.profile);
+              resolve(result.value.opening);
+            }
+          },
+        ),
+    );
+  };
+  return (
+    <Context.Provider
+      value={{
+        profile,
+        busy,
+        connected: connected && ready,
+        error,
+        login,
+        logout,
+        equip,
+        openCase,
+        clearError: () => setError(null),
+      }}
+    >
+      {children}
+    </Context.Provider>
+  );
+}
+export function useProfile() {
+  const value = useContext(Context);
+  if (!value) throw new Error("ProfileProvider is missing");
+  return value;
+}

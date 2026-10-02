@@ -1,3 +1,4 @@
+import { getCardSkin, type CardSkinId } from "../../../../../shared/platform/cosmetics";
 import * as THREE from "three";
 import { makeRoomEnvironment } from "./RoomEnvironment";
 import { CARD_HEIGHT, makeCardGeometry, type CardMesh } from "./CardGeometry";
@@ -29,6 +30,7 @@ export interface TablePerformance {
 export interface TablePerson {
   id: string;
   avatarId: AvatarId;
+  cardSkinId?: CardSkinId;
   name: string;
   count: number;
   active: boolean;
@@ -60,6 +62,7 @@ export interface RoundTableState {
   trump: { rank: string; suit: string; red: boolean } | null;
   takeSeatId: string | null;
   ownHand?: TableHandCard[];
+  cardSkinId?: CardSkinId;
 }
 
 interface MovingCard {
@@ -192,7 +195,7 @@ export class RoundTableScene {
     );
     this.ownHand = new FirstPersonHand(
       host,
-      (face) => this.makeCard(face.rank, face.suit, face.red, face.color),
+      (face) => this.makeCard(face.rank, face.suit, face.red, face.color, face.skinId),
       (object) => this.disposeObject(object),
       (id) => this.options.onFocusHandCard?.(id),
       (id) => this.options.onSelectHandCard?.(id),
@@ -405,8 +408,15 @@ export class RoundTableScene {
     return texture;
   }
 
-  private cardTexture(rank: string, suit: string, red: boolean, color?: TableCard["color"]) {
-    const key = `${this.options.variant}:${rank}:${suit}:${color ?? ""}`;
+  private cardTexture(
+    rank: string,
+    suit: string,
+    red: boolean,
+    color?: TableCard["color"],
+    skinId?: CardSkinId,
+  ) {
+    const skin = getCardSkin(skinId);
+    const key = `${this.options.variant}:${rank}:${suit}:${red}:${color ?? ""}:${skin.id}`;
     const cached = this.textures.get(key);
     if (cached) return cached;
     const canvas = document.createElement("canvas");
@@ -414,9 +424,9 @@ export class RoundTableScene {
     canvas.height = 720;
     const ctx = canvas.getContext("2d")!;
     ctx.scale(2, 2);
-    ctx.fillStyle = rank ? "#fffcf4" : "#284c62";
+    ctx.fillStyle = rank ? skin.face : skin.background;
     ctx.fillRect(0, 0, 256, 360);
-    ctx.strokeStyle = rank ? "#d7cebc" : "#b9a474";
+    ctx.strokeStyle = skin.id === "classic" ? (rank ? "#d7cebc" : "#b9a474") : skin.accent;
     ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.roundRect(10, 10, 236, 340, 13);
@@ -503,6 +513,37 @@ export class RoundTableScene {
       ctx.font = "118px Georgia";
       ctx.fillText(suit, 128, 218);
     }
+    if (skin.id !== "classic") {
+      if (!rank) {
+        ctx.fillStyle = skin.background;
+        ctx.fillRect(0, 0, 256, 360);
+        ctx.strokeStyle = skin.accent;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.45;
+        for (let i = -360; i < 620; i += 24) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i + 360, 360);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = skin.background;
+        ctx.beginPath();
+        ctx.arc(128, 180, 65, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = skin.accent;
+        ctx.textAlign = "center";
+        ctx.font = "76px Georgia";
+        ctx.fillText(skin.mark, 128, 204);
+        ctx.font = "bold 20px sans-serif";
+        ctx.fillText(this.options.variant === "uno" ? "UNO" : "PARTYPLAY", 128, 266);
+      }
+      ctx.strokeStyle = skin.accent;
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.roundRect(7, 7, 242, 346, 13);
+      ctx.stroke();
+    }
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = Math.min(this.renderer.capabilities.getMaxAnisotropy(), 8);
@@ -510,14 +551,20 @@ export class RoundTableScene {
     return texture;
   }
 
-  private makeCard(rank = "", suit = "", red = false, color?: TableCard["color"]) {
+  private makeCard(
+    rank = "",
+    suit = "",
+    red = false,
+    color?: TableCard["color"],
+    skinId?: CardSkinId,
+  ) {
     const edge = this.material(0xe4dac4);
     const face = new THREE.MeshStandardMaterial({
-      map: this.cardTexture(rank, suit, red, color),
+      map: this.cardTexture(rank, suit, red, color, skinId),
       roughness: 0.85,
     });
     const back = new THREE.MeshStandardMaterial({
-      map: this.cardTexture("", "", false),
+      map: this.cardTexture("", "", false, undefined, skinId),
       roughness: 0.85,
     });
     const mesh = new THREE.Mesh(makeCardGeometry(), [edge, edge, face, back]);
@@ -526,8 +573,14 @@ export class RoundTableScene {
     return mesh;
   }
 
-  private makeTableCard(rank = "", suit = "", red = false, color?: TableCard["color"]) {
-    const mesh = this.makeCard(rank, suit, red, color);
+  private makeTableCard(
+    rank = "",
+    suit = "",
+    red = false,
+    color?: TableCard["color"],
+    skinId?: CardSkinId,
+  ) {
+    const mesh = this.makeCard(rank, suit, red, color, skinId);
     mesh.scale.setScalar(TABLE_CARD_SCALE);
     return mesh;
   }
@@ -553,7 +606,11 @@ export class RoundTableScene {
     const { body, head, leftArm, rightArm, hand } = makeSeatedAvatar(person.avatarId, holdsCards);
     group.add(body);
     this.cardArms.set(person.id, leftArm);
-    this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
+    this.updatePersonHand(
+      hand,
+      this.options.variant === "bunker" ? 0 : person.count,
+      person.cardSkinId,
+    );
     mergeRigidParts(group);
     const animator = new TableAvatarAnimator(
       body,
@@ -585,13 +642,14 @@ export class RoundTableScene {
     this.resizeObserver.observe(node, { box: "border-box" });
   }
 
-  private updatePersonHand(hand: THREE.Group, count: number) {
+  private updatePersonHand(hand: THREE.Group, count: number, skinId?: CardSkinId) {
     const visibleCount = Math.min(count, 8);
-    if (hand.userData.count === visibleCount) return;
+    if (hand.userData.count === visibleCount && hand.userData.skinId === skinId) return;
     this.disposeGroup(hand);
     hand.userData.count = visibleCount;
+    hand.userData.skinId = skinId;
     for (let i = 0; i < visibleCount; i++) {
-      const card = this.makeCard();
+      const card = this.makeCard("", "", false, undefined, skinId);
       const offset = i - (visibleCount - 1) / 2;
       const pivot = new THREE.Group();
       // All lower card edges meet at the pinch, instead of spreading beyond the fingers.
@@ -685,7 +743,9 @@ export class RoundTableScene {
     const ownIndex = state.people.findIndex((person) => person.id === state.viewerId);
     const ownAvatar = getAvatar(state.people[ownIndex]?.avatarId);
     this.ownHand.update(
-      ownIndex >= 0 ? (state.ownHand ?? []) : [],
+      ownIndex >= 0
+        ? (state.ownHand ?? []).map((card) => ({ ...card, skinId: state.cardSkinId }))
+        : [],
       ownAvatar.skin,
       ownAvatar.outfit,
     );
@@ -698,7 +758,7 @@ export class RoundTableScene {
     this.table.scale.set(radius / RADIUS, 1, radius / RADIUS);
     this.seatedPosition.z = this.seatRadius + (this.options.variant === "bunker" ? 0.85 : 0.1);
     const peopleKey = JSON.stringify([
-      state.people.map((person) => [person.id, person.avatarId]),
+      state.people.map((person) => [person.id, person.avatarId, person.cardSkinId]),
       state.viewerId,
     ]);
     if (peopleKey !== this.peopleKey) {
@@ -738,29 +798,44 @@ export class RoundTableScene {
         ?.setHolding(this.options.variant !== "bunker" && person.count > 0);
       const hand = group.getObjectByName("hand");
       if (hand instanceof THREE.Group)
-        this.updatePersonHand(hand, this.options.variant === "bunker" ? 0 : person.count);
+        this.updatePersonHand(
+          hand,
+          this.options.variant === "bunker" ? 0 : person.count,
+          person.cardSkinId,
+        );
       const marker = group.getObjectByName("turn-marker");
       if (marker) marker.visible = person.active && !person.eliminated;
       const label = this.labels.get(person.id)?.node;
       if (label) this.updatePersonLabel(label, person);
     });
-    const pileKey = JSON.stringify([state.deckCount, state.discardCount, state.trump]);
+    const pileKey = JSON.stringify([
+      state.deckCount,
+      state.discardCount,
+      state.trump,
+      state.cardSkinId,
+    ]);
     if (pileKey !== this.pileKey) {
       this.pileKey = pileKey;
       this.disposeGroup(this.pile);
       if (state.trump && state.deckCount > 0) {
-        const trump = this.makeTableCard(state.trump.rank, state.trump.suit, state.trump.red);
+        const trump = this.makeTableCard(
+          state.trump.rank,
+          state.trump.suit,
+          state.trump.red,
+          undefined,
+          state.cardSkinId,
+        );
         trump.position.set(-1.86, TABLE_Y + 0.046, 0.1);
         trump.rotation.y = Math.PI / 2;
         this.pile.add(trump);
       }
       for (let i = 0; i < Math.min(state.deckCount, 12); i++) {
-        const card = this.makeTableCard();
+        const card = this.makeTableCard("", "", false, undefined, state.cardSkinId);
         card.position.set(-2.06, TABLE_Y + 0.06 + i * 0.006, -0.12);
         this.pile.add(card);
       }
       for (let i = 0; i < Math.min(state.discardCount, 7); i++) {
-        const card = this.makeTableCard();
+        const card = this.makeTableCard("", "", false, undefined, state.cardSkinId);
         card.position.set(2.03, TABLE_Y + 0.05 + i * 0.006, -0.1);
         card.rotation.y = i * 0.12;
         this.pile.add(card);
@@ -779,7 +854,13 @@ export class RoundTableScene {
     state.cards.forEach((card) => {
       let entry = this.cards.get(card.id);
       if (!entry) {
-        const mesh = this.makeTableCard(card.rank, card.suit, card.red, card.color);
+        const mesh = this.makeTableCard(
+          card.rank,
+          card.suit,
+          card.red,
+          card.color,
+          card.skinId ?? state.cardSkinId,
+        );
         mesh.position.copy(this.seatPositions.get(card.sourceId) ?? new THREE.Vector3(0, 2, 3.4));
         entry = { mesh, target: new THREE.Vector3(), removing: false };
         this.cards.set(card.id, entry);

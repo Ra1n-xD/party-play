@@ -1,9 +1,91 @@
-import { Suspense, useLayoutEffect } from "react";
+import { Suspense, useEffect, useLayoutEffect, useState } from "react";
 import { PlatformOverlays } from "./platform/components/PlatformOverlays";
 import { PlatformProvider, usePlatform } from "./platform/context/PlatformContext";
 import { getLazyGameComponent } from "./platform/gameRegistry";
 import { HomeScreen } from "./platform/screens/HomeScreen";
 import { StatsScreen } from "./platform/screens/StatsScreen";
+import { ProfileProvider, useProfile } from "./platform/context/ProfileContext";
+import { LoginScreen, ProfileScreen } from "./platform/screens/ProfileScreen";
+import { CasesScreen } from "./platform/screens/CasesScreen";
+import "./styles/profiles.css";
+
+function ProfileApp() {
+  const { profile, connected, busy } = useProfile();
+  const { roomCode } = usePlatform();
+  const [path, setPath] = useState(window.location.pathname.replace(/\/$/, "") || "/");
+  useEffect(() => {
+    const update = () => {
+      setPath(window.location.pathname.replace(/\/$/, "") || "/");
+      window.scrollTo(0, 0);
+    };
+    const click = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const link = (event.target as HTMLElement).closest("a");
+      if (
+        !link ||
+        link.target ||
+        !["/", "/profile", "/cases"].includes(link.getAttribute("href") ?? "")
+      )
+        return;
+      event.preventDefault();
+      history.pushState(null, "", link.getAttribute("href"));
+      update();
+    };
+    document.addEventListener("click", click);
+    window.addEventListener("popstate", update);
+    return () => {
+      document.removeEventListener("click", click);
+      window.removeEventListener("popstate", update);
+    };
+  }, []);
+  if (!profile) return <LoginScreen />;
+  const profilePage = path === "/profile" || path === "/cases";
+  return (
+    <>
+      <header className="profile-navigation">
+        <a href="/" className="profile-logo">
+          partyplay
+        </a>
+        <nav aria-label="Профиль и коллекция">
+          <a href="/" aria-current={!profilePage ? "page" : undefined}>
+            {roomCode ? "В комнату" : "Игры"}
+          </a>
+          <a href="/profile" aria-current={path === "/profile" ? "page" : undefined}>
+            Коллекция
+          </a>
+          <a href="/cases" aria-current={path === "/cases" ? "page" : undefined}>
+            Кейсы
+          </a>
+        </nav>
+        <a href="/profile" className="profile-balance">
+          <span>{profile.nickname}</span>
+          <strong>◉ {profile.coins}</strong>
+        </a>
+        {(!connected || busy) && (
+          <span className="profile-connection" role="status">
+            {connected ? "Сохраняем…" : "Нет связи"}
+          </span>
+        )}
+      </header>
+      {path === "/profile" ? (
+        <ProfileScreen />
+      ) : path === "/cases" ? (
+        <CasesScreen />
+      ) : (
+        <RoomAppContent />
+      )}
+      <PlatformOverlays />
+    </>
+  );
+}
 
 function RoomLoading({
   message = "Загружаем комнату…",
@@ -78,8 +160,9 @@ export default function App() {
         <StatsScreen />
       ) : (
         <PlatformProvider>
-          <RoomAppContent />
-          <PlatformOverlays />
+          <ProfileProvider>
+            <ProfileApp />
+          </ProfileProvider>
         </PlatformProvider>
       )}
       <div className="app-version">v{__APP_VERSION__}</div>
