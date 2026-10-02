@@ -689,27 +689,6 @@
   font-size: calc(12 * var(--show-unit));
 }
 
-.show-steps {
-  display: grid;
-  gap: calc(12 * var(--show-unit));
-  margin: calc(22 * var(--show-unit)) calc(4 * var(--show-unit)) 0;
-  color: var(--show-muted);
-  font-size: calc(12 * var(--show-unit));
-  list-style: none;
-}
-
-.show-steps li {
-  display: flex;
-  align-items: center;
-  gap: calc(12 * var(--show-unit));
-}
-
-.show-steps span {
-  font-size: calc(11 * var(--show-unit));
-  font-weight: 800;
-  color: #e3aff6;
-}
-
 .show-menu-footer {
   display: flex;
   align-items: center;
@@ -1239,14 +1218,17 @@
     min-height: calc(100svh - 36 * var(--show-unit));
   }
 
-  .is-main-menu .show-menu-header,
-  .is-game-menu .show-menu-header {
+  .show-menu.platform-header {
+    padding-top: calc(16 * var(--show-unit));
+  }
+
+  .show-profile-header {
     padding-bottom: calc(12 * var(--show-unit));
   }
 
   .is-main-menu .show-headline {
     padding: clamp(calc(20 * var(--show-unit)), calc(100svh - 740px), calc(36 * var(--show-unit))) 0
-      calc(12 * var(--show-unit));
+      calc(24 * var(--show-unit));
   }
 
   .is-main-menu .show-main-layout {
@@ -1256,14 +1238,6 @@
 
   .is-main-menu .show-join-column {
     display: contents;
-  }
-
-  .is-main-menu .show-steps {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: center;
-    gap: calc(32 * var(--show-unit));
-    margin: 0;
   }
 
   .is-main-menu .show-feature-art {
@@ -1649,11 +1623,6 @@
 
   .show-entry-panel.is-compact {
     padding: calc(24 * var(--show-unit));
-  }
-
-  .show-steps {
-    gap: calc(10 * var(--show-unit));
-    margin-top: calc(20 * var(--show-unit));
   }
 
   .show-game-switch {

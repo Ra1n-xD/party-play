@@ -347,20 +347,7 @@ export function HomeScreen() {
                   </div>
                 </div>
               </article>
-              <div className="show-join-column">
-                {entryForm}
-                <ol className="show-steps" aria-label="Как начать">
-                  <li>
-                    <span>01</span>Выберите игру
-                  </li>
-                  <li>
-                    <span>02</span>Поделитесь кодом
-                  </li>
-                  <li>
-                    <span>03</span>Играйте вместе
-                  </li>
-                </ol>
-              </div>
+              <div className="show-join-column">{entryForm}</div>
             </div>
           </>
         )}
