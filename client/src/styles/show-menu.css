@@ -1245,12 +1245,13 @@
   }
 
   .is-main-menu .show-headline {
-    padding: calc(12 * var(--show-unit)) 0;
+    padding: clamp(calc(20 * var(--show-unit)), calc(100svh - 740px), calc(36 * var(--show-unit))) 0
+      calc(12 * var(--show-unit));
   }
 
   .is-main-menu .show-main-layout {
     row-gap: calc(12 * var(--show-unit));
-    padding-bottom: calc(14 * var(--show-unit));
+    padding-bottom: calc(6 * var(--show-unit));
   }
 
   .is-main-menu .show-join-column {
