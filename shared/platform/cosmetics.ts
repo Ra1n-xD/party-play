@@ -59,9 +59,9 @@ export const CARD_SKINS = [
     id: "royal",
     name: "Золотой век",
     rarity: "legendary",
-    background: "#382a17",
-    accent: "#ffcf69",
-    face: "#fff6d9",
+    background: "#111b2b",
+    accent: "#f5d580",
+    face: "#111b2b",
     mark: "♛",
   },
 ] as const;

@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { getCardSkin, type Cosmetic } from "../../../../shared/platform/cosmetics";
 import { AvatarPortrait } from "./AvatarPortrait";
 import { CardFaceArtwork } from "./CardFaceArtwork";
+import { RoyalCardBackArtwork } from "./RoyalCardBackArtwork";
 
 export function CosmeticPreview({ item }: { item: Cosmetic }) {
   if (item.avatarId)
@@ -33,8 +34,14 @@ export function CosmeticPreview({ item }: { item: Cosmetic }) {
         />
       </div>
       <div className="cosmetic-card-back">
-        <span>{skin.mark}</span>
-        <small>{item.kind === "durak" ? "ДУРАК" : "UNO"}</small>
+        {skin.id === "royal" ? (
+          <RoyalCardBackArtwork game={item.kind === "uno" ? "uno" : "durak"} />
+        ) : (
+          <>
+            <span>{skin.mark}</span>
+            <small>{item.kind === "durak" ? "ДУРАК" : "UNO"}</small>
+          </>
+        )}
       </div>
     </div>
   );

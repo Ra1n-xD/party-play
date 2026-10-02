@@ -1,5 +1,6 @@
 import { getCardSkin, type CardSkinId } from "../../../../../shared/platform/cosmetics";
 import { drawCardFace } from "../../../platform/cardFaceArtwork";
+import { drawRoyalCardBack } from "../../../platform/royalCardArtwork";
 import * as THREE from "three";
 import { makeRoomEnvironment } from "./RoomEnvironment";
 import { CARD_HEIGHT, makeCardGeometry, type CardMesh } from "./CardGeometry";
@@ -521,6 +522,8 @@ export class RoundTableScene {
           { game: this.options.variant === "uno" ? "uno" : "durak", rank, suit, red, color },
           skin.id,
         );
+      } else if (skin.id === "royal") {
+        drawRoyalCardBack(ctx, this.options.variant === "uno" ? "uno" : "durak");
       } else {
         ctx.fillStyle = skin.background;
         ctx.fillRect(0, 0, 256, 360);
