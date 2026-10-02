@@ -1,0 +1,172 @@
+.drop-feed {
+  display: flex;
+  align-items: stretch;
+  gap: 18px;
+  min-width: 0;
+  margin-bottom: 28px;
+  padding: 14px;
+  border: 1px solid #ffffff16;
+  border-radius: 16px;
+  background: #ffffff04;
+}
+.drop-feed-heading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 0 8px;
+}
+.drop-feed-live {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.drop-feed-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8b7d9d;
+}
+.drop-feed-live.is-online i {
+  background: #d8fc61;
+  box-shadow: 0 0 10px #d8fc6155;
+}
+.drop-feed-heading > small {
+  color: #bcb0cc;
+  font-size: 10px;
+}
+.drop-feed-track {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #695579 transparent;
+  list-style: none;
+  padding: 0 0 5px;
+  margin: 0;
+}
+.drop-feed-track:focus-visible {
+  outline: 2px solid #d8fc61;
+  outline-offset: 4px;
+}
+.drop-feed-item {
+  display: flex;
+  align-items: center;
+  flex: 0 0 220px;
+  min-width: 0;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #ffffff12;
+  border-bottom: 2px solid var(--drop-color);
+  border-radius: 10px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--drop-color) 12%, #2c223b), #241c30);
+  animation: drop-arrive 240ms ease-out;
+}
+.drop-feed-preview {
+  display: grid;
+  place-items: center;
+  flex: 0 0 56px;
+  width: 56px;
+  height: 68px;
+  overflow: hidden;
+}
+.drop-feed-preview .cosmetic-avatar {
+  height: auto;
+  margin: 0;
+  padding: 0;
+}
+.drop-feed-preview .cosmetic-avatar .avatar-portrait {
+  width: 56px;
+  height: 56px;
+}
+.drop-feed-preview .cosmetic-deck {
+  margin: 0;
+  zoom: 0.43;
+}
+.drop-feed-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.drop-feed-copy > strong,
+.drop-feed-nickname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drop-feed-nickname {
+  font-size: 11px;
+  color: #fff8e8;
+}
+.drop-feed-copy > strong {
+  color: var(--drop-color);
+  font-size: 12px;
+}
+.drop-feed-copy > small {
+  color: #bcb0cc;
+  font-size: 9px;
+}
+.drop-feed-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #bcb0cc;
+  font-size: 9px;
+}
+.drop-feed-empty {
+  align-self: center;
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  color: #bcb0cc;
+  font-size: 12px;
+  line-height: 1.5;
+}
+@keyframes drop-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 760px) {
+  .drop-feed {
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    margin-bottom: 22px;
+  }
+  .drop-feed-heading {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+  }
+  .drop-feed-item {
+    flex-basis: 202px;
+  }
+}
+@media (max-width: 360px) {
+  .drop-feed-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drop-feed-item {
+    animation: none;
+  }
+}

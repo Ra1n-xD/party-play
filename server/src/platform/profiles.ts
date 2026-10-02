@@ -25,6 +25,7 @@ import {
 } from "../../../shared/platform/cosmetics.js";
 import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
 import { getUpgradeQuote, type UpgradeAttempt } from "../../../shared/platform/upgrades.js";
+import { DROP_FEED_LIMIT, type CosmeticDrop } from "../../../shared/platform/dropFeed.js";
 import type { IOServer } from "./gameModule.js";
 import { getAllRooms, type Player, type Room } from "./roomManager.js";
 
@@ -139,6 +140,50 @@ function transaction(change: () => void): void {
 function profileRoom(key: string): string {
   return `__profile_${createHash("sha256").update(key).digest("hex")}`;
 }
+
+const DROP_FEED_ROOM = "__cosmetic_drops";
+function makeDrop(
+  profile: ProfileSnapshot,
+  source: CosmeticDrop["source"],
+  requestId: string,
+  itemId: string,
+  createdAt: number,
+): CosmeticDrop {
+  return {
+    id: createHash("sha256")
+      .update(JSON.stringify([nicknameKey(profile.nickname), source, requestId]))
+      .digest("hex"),
+    nickname: profile.nickname,
+    itemId,
+    source,
+    createdAt,
+  };
+}
+let recentDrops: CosmeticDrop[] = [];
+if (storageHealthy) {
+  // Rebuild the public projection from receipts already saved with each profile.
+  for (const profile of profiles.values()) {
+    const drops = [
+      ...profile.recentOpenings.map((opening) =>
+        makeDrop(profile, "case", opening.requestId, opening.itemId, opening.openedAt),
+      ),
+      ...(profile.recentUpgrades ?? [])
+        .filter((attempt) => attempt.success)
+        .map((attempt) =>
+          makeDrop(profile, "upgrade", attempt.requestId, attempt.targetItemId, attempt.createdAt),
+        ),
+    ];
+    recentDrops = [...recentDrops, ...drops]
+      .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))
+      .slice(0, DROP_FEED_LIMIT);
+  }
+}
+function publishDrop(drop: CosmeticDrop, io: IOServer): void {
+  recentDrops = [drop, ...recentDrops.filter((entry) => entry.id !== drop.id)]
+    .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))
+    .slice(0, DROP_FEED_LIMIT);
+  io.to(DROP_FEED_ROOM).emit("drops:snapshot", recentDrops);
+}
 export function getProfile(name: string): ProfileSnapshot | undefined {
   return profiles.get(nicknameKey(name));
 }
@@ -195,6 +240,20 @@ export function registerProfileHandlers(
     if (requests.length >= 40) throw new Error("Слишком много действий. Подождите минуту");
     requests.push(now);
   };
+  socket.on("drops:subscribe", () => {
+    const key = socket.data.profileKey as string | undefined;
+    if (!key || !profiles.has(key)) return;
+    try {
+      guard();
+      socket.join(DROP_FEED_ROOM);
+      socket.emit("drops:snapshot", recentDrops);
+    } catch {
+      // A subscription cannot mutate a profile or bypass its request limit.
+    }
+  });
+  socket.on("drops:unsubscribe", () => {
+    socket.leave(DROP_FEED_ROOM);
+  });
   socket.on("profile:login", (data, reply) => {
     if (typeof reply !== "function") return;
     try {
@@ -231,6 +290,7 @@ export function registerProfileHandlers(
     if (typeof reply !== "function") return;
     if (membershipNickname()) return reply({ ok: false, error: "Сначала выйдите из комнаты" });
     if (socket.data.profileKey) socket.leave(profileRoom(socket.data.profileKey));
+    socket.leave(DROP_FEED_ROOM);
     delete socket.data.profileKey;
     reply({ ok: true, value: null });
   });
@@ -285,6 +345,7 @@ export function registerProfileHandlers(
         profile.recentOpenings = profile.recentOpenings.slice(0, 100);
       });
       publishProfile(key, io);
+      publishDrop(makeDrop(profiles.get(key)!, "case", requestId, item.id, opening.openedAt), io);
       reply({ ok: true, value: { profile: profiles.get(key)!, opening } });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });
@@ -337,6 +398,17 @@ export function registerProfileHandlers(
         current.recentUpgrades = [attempt, ...(current.recentUpgrades ?? [])].slice(0, 100);
       });
       publishProfile(key, io);
+      if (attempt.success)
+        publishDrop(
+          makeDrop(
+            profiles.get(key)!,
+            "upgrade",
+            attempt.requestId,
+            attempt.targetItemId,
+            attempt.createdAt,
+          ),
+          io,
+        );
       reply({ ok: true, value: { profile: profiles.get(key)!, attempt } });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });

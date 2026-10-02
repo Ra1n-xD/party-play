@@ -314,6 +314,13 @@ export function HomeScreen() {
                     </small>
                   </button>
                 ))}
+                {["Кости лжеца", "Кто я"].map((title, index) => (
+                  <div className="show-lineup-coming" key={title} aria-label={`${title} — скоро`}>
+                    <span className="show-lineup-number">0{catalogGames.length + index + 1}</span>
+                    <strong>{title}</strong>
+                    <small className="show-coming-label">Скоро</small>
+                  </div>
+                ))}
               </nav>
               <article className="show-feature" aria-labelledby="show-feature-title">
                 <div className={`show-feature-art is-${featuredGameId}`}>

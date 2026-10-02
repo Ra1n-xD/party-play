@@ -50,7 +50,6 @@ export function LoginScreen() {
           <span className="profile-welcome-coins">
             <CoinAmount amount={INITIAL_COINS} label="монет новому игроку" />
           </span>
-          <span>Человек и базовые карты</span>
         </div>
         <small>
           Временные профили без пароля. Доступ есть у каждого, кто знает ник. При переходе на БД

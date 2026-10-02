@@ -13,6 +13,7 @@ import { CosmeticPreview } from "../components/CosmeticPreview";
 import { useProfile } from "../context/ProfileContext";
 import { useCollectionAudio } from "../useCollectionAudio";
 import { CoinAmount } from "../components/CoinAmount";
+import { DropFeed } from "../components/DropFeed";
 
 const WINNER_INDEX = 38;
 function randomItem() {
@@ -104,6 +105,7 @@ export function CasesScreen() {
   const equipped = winner && `${winner.kind}:${profile.equipped[winner.kind]}` === winner.id;
   return (
     <main className="cases-page">
+      <DropFeed holdUpdates={phase === "request" || phase === "spin"} />
       <section className={`case-stage phase-${phase}`} aria-label="Открытие кейса">
         <div className="case-stage-light" />
         <div className="case-caption">
