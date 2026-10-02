@@ -5,12 +5,14 @@ import {
   COSMETIC_KIND_NAMES,
   RARITIES,
   getCosmetic,
+  CASE_COST,
   type CaseOpening,
   type Cosmetic,
 } from "../../../../shared/platform/cosmetics";
 import { CosmeticPreview } from "../components/CosmeticPreview";
 import { useProfile } from "../context/ProfileContext";
-import { useCaseAudio } from "../useCaseAudio";
+import { useCollectionAudio } from "../useCollectionAudio";
+import { CoinAmount } from "../components/CoinAmount";
 
 const WINNER_INDEX = 38;
 function randomItem() {
@@ -29,7 +31,7 @@ function ReelItem({ item }: { item: Cosmetic }) {
   );
 }
 export function CasesScreen() {
-  const sound = useCaseAudio();
+  const sound = useCollectionAudio();
   const { profile, openCase, equip, busy, connected, error } = useProfile();
   const [opening, setOpening] = useState<CaseOpening | null>(null);
   const [reel, setReel] = useState<Cosmetic[]>(() => Array.from({ length: 8 }, randomItem));
@@ -102,15 +104,7 @@ export function CasesScreen() {
   const equipped = winner && `${winner.kind}:${profile.equipped[winner.kind]}` === winner.id;
   return (
     <main className="cases-page">
-      <div className="collection-heading">
-        <div>
-          <span className="profile-eyebrow">PARTY CASE / 01</span>
-          <h1>Вечер с сюрпризом</h1>
-          <p>Персонажи и карты. Один кейс, один новый повод сыграть.</p>
-        </div>
-        <span className="case-price">◉ 1 монета за открытие</span>
-      </div>
-      <section className={`case-stage phase-${phase}`}>
+      <section className={`case-stage phase-${phase}`} aria-label="Открытие кейса">
         <div className="case-stage-light" />
         <div className="case-caption">
           <div>
@@ -160,14 +154,20 @@ export function CasesScreen() {
               onClick={start}
               disabled={phase === "request" || busy || !connected || profile.coins < 1}
             >
-              {phase === "request"
-                ? "Открываем…"
-                : profile.coins < 1
-                  ? "Нужна 1 монета"
-                  : "Открыть кейс · ◉ 1"}
+              {phase === "request" ? (
+                "Открываем…"
+              ) : profile.coins < 1 ? (
+                "Нужна 1 монета"
+              ) : (
+                <>
+                  Открыть кейс <CoinAmount amount={CASE_COST} label="монета" />
+                </>
+              )}
             </button>
           )}
-          <span>Ваш баланс: ◉ {profile.coins}</span>
+          <span>
+            Ваш баланс: <CoinAmount amount={profile.coins} />
+          </span>
         </div>
         {phase === "result" && winner && (
           <div
@@ -200,10 +200,6 @@ export function CasesScreen() {
         )}
       </section>
       <div className="case-info">
-        <p>
-          ◉ +1 монета каждому игроку за полностью завершённую партию в любой игре. Зрители и
-          прерванные партии без награды.
-        </p>
         <a href="/profile">Открыть коллекцию →</a>
       </div>
       <section className="case-contents">

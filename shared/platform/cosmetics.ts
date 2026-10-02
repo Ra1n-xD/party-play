@@ -118,6 +118,7 @@ export const COSMETIC_KIND_NAMES: Record<CosmeticKind, string> = {
 };
 export const CASE_COST = 1;
 export const GAME_REWARD = 1;
+export const INITIAL_COINS = 100;
 export function getCosmetic(id: unknown) {
   return COSMETICS.find((item) => item.id === id);
 }

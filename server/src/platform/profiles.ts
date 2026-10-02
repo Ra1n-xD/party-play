@@ -15,6 +15,7 @@ import {
   CASE_COST,
   CASE_ITEMS,
   GAME_REWARD,
+  INITIAL_COINS,
   RARITIES,
   getCosmetic,
   nicknameKey,
@@ -210,7 +211,7 @@ export function registerProfileHandlers(
         transaction(() =>
           profiles.set(key, {
             nickname: name,
-            coins: 5,
+            coins: INITIAL_COINS,
             completedGames: 0,
             inventory: Object.fromEntries(BASIC_ITEMS.map((id) => [id, 1])),
             equipped: { avatar: "human", durak: "classic", uno: "classic" },

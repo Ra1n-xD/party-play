@@ -1,5 +1,77 @@
 @import "./show-menu.css";
 
+.coin-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffcf67;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.coin-icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.coin-amount > b {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.coin-amount .coin-label {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 500;
+}
+.coin-wallet {
+  position: relative;
+  flex-shrink: 0;
+}
+.coin-wallet summary {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid #ffcf6730;
+  border-radius: 24px;
+  background: #ffcf670c;
+  cursor: pointer;
+  list-style: none;
+}
+.coin-wallet summary::-webkit-details-marker {
+  display: none;
+}
+.coin-wallet summary:hover,
+.coin-wallet[open] summary {
+  background: #ffcf671c;
+  border-color: #ffcf6760;
+}
+.coin-wallet summary:focus-visible {
+  outline: 2px solid #ffcf67;
+  outline-offset: 3px;
+}
+.coin-wallet-help {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(280px, calc(100vw - 40px));
+  padding: 18px;
+  border: 1px solid #ffcf6740;
+  border-radius: 14px;
+  background: #30233e;
+  box-shadow: 0 12px 32px #0005;
+  color: #fff8e8;
+  font:
+    13px/1.5 "Golos Text",
+    sans-serif;
+}
+.coin-wallet-help > strong {
+  color: #ffcf67;
+}
+.coin-wallet-help p {
+  margin: 8px 0 0;
+  color: #d4c8de;
+}
+
 html:has(.show-menu, .profile-login),
 body:has(.show-menu, .profile-login),
 #root:has(.show-menu, .profile-login) {
@@ -109,6 +181,15 @@ body:has(.show-menu, .profile-login),
   border: 1px solid #ffffff20;
   border-radius: 8px;
 }
+.profile-welcome .coin-amount,
+.profile-welcome .coin-label {
+  padding: 0;
+  border: 0;
+}
+.profile-welcome-coins {
+  display: inline-flex;
+  align-items: center;
+}
 .profile-login section > small {
   display: block;
   color: #bcb0cc;
@@ -164,6 +245,10 @@ body:has(.show-menu, .profile-login),
 .profile-summary span {
   color: var(--profile-muted);
   font-size: 13px;
+}
+.profile-summary .coin-amount,
+.profile-summary .coin-label {
+  color: #ffcf67;
 }
 .profile-text-button {
   border: 0;
@@ -346,15 +431,6 @@ body:has(.show-menu, .profile-login),
   letter-spacing: 1px;
   margin-top: 7px;
 }
-.case-price {
-  color: #d8fc61;
-  font-size: 13px;
-  white-space: nowrap;
-  padding: 14px 18px;
-  background: #ffffff05;
-  border: 1px solid var(--profile-line);
-  border-radius: 30px;
-}
 .case-stage {
   position: relative;
   border: 1px solid #ffffff20;
@@ -506,12 +582,6 @@ body:has(.show-menu, .profile-login),
   padding: 24px 0 38px;
   align-items: center;
   font-size: 13px;
-}
-.case-info p {
-  color: #bcb0cc;
-  line-height: 1.6;
-  max-width: 660px;
-  margin: 0;
 }
 .case-info a {
   color: #d8fc61;
@@ -716,6 +786,35 @@ body:has(.show-menu, .profile-login),
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+}
+
+.case-controls .profile-primary .coin-amount {
+  color: inherit;
+}
+.case-controls > span > .coin-amount {
+  margin-left: 4px;
+}
+
+@media (max-width: 600px) {
+  .show-profile-header {
+    position: relative;
+  }
+  .coin-wallet {
+    position: static;
+  }
+  .coin-wallet summary {
+    padding: 6px 7px;
+  }
+  .coin-wallet .coin-amount {
+    gap: 4px;
+  }
+  .coin-wallet .coin-icon {
+    width: 22px;
+    height: 22px;
+  }
+  .coin-wallet .coin-label {
+    font-size: 9px;
+  }
 }
 
 .case-caption > div {

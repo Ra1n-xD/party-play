@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BiDonateHeart } from "react-icons/bi";
 import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
-import { FiAlertCircle, FiArrowLeft, FiArrowRight, FiBookOpen, FiUsers } from "react-icons/fi";
+import { FiAlertCircle, FiArrowRight, FiBookOpen, FiUsers } from "react-icons/fi";
 import { ROOM_CODE_LENGTH } from "../../../../shared/roomCode";
 import {
   PUBLIC_ROOM_SPECTATOR_LIMIT,
@@ -240,9 +240,6 @@ export function HomeScreen() {
         <ProfileHeader onHome={selectedGame ? backToCatalog : undefined} />
         {selectedGame && (
           <div className="show-game-navigation">
-            <button className="show-quiet show-back" type="button" onClick={backToCatalog}>
-              <FiArrowLeft aria-hidden="true" /> Ко всем играм
-            </button>
             <nav className="show-game-switch" aria-label="Выберите игру">
               {catalogGames.map((game) => (
                 <button
@@ -285,9 +282,6 @@ export function HomeScreen() {
                 {rulesButton}
                 {publicRoomsButton}
               </aside>
-            </div>
-            <div className="show-game-help">
-              <p>{selectedGame.metadata.playerSummary}. Каждый играет со своего устройства.</p>
             </div>
           </>
         ) : (
