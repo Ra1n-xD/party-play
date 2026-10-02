@@ -595,9 +595,10 @@ function advanceRoundOrEnd(room: Room, io: IOServer): void {
   }
 }
 
-function transitionToGameOver(room: Room, io: IOServer): void {
+function transitionToGameOver(room: Room, io: IOServer, natural = true): void {
   if (!room.gameState) return;
   runBeforeGameOverHook(room, io);
+  room.completedNaturally = natural;
   room.gameState.phase = "GAME_OVER";
   room.lifecycle = "results";
   broadcastState(room, io);
@@ -1259,7 +1260,7 @@ export function forceEndGame(room: Room, io: IOServer): void {
   room.gameState.pausedCallback = null;
   room.pauseReasons.admin = false;
   room.pauseReasons.disconnectedSeatIds.clear();
-  transitionToGameOver(room, io);
+  transitionToGameOver(room, io, false);
 }
 
 export function resetGame(room: Room, io: IOServer): void {

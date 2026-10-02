@@ -1,3 +1,4 @@
+import { useCardSkin } from "../../../platform/useCardSkin";
 import type { UnoCard as UnoCardData, UnoColor } from "../../../../../shared/games/uno/types";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import cardBack from "../assets/card-back.svg";
@@ -72,6 +73,7 @@ export function UnoCard({
   ariaLabel,
   ariaDescribedBy,
 }: UnoCardProps) {
+  const { props: skinProps } = useCardSkin("uno");
   const className = [
     "uno-card",
     `is-${size}`,
@@ -109,6 +111,7 @@ export function UnoCard({
       <button
         type="button"
         className={className}
+        {...skinProps}
         disabled={disabled}
         onClick={
           onClick
@@ -132,6 +135,7 @@ export function UnoCard({
   return (
     <div
       className={className}
+      {...skinProps}
       role="img"
       aria-label={ariaLabel ?? getUnoCardName(card)}
       onContextMenu={(event) => event.preventDefault()}
@@ -142,9 +146,14 @@ export function UnoCard({
 }
 
 export function UnoCardBack({ label = "Карта рубашкой вверх" }: { label?: string }) {
+  const { skin, props: skinProps } = useCardSkin("uno");
   return (
-    <div className="uno-card uno-card-back is-table" role="img" aria-label={label}>
-      <img src={cardBack} alt="" aria-hidden="true" draggable={false} />
+    <div {...skinProps} className="uno-card uno-card-back is-table" role="img" aria-label={label}>
+      {skin.id === "classic" ? (
+        <img src={cardBack} alt="" aria-hidden="true" draggable={false} />
+      ) : (
+        <span aria-hidden="true">{skin.mark}</span>
+      )}
     </div>
   );
 }

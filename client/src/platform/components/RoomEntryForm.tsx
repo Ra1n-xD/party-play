@@ -78,7 +78,7 @@ export function RoomEntryForm({
           </label>
         )}
         <label className="show-field">
-          <span>Ваше имя</span>
+          <span>Ваш никнейм</span>
           <input
             type="text"
             value={name}
@@ -86,6 +86,7 @@ export function RoomEntryForm({
             maxLength={20}
             autoComplete="nickname"
             placeholder="Как вас зовут"
+            readOnly
             disabled={pending}
           />
         </label>

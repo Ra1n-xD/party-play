@@ -82,6 +82,12 @@ import {
   syncPublishedRoomWithProjectStats,
   unsubscribeFromProjectStats,
 } from "./projectStats.js";
+import {
+  registerProfileHandlers,
+  syncRoomProfileRewards,
+  applyProfileToPlayer,
+} from "./profiles.js";
+import { nicknameKey, normalizeNickname } from "../../../shared/platform/cosmetics.js";
 import { setRoomPublishedHook } from "./statePublisher.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
@@ -101,17 +107,6 @@ const REACTION_RATE_WINDOW_MS = 10_000;
 const MAX_REACTIONS_PER_WINDOW = 6;
 const reactionRateBySocket = new Map<string, { lastAcceptedAt: number; acceptedAt: number[] }>();
 const lastLookAtBySocket = new Map<string, number>();
-const deploymentMembershipEvents = new Set<string>([
-  "room:create",
-  "room:join",
-  "room:joinSpectator",
-  "room:rejoin",
-  "room:rejoinSpectator",
-  "room:listReconnectableSeats",
-  "room:requestSeatClaim",
-  "publicRooms:join",
-  "publicRooms:watch",
-]);
 
 // --- Per-action rate limiting ---
 const ACTION_LIMITS: Record<string, { max: number; windowMs: number }> = {
@@ -615,6 +610,7 @@ function resolveSeatClaimCommand(
     socketId: claimantSocket.id,
     epoch: player.controller.epoch + 1,
   };
+  applyProfileToPlayer(player);
   player.isBot = false;
   player.temporaryBot = false;
   player.voluntarilyLeft = false;
@@ -646,15 +642,63 @@ export function registerHandlers(io: IOServer): void {
   setRoomPublishedHook((room, publishedIo) => {
     syncPublishedRoomWithPublicDirectory(room, publishedIo);
     syncPublishedRoomWithProjectStats(room, publishedIo);
+    syncRoomProfileRewards(room, publishedIo);
   });
   io.on("connection", (socket: IOSocket) => {
-    socket.use(([event], next) => {
-      if (isDeploymentDraining() && deploymentMembershipEvents.has(event)) {
+    registerProfileHandlers(
+      socket,
+      io,
+      () => {
+        const info = socketRoomMap.get(socket.id);
+        if (!info) return null;
+        const room = getRoom(info.roomCode);
+        return info.role === "player"
+          ? (room?.players.get(info.playerId)?.owner.name ?? null)
+          : (room?.spectators.get(info.playerId)?.name ?? null);
+      },
+      () => {
+        for (const room of getAllRooms().values())
+          if (room.lifecycle !== "playing") publishRoom(room, io);
+      },
+    );
+    socket.use(([event, data], next) => {
+      const membershipEvents = [
+        "room:create",
+        "room:join",
+        "room:joinSpectator",
+        "room:rejoin",
+        "room:rejoinSpectator",
+        "room:listReconnectableSeats",
+        "room:requestSeatClaim",
+        "publicRooms:join",
+        "publicRooms:watch",
+      ];
+      if (isDeploymentDraining() && membershipEvents.includes(event)) {
         socket.emit("room:kicked", {
           message: DEPLOYMENT_STOP_MESSAGE,
           reason: "deployment",
         });
         return;
+      }
+      const nameEvents = [
+        "room:create",
+        "room:join",
+        "publicRooms:join",
+        "room:joinSpectator",
+        "publicRooms:watch",
+        "room:requestSeatClaim",
+      ];
+      if (nameEvents.includes(event)) {
+        const name = normalizeNickname(
+          data?.playerName ?? data?.spectatorName ?? data?.claimantName,
+        );
+        if (!name || !socket.data.profileKey || nicknameKey(name) !== socket.data.profileKey) {
+          socket.emit("room:error", { message: "Войдите в профиль и используйте его никнейм" });
+          return;
+        }
+        for (const field of ["playerName", "spectatorName", "claimantName"]) {
+          if (typeof data[field] === "string") data[field] = name;
+        }
       }
       next();
     });

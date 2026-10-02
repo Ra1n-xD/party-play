@@ -17,6 +17,7 @@ import type {
   RoomVisibility,
 } from "./publicRooms.js";
 import type { ProjectStatsSnapshot } from "./projectStats.js";
+import type { CaseOpening, ProfileReply, ProfileSnapshot } from "./cosmetics.js";
 import type { AnyRoomCommandEnvelope, AnyRoomSnapshot, RoomCommandResult, SeatId } from "./room.js";
 
 export type HostChangeReason = "disconnect" | "manual" | "recovery";
@@ -57,6 +58,19 @@ export interface SpectatorJoinedPayload {
 
 // Client -> Server
 export interface ClientEvents {
+  "profile:login": (
+    data: { nickname: string },
+    reply: (result: ProfileReply<ProfileSnapshot>) => void,
+  ) => void;
+  "profile:logout": (reply: (result: ProfileReply<null>) => void) => void;
+  "profile:equip": (
+    data: { itemId: string },
+    reply: (result: ProfileReply<ProfileSnapshot>) => void,
+  ) => void;
+  "profile:open-case": (
+    data: { requestId: string },
+    reply: (result: ProfileReply<{ profile: ProfileSnapshot; opening: CaseOpening }>) => void,
+  ) => void;
   "room:create": (data: {
     gameId?: GameId;
     playerName: string;
@@ -128,6 +142,7 @@ export interface ClientEvents {
 
 // Server -> Client
 export interface ServerEvents {
+  "profile:snapshot": (data: ProfileSnapshot) => void;
   "room:created": (data: RoomCreatedPayload) => void;
   "room:joined": (data: RoomJoinedPayload) => void;
   "room:spectatorJoined": (data: SpectatorJoinedPayload) => void;

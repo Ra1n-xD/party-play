@@ -57,42 +57,14 @@ enter_deployment_drain() {
   case "$status" in
     200)
       deployment_draining=true
-      echo "Rooms stopped with an update notice; new rooms are blocked until the update completes."
-      cat "$response_file"
-      echo
+      echo "Deployment gate closed: no rooms can start during the update."
       ;;
     409)
-      if [ "${PARTYPLAY_ALLOW_LEGACY_ROOM_STOP:-0}" = "1" ] &&
-        node - "$response_file" <<'NODE'
-const fs = require("node:fs");
-try {
-  const response = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-  process.exit(
-    response.status === "busy" &&
-    Number.isSafeInteger(response.retainedRooms) &&
-    response.retainedRooms > 0 &&
-    response.deploymentMode === undefined ? 0 : 1,
-  );
-} catch {
-  process.exit(1);
-}
-NODE
-      then
-        if ! curl --fail --silent --show-error --connect-timeout 2 --max-time 3 "$health_url" >/dev/null; then
-          rm -f "$response_file"
-          echo "ERROR: legacy server is not ready; refusing the deployment transition" >&2
-          return 1
-        fi
-        legacy_deploy_endpoint=true
-        echo "One-time transition from the legacy room-retention gate."
-        echo "Legacy games will stop at restart after a successful build; this server cannot send an update notice yet."
-      else
-        echo "ERROR: server cannot enter deployment drain:" >&2
-        cat "$response_file" >&2
-        echo >&2
-        rm -f "$response_file"
-        return 1
-      fi
+      echo "ERROR: deployment postponed because a room is still retained:" >&2
+      cat "$response_file" >&2
+      echo >&2
+      rm -f "$response_file"
+      return 1
       ;;
     404)
       if [ "${PARTYPLAY_ALLOW_LEGACY_DEPLOY:-0}" != "1" ]; then

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ROOM_CODE_LENGTH, sanitizeRoomCodeInput } from "../../../../shared/roomCode";
+import { useProfile } from "../context/ProfileContext";
 import { usePlatform } from "../context/PlatformContext";
 
 interface ReconnectScreenProps {
@@ -7,6 +8,7 @@ interface ReconnectScreenProps {
 }
 
 export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
+  const { profile } = useProfile();
   const {
     connected,
     sessionPending,
@@ -25,7 +27,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
   } = usePlatform();
   const [roomCode, setRoomCode] = useState("");
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
-  const [claimantName, setClaimantName] = useState("");
+  const [claimantName, setClaimantName] = useState(profile?.nickname ?? "");
 
   const claimInProgress =
     pendingSeatClaim?.status === "submitting" ||
@@ -138,7 +140,8 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
               <input
                 type="text"
                 className="input"
-                aria-label="Ваше имя"
+                aria-label="Ваш никнейм"
+                readOnly
                 value={claimantName}
                 onChange={(event) => setClaimantName(event.target.value)}
                 maxLength={20}

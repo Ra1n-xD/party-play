@@ -21,6 +21,7 @@ import { GameMenuArtwork } from "../components/GameMenuArtwork";
 import { GameRulesModal } from "../components/GameRulesModal";
 import { RoomEntryForm, type RoomEntryMode } from "../components/RoomEntryForm";
 import { usePlatform } from "../context/PlatformContext";
+import { useProfile } from "../context/ProfileContext";
 import { clientGameRegistry, type RegisteredClientGameId } from "../gameRegistry";
 import { gameMenuPresentation } from "../gameMenuPresentation";
 import { ReconnectScreen } from "./ReconnectScreen";
@@ -54,6 +55,7 @@ function roomTimerSetting(room: PublicRoomListItem): string | null {
 }
 
 export function HomeScreen() {
+  const { profile } = useProfile();
   const {
     connected,
     createRoom,
@@ -73,7 +75,7 @@ export function HomeScreen() {
     sessionPending,
     error,
   } = usePlatform();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(profile?.nickname ?? "");
   const [joinCode, setJoinCode] = useState("");
   const [featuredGameId, setFeaturedGameId] = useState<RegisteredClientGameId>(catalogGames[0].id);
   const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(null);
@@ -83,7 +85,7 @@ export function HomeScreen() {
   const [rulesGameId, setRulesGameId] = useState<RegisteredClientGameId | null>(null);
   const [createVisibility, setCreateVisibility] = useState<RoomVisibility>("private");
   const [publicRoomsGameId, setPublicRoomsGameId] = useState<RegisteredClientGameId | null>(null);
-  const [publicRoomName, setPublicRoomName] = useState("");
+  const [publicRoomName, setPublicRoomName] = useState(profile?.nickname ?? "");
   const [directoryClock, setDirectoryClock] = useState(() => Date.now());
   const titleRef = useRef<HTMLHeadingElement>(null);
   const initialRender = useRef(true);
@@ -510,7 +512,7 @@ export function HomeScreen() {
 
           <div className="platform-public-rooms-intro">
             <label className="platform-home-field">
-              <span>Ваше имя</span>
+              <span>Ваш никнейм</span>
               <input
                 className="input"
                 type="text"
@@ -518,6 +520,7 @@ export function HomeScreen() {
                 onChange={(event) => setPublicRoomName(event.target.value)}
                 maxLength={20}
                 autoComplete="nickname"
+                readOnly
                 placeholder="Как вас зовут"
               />
             </label>

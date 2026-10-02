@@ -37,6 +37,7 @@ export default function UnoTable3D(props: Props) {
         id: player.seatId,
         avatarId: getAvatar(snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.avatarId)
           .id,
+        cardSkinId: snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.cardSkins.uno,
         name: player.name,
         count: player.cardCount,
         active: player.isCurrentActor && !props.paused,
@@ -58,10 +59,13 @@ export default function UnoTable3D(props: Props) {
       })),
       viewerId: viewerSeatId,
       ownHand: props.hand,
+      cardSkinId: snapshot?.seats.find((seat) => seat.seatId === viewerSeatId)?.cardSkins.uno,
       cards: card
         ? [
             {
               id: card.id,
+              skinId: snapshot?.seats.find((seat) => seat.seatId === game.lastPlayedBySeatId)
+                ?.cardSkins.uno,
               rank,
               suit: "",
               red: false,

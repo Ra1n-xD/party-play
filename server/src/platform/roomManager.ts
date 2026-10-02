@@ -15,6 +15,8 @@ import {
 } from "../utils.js";
 import { CONFIG } from "../config.js";
 import { AVATARS, DEFAULT_AVATAR_ID, type AvatarId } from "../../../shared/platform/avatars.js";
+import type { CardSkinId } from "../../../shared/platform/cosmetics.js";
+import { applyProfileToPlayer } from "./profiles.js";
 
 export interface Player {
   id: string;
@@ -22,6 +24,8 @@ export interface Player {
   sessionToken: string;
   name: string;
   avatarId: AvatarId;
+  profileKey: string | null;
+  cardSkins: { durak: CardSkinId; uno: CardSkinId };
   ready: boolean;
   connected: boolean;
   alive: boolean;
@@ -113,6 +117,7 @@ export interface Room<G extends GameId = GameId> {
   pendingSeatClaims: Map<string, PendingSeatClaim>;
   revision: number;
   processedCommands: Map<string, RoomCommandResult>;
+  completedNaturally?: boolean;
 }
 
 const rooms = new Map<string, Room>();
@@ -230,6 +235,8 @@ export function createRoom<G extends GameId = "bunker">(
     sessionToken,
     name: playerName,
     avatarId: DEFAULT_AVATAR_ID,
+    profileKey: null,
+    cardSkins: { durak: "classic", uno: "classic" },
     ready: false,
     connected: true,
     alive: true,
@@ -257,6 +264,7 @@ export function createRoom<G extends GameId = "bunker">(
     temporaryBot: false,
   };
 
+  applyProfileToPlayer(player);
   const room: Room<G> = {
     code,
     visibility,
@@ -306,6 +314,8 @@ export function joinRoom(
     sessionToken,
     name: playerName,
     avatarId: DEFAULT_AVATAR_ID,
+    profileKey: null,
+    cardSkins: { durak: "classic", uno: "classic" },
     ready: false,
     connected: true,
     alive: true,
@@ -333,6 +343,7 @@ export function joinRoom(
     temporaryBot: false,
   };
 
+  if (player.owner.kind === "human") applyProfileToPlayer(player);
   room.players.set(playerId, player);
   room.allPlayerIds.push(playerId);
   touchRoom(roomCode);
@@ -428,6 +439,8 @@ export function addBotToRoom(room: Room, maxSeats = room.seatLimit): Player | nu
     sessionToken: "",
     name,
     avatarId: AVATARS[room.players.size % AVATARS.length].id,
+    profileKey: null,
+    cardSkins: { durak: "classic", uno: "classic" },
     ready: true,
     connected: true,
     alive: true,

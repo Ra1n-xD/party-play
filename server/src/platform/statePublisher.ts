@@ -21,6 +21,7 @@ function buildPublicSeat(room: Room, seatId: string): PublicSeat | null {
     seatId: player.id,
     name: player.owner.name,
     avatarId: player.avatarId,
+    cardSkins: player.cardSkins,
     occupantKind: player.owner.kind,
     controllerKind: player.controller.kind,
     temporaryBot: player.temporaryBot,

@@ -112,10 +112,12 @@ export default function DurakTable3D({
     const state: RoundTableState = {
       viewerId: viewerSeatId,
       ownHand: hand,
+      cardSkinId: snapshot?.seats.find((seat) => seat.seatId === viewerSeatId)?.cardSkins.durak,
       people: game.players.map((player) => ({
         id: player.seatId,
         avatarId: getAvatar(snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.avatarId)
           .id,
+        cardSkinId: snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.cardSkins.durak,
         name: player.name,
         count: player.cardCount,
         active: player.isCurrentActor && !paused,
@@ -154,6 +156,8 @@ export default function DurakTable3D({
         return [
           {
             id: pair.attack.id,
+            skinId: snapshot?.seats.find((seat) => seat.seatId === pair.attackPlayedBySeatId)
+              ?.cardSkins.durak,
             ...getDurakCardFace(pair.attack),
             x,
             z,
@@ -166,6 +170,8 @@ export default function DurakTable3D({
             ? [
                 {
                   id: pair.defense.id,
+                  skinId: snapshot?.seats.find((seat) => seat.seatId === pair.defensePlayedBySeatId)
+                    ?.cardSkins.durak,
                   ...getDurakCardFace(pair.defense),
                   x: x + 0.25,
                   z: z + 0.25,
@@ -394,6 +400,8 @@ export default function DurakTable3D({
         actions={isHost ? [{ label: "Управление комнатой", key: "H", onSelect: onManage }] : []}
         people={game.players.map((player) => ({
           id: player.seatId,
+          cardSkinId: snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.cardSkins
+            .durak,
           name: player.name,
           detail: `${player.cardCount} карт${player.isCurrentActor ? " · ходит" : ""}${player.controllerKind === "bot" ? " · бот" : ""}`,
         }))}
