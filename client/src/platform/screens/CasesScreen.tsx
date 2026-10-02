@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { FiVolume2, FiVolumeX } from "react-icons/fi";
 import {
   CASE_ITEMS,
   COSMETIC_KIND_NAMES,
@@ -9,6 +10,7 @@ import {
 } from "../../../../shared/platform/cosmetics";
 import { CosmeticPreview } from "../components/CosmeticPreview";
 import { useProfile } from "../context/ProfileContext";
+import { useCaseAudio } from "../useCaseAudio";
 
 const WINNER_INDEX = 38;
 function randomItem() {
@@ -27,6 +29,7 @@ function ReelItem({ item }: { item: Cosmetic }) {
   );
 }
 export function CasesScreen() {
+  const sound = useCaseAudio();
   const { profile, openCase, equip, busy, connected, error } = useProfile();
   const [opening, setOpening] = useState<CaseOpening | null>(null);
   const [reel, setReel] = useState<Cosmetic[]>(() => Array.from({ length: 8 }, randomItem));
@@ -48,13 +51,17 @@ export function CasesScreen() {
     };
   }, []);
   const finish = () => {
-    if (mounted.current) {
+    if (mounted.current && openingLock.current) {
+      window.clearTimeout(timer.current);
+      window.cancelAnimationFrame(frame.current ?? 0);
+      sound.reveal();
       setPhase("result");
       openingLock.current = false;
     }
   };
   const start = async () => {
     if (openingLock.current || !connected) return;
+    sound.unlock();
     openingLock.current = true;
     setPhase("request");
     setOpening(null);
@@ -79,10 +86,9 @@ export function CasesScreen() {
         const card = track.current.children[WINNER_INDEX] as HTMLElement;
         setOffset(viewport.current.clientWidth / 2 - card.offsetLeft - card.offsetWidth / 2);
         setAnimated(true);
-        timer.current = window.setTimeout(
-          finish,
-          window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 100 : 6200,
-        );
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        sound.spin(reducedMotion ? 0 : 6);
+        timer.current = window.setTimeout(finish, reducedMotion ? 100 : 6200);
       });
     });
   };
@@ -107,14 +113,26 @@ export function CasesScreen() {
       <section className={`case-stage phase-${phase}`}>
         <div className="case-stage-light" />
         <div className="case-caption">
-          <span>
-            {phase === "spin"
-              ? "Ищем ваш стиль…"
-              : phase === "result"
-                ? "Ваша награда"
-                : "Коллекция PartyPlay"}
-          </span>
-          <small>{CASE_ITEMS.length} предметов · 4 редкости</small>
+          <div>
+            <span>
+              {phase === "spin"
+                ? "Ищем ваш стиль…"
+                : phase === "result"
+                  ? "Ваша награда"
+                  : "Коллекция PartyPlay"}
+            </span>
+            <small>{CASE_ITEMS.length} предметов · 4 редкости</small>
+          </div>
+          <button
+            type="button"
+            className="case-sound-toggle"
+            onClick={sound.toggle}
+            aria-pressed={sound.enabled}
+            aria-label="Звук открытия кейса"
+          >
+            {sound.enabled ? <FiVolume2 aria-hidden="true" /> : <FiVolumeX aria-hidden="true" />}
+            {sound.enabled ? "Звук включён" : "Без звука"}
+          </button>
         </div>
         <div className="case-reel-window" ref={viewport} aria-hidden="true">
           <div className="case-pointer" />

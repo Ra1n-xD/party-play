@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import { socket } from "../../socket";
+import { usePlatform } from "./PlatformContext";
+import { AccessibleModal } from "../components/AccessibleModal";
 import type {
   CaseOpening,
   ProfileSnapshot,
@@ -60,11 +62,13 @@ interface ProfileContextValue {
 }
 const Context = createContext<ProfileContextValue | null>(null);
 export function ProfileProvider({ children }: { children: ReactNode }) {
+  const { roomCode, leaveRoom } = usePlatform();
   const [profile, setProfile] = useState<ProfileSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(socket.connected);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const nickname = useRef(savedNickname());
   const pendingOpening = useRef<string | null>(null);
   const requestBusy = useRef(false);
@@ -137,26 +141,35 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       socket.off("profile:snapshot", accept);
     };
   }, [accept, login]);
-  const logout = () => {
-    if (!socket.connected || requestBusy.current) return;
+  const performLogout = () => {
+    if (!socket.connected || !ready || requestBusy.current) return;
     requestBusy.current = true;
+    setConfirmLogout(false);
     setBusy(true);
     setError(null);
+    const connectionId = socket.id;
+    // Socket.IO preserves packet order: leave membership before logging out.
+    if (roomCode) leaveRoom();
     socket
       .timeout(8000)
       .emit("profile:logout", (timeout: Error | null, result: ProfileReply<null>) => {
         requestBusy.current = false;
         setBusy(false);
+        if (socket.id !== connectionId) return;
         if (timeout) setError("Сервер не ответил");
         else if (!result.ok) setError(result.error);
         else {
           nickname.current = "";
           saveNickname("");
           pendingOpening.current = null;
-          savePendingCase("", null);
           setProfile(null);
         }
       });
+  };
+  const logout = () => {
+    if (!socket.connected || !ready || requestBusy.current) return;
+    if (roomCode) setConfirmLogout(true);
+    else performLogout();
   };
   const equip = (itemId: string) => {
     if (!socket.connected || requestBusy.current) return;
@@ -230,6 +243,27 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      {confirmLogout && profile && (
+        <AccessibleModal labelledBy="profile-logout-title" onClose={() => setConfirmLogout(false)}>
+          <h2 id="profile-logout-title">Выйти из аккаунта?</h2>
+          <p className="profile-logout-note">
+            Вы также покинете текущую комнату. Если в ней больше нет людей, она закроется. Коллекция
+            сохранится за вашим ником.
+          </p>
+          <div className="modal-actions">
+            <button className="btn btn-secondary" onClick={() => setConfirmLogout(false)}>
+              Остаться
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={performLogout}
+              disabled={busy || !connected}
+            >
+              Выйти из аккаунта
+            </button>
+          </div>
+        </AccessibleModal>
+      )}
     </Context.Provider>
   );
 }

@@ -626,7 +626,13 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                           className="uno-discard-flight-target"
                           data-table-card-flight={`uno-discard-flight:${game.topDiscard.id}`}
                         >
-                          <UnoCard card={game.topDiscard} />
+                          <UnoCard
+                            card={game.topDiscard}
+                            skinId={
+                              snapshot.seats.find((seat) => seat.seatId === game.lastPlayedBySeatId)
+                                ?.cardSkins.uno ?? "classic"
+                            }
+                          />
                         </div>
                       </div>
                     ) : (

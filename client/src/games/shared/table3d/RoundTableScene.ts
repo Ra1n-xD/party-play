@@ -1,4 +1,5 @@
 import { getCardSkin, type CardSkinId } from "../../../../../shared/platform/cosmetics";
+import { drawCardFace } from "../../../platform/cardFaceArtwork";
 import * as THREE from "three";
 import { makeRoomEnvironment } from "./RoomEnvironment";
 import { CARD_HEIGHT, makeCardGeometry, type CardMesh } from "./CardGeometry";
@@ -514,7 +515,13 @@ export class RoundTableScene {
       ctx.fillText(suit, 128, 218);
     }
     if (skin.id !== "classic") {
-      if (!rank) {
+      if (rank) {
+        drawCardFace(
+          ctx,
+          { game: this.options.variant === "uno" ? "uno" : "durak", rank, suit, red, color },
+          skin.id,
+        );
+      } else {
         ctx.fillStyle = skin.background;
         ctx.fillRect(0, 0, 256, 360);
         ctx.strokeStyle = skin.accent;

@@ -993,6 +993,11 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                               >
                                 <DurakCard
                                   card={pair.attack}
+                                  skinId={
+                                    snapshot.seats.find(
+                                      (seat) => seat.seatId === pair.attackPlayedBySeatId,
+                                    )?.cardSkins.durak ?? "classic"
+                                  }
                                   size="table"
                                   playable={canDefendSelected}
                                   onClick={
@@ -1024,6 +1029,11 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                                 >
                                   <DurakCard
                                     card={pair.defense}
+                                    skinId={
+                                      snapshot.seats.find(
+                                        (seat) => seat.seatId === pair.defensePlayedBySeatId,
+                                      )?.cardSkins.durak ?? "classic"
+                                    }
                                     size="table"
                                     ariaLabel={`${defenderName} побил: ${getCardName(pair.defense)}`}
                                   />
