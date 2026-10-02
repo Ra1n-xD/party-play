@@ -1,4 +1,5 @@
 import { getCardSkin, type CardSkinId } from "../../../shared/platform/cosmetics";
+import { drawRoyalCardFace } from "./royalCardArtwork";
 
 export interface CardArtworkFace {
   game: "durak" | "uno";
@@ -14,7 +15,7 @@ const FACE_COLORS = {
   midnight: { paper: "#121936", ink: "#e3e8ff", red: "#ff91ac" },
   ember: { paper: "#281e25", ink: "#fff0de", red: "#ff9566" },
   aurora: { paper: "#292040", ink: "#c1ffe7", red: "#ff9fdc" },
-  royal: { paper: "#fff1ce", ink: "#493416", red: "#9d2940" },
+  royal: { paper: "#111b2b", ink: "#ffe6a4", red: "#ff7894" },
 };
 const UNO_COLORS = ["#ce3e48", "#e6b939", "#258358", "#347bc5"];
 
@@ -24,15 +25,16 @@ export function drawCardFace(
   face: CardArtworkFace,
   skinId: CardSkinId,
 ) {
+  if (skinId === "royal") return drawRoyalCardFace(ctx, face);
   const skin = getCardSkin(skinId);
   const palette = FACE_COLORS[skin.id];
-  const serif = ["classic", "midnight", "royal"].includes(skin.id);
+  const serif = ["classic", "midnight"].includes(skin.id);
   const font = serif ? "Georgia, serif" : "Arial, sans-serif";
   ctx.save();
   ctx.fillStyle = palette.paper;
   ctx.fillRect(0, 0, 256, 360);
   ctx.strokeStyle = skin.accent;
-  ctx.lineWidth = skin.id === "royal" ? 3 : 2;
+  ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.roundRect(9, 9, 238, 342, 12);
   ctx.stroke();
@@ -77,18 +79,6 @@ export function drawCardFace(
       ctx.bezierCurveTo(85, 15 + i * 29, 160, 285 + i * 4, 238, 93 + i * 24);
       ctx.stroke();
     }
-  } else if (skin.id === "royal") {
-    ctx.globalAlpha = 0.7;
-    ctx.strokeRect(17, 17, 222, 326);
-    for (const y of [78, 282]) {
-      ctx.beginPath();
-      ctx.moveTo(35, y);
-      ctx.lineTo(110, y);
-      ctx.lineTo(128, y - 9);
-      ctx.lineTo(146, y);
-      ctx.lineTo(221, y);
-      ctx.stroke();
-    }
   }
   ctx.restore();
 
@@ -121,7 +111,7 @@ export function drawCardFace(
 
   ctx.fillStyle = palette.paper;
   ctx.strokeStyle = skin.accent;
-  ctx.lineWidth = skin.id === "royal" ? 4 : 2;
+  ctx.lineWidth = 2;
   ctx.beginPath();
   if (skin.id === "ember") {
     ctx.moveTo(128, 98);
@@ -134,7 +124,7 @@ export function drawCardFace(
   } else if (skin.id === "mint") {
     ctx.roundRect(60, 107, 136, 146, 26);
   } else {
-    ctx.ellipse(128, 180, skin.id === "royal" ? 72 : 78, 86, 0, 0, Math.PI * 2);
+    ctx.ellipse(128, 180, 78, 86, 0, 0, Math.PI * 2);
   }
   ctx.fill();
   ctx.stroke();
@@ -143,7 +133,7 @@ export function drawCardFace(
   ctx.fillStyle = face.game === "durak" && face.red ? palette.red : palette.ink;
   ctx.font = `bold ${face.game === "durak" ? 94 : face.rank.length > 1 ? 62 : 90}px ${font}`;
   ctx.fillText(face.game === "durak" ? (face.suit ?? "♠") : face.rank, 128, 184);
-  ctx.fillStyle = skin.id === "royal" ? "#8e671f" : skin.accent;
+  ctx.fillStyle = skin.accent;
   ctx.font = `26px ${font}`;
   ctx.fillText(skin.mark, 128, 42);
   ctx.fillText(skin.mark, 128, 321);

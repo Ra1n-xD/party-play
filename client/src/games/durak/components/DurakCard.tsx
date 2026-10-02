@@ -1,5 +1,6 @@
 import { useCardSkin } from "../../../platform/useCardSkin";
 import { CardFaceArtwork } from "../../../platform/components/CardFaceArtwork";
+import { RoyalCardBackArtwork } from "../../../platform/components/RoyalCardBackArtwork";
 import type { CardSkinId } from "../../../../../shared/platform/cosmetics";
 import type {
   DurakCard as DurakCardData,
@@ -173,7 +174,11 @@ export function DurakCardBack({ label = "Карта рубашкой вверх"
       role="img"
       aria-label={label}
     >
-      <span aria-hidden="true">{skin.mark}</span>
+      {skin.id === "royal" ? (
+        <RoyalCardBackArtwork game="durak" />
+      ) : (
+        <span aria-hidden="true">{skin.mark}</span>
+      )}
     </div>
   );
 }

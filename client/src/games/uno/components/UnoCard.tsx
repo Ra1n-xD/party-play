@@ -1,5 +1,6 @@
 import { useCardSkin } from "../../../platform/useCardSkin";
 import { CardFaceArtwork } from "../../../platform/components/CardFaceArtwork";
+import { RoyalCardBackArtwork } from "../../../platform/components/RoyalCardBackArtwork";
 import type { CardSkinId } from "../../../../../shared/platform/cosmetics";
 import type { UnoCard as UnoCardData, UnoColor } from "../../../../../shared/games/uno/types";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -161,6 +162,8 @@ export function UnoCardBack({ label = "Карта рубашкой вверх" }
     <div {...skinProps} className="uno-card uno-card-back is-table" role="img" aria-label={label}>
       {skin.id === "classic" ? (
         <img src={cardBack} alt="" aria-hidden="true" draggable={false} />
+      ) : skin.id === "royal" ? (
+        <RoyalCardBackArtwork game="uno" />
       ) : (
         <span aria-hidden="true">{skin.mark}</span>
       )}
