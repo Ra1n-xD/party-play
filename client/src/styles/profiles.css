@@ -1,5 +1,11 @@
 @import "./show-menu.css";
 
+html:has(.show-menu, .profile-login),
+body:has(.show-menu, .profile-login),
+#root:has(.show-menu, .profile-login) {
+  background: #221930;
+}
+
 .profile-login,
 .collection-page,
 .cases-page {

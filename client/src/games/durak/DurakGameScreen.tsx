@@ -37,6 +37,7 @@ import { useCardDrag } from "../shared/useCardDrag";
 import { useCardTransferMotion } from "../shared/useCardTransferMotion";
 import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
+import { useTableActionDock } from "../shared/table3d/useTableActionDock";
 import {
   DurakCard,
   DurakCardBack,
@@ -325,6 +326,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
   } = usePlatform();
   const game = snapshot.game;
   const [is3D, setIs3D] = useState(true);
+  const screenRef = useTableActionDock(is3D && Boolean(game));
   const [cursorVisible, setCursorVisible] = useState(false);
   const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
   const [focusedTargetId, setFocusedTargetId] = useState<string | null>(null);
@@ -793,6 +795,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
 
   return (
     <main
+      ref={screenRef}
       className={`screen command-game-screen card-game-screen durak-screen has-durak-command-dock ${is3D ? "is-3d" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
     >
       <GameRoomHeader

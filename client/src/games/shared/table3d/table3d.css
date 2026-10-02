@@ -554,7 +554,7 @@
     cursor: auto !important;
   }
 }
-@media (max-height: 540px) and (min-width: 681px) {
+@media (max-height: 540px) and (min-width: 681px) and (pointer: fine) {
   .table3d-keyboard {
     top: 8px;
     right: 10px;
@@ -611,7 +611,7 @@
   font-size: 0.75rem;
 }
 
-/* Actions float over the room; there is no footer panel or reserved footer space in 3D. */
+/* Desktop actions float over the room; mobile actions have a separate bottom panel. */
 .screen.command-game-screen.card-game-screen.is-3d,
 .screen.command-game-screen.is-3d.bunker3d-screen {
   padding-bottom: 0;
@@ -749,13 +749,26 @@
 .table3d-targets {
   bottom: 38%;
 }
-@media (max-width: 680px) {
+@media (max-width: 680px), (pointer: coarse) {
+  .screen.command-game-screen.card-game-screen.is-3d,
+  .screen.command-game-screen.is-3d.bunker3d-screen {
+    padding-bottom: var(--table3d-dock-height, calc(64px + env(safe-area-inset-bottom)));
+  }
+  .screen.command-game-screen.is-3d.bunker3d-screen > .table3d-scene {
+    bottom: var(--table3d-dock-height, calc(64px + env(safe-area-inset-bottom)));
+  }
   .screen.command-game-screen.is-3d
     :is(.uno-command-dock, .durak-command-dock, .gs-action-bar, .vote-command-bar) {
-    right: 10px;
-    left: 10px;
-    bottom: max(8px, env(safe-area-inset-bottom));
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 80;
     max-width: none;
+    padding: 10px max(10px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+    border-top: 1px solid #d4bf8533;
+    background: #14221e;
+    box-shadow: 0 -4px 18px #0003;
+    pointer-events: auto;
   }
   .screen.command-game-screen.is-3d
     :is(.uno-command-actions, .durak-command-actions, .gs-command-actions, .vote-command-actions) {
@@ -763,21 +776,25 @@
     gap: 5px;
   }
   .table3d-hand-caption {
-    bottom: 75px;
+    bottom: 12px;
     left: 10px;
     width: 42%;
     font-size: 0.62rem;
   }
   .table3d-hand-step {
-    bottom: 185px;
+    bottom: 135px;
     left: 8px;
     width: 36px;
   }
   .table3d-hand-step.is-next {
     right: 8px;
   }
+  .table3d-keyboard,
+  .is-3d .btn kbd {
+    display: none;
+  }
 }
-@media (max-height: 540px) and (min-width: 681px) {
+@media (max-height: 540px) and (min-width: 681px) and (pointer: fine) {
   .table3d-keyboard {
     width: 300px;
     padding: 8px 10px;
@@ -796,7 +813,7 @@
 }
 
 /* Desktop play uses the keyboard. Touch devices retain their action controls. */
-@media (pointer: fine) {
+@media (min-width: 681px) and (pointer: fine) {
   .screen.command-game-screen.is-3d
     :is(.uno-command-dock, .durak-command-dock, .gs-action-bar, .vote-command-bar),
   .is-3d .bunker3d-tools,

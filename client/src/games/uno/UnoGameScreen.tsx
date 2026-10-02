@@ -27,6 +27,7 @@ import { UnoCard, UnoCardBack, getUnoCardMark, getUnoCardName } from "./componen
 import { UnoColorDialog } from "./components/UnoColorDialog";
 
 import { useTableHotkeys } from "../shared/table3d/useTableHotkeys";
+import { useTableActionDock } from "../shared/table3d/useTableActionDock";
 const UnoTable3D = lazy(() => import("./components/UnoTable3D"));
 
 interface UnoGameScreenProps {
@@ -111,6 +112,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   } = usePlatform();
   const game = snapshot.game;
   const [is3D, setIs3D] = useState(true);
+  const screenRef = useTableActionDock(is3D && Boolean(game));
   const [cursorVisible, setCursorVisible] = useState(false);
   const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -484,6 +486,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
 
   return (
     <main
+      ref={screenRef}
       className={`screen command-game-screen card-game-screen uno-screen has-uno-command-dock ${is3D ? "is-3d" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
     >
       <GameRoomHeader

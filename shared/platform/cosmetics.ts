@@ -1,4 +1,5 @@
 import { AVATARS, type AvatarId } from "./avatars.js";
+import type { UpgradeAttempt } from "./upgrades.js";
 
 export const RARITIES = {
   basic: { name: "Базовый", color: "#9da7b5", chance: 0 },
@@ -146,5 +147,6 @@ export interface ProfileSnapshot {
   inventory: Record<string, number>;
   equipped: { avatar: AvatarId; durak: CardSkinId; uno: CardSkinId };
   recentOpenings: CaseOpening[];
+  recentUpgrades?: UpgradeAttempt[];
 }
 export type ProfileReply<T> = { ok: true; value: T } | { ok: false; error: string };

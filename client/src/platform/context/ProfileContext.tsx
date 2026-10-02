@@ -15,9 +15,32 @@ import type {
   ProfileSnapshot,
   ProfileReply,
 } from "../../../../shared/platform/cosmetics";
+import type {
+  UpgradeAttempt,
+  UpgradeInput,
+  UpgradeRequest,
+} from "../../../../shared/platform/upgrades";
+import { getUpgradeQuote } from "../../../../shared/platform/upgrades";
 
 const STORAGE_KEY = "partyplay_nickname_v1";
 const OPENING_KEY = "partyplay_pending_case_v1";
+const UPGRADE_KEY = "partyplay_pending_upgrade_v1";
+function readPendingUpgrade(name: string): UpgradeRequest | null {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(`${UPGRADE_KEY}:${name.toLocaleLowerCase("ru-RU")}`) ?? "null",
+    );
+    const request = saved?.request;
+    return saved?.nickname === name &&
+      typeof request?.requestId === "string" &&
+      typeof request?.targetItemId === "string" &&
+      getUpgradeQuote(request?.inputs, request?.targetItemId)
+      ? request
+      : null;
+  } catch {
+    return null;
+  }
+}
 function pendingCase(name: string): string | null {
   try {
     const saved = JSON.parse(localStorage.getItem(OPENING_KEY) ?? "null");
@@ -58,6 +81,8 @@ interface ProfileContextValue {
   logout(): void;
   equip(itemId: string): void;
   openCase(): Promise<CaseOpening | null>;
+  pendingUpgrade: UpgradeRequest | null;
+  upgrade(inputs: UpgradeInput[], targetItemId: string): Promise<UpgradeAttempt | null>;
   clearError(): void;
 }
 const Context = createContext<ProfileContextValue | null>(null);
@@ -71,6 +96,20 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const nickname = useRef(savedNickname());
   const pendingOpening = useRef<string | null>(null);
+  const pendingUpgradeRef = useRef<UpgradeRequest | null>(null);
+  const [pendingUpgrade, setPendingUpgrade] = useState<UpgradeRequest | null>(null);
+  const rememberUpgrade = useCallback((request: UpgradeRequest | null) => {
+    pendingUpgradeRef.current = request;
+    setPendingUpgrade(request);
+    try {
+      const key = `${UPGRADE_KEY}:${nickname.current.toLocaleLowerCase("ru-RU")}`;
+      if (request)
+        localStorage.setItem(key, JSON.stringify({ nickname: nickname.current, request }));
+      else localStorage.removeItem(key);
+    } catch {
+      /* Keep the same request in memory if browser storage is unavailable. */
+    }
+  }, []);
   const requestBusy = useRef(false);
   const accept = useCallback((next: ProfileSnapshot) => {
     nickname.current = next.nickname;
@@ -103,11 +142,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
             } else {
               accept(result.value);
               pendingOpening.current = pendingCase(result.value.nickname);
+              rememberUpgrade(readPendingUpgrade(result.value.nickname));
             }
           },
         );
     },
-    [accept],
+    [accept, rememberUpgrade],
   );
   useEffect(() => {
     let retry: ReturnType<typeof setTimeout> | undefined;
@@ -162,6 +202,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           nickname.current = "";
           saveNickname("");
           pendingOpening.current = null;
+          pendingUpgradeRef.current = null;
+          setPendingUpgrade(null);
           setProfile(null);
         }
       });
@@ -228,6 +270,48 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         ),
     );
   };
+  const upgrade = (
+    inputs: UpgradeInput[],
+    targetItemId: string,
+  ): Promise<UpgradeAttempt | null> => {
+    if (!socket.connected || !ready || requestBusy.current) return Promise.resolve(null);
+    requestBusy.current = true;
+    setBusy(true);
+    setError(null);
+    const request = pendingUpgradeRef.current ?? {
+      requestId: crypto.randomUUID(),
+      inputs,
+      targetItemId,
+    };
+    rememberUpgrade(request);
+    return new Promise((resolve) =>
+      socket
+        .timeout(8000)
+        .emit(
+          "profile:upgrade",
+          request,
+          (
+            timeout: Error | null,
+            result: ProfileReply<{ profile: ProfileSnapshot; attempt: UpgradeAttempt }>,
+          ) => {
+            requestBusy.current = false;
+            setBusy(false);
+            if (timeout) {
+              setError("Ответ потерялся. Восстановите результат: повторного списания не будет");
+              resolve(null);
+            } else if (!result.ok) {
+              rememberUpgrade(null);
+              setError(result.error);
+              resolve(null);
+            } else {
+              rememberUpgrade(null);
+              accept(result.value.profile);
+              resolve(result.value.attempt);
+            }
+          },
+        ),
+    );
+  };
   return (
     <Context.Provider
       value={{
@@ -239,6 +323,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         logout,
         equip,
         openCase,
+        pendingUpgrade,
+        upgrade,
         clearError: () => setError(null),
       }}
     >

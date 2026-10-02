@@ -5,7 +5,7 @@ import { useProfile } from "../context/ProfileContext";
 import { BrandDice } from "./BrandDice";
 
 interface ProfileHeaderProps {
-  activePage?: "games" | "profile" | "cases";
+  activePage?: "games" | "profile" | "cases" | "upgrade";
   onHome?: () => void;
 }
 
@@ -33,6 +33,9 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
         </a>
         <a href="/cases" aria-current={activePage === "cases" ? "page" : undefined}>
           Кейсы
+        </a>
+        <a href="/upgrade" aria-current={activePage === "upgrade" ? "page" : undefined}>
+          Улучшить
         </a>
       </nav>
       <a href="/profile" className="show-profile-balance">

@@ -19,6 +19,7 @@ import {
 } from "./game/gameScreenViewModel";
 
 import { useTableHotkeys } from "../games/shared/table3d/useTableHotkeys";
+import { useTableActionDock } from "../games/shared/table3d/useTableActionDock";
 const BunkerTable3D = lazy(() => import("../games/bunker/BunkerTable3D"));
 
 export function GameScreen({
@@ -64,6 +65,7 @@ export function GameScreen({
     transferHost,
   } = useGame();
   const [showAttrPicker, setShowAttrPicker] = useState(false);
+  const screenRef = useTableActionDock(is3D && Boolean(gameState));
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [confirmRevealAction, setConfirmRevealAction] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState<MobileGameTab>("players");
@@ -203,6 +205,7 @@ export function GameScreen({
 
   return (
     <main
+      ref={screenRef}
       className={`screen command-game-screen has-game-command-bar ${is3D ? "is-3d bunker3d-screen" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
     >
       <GameRoomHeader
