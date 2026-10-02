@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { FiArrowUpRight, FiCheck, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
+import {
+  FiArrowUpRight,
+  FiCheck,
+  FiPlus,
+  FiRefreshCw,
+  FiVolume2,
+  FiVolumeX,
+  FiX,
+} from "react-icons/fi";
 import {
   CASE_ITEMS,
   COSMETIC_KIND_NAMES,
@@ -18,6 +26,7 @@ import {
 } from "../../../../shared/platform/upgrades";
 import { CosmeticPreview } from "../components/CosmeticPreview";
 import { useProfile } from "../context/ProfileContext";
+import { useCollectionAudio } from "../useCollectionAudio";
 import "../../styles/upgrades.css";
 
 const formatChance = (value: number) =>
@@ -47,6 +56,7 @@ function ItemCard({
 }
 
 export function UpgradeScreen() {
+  const sound = useCollectionAudio();
   const { profile, busy, connected, error, clearError, upgrade, pendingUpgrade, equip } =
     useProfile();
   const [inputs, setInputs] = useState<UpgradeInput[]>([]);
@@ -61,6 +71,7 @@ export function UpgradeScreen() {
   const frame = useRef<number>();
   const mounted = useRef(true);
   const locked = useRef(false);
+  const revealSuccess = useRef(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -136,11 +147,15 @@ export function UpgradeScreen() {
   };
   const finish = () => {
     clearTimeout(timer.current);
-    if (mounted.current) setPhase("result");
+    if (mounted.current && locked.current) {
+      sound.reveal(revealSuccess.current);
+      setPhase("result");
+    }
     locked.current = false;
   };
   const start = async () => {
     if (locked.current || busy || !connected || (!quote && !pendingUpgrade)) return;
+    sound.unlock();
     locked.current = true;
     setPreviewProfile(profile);
     setPhase("request");
@@ -154,10 +169,12 @@ export function UpgradeScreen() {
       return;
     }
     setAttempt(result);
+    revealSuccess.current = result.success;
     setPhase("spin");
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     frame.current = requestAnimationFrame(() => {
       setRotation((reduced ? 0 : 1800) + (result.roll / 10_000) * 360);
+      sound.spin(reduced ? 0 : 4.1);
       timer.current = setTimeout(finish, reduced ? 100 : 4300);
     });
   };
@@ -172,17 +189,6 @@ export function UpgradeScreen() {
 
   return (
     <main className="upgrade-page">
-      <div className="collection-heading">
-        <div>
-          <span className="profile-eyebrow">PARTY UPGRADE / 02</span>
-          <h1>Выше ставка. Ярче стиль.</h1>
-          <p>Превратите предметы коллекции в шанс получить что-то особенное.</p>
-        </div>
-        <span className="upgrade-tag">
-          <FiArrowUpRight aria-hidden="true" /> Без монет
-        </span>
-      </div>
-
       {pendingUpgrade && phase === "idle" && (
         <div className="upgrade-pending" role="status">
           Результат предыдущей попытки ещё не получен. Восстановите его без повторного списания.
@@ -306,6 +312,16 @@ export function UpgradeScreen() {
                   ? "Цель должна быть ценнее выбранных предметов."
                   : "При неудаче выбранные предметы будут потрачены."}
           </p>
+          <button
+            type="button"
+            className="case-sound-toggle"
+            onClick={sound.toggle}
+            aria-pressed={sound.enabled}
+            aria-label="Звук улучшения"
+          >
+            {sound.enabled ? <FiVolume2 aria-hidden="true" /> : <FiVolumeX aria-hidden="true" />}
+            {sound.enabled ? "Звук включён" : "Без звука"}
+          </button>
         </div>
 
         <div className="upgrade-selection upgrade-target">
@@ -345,21 +361,6 @@ export function UpgradeScreen() {
         </p>
       )}
 
-      <div className="upgrade-rules">
-        <p>
-          Шанс = ценность ваших предметов / ценность цели, максимум 90%. Результат каждой попытки
-          независим.
-        </p>
-        <div>
-          {Object.entries(UPGRADE_VALUES)
-            .filter(([, value]) => value > 0)
-            .map(([rarity, value]) => (
-              <span key={rarity} style={{ color: RARITIES[rarity as keyof typeof RARITIES].color }}>
-                {RARITIES[rarity as keyof typeof RARITIES].name} · {value} ед.
-              </span>
-            ))}
-        </div>
-      </div>
       <div className="upgrade-catalogs">
         <section aria-labelledby="upgrade-inventory-title">
           <div className="upgrade-catalog-heading">

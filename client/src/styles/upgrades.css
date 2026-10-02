@@ -13,17 +13,6 @@
     sans-serif;
   letter-spacing: -0.7px;
 }
-.upgrade-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  padding: 12px 16px;
-  border: 1px solid #d8fc6133;
-  border-radius: 30px;
-  color: var(--upgrade-accent);
-  font-size: 13px;
-}
 .upgrade-stage {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(270px, 1.15fr) minmax(0, 1fr);
@@ -316,23 +305,11 @@
 .upgrade-page > .profile-error {
   margin-top: 16px;
 }
-.upgrade-rules {
-  display: grid;
-  gap: 10px;
-  margin: 22px 0 36px;
-  color: var(--upgrade-muted);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.upgrade-rules > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 22px;
-}
 .upgrade-catalogs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 30px;
+  margin-top: 30px;
 }
 .upgrade-catalogs > section {
   min-width: 0;
@@ -593,9 +570,6 @@
 @media (max-width: 420px) {
   .upgrade-page {
     padding-inline: 16px;
-  }
-  .upgrade-page .collection-heading h1 {
-    font-size: 24px;
   }
   .upgrade-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

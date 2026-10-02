@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 const SOUND_KEY = "partyplay_case_sound_v1";
 
-class CaseAudio {
+class CollectionAudio {
   private context: AudioContext | null = null;
   private output: GainNode | null = null;
   private voices = new Set<OscillatorNode>();
@@ -18,7 +18,7 @@ class CaseAudio {
       }
       void this.context.resume().catch(() => {});
     } catch {
-      // Audio is optional; unavailable devices must not block case opening.
+      // Audio is optional; unavailable devices must not block collection actions.
     }
   }
 
@@ -56,11 +56,11 @@ class CaseAudio {
     }
   }
 
-  reveal() {
+  reveal(success = true) {
     this.stop();
     if (!this.context) return;
     const start = this.context.currentTime;
-    [523.25, 659.25, 783.99].forEach((frequency, index) => {
+    (success ? [523.25, 659.25, 783.99] : [392, 329.63]).forEach((frequency, index) => {
       this.tone(frequency, start + index * 0.09, 0.42, 0.2);
     });
   }
@@ -78,7 +78,7 @@ class CaseAudio {
   }
 }
 
-export function useCaseAudio() {
+export function useCollectionAudio() {
   const [enabled, setEnabled] = useState(() => {
     try {
       return localStorage.getItem(SOUND_KEY) !== "off";
@@ -87,7 +87,7 @@ export function useCaseAudio() {
     }
   });
   const enabledRef = useRef(enabled);
-  const audio = useRef<CaseAudio>();
+  const audio = useRef<CollectionAudio>();
   useEffect(() => () => audio.current?.dispose(), []);
   return {
     enabled,
@@ -104,14 +104,14 @@ export function useCaseAudio() {
     },
     unlock() {
       if (!enabledRef.current) return;
-      audio.current ??= new CaseAudio();
+      audio.current ??= new CollectionAudio();
       audio.current.unlock();
     },
     spin(duration: number) {
       if (enabledRef.current) audio.current?.spin(duration);
     },
-    reveal() {
-      if (enabledRef.current) audio.current?.reveal();
+    reveal(success = true) {
+      if (enabledRef.current) audio.current?.reveal(success);
     },
   };
 }

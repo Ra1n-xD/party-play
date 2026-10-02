@@ -3,10 +3,12 @@ import {
   COSMETICS,
   COSMETIC_KIND_NAMES,
   RARITIES,
+  INITIAL_COINS,
   type CosmeticKind,
 } from "../../../../shared/platform/cosmetics";
 import { useProfile } from "../context/ProfileContext";
 import { CosmeticPreview } from "../components/CosmeticPreview";
+import { CoinAmount } from "../components/CoinAmount";
 
 export function LoginScreen() {
   const { login, busy, connected, error } = useProfile();
@@ -45,7 +47,9 @@ export function LoginScreen() {
           </button>
         </form>
         <div className="profile-welcome">
-          <span>◉ 5 монет в подарок</span>
+          <span className="profile-welcome-coins">
+            <CoinAmount amount={INITIAL_COINS} label="монет новому игроку" />
+          </span>
           <span>Человек и базовые карты</span>
         </div>
         <small>
@@ -81,7 +85,7 @@ export function ProfileScreen() {
       </div>
       <section className="profile-summary">
         <strong>{profile.nickname}</strong>
-        <span>◉ {profile.coins} монет</span>
+        <CoinAmount amount={profile.coins} />
         <span>
           {owned} / {COSMETICS.length} предметов
         </span>

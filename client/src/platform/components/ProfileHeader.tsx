@@ -3,6 +3,8 @@ import { FiLogOut } from "react-icons/fi";
 import { usePlatform } from "../context/PlatformContext";
 import { useProfile } from "../context/ProfileContext";
 import { BrandDice } from "./BrandDice";
+import { CoinAmount } from "./CoinAmount";
+import { CASE_COST, GAME_REWARD } from "../../../../shared/platform/cosmetics";
 
 interface ProfileHeaderProps {
   activePage?: "games" | "profile" | "cases" | "upgrade";
@@ -38,10 +40,21 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
           Улучшить
         </a>
       </nav>
-      <a href="/profile" className="show-profile-balance">
-        <span>{profile.nickname}</span>
-        <strong>◉ {profile.coins}</strong>
-      </a>
+      <div className="show-profile-balance">
+        <a href="/profile" className="show-profile-nickname">
+          {profile.nickname}
+        </a>
+        <details className="coin-wallet">
+          <summary aria-label={`Ваш баланс: ${profile.coins} монет. Как получить монеты`}>
+            <CoinAmount amount={profile.coins} />
+          </summary>
+          <div className="coin-wallet-help">
+            <strong>Монеты PartyPlay</strong>
+            <p>+{GAME_REWARD} монета каждому игроку за завершённую партию в любой игре.</p>
+            <p>Зрители и прерванные партии без награды. Открытие кейса стоит {CASE_COST} монету.</p>
+          </div>
+        </details>
+      </div>
       <button
         className="show-logout"
         type="button"
