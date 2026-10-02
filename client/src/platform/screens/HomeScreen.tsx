@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BiDonateHeart } from "react-icons/bi";
 import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
-import {
-  FiAlertCircle,
-  FiArrowLeft,
-  FiArrowRight,
-  FiBookOpen,
-  FiRefreshCw,
-  FiUsers,
-} from "react-icons/fi";
+import { FiAlertCircle, FiArrowLeft, FiArrowRight, FiBookOpen, FiUsers } from "react-icons/fi";
 import { ROOM_CODE_LENGTH } from "../../../../shared/roomCode";
 import {
   PUBLIC_ROOM_SPECTATOR_LIMIT,
@@ -16,7 +9,7 @@ import {
   type RoomVisibility,
 } from "../../../../shared/platform/publicRooms";
 import { AccessibleModal } from "../components/AccessibleModal";
-import { BrandDice } from "../components/BrandDice";
+import { ProfileHeader } from "../components/ProfileHeader";
 import { GameMenuArtwork } from "../components/GameMenuArtwork";
 import { GameRulesModal } from "../components/GameRulesModal";
 import { RoomEntryForm, type RoomEntryMode } from "../components/RoomEntryForm";
@@ -80,7 +73,6 @@ export function HomeScreen() {
   const [featuredGameId, setFeaturedGameId] = useState<RegisteredClientGameId>(catalogGames[0].id);
   const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(null);
   const [entryMode, setEntryMode] = useState<RoomEntryMode>("join");
-  const [howToOpen, setHowToOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [rulesGameId, setRulesGameId] = useState<RegisteredClientGameId | null>(null);
   const [createVisibility, setCreateVisibility] = useState<RoomVisibility>("private");
@@ -205,6 +197,7 @@ export function HomeScreen() {
       onVisibilityChange={setCreateVisibility}
       onSubmit={selectedGame && entryMode === "create" ? handleCreate : handleJoin}
       onSpectate={handleSpectate}
+      onReconnect={openRecoveryModal}
       onModeChange={
         selectedGame
           ? (mode) => {
@@ -244,62 +237,26 @@ export function HomeScreen() {
       data-game={selectedGame?.id}
     >
       <div className="show-menu-shell">
-        <header className="show-menu-header">
-          {selectedGame ? (
-            <>
-              <button className="show-quiet show-back" type="button" onClick={backToCatalog}>
-                <FiArrowLeft aria-hidden="true" /> Ко всем играм
-              </button>
-              <nav className="show-game-switch" aria-label="Выберите игру">
-                {catalogGames.map((game) => (
-                  <button
-                    type="button"
-                    key={game.id}
-                    aria-pressed={selectedGameId === game.id}
-                    onClick={() => openGame(game.id)}
-                  >
-                    {game.metadata.title}
-                  </button>
-                ))}
-              </nav>
-              <button
-                className="show-brand show-brand-small"
-                type="button"
-                onClick={backToCatalog}
-                aria-label="PartyPlay — на главную"
-              >
-                <BrandDice className="show-brand-dice" />
-                partyplay
-              </button>
-            </>
-          ) : (
-            <>
-              <a className="show-brand" href="/" aria-label="PartyPlay — на главную">
-                <BrandDice className="show-brand-dice" />
-                partyplay
-              </a>
-              <nav className="show-header-actions" aria-label="Помощь">
+        <ProfileHeader onHome={selectedGame ? backToCatalog : undefined} />
+        {selectedGame && (
+          <div className="show-game-navigation">
+            <button className="show-quiet show-back" type="button" onClick={backToCatalog}>
+              <FiArrowLeft aria-hidden="true" /> Ко всем играм
+            </button>
+            <nav className="show-game-switch" aria-label="Выберите игру">
+              {catalogGames.map((game) => (
                 <button
-                  className="show-quiet"
                   type="button"
-                  onClick={() => setHowToOpen(true)}
-                  aria-haspopup="dialog"
+                  key={game.id}
+                  aria-pressed={selectedGameId === game.id}
+                  onClick={() => openGame(game.id)}
                 >
-                  Как играть
+                  {game.metadata.title}
                 </button>
-                <button
-                  className="show-outline"
-                  type="button"
-                  onClick={openRecoveryModal}
-                  disabled={sessionPending}
-                  aria-haspopup="dialog"
-                >
-                  <FiRefreshCw aria-hidden="true" /> Вернуться в игру
-                </button>
-              </nav>
-            </>
-          )}
-        </header>
+              ))}
+            </nav>
+          </div>
+        )}
 
         {selectedGame ? (
           <>
@@ -331,15 +288,6 @@ export function HomeScreen() {
             </div>
             <div className="show-game-help">
               <p>{selectedGame.metadata.playerSummary}. Каждый играет со своего устройства.</p>
-              <button
-                className="show-quiet"
-                type="button"
-                onClick={openRecoveryModal}
-                disabled={sessionPending}
-                aria-haspopup="dialog"
-              >
-                <FiRefreshCw aria-hidden="true" /> Вернуться в игру
-              </button>
             </div>
           </>
         ) : (
@@ -447,46 +395,6 @@ export function HomeScreen() {
           </nav>
         </footer>
       </div>
-
-      {howToOpen && (
-        <AccessibleModal
-          labelledBy="show-how-to-title"
-          onClose={() => setHowToOpen(false)}
-          overlayClassName="platform-create-modal"
-          panelClassName="show-how-to-panel"
-        >
-          <div className="show-how-to-heading">
-            <h2 id="show-how-to-title">Соберите компанию</h2>
-            <button
-              className="platform-modal-close"
-              type="button"
-              onClick={() => setHowToOpen(false)}
-              aria-label="Закрыть"
-            >
-              ×
-            </button>
-          </div>
-          <ol>
-            <li>
-              <strong>Выберите игру</strong>
-              <p>
-                Откройте её меню и нажмите «Создать». Можно играть с друзьями или добавить ботов.
-              </p>
-            </li>
-            <li>
-              <strong>Отправьте код друзьям</strong>
-              <p>
-                Каждый открывает PartyPlay на своём устройстве и вводит четыре буквы кода и своё
-                имя.
-              </p>
-            </li>
-            <li>
-              <strong>Начинайте!</strong>
-              <p>Все собрались? Ведущий запускает игру. Правила доступны в меню каждой игры.</p>
-            </li>
-          </ol>
-        </AccessibleModal>
-      )}
 
       {publicRoomsGame && publicRoomsGameId && (
         <AccessibleModal

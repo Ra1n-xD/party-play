@@ -7,10 +7,11 @@ import { StatsScreen } from "./platform/screens/StatsScreen";
 import { ProfileProvider, useProfile } from "./platform/context/ProfileContext";
 import { LoginScreen, ProfileScreen } from "./platform/screens/ProfileScreen";
 import { CasesScreen } from "./platform/screens/CasesScreen";
+import { ProfileHeader } from "./platform/components/ProfileHeader";
 import "./styles/profiles.css";
 
 function ProfileApp() {
-  const { profile, connected, busy } = useProfile();
+  const { profile } = useProfile();
   const { roomCode } = usePlatform();
   const [path, setPath] = useState(window.location.pathname.replace(/\/$/, "") || "/");
   useEffect(() => {
@@ -50,31 +51,15 @@ function ProfileApp() {
   const profilePage = path === "/profile" || path === "/cases";
   return (
     <>
-      <header className="profile-navigation">
-        <a href="/" className="profile-logo">
-          partyplay
-        </a>
-        <nav aria-label="Профиль и коллекция">
-          <a href="/" aria-current={!profilePage ? "page" : undefined}>
-            {roomCode ? "В комнату" : "Игры"}
-          </a>
-          <a href="/profile" aria-current={path === "/profile" ? "page" : undefined}>
-            Коллекция
-          </a>
-          <a href="/cases" aria-current={path === "/cases" ? "page" : undefined}>
-            Кейсы
-          </a>
-        </nav>
-        <a href="/profile" className="profile-balance">
-          <span>{profile.nickname}</span>
-          <strong>◉ {profile.coins}</strong>
-        </a>
-        {(!connected || busy) && (
-          <span className="profile-connection" role="status">
-            {connected ? "Сохраняем…" : "Нет связи"}
-          </span>
-        )}
-      </header>
+      {(profilePage || roomCode) && (
+        <div className="show-menu platform-header">
+          <div className="show-menu-shell">
+            <ProfileHeader
+              activePage={path === "/profile" ? "profile" : path === "/cases" ? "cases" : "games"}
+            />
+          </div>
+        </div>
+      )}
       {path === "/profile" ? (
         <ProfileScreen />
       ) : path === "/cases" ? (
