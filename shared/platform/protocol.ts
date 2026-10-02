@@ -19,6 +19,7 @@ import type {
 import type { ProjectStatsSnapshot } from "./projectStats.js";
 import type { CaseOpening, ProfileReply, ProfileSnapshot } from "./cosmetics.js";
 import type { UpgradeAttempt, UpgradeRequest } from "./upgrades.js";
+import type { CosmeticDrop } from "./dropFeed.js";
 import type { AnyRoomCommandEnvelope, AnyRoomSnapshot, RoomCommandResult, SeatId } from "./room.js";
 
 export type HostChangeReason = "disconnect" | "manual" | "recovery";
@@ -59,6 +60,8 @@ export interface SpectatorJoinedPayload {
 
 // Client -> Server
 export interface ClientEvents {
+  "drops:subscribe": () => void;
+  "drops:unsubscribe": () => void;
   "profile:login": (
     data: { nickname: string },
     reply: (result: ProfileReply<ProfileSnapshot>) => void,
@@ -147,6 +150,7 @@ export interface ClientEvents {
 
 // Server -> Client
 export interface ServerEvents {
+  "drops:snapshot": (data: CosmeticDrop[]) => void;
   "profile:snapshot": (data: ProfileSnapshot) => void;
   "room:created": (data: RoomCreatedPayload) => void;
   "room:joined": (data: RoomJoinedPayload) => void;

@@ -27,6 +27,7 @@ import {
 import { CosmeticPreview } from "../components/CosmeticPreview";
 import { useProfile } from "../context/ProfileContext";
 import { useCollectionAudio } from "../useCollectionAudio";
+import { DropFeed } from "../components/DropFeed";
 import "../../styles/upgrades.css";
 
 const formatChance = (value: number) =>
@@ -189,6 +190,7 @@ export function UpgradeScreen() {
 
   return (
     <main className="upgrade-page">
+      <DropFeed holdUpdates={phase === "request" || phase === "spin"} />
       {pendingUpgrade && phase === "idle" && (
         <div className="upgrade-pending" role="status">
           Результат предыдущей попытки ещё не получен. Восстановите его без повторного списания.
