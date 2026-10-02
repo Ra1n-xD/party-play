@@ -42,6 +42,8 @@
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
+  background: var(--bg-primary);
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -59,7 +61,7 @@ body {
     radial-gradient(ellipse at 50% 100%, rgba(217, 120, 108, 0.04) 0%, transparent 40%);
   background-attachment: fixed;
   color: var(--text-primary);
-  min-height: 100vh;
+  min-height: 100dvh;
   line-height: 1.5;
 }
 
@@ -71,15 +73,21 @@ textarea {
 }
 
 #root {
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ============ SCREEN LAYOUT ============ */
 .screen {
-  min-height: 100vh;
+  min-height: 100dvh;
   padding: 16px;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 680px), (pointer: coarse) {
+  body {
+    background-attachment: scroll;
+  }
 }
 
 /* ============ STICKY TOP BAR ============ */

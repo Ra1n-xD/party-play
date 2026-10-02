@@ -7,12 +7,12 @@ import { StatsScreen } from "./platform/screens/StatsScreen";
 import { ProfileProvider, useProfile } from "./platform/context/ProfileContext";
 import { LoginScreen, ProfileScreen } from "./platform/screens/ProfileScreen";
 import { CasesScreen } from "./platform/screens/CasesScreen";
+import { UpgradeScreen } from "./platform/screens/UpgradeScreen";
 import { ProfileHeader } from "./platform/components/ProfileHeader";
 import "./styles/profiles.css";
 
 function ProfileApp() {
   const { profile } = useProfile();
-  const { roomCode } = usePlatform();
   const [path, setPath] = useState(window.location.pathname.replace(/\/$/, "") || "/");
   useEffect(() => {
     const update = () => {
@@ -33,7 +33,7 @@ function ProfileApp() {
       if (
         !link ||
         link.target ||
-        !["/", "/profile", "/cases"].includes(link.getAttribute("href") ?? "")
+        !["/", "/profile", "/cases", "/upgrade"].includes(link.getAttribute("href") ?? "")
       )
         return;
       event.preventDefault();
@@ -48,14 +48,16 @@ function ProfileApp() {
     };
   }, []);
   if (!profile) return <LoginScreen />;
-  const profilePage = path === "/profile" || path === "/cases";
+  const profilePage = path === "/profile" || path === "/cases" || path === "/upgrade";
   return (
     <>
-      {(profilePage || roomCode) && (
+      {profilePage && (
         <div className="show-menu platform-header">
           <div className="show-menu-shell">
             <ProfileHeader
-              activePage={path === "/profile" ? "profile" : path === "/cases" ? "cases" : "games"}
+              activePage={
+                path === "/profile" ? "profile" : path === "/upgrade" ? "upgrade" : "cases"
+              }
             />
           </div>
         </div>
@@ -64,6 +66,8 @@ function ProfileApp() {
         <ProfileScreen />
       ) : path === "/cases" ? (
         <CasesScreen />
+      ) : path === "/upgrade" ? (
+        <UpgradeScreen />
       ) : (
         <RoomAppContent />
       )}

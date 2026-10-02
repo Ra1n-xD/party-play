@@ -18,6 +18,7 @@ import type {
 } from "./publicRooms.js";
 import type { ProjectStatsSnapshot } from "./projectStats.js";
 import type { CaseOpening, ProfileReply, ProfileSnapshot } from "./cosmetics.js";
+import type { UpgradeAttempt, UpgradeRequest } from "./upgrades.js";
 import type { AnyRoomCommandEnvelope, AnyRoomSnapshot, RoomCommandResult, SeatId } from "./room.js";
 
 export type HostChangeReason = "disconnect" | "manual" | "recovery";
@@ -70,6 +71,10 @@ export interface ClientEvents {
   "profile:open-case": (
     data: { requestId: string },
     reply: (result: ProfileReply<{ profile: ProfileSnapshot; opening: CaseOpening }>) => void,
+  ) => void;
+  "profile:upgrade": (
+    data: UpgradeRequest,
+    reply: (result: ProfileReply<{ profile: ProfileSnapshot; attempt: UpgradeAttempt }>) => void,
   ) => void;
   "room:create": (data: {
     gameId?: GameId;

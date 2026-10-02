@@ -8,6 +8,7 @@ import { AccessibleModal } from "./game/AccessibleModal";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { GameDockTools } from "./game/GameDockTools";
 import { HostControlDialog } from "./game/HostControlDialog";
+import { useTableActionDock } from "../games/shared/table3d/useTableActionDock";
 
 const BunkerTable3D = lazy(() => import("../games/bunker/BunkerTable3D"));
 
@@ -54,6 +55,7 @@ export function VoteScreen({
     transferHost,
   } = useGame();
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
+  const screenRef = useTableActionDock(is3D && Boolean(gameState));
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [confirmRevealAction, setConfirmRevealAction] = useState(false);
   const [voteSubmitting, setVoteSubmitting] = useState(false);
@@ -135,6 +137,7 @@ export function VoteScreen({
   if (isSpectator) {
     return (
       <main
+        ref={screenRef}
         className={`screen command-game-screen vote-screen has-vote-command-bar ${is3D ? "is-3d bunker3d-screen" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
       >
         <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
@@ -208,6 +211,7 @@ export function VoteScreen({
 
   return (
     <main
+      ref={screenRef}
       className={`screen command-game-screen vote-screen has-vote-command-bar ${is3D ? "is-3d bunker3d-screen" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
     >
       <GameRoomHeader

@@ -23,6 +23,7 @@ import {
   type CaseOpening,
 } from "../../../shared/platform/cosmetics.js";
 import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
+import { getUpgradeQuote, type UpgradeAttempt } from "../../../shared/platform/upgrades.js";
 import type { IOServer } from "./gameModule.js";
 import { getAllRooms, type Player, type Room } from "./roomManager.js";
 
@@ -68,6 +69,26 @@ try {
       )
     )
       throw new Error("Invalid case history");
+    profile.recentUpgrades ??= [];
+    if (
+      !Array.isArray(profile.recentUpgrades) ||
+      profile.recentUpgrades.some((attempt) => {
+        const quote = getUpgradeQuote(attempt.inputs, attempt.targetItemId);
+        return (
+          !quote ||
+          typeof attempt.requestId !== "string" ||
+          !Number.isFinite(attempt.createdAt) ||
+          !Number.isInteger(attempt.roll) ||
+          attempt.roll < 0 ||
+          attempt.roll >= 10_000 ||
+          !Number.isInteger(attempt.chanceBasisPoints) ||
+          attempt.chanceBasisPoints < 1 ||
+          attempt.chanceBasisPoints > 9000 ||
+          attempt.success !== attempt.roll < attempt.chanceBasisPoints
+        );
+      })
+    )
+      throw new Error("Invalid upgrade history");
     const key = nicknameKey(profile.nickname);
     if (profiles.has(key)) throw new Error("Duplicate profile");
     profiles.set(key, profile);
@@ -194,6 +215,7 @@ export function registerProfileHandlers(
             inventory: Object.fromEntries(BASIC_ITEMS.map((id) => [id, 1])),
             equipped: { avatar: "human", durak: "classic", uno: "classic" },
             recentOpenings: [],
+            recentUpgrades: [],
           }),
         );
       if (socket.data.profileKey) socket.leave(profileRoom(socket.data.profileKey));
@@ -263,6 +285,58 @@ export function registerProfileHandlers(
       });
       publishProfile(key, io);
       reply({ ok: true, value: { profile: profiles.get(key)!, opening } });
+    } catch (error) {
+      reply({ ok: false, error: (error as Error).message });
+    }
+  });
+  socket.on("profile:upgrade", (data, reply) => {
+    if (typeof reply !== "function") return;
+    try {
+      guard();
+      const key = socket.data.profileKey as string | undefined;
+      const profile = key ? profiles.get(key) : undefined;
+      if (!key || !profile) throw new Error("Сначала войдите по нику");
+      if (typeof data?.requestId !== "string" || !/^[a-f0-9-]{36}$/.test(data.requestId))
+        throw new Error("Некорректный запрос улучшения");
+      const existing = profile.recentUpgrades?.find(
+        (attempt) => attempt.requestId === data.requestId,
+      );
+      if (existing) return reply({ ok: true, value: { profile, attempt: existing } });
+      const quote = getUpgradeQuote(data.inputs, data.targetItemId);
+      if (!quote) throw new Error("Выберите от 1 до 5 предметов и более ценную цель");
+      for (const input of data.inputs) {
+        const item = getCosmetic(input.itemId)!;
+        const protectedCopy = `${item.kind}:${profile.equipped[item.kind]}` === item.id ? 1 : 0;
+        if ((profile.inventory[item.id] ?? 0) - protectedCopy < input.count)
+          throw new Error(
+            "Предметов недостаточно. Используемый экземпляр защищён: сначала смените его в коллекции",
+          );
+      }
+      const roll = randomInt(10_000);
+      const attempt: UpgradeAttempt = {
+        requestId: data.requestId,
+        inputs: data.inputs.map(({ itemId, count }) => ({ itemId, count })),
+        targetItemId: data.targetItemId,
+        ...quote,
+        roll,
+        success: roll < quote.chanceBasisPoints,
+        createdAt: Date.now(),
+      };
+      transaction(() => {
+        const current = profiles.get(key)!;
+        for (const input of attempt.inputs) {
+          current.inventory[input.itemId] -= input.count;
+          if (!current.inventory[input.itemId]) delete current.inventory[input.itemId];
+        }
+        if (attempt.success) {
+          const count = (current.inventory[attempt.targetItemId] ?? 0) + 1;
+          if (!Number.isSafeInteger(count)) throw new Error("Inventory limit exceeded");
+          current.inventory[attempt.targetItemId] = count;
+        }
+        current.recentUpgrades = [attempt, ...(current.recentUpgrades ?? [])].slice(0, 100);
+      });
+      publishProfile(key, io);
+      reply({ ok: true, value: { profile: profiles.get(key)!, attempt } });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });
     }
