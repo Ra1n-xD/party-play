@@ -1,9 +1,9 @@
 import type { CSSProperties } from "react";
-import { getCardSkin } from "../../../shared/platform/cosmetics";
+import { getCardSkin, type CardSkinId } from "../../../shared/platform/cosmetics";
 import { usePlatform } from "./context/PlatformContext";
 import { useProfile } from "./context/ProfileContext";
 
-export function useCardSkin(game: "durak" | "uno") {
+export function useCardSkin(game: "durak" | "uno", skinId?: CardSkinId) {
   const { snapshot } = usePlatform();
   const { profile } = useProfile();
   const ownSeat =
@@ -12,7 +12,7 @@ export function useCardSkin(game: "durak" | "uno") {
           (seat) => snapshot.viewer.role === "player" && seat.seatId === snapshot.viewer.seatId,
         )
       : null;
-  const skin = getCardSkin(ownSeat?.cardSkins[game] ?? profile?.equipped[game]);
+  const skin = getCardSkin(skinId ?? ownSeat?.cardSkins[game] ?? profile?.equipped[game]);
   return {
     skin,
     props: {

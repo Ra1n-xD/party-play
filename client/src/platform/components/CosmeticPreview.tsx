@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { getCardSkin, type Cosmetic } from "../../../../shared/platform/cosmetics";
 import { AvatarPortrait } from "./AvatarPortrait";
+import { CardFaceArtwork } from "./CardFaceArtwork";
 
 export function CosmeticPreview({ item }: { item: Cosmetic }) {
   if (item.avatarId)
@@ -22,8 +23,14 @@ export function CosmeticPreview({ item }: { item: Cosmetic }) {
       aria-hidden="true"
     >
       <div className="cosmetic-card-face">
-        <small>{item.kind === "durak" ? "Т ♥" : "+4"}</small>
-        <strong>{item.kind === "durak" ? "♥" : "UNO"}</strong>
+        <CardFaceArtwork
+          skinId={skin.id}
+          face={
+            item.kind === "durak"
+              ? { game: "durak", rank: "Т", suit: "♥", red: true }
+              : { game: "uno", rank: "+4", color: "wild" }
+          }
+        />
       </div>
       <div className="cosmetic-card-back">
         <span>{skin.mark}</span>

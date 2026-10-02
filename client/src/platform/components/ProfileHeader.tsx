@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import { FiLogOut } from "react-icons/fi";
 import { usePlatform } from "../context/PlatformContext";
 import { useProfile } from "../context/ProfileContext";
 import { BrandDice } from "./BrandDice";
@@ -9,7 +10,7 @@ interface ProfileHeaderProps {
 }
 
 export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderProps) {
-  const { profile, connected, busy } = useProfile();
+  const { profile, connected, busy, logout, error } = useProfile();
   const { roomCode } = usePlatform();
   if (!profile) return null;
   const goHome = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -38,9 +39,25 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
         <span>{profile.nickname}</span>
         <strong>◉ {profile.coins}</strong>
       </a>
+      <button
+        className="show-logout"
+        type="button"
+        onClick={logout}
+        disabled={busy || !connected}
+        aria-label="Выйти из аккаунта"
+        title={roomCode ? "Выйти из аккаунта и покинуть комнату" : "Выйти из аккаунта"}
+      >
+        <FiLogOut aria-hidden="true" />
+        <span>Выйти</span>
+      </button>
       {(!connected || busy) && (
         <span className="show-profile-connection" role="status">
           {connected ? "Сохраняем…" : "Нет связи"}
+        </span>
+      )}
+      {error && (
+        <span className="show-profile-connection" role="alert">
+          {error}
         </span>
       )}
     </header>

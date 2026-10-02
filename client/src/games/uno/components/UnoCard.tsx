@@ -1,4 +1,6 @@
 import { useCardSkin } from "../../../platform/useCardSkin";
+import { CardFaceArtwork } from "../../../platform/components/CardFaceArtwork";
+import type { CardSkinId } from "../../../../../shared/platform/cosmetics";
 import type { UnoCard as UnoCardData, UnoColor } from "../../../../../shared/games/uno/types";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import cardBack from "../assets/card-back.svg";
@@ -48,6 +50,7 @@ export function getUnoCardName(card: UnoCardData): string {
 
 interface UnoCardProps {
   card: UnoCardData;
+  skinId?: CardSkinId;
   size?: "hand" | "table" | "mini";
   selected?: boolean;
   playable?: boolean;
@@ -62,6 +65,7 @@ interface UnoCardProps {
 
 export function UnoCard({
   card,
+  skinId,
   size = "table",
   selected = false,
   playable = false,
@@ -73,7 +77,7 @@ export function UnoCard({
   ariaLabel,
   ariaDescribedBy,
 }: UnoCardProps) {
-  const { props: skinProps } = useCardSkin("uno");
+  const { skin, props: skinProps } = useCardSkin("uno", skinId);
   const className = [
     "uno-card",
     `is-${size}`,
@@ -87,19 +91,25 @@ export function UnoCard({
     .join(" ");
   const mark = getUnoCardMark(card);
   const icon = actionIcon(card);
-  const content = (
-    <>
-      <span className="uno-card-corner" aria-hidden="true">
-        {mark}
-      </span>
-      <span className="uno-card-core" aria-hidden="true">
-        {icon ? <img src={icon} alt="" draggable={false} /> : mark}
-      </span>
-      <span className="uno-card-corner is-bottom" aria-hidden="true">
-        {mark}
-      </span>
-    </>
-  );
+  const content =
+    skin.id !== "classic" ? (
+      <CardFaceArtwork
+        face={{ game: "uno", rank: mark, color: card.color ?? "wild" }}
+        skinId={skin.id}
+      />
+    ) : (
+      <>
+        <span className="uno-card-corner" aria-hidden="true">
+          {mark}
+        </span>
+        <span className="uno-card-core" aria-hidden="true">
+          {icon ? <img src={icon} alt="" draggable={false} /> : mark}
+        </span>
+        <span className="uno-card-corner is-bottom" aria-hidden="true">
+          {mark}
+        </span>
+      </>
+    );
 
   if (onClick || onDoubleClick || onKeyboardActivate) {
     const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {

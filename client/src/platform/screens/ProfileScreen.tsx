@@ -87,7 +87,7 @@ export function ProfileScreen() {
         </span>
         <span>{profile.completedGames} завершённых партий</span>
         <button onClick={logout} disabled={busy || !connected} className="profile-text-button">
-          Сменить ник
+          Выйти из аккаунта
         </button>
       </section>
       <nav className="collection-tabs" aria-label="Тип предметов">

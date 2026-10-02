@@ -1,4 +1,6 @@
 import { useCardSkin } from "../../../platform/useCardSkin";
+import { CardFaceArtwork } from "../../../platform/components/CardFaceArtwork";
+import type { CardSkinId } from "../../../../../shared/platform/cosmetics";
 import type {
   DurakCard as DurakCardData,
   DurakRank,
@@ -62,6 +64,7 @@ export function getDurakCardFace(card: DurakCardData) {
 
 interface DurakCardProps {
   card: DurakCardData;
+  skinId?: CardSkinId;
   size?: "hand" | "table" | "mini";
   selected?: boolean;
   playable?: boolean;
@@ -75,6 +78,7 @@ interface DurakCardProps {
 
 export function DurakCard({
   card,
+  skinId,
   size = "table",
   selected,
   playable = false,
@@ -85,7 +89,7 @@ export function DurakCard({
   ariaLabel,
   ariaDescribedBy,
 }: DurakCardProps) {
-  const { props: skinProps } = useCardSkin("durak");
+  const { skin, props: skinProps } = useCardSkin("durak", skinId);
   const accessibleName = ariaLabel ?? getCardName(card);
   const className = [
     "durak-card",
@@ -97,21 +101,24 @@ export function DurakCard({
   ]
     .filter(Boolean)
     .join(" ");
-  const content = (
-    <>
-      <span className="durak-card-corner">
-        <strong>{RANK_LABELS[card.rank]}</strong>
-        <span>{SUIT_SYMBOLS[card.suit]}</span>
-      </span>
-      <span className="durak-card-suit" aria-hidden="true">
-        {SUIT_SYMBOLS[card.suit]}
-      </span>
-      <span className="durak-card-corner is-bottom" aria-hidden="true">
-        <strong>{RANK_LABELS[card.rank]}</strong>
-        <span>{SUIT_SYMBOLS[card.suit]}</span>
-      </span>
-    </>
-  );
+  const content =
+    skin.id !== "classic" ? (
+      <CardFaceArtwork face={{ game: "durak", ...getDurakCardFace(card) }} skinId={skin.id} />
+    ) : (
+      <>
+        <span className="durak-card-corner">
+          <strong>{RANK_LABELS[card.rank]}</strong>
+          <span>{SUIT_SYMBOLS[card.suit]}</span>
+        </span>
+        <span className="durak-card-suit" aria-hidden="true">
+          {SUIT_SYMBOLS[card.suit]}
+        </span>
+        <span className="durak-card-corner is-bottom" aria-hidden="true">
+          <strong>{RANK_LABELS[card.rank]}</strong>
+          <span>{SUIT_SYMBOLS[card.suit]}</span>
+        </span>
+      </>
+    );
 
   if (onClick || onDoubleClick || onKeyboardActivate) {
     const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
