@@ -1,5 +1,5 @@
 import { useId, type FormEvent } from "react";
-import { FiArrowRight, FiEye } from "react-icons/fi";
+import { FiArrowRight, FiEye, FiRefreshCw } from "react-icons/fi";
 import { ROOM_CODE_LENGTH, sanitizeRoomCodeInput } from "../../../../shared/roomCode";
 import type { RoomVisibility } from "../../../../shared/platform/publicRooms";
 
@@ -19,6 +19,7 @@ interface RoomEntryFormProps {
   onVisibilityChange: (visibility: RoomVisibility) => void;
   onSubmit: (event: FormEvent) => void;
   onSpectate: () => void;
+  onReconnect: () => void;
   onModeChange?: (mode: RoomEntryMode) => void;
 }
 
@@ -36,6 +37,7 @@ export function RoomEntryForm({
   onVisibilityChange,
   onSubmit,
   onSpectate,
+  onReconnect,
   onModeChange,
 }: RoomEntryFormProps) {
   const id = useId();
@@ -135,6 +137,19 @@ export function RoomEntryForm({
           </button>
         )}
       </form>
+      {!creating && (
+        <div className="show-entry-recovery">
+          <button
+            className="show-quiet"
+            type="button"
+            onClick={onReconnect}
+            disabled={pending}
+            aria-haspopup="dialog"
+          >
+            <FiRefreshCw aria-hidden="true" /> Вернуться в игру
+          </button>
+        </div>
+      )}
       {!connected && (
         <p className="show-connection-note" role="status">
           Нет связи с сервером. Ждём подключения…

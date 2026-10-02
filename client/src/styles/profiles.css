@@ -1,6 +1,5 @@
 @import "./show-menu.css";
 
-.profile-navigation,
 .profile-login,
 .collection-page,
 .cases-page {
@@ -10,17 +9,6 @@
   --profile-muted: #bcb0cc;
   --profile-line: #ffffff20;
   --profile-surface: #2c223b;
-}
-.profile-navigation {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 30px;
-  padding: 16px max(24px, calc((100vw - 1200px) / 2));
-  background: #20172c;
-  border-bottom: 1px solid var(--profile-line);
-  z-index: 3;
-  flex-wrap: wrap;
 }
 .profile-logo {
   font-family: "Unbounded", sans-serif;
@@ -36,48 +24,6 @@
     11px "Golos Text",
     sans-serif;
   letter-spacing: 2px;
-}
-.profile-navigation nav {
-  display: flex;
-  gap: 22px;
-}
-.profile-navigation nav a {
-  font-size: 14px;
-  color: var(--profile-muted);
-  text-decoration: none;
-  padding: 5px 0;
-}
-.profile-navigation nav a[aria-current] {
-  color: #d8fc61;
-  box-shadow: 0 2px #d8fc61;
-}
-.profile-balance {
-  margin-left: auto;
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  text-decoration: none;
-  color: #fff8e8;
-  min-width: 0;
-}
-.profile-balance span {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.profile-balance strong {
-  color: #d8fc61;
-  white-space: nowrap;
-  background: #d8fc6110;
-  padding: 8px 12px;
-  border-radius: 24px;
-}
-.profile-connection {
-  width: 100%;
-  text-align: right;
-  font-size: 12px;
-  color: var(--profile-muted);
 }
 .profile-login {
   min-height: 100svh;
@@ -619,7 +565,6 @@
     transform: none;
   }
 }
-.profile-navigation :is(a, button):focus-visible,
 .profile-login :is(a, button, input):focus-visible,
 .collection-page :is(a, button):focus-visible,
 .cases-page :is(a, button):focus-visible {
@@ -632,25 +577,6 @@
   }
 }
 @media (max-width: 760px) {
-  .profile-navigation {
-    padding: 14px 18px;
-    gap: 14px;
-  }
-  .profile-navigation > .profile-logo {
-    font-size: 18px;
-  }
-  .profile-navigation nav {
-    order: 3;
-    width: 100%;
-    justify-content: center;
-  }
-  .profile-balance {
-    font-size: 12px;
-    gap: 8px;
-  }
-  .profile-balance span {
-    max-width: 110px;
-  }
   .collection-page,
   .cases-page {
     padding: 30px 18px 65px;
