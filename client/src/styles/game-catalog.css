@@ -212,6 +212,8 @@
 }
 
 .show-catalog-card.is-coming {
+  opacity: 0.5;
+  filter: saturate(0.5);
   border-style: dashed;
   background: #30243d;
 }
@@ -766,4 +768,12 @@
     gap: 4px;
     font-size: 11px;
   }
+}
+
+.show-catalog-card.is-coming::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(135deg, transparent 0 18px, #d7c9e611 18px 20px);
 }

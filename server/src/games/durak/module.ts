@@ -181,10 +181,15 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
         ) {
           return;
         }
+        const resolutionNow = Date.now();
+        if (resolutionNow < expectedReadyAt) {
+          scheduleDurakActions(room, io);
+          return;
+        }
         const result = applyDurakPendingResolution(
           currentState,
           expectedFightId,
-          Date.now(),
+          resolutionNow,
           false,
         );
         if (result.success) commitDurakState(room, result.state, io);
@@ -223,7 +228,12 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
         ) {
           return;
         }
-        const result = applyDurakTurnTimeout(currentState, expectedTurnId, Date.now());
+        const timeoutNow = Date.now();
+        if (timeoutNow < expectedDeadline) {
+          scheduleDurakActions(room, io);
+          return;
+        }
+        const result = applyDurakTurnTimeout(currentState, expectedTurnId, timeoutNow);
         if (result.success) commitDurakState(room, result.state, io);
       }).catch(() => {});
     }, delay);
@@ -244,12 +254,13 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
           !currentState ||
           currentState.gameInstanceId !== expectedGameInstanceId ||
           currentTurn?.id !== expectedTurnId ||
-          currentTurn.readyAt !== expectedReadyAt ||
-          !isDurakTurnReady(currentTurn, Date.now())
+          currentTurn.readyAt !== expectedReadyAt
         ) {
           return;
         }
-        publishDurak(room, io);
+        // Timers may wake just before readyAt. Scheduling again preserves the wake-up.
+        if (!isDurakTurnReady(currentTurn, Date.now())) scheduleDurakActions(room, io);
+        else publishDurak(room, io);
       }).catch(() => {});
     }, delay);
     timer.unref();
@@ -295,7 +306,9 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
           const currentPending = pendingActions.get(room.code);
           const currentBotAction = currentPending?.botActions.get(seatId);
           if (!currentBotAction || currentBotAction.timer !== botTimer) return;
-          currentBotAction.timer = null;
+          // A fired callback no longer owns a pending action. Otherwise a rejected
+          // command prevents this bot from ever being scheduled again on the same turn.
+          currentPending!.botActions.delete(seatId);
           if (getRoom(room.code) !== room || isPaused(room)) return;
 
           const currentState = room.gameState;
@@ -323,7 +336,10 @@ function scheduleDurakActions(room: DurakRoom, io: IOServer): void {
             privateState,
             () => randomInt(1_000_000) / 1_000_000,
           );
-          if (!command) return;
+          if (!command) {
+            scheduleDurakActions(room, io);
+            return;
+          }
           const result = applyDurakCommand(
             currentState,
             currentActor.id,

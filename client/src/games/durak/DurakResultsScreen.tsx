@@ -9,7 +9,7 @@ interface DurakResultsScreenProps {
 
 const STATUS_LABELS = {
   active: "Остался с картами",
-  out: "Вышел",
+  out: "Без карт",
   excluded: "Исключён",
 } as const;
 

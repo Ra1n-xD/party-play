@@ -18,6 +18,8 @@ import type {
 } from "./publicRooms.js";
 import type { ProjectStatsSnapshot } from "./projectStats.js";
 import type { CaseOpening, ProfileReply, ProfileSnapshot } from "./cosmetics.js";
+import type { CaseId } from "./cases.js";
+import type { DailyReward } from "./dailyRewards.js";
 import type { UpgradeAttempt, UpgradeRequest } from "./upgrades.js";
 import type { CosmeticDrop } from "./dropFeed.js";
 import type { LeaderboardQuery, LeaderboardSnapshot } from "./leaderboard.js";
@@ -77,13 +79,16 @@ export interface ClientEvents {
     reply: (result: ProfileReply<ProfileSession>) => void,
   ) => void;
   "profile:session": (reply: (result: ProfileReply<ProfileSnapshot | null>) => void) => void;
+  "profile:claim-daily": (
+    reply: (result: ProfileReply<{ profile: ProfileSnapshot; reward: DailyReward | null }>) => void,
+  ) => void;
   "profile:logout": (reply: (result: ProfileReply<null>) => void) => void;
   "profile:equip": (
     data: { itemId: string },
     reply: (result: ProfileReply<ProfileSnapshot>) => void,
   ) => void;
   "profile:open-case": (
-    data: { requestId: string },
+    data: { requestId: string; caseId?: CaseId },
     reply: (result: ProfileReply<{ profile: ProfileSnapshot; opening: CaseOpening }>) => void,
   ) => void;
   "profile:upgrade": (

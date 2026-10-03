@@ -55,7 +55,7 @@
   top: 0;
   left: 0;
   display: flex;
-  max-width: 150px;
+  max-width: 175px;
   flex-direction: column;
   gap: 3px;
   padding: 6px 13px;
@@ -72,13 +72,13 @@
 .table3d-person-label strong {
   overflow: hidden;
   color: #f3ead6;
-  font-size: 0.77rem;
+  font-size: 0.88rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .table3d-person-label span {
   color: #c3c8b9;
-  font-size: 0.62rem;
+  font-size: 0.72rem;
 }
 .table3d-person-label.is-active {
   border-color: #72f3a5;
@@ -101,7 +101,7 @@
   border-radius: 3px;
   background: #70efa3;
   color: #092c18;
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   font-weight: 850;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -332,7 +332,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  width: 310px;
+  width: 360px;
   padding: 14px 16px;
   border: 1px solid #adbdba8a;
   border-left: 4px solid #b7c9c0;
@@ -353,7 +353,7 @@
   align-items: center;
   gap: 7px;
   color: #bccdc4;
-  font-size: 0.55rem;
+  font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.1em;
 }
@@ -364,7 +364,7 @@
   background: currentColor;
 }
 .table3d-turn-copy strong {
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   line-height: 1.15;
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -373,12 +373,10 @@
   overflow: hidden;
 }
 .table3d-turn-detail {
-  color: #c7d6ce;
-  font-size: 0.7rem;
+  color: #dce9e0;
+  font-size: 0.8rem;
   line-height: 1.4;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .table3d-turn-clock {
   display: grid;
@@ -547,14 +545,14 @@
     font-size: 0.52rem;
   }
   .table3d-person-label {
-    max-width: 108px;
+    max-width: 125px;
     padding: 5px 8px;
   }
   .table3d-person-label strong {
-    font-size: 0.67rem;
+    font-size: 0.75rem;
   }
   .table3d-person-label span {
-    font-size: 0.54rem;
+    font-size: 0.66rem;
   }
   .table3d-turn-indicator {
     top: 8px;
@@ -565,7 +563,7 @@
   }
   .table3d-turn-copy strong {
     -webkit-line-clamp: 1;
-    font-size: 1.06rem;
+    font-size: 1.16rem;
   }
   .table3d-turn-eyebrow {
     display: none;
@@ -574,7 +572,7 @@
     gap: 4px;
   }
   .table3d-turn-detail {
-    font-size: 0.6rem;
+    font-size: 0.72rem;
   }
   .table3d-turn-clock {
     flex-basis: 60px;
@@ -1026,4 +1024,9 @@
   .modal.table3d-menu-panel {
     padding: 20px;
   }
+}
+
+.table3d-person-label:not(.is-active) .table3d-person-turn {
+  background: #f2d59b;
+  color: #382711;
 }

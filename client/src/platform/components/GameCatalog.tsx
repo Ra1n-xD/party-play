@@ -151,7 +151,7 @@ export function GameCatalog({ games, counts, onPlay, onRooms, onRules }: GameCat
             <FiChevronRight aria-hidden="true" />
           </button>
         </div>
-        <span>Игр в каталоге: {entries.length}</span>
+        <span>Игр в каталоге: {games.length}</span>
       </nav>
     </section>
   );

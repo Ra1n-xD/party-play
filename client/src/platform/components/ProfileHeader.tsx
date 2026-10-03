@@ -4,7 +4,7 @@ import { usePlatform } from "../context/PlatformContext";
 import { useProfile } from "../context/ProfileContext";
 import { BrandDice } from "./BrandDice";
 import { CoinAmount } from "./CoinAmount";
-import { CASE_COST, GAME_REWARD } from "../../../../shared/platform/cosmetics";
+import { CASE_COST, GAME_REWARD, WIN_REWARD } from "../../../../shared/platform/cosmetics";
 
 interface ProfileHeaderProps {
   activePage?: "games" | "profile" | "cases" | "upgrade" | "updates" | "leaderboard" | "stats";
@@ -54,7 +54,20 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
               </summary>
               <div className="coin-wallet-help">
                 <strong>Монеты PartyPlay</strong>
-                <p>+{GAME_REWARD} монета каждому игроку за завершённую партию в любой игре.</p>
+                <p>
+                  За победу — {WIN_REWARD} монет. Остальным участникам завершённой партии —{" "}
+                  {GAME_REWARD} монета.
+                </p>
+                <p>
+                  Ежедневный вход: день серии = число монет. Новый день — в 00:00 МСК. Пропуск
+                  сбрасывает серию.
+                </p>
+                {profile.dailyReward && (
+                  <p>
+                    Последняя награда: +{profile.dailyReward.coins}, день серии{" "}
+                    {profile.dailyReward.streak}.
+                  </p>
+                )}
                 <p>
                   Зрители и прерванные партии без награды. Открытие кейса стоит {CASE_COST} монету.
                 </p>

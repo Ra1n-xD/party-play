@@ -24,6 +24,8 @@ import { getUpgradeQuote } from "../../../../shared/platform/upgrades";
 
 import type { ProfileSession } from "../../../../shared/platform/auth";
 import { PROFILE_SESSION_KEY, readProfileSession, saveProfileSession } from "../profileSession";
+import { getCase, type CaseId, type CaseRequest } from "../../../../shared/platform/cases";
+import { nextMoscowMidnight, type DailyReward } from "../../../../shared/platform/dailyRewards";
 const OPENING_KEY = "partyplay_pending_case_v2";
 const UPGRADE_KEY = "partyplay_pending_upgrade_v2";
 function readPendingUpgrade(name: string): UpgradeRequest | null {
@@ -42,18 +44,21 @@ function readPendingUpgrade(name: string): UpgradeRequest | null {
     return null;
   }
 }
-function pendingCase(name: string): string | null {
+function pendingCase(name: string): CaseRequest | null {
   try {
     const saved = JSON.parse(localStorage.getItem(OPENING_KEY) ?? "null");
-    return saved?.accountId === name ? saved.requestId : null;
+    return saved?.accountId === name &&
+      typeof saved.requestId === "string" &&
+      getCase(saved.caseId ?? "partyplay")
+      ? { requestId: saved.requestId, caseId: saved.caseId ?? "partyplay" }
+      : null;
   } catch {
     return null;
   }
 }
-function savePendingCase(name: string, requestId: string | null) {
+function savePendingCase(name: string, request: CaseRequest | null) {
   try {
-    if (requestId)
-      localStorage.setItem(OPENING_KEY, JSON.stringify({ accountId: name, requestId }));
+    if (request) localStorage.setItem(OPENING_KEY, JSON.stringify({ accountId: name, ...request }));
     else localStorage.removeItem(OPENING_KEY);
   } catch {
     /* The in-memory key still prevents retry charges. */
@@ -69,7 +74,8 @@ interface ProfileContextValue {
   register(name: string, password: string): Promise<boolean>;
   logout(): void;
   equip(itemId: string): void;
-  openCase(): Promise<CaseOpening | null>;
+  openCase(caseId: CaseId): Promise<CaseOpening | null>;
+  pendingCaseId: CaseId | null;
   pendingUpgrade: UpgradeRequest | null;
   upgrade(inputs: UpgradeInput[], targetItemId: string): Promise<UpgradeAttempt | null>;
   clearError(): void;
@@ -84,7 +90,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const accountId = useRef("");
-  const pendingOpening = useRef<string | null>(null);
+  const pendingOpening = useRef<CaseRequest | null>(null);
+  const [pendingCaseId, setPendingCaseId] = useState<CaseId | null>(null);
+  const [dailyNotice, setDailyNotice] = useState<DailyReward | null>(null);
   const pendingUpgradeRef = useRef<UpgradeRequest | null>(null);
   const [pendingUpgrade, setPendingUpgrade] = useState<UpgradeRequest | null>(null);
   const rememberUpgrade = useCallback((request: UpgradeRequest | null) => {
@@ -108,6 +116,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     saveProfileSession(null);
     accountId.current = "";
     pendingOpening.current = null;
+    setPendingCaseId(null);
+    setDailyNotice(null);
     pendingUpgradeRef.current = null;
     setPendingUpgrade(null);
     setProfile(null);
@@ -116,6 +126,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     (next: ProfileSnapshot) => {
       accept(next);
       pendingOpening.current = pendingCase(next.id);
+      setPendingCaseId(pendingOpening.current?.caseId ?? null);
       rememberUpgrade(readPendingUpgrade(next.id));
     },
     [accept, rememberUpgrade],
@@ -228,6 +239,39 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("storage", storage);
     };
   }, [accept, acceptSession, clearProfile]);
+  useEffect(() => {
+    if (!profile?.id || !connected || !ready) return;
+    let active = true;
+    let inFlight = false;
+    const claim = () => {
+      if (!active || document.hidden || inFlight) return;
+      const connectionId = socket.id;
+      inFlight = true;
+      socket.timeout(8000).emit("profile:claim-daily", (timeout, result) => {
+        inFlight = false;
+        if (!active || socket.id !== connectionId || timeout || !result.ok) return;
+        accept(result.value.profile);
+        if (result.value.reward) setDailyNotice(result.value.reward);
+      });
+    };
+    claim();
+    const timer = window.setInterval(claim, 60_000);
+    const midnight = window.setTimeout(claim, nextMoscowMidnight() - Date.now() + 100);
+    document.addEventListener("visibilitychange", claim);
+    window.addEventListener("focus", claim);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.clearTimeout(midnight);
+      document.removeEventListener("visibilitychange", claim);
+      window.removeEventListener("focus", claim);
+    };
+  }, [profile?.id, connected, ready, accept]);
+  useEffect(() => {
+    if (!dailyNotice) return;
+    const timer = window.setTimeout(() => setDailyNotice(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [dailyNotice]);
   const performLogout = () => {
     if (!socket.connected || !ready || requestBusy.current) return;
     requestBusy.current = true;
@@ -276,21 +320,22 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         },
       );
   };
-  const openCase = (): Promise<CaseOpening | null> => {
+  const openCase = (caseId: CaseId): Promise<CaseOpening | null> => {
     if (!socket.connected || requestBusy.current) return Promise.resolve(null);
     const connectionId = socket.id;
     requestBusy.current = true;
     setBusy(true);
     setError(null);
-    const requestId = pendingOpening.current ?? crypto.randomUUID();
-    pendingOpening.current = requestId;
-    savePendingCase(accountId.current, requestId);
+    const request = pendingOpening.current ?? { requestId: crypto.randomUUID(), caseId };
+    pendingOpening.current = request;
+    setPendingCaseId(request.caseId);
+    savePendingCase(accountId.current, request);
     return new Promise((resolve) =>
       socket
         .timeout(8000)
         .emit(
           "profile:open-case",
-          { requestId },
+          request,
           (
             timeout: Error | null,
             result: ProfileReply<{ profile: ProfileSnapshot; opening: CaseOpening }>,
@@ -306,11 +351,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
               resolve(null);
             } else if (!result.ok) {
               pendingOpening.current = null;
+              setPendingCaseId(null);
               savePendingCase(accountId.current, null);
               setError(result.error);
               resolve(null);
             } else {
               pendingOpening.current = null;
+              setPendingCaseId(null);
               savePendingCase(accountId.current, null);
               accept(result.value.profile);
               resolve(result.value.opening);
@@ -379,12 +426,26 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         logout,
         equip,
         openCase,
+        pendingCaseId,
         pendingUpgrade,
         upgrade,
         clearError: () => setError(null),
       }}
     >
       {children}
+      {dailyNotice && (
+        <div className="daily-reward-toast" role="status">
+          <strong>+{dailyNotice.coins} · Ежедневная награда</strong>
+          <span>День {dailyNotice.streak} подряд. Завтра — ещё больше!</span>
+          <button
+            type="button"
+            aria-label="Закрыть ежедневную награду"
+            onClick={() => setDailyNotice(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
       {confirmLogout && profile && (
         <AccessibleModal labelledBy="profile-logout-title" onClose={() => setConfirmLogout(false)}>
           <h2 id="profile-logout-title">Выйти из аккаунта?</h2>
