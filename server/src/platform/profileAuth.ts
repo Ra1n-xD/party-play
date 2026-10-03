@@ -211,6 +211,7 @@ export function registerProfileAuthHandlers(
             nickname: name,
             coins: INITIAL_COINS,
             completedGames: 0,
+            wins: 0,
             inventory: Object.fromEntries(BASIC_ITEMS.map((item) => [item, 1])),
             equipped: { avatar: "human", durak: "classic", uno: "classic" },
             recentOpenings: [],

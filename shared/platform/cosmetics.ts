@@ -146,6 +146,7 @@ export interface ProfileSnapshot {
   nickname: string;
   coins: number;
   completedGames: number;
+  wins: number;
   inventory: Record<string, number>;
   equipped: { avatar: AvatarId; durak: CardSkinId; uno: CardSkinId };
   recentOpenings: CaseOpening[];

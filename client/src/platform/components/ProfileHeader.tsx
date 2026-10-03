@@ -7,7 +7,7 @@ import { CoinAmount } from "./CoinAmount";
 import { CASE_COST, GAME_REWARD } from "../../../../shared/platform/cosmetics";
 
 interface ProfileHeaderProps {
-  activePage?: "games" | "profile" | "cases" | "upgrade" | "updates";
+  activePage?: "games" | "profile" | "cases" | "upgrade" | "updates" | "leaderboard";
   onHome?: () => void;
 }
 
@@ -37,6 +37,9 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
         </a>
         <a href="/upgrade" aria-current={activePage === "upgrade" ? "page" : undefined}>
           Улучшить
+        </a>
+        <a href="/leaderboard" aria-current={activePage === "leaderboard" ? "page" : undefined}>
+          Рейтинг
         </a>
       </nav>
       {profile ? (

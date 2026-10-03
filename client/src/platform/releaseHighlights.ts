@@ -1,3 +1,4 @@
+import leaderboard from "../assets/updates/leaderboard-5.1.0.png";
 import guestPlay from "../assets/updates/guest-play-4.10.0.png";
 import bunker from "../assets/updates/bunker-4.10.1.png";
 import catalog from "../assets/updates/catalog-4.9.0.png";
@@ -31,6 +32,29 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-5-1",
+    version: "5.1.0",
+    date: "2026-10-03",
+    category: "РЕЙТИНГ",
+    title: "Кто сегодня в топе?",
+    summary: "Все игроки — в одном рейтинге. Выберите, за что соревноваться.",
+    changes: [
+      "Новая вкладка «Рейтинг»: сортировка по победам, завершённым партиям, монетам и размеру коллекции.",
+      "Ваше место видно отдельно, даже если вы пока не на первой странице. Одинаковые результаты делят место.",
+      "Победы считаются сервером в Бункере, Дураке и UNO. Учёт начался с этой версии; прежние партии, монеты и предметы сохранены.",
+      "Рейтинг доступен гостям, а результаты сохраняются за аккаунтом. Данные автоматически обновляются каждые 30 секунд.",
+    ],
+    screenshots: [
+      {
+        src: leaderboard,
+        caption: "5.1.0 · Рейтинг по победам — пример на тестовых аккаунтах",
+        alt: "Рейтинг PartyPlay: места игроков, победы, партии, монеты и коллекция. Показаны тестовые данные.",
+        width: 1440,
+        height: 1000,
+      },
+    ],
+  },
   {
     id: "release-5-0",
     version: "5.0.0",

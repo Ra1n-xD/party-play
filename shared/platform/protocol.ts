@@ -20,6 +20,7 @@ import type { ProjectStatsSnapshot } from "./projectStats.js";
 import type { CaseOpening, ProfileReply, ProfileSnapshot } from "./cosmetics.js";
 import type { UpgradeAttempt, UpgradeRequest } from "./upgrades.js";
 import type { CosmeticDrop } from "./dropFeed.js";
+import type { LeaderboardQuery, LeaderboardSnapshot } from "./leaderboard.js";
 import type { ProfileCredentials, ProfileSession } from "./auth.js";
 import type { AnyRoomCommandEnvelope, AnyRoomSnapshot, RoomCommandResult, SeatId } from "./room.js";
 
@@ -61,6 +62,10 @@ export interface SpectatorJoinedPayload {
 
 // Client -> Server
 export interface ClientEvents {
+  "leaderboard:get": (
+    query: LeaderboardQuery,
+    reply: (result: ProfileReply<LeaderboardSnapshot>) => void,
+  ) => void;
   "drops:subscribe": () => void;
   "drops:unsubscribe": () => void;
   "profile:login": (

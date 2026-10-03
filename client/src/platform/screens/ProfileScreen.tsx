@@ -32,7 +32,9 @@ export function ProfileScreen() {
         <span>
           {owned} / {COSMETICS.length} предметов
         </span>
-        <span>{profile.completedGames} завершённых партий</span>
+        <span>
+          {profile.completedGames} завершённых партий · {profile.wins} побед
+        </span>
         <button onClick={logout} disabled={busy || !connected} className="profile-text-button">
           Выйти из аккаунта
         </button>

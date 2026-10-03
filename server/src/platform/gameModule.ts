@@ -31,6 +31,10 @@ export interface ServerGameModule<G extends GameId> {
   validateSettings(value: unknown): value is GameSettings<G>;
   updateSettings(room: Room<G>, settings: GameSettings<G>, io: IOServer): GameCommandExecution;
   lifecycle(room: Room<G>): RoomLifecycle;
+  completedMatchResult(room: Room<G>): {
+    participantSeatIds: string[];
+    winnerSeatIds: string[];
+  } | null;
   parseCommand(value: unknown): GameCommand<G> | null;
   start(room: Room<G>, io: IOServer): GameCommandExecution;
   resetForReplay(room: Room<G>, io: IOServer): GameCommandExecution;
