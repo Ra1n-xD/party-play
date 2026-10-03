@@ -1,6 +1,10 @@
 import type { RegisteredClientGameId } from "../gameRegistry";
 
-export function GameMenuArtwork({ gameId }: { gameId: RegisteredClientGameId }) {
+export function GameMenuArtwork({
+  gameId,
+}: {
+  gameId: RegisteredClientGameId | "liar-dice" | "who-am-i";
+}) {
   return (
     <div className={`show-art show-art-${gameId}`} aria-hidden="true">
       <span className="show-art-spark">✦</span>
@@ -14,6 +18,19 @@ export function GameMenuArtwork({ gameId }: { gameId: RegisteredClientGameId }) 
             ПРОПУСК
           </div>
         </>
+      ) : gameId === "liar-dice" ? (
+        <div className="show-art-dice">
+          <span className="show-art-die">
+            {Array.from({ length: 4 }, (_, index) => (
+              <i key={index} />
+            ))}
+          </span>
+          <span className="show-art-die">
+            <i />
+          </span>
+        </div>
+      ) : gameId === "who-am-i" ? (
+        <span className="show-art-identity">?</span>
       ) : (
         <div className="show-art-fan">
           {(gameId === "durak"
