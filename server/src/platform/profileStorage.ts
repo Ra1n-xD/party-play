@@ -53,6 +53,7 @@ const storagePath =
     basename(process.cwd()) === "server" ? ".data/profiles.json" : "server/.data/profiles.json",
   );
 const lockPath = `${storagePath}.lock`;
+const STORAGE_VERSION = 3;
 let savedCurrentFormat = false;
 
 // A second Node process must not overwrite the first process's in-memory accounts.
@@ -86,7 +87,7 @@ process.once("exit", () => {
 
 function serialize(store: ProfileStore): string {
   return JSON.stringify({
-    version: 2,
+    version: STORAGE_VERSION,
     profiles: [...store.profiles.values()],
     accounts: [...store.accounts.values()],
     sessions: [...store.sessions.values()],
@@ -113,7 +114,7 @@ export function profileTransaction(change: () => void): void {
   profileStore = structuredClone(previous);
   try {
     change();
-    // Keep one complete previous v2 snapshot. Legacy passwordless profiles are not backed up.
+    // Only back up snapshots from the current account generation.
     if (savedCurrentFormat) writeAtomic(`${storagePath}.bak`, serialize(previous));
     writeAtomic(storagePath, serialize(profileStore));
     savedCurrentFormat = true;
@@ -128,13 +129,24 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{1
 const hash = /^[0-9a-f]{64}$/;
 try {
   const data = JSON.parse(readFileSync(storagePath, "utf8"));
-  if (data.version === 1 && Array.isArray(data.profiles) && Array.isArray(data.rewardedMatches)) {
-    // Explicit product reset: old nickname-only accounts have no provable owner.
+  const legacyStore =
+    Array.isArray(data.profiles) &&
+    Array.isArray(data.rewardedMatches) &&
+    (data.version === 1 ||
+      (data.version === 2 && Array.isArray(data.accounts) && Array.isArray(data.sessions)));
+  if (legacyStore) {
+    // Explicit 6.0 reset: remove old accounts, sessions, balances, rankings and receipts once.
+    // Delete the previous backup first so it cannot retain the discarded accounts.
+    try {
+      unlinkSync(`${storagePath}.bak`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
     profileTransaction(() => {});
-    console.info("Legacy nickname-only profiles reset; password accounts use storage version 2.");
+    console.info("Previous accounts reset; new accounts use profile storage version 3.");
   } else {
     if (
-      data.version !== 2 ||
+      data.version !== STORAGE_VERSION ||
       !Array.isArray(data.profiles) ||
       !Array.isArray(data.accounts) ||
       !Array.isArray(data.sessions) ||
@@ -157,9 +169,6 @@ try {
         !Array.isArray(profile.recentOpenings)
       )
         throw new Error("Invalid profile");
-      // Existing password accounts retain their coins and completed games.
-      // Historical winners were not stored, so their win counter starts at zero.
-      profile.wins ??= 0;
       if (
         !Number.isSafeInteger(profile.wins) ||
         profile.wins < 0 ||

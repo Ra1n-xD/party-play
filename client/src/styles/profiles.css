@@ -196,6 +196,9 @@ body:has(.show-menu, .profile-login),
   gap: 12px;
   margin: 30px 0;
 }
+.profile-login form > .profile-primary {
+  margin-top: 12px;
+}
 .profile-login label {
   font-size: 13px;
   font-weight: 600;
