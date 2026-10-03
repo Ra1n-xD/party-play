@@ -55,6 +55,12 @@ export function limbBetween(
   return mesh;
 }
 
+interface ArmGestureOptions {
+  arc?: number;
+  elbowTuck?: number;
+  wristAlignment?: number;
+}
+
 /** A continuous sleeve follows a two-bone solve; limb lengths stay constant during gestures. */
 export function makeSeatedArm(
   skin: number,
@@ -93,14 +99,25 @@ export function makeSeatedArm(
   let sleeveMesh: THREE.SkinnedMesh | null = null;
   let currentHolding: boolean | null = null;
   let gestureFingerWeight = 0;
+  let elbowTuck = 0;
+  let wristAlignment = 0;
   let hand: ReturnType<typeof makeArticulatedHand> | null = null;
   const restPosition = new THREE.Vector3();
   const restRotation = new THREE.Quaternion();
   const targetPosition = new THREE.Vector3();
   const targetRotation = new THREE.Quaternion();
   const targetEuler = new THREE.Euler();
+  const requestedPosition = new THREE.Vector3();
+  const requestedRotation = new THREE.Quaternion();
+  const palmAxis = new THREE.Vector3();
+  const wristCorrection = new THREE.Quaternion();
+  const alignedRotation = new THREE.Quaternion();
 
   const updateArm = () => {
+    // Always solve from the requested pose: finger and wrist updates may run in
+    // the same frame and must never accumulate the alignment correction.
+    grip.position.copy(requestedPosition);
+    grip.quaternion.copy(requestedRotation);
     wristOffset
       .set(0, -0.14, currentHolding ? -0.045 * (1 - gestureFingerWeight) : 0)
       .applyQuaternion(grip.quaternion);
@@ -114,7 +131,9 @@ export function makeSeatedArm(
       (upperLength * upperLength - lowerLength * lowerLength + distance * distance) /
       (2 * distance);
     const height = Math.sqrt(Math.max(0, upperLength * upperLength - projection * projection));
-    bend.set(side * 0.85, -0.75, -0.12).addScaledVector(direction, -bend.dot(direction));
+    bend
+      .set(side * (0.85 - elbowTuck * 0.62), -0.75 - elbowTuck * 0.18, -0.12)
+      .addScaledVector(direction, -bend.dot(direction));
     if (bend.lengthSq() < 0.0001)
       bend.set(side, 0, 0).addScaledVector(direction, -side * direction.x);
     bend.normalize();
@@ -125,6 +144,17 @@ export function makeSeatedArm(
       upperBone.quaternion.setFromUnitVectors(bindUpper, upperDirection);
       lowerBone.position.copy(elbow);
       lowerBone.quaternion.setFromUnitVectors(bindLower, lowerDirection);
+    }
+    if (wristAlignment > 0) {
+      palmAxis.copy(up).applyQuaternion(requestedRotation);
+      wristCorrection.setFromUnitVectors(palmAxis, lowerDirection);
+      alignedRotation.copy(wristCorrection).multiply(requestedRotation);
+      grip.quaternion.copy(requestedRotation).slerp(alignedRotation, wristAlignment);
+      // Rotate around the wrist, not the palm, so sleeve and hand stay joined.
+      wristOffset
+        .set(0, -0.14, currentHolding ? -0.045 * (1 - gestureFingerWeight) : 0)
+        .applyQuaternion(grip.quaternion);
+      grip.position.copy(wrist).sub(wristOffset);
     }
     cuff.position.copy(wrist);
     cuff.quaternion.setFromUnitVectors(up, lowerDirection);
@@ -204,7 +234,7 @@ export function makeSeatedArm(
   const setHolding = (next: boolean) => {
     if (next === currentHolding) return;
     currentHolding = next;
-    gestureFingerWeight = 0;
+    gestureFingerWeight = elbowTuck = wristAlignment = 0;
     if (hand) {
       grip.remove(hand.root);
       hand.root.traverse((part) => {
@@ -218,6 +248,8 @@ export function makeSeatedArm(
     grip.add(hand.root);
     grip.position.set(side * 0.24, next ? 1.76 : 1.605, next ? 0.5 : 0.8).sub(shoulder);
     grip.rotation.set(next ? 0 : 1.88, next ? -0.12 : 0, next ? side * 0.12 : -side * 0.08);
+    requestedPosition.copy(grip.position);
+    requestedRotation.copy(grip.quaternion);
     updateArm();
     restPosition.copy(grip.position);
     restRotation.copy(grip.quaternion);
@@ -229,23 +261,41 @@ export function makeSeatedArm(
     grip,
     setHolding,
     resetGesture() {
-      grip.position.copy(restPosition);
-      grip.quaternion.copy(restRotation);
-      gestureFingerWeight = 0;
+      requestedPosition.copy(restPosition);
+      requestedRotation.copy(restRotation);
+      gestureFingerWeight = elbowTuck = wristAlignment = 0;
       hand?.reset();
       updateArm();
     },
-    poseFingers(curls: readonly number[], spread: number, thumb: number, weight: number) {
+    poseFingers(
+      curls: readonly number[],
+      spread: number,
+      thumb: number,
+      weight: number,
+      thumbsUp = 0,
+    ) {
       gestureFingerWeight = THREE.MathUtils.clamp(weight, 0, 1);
-      hand?.pose(curls, spread, thumb, gestureFingerWeight);
+      hand?.pose(curls, spread, thumb, gestureFingerWeight, thumbsUp);
       updateArm();
     },
-    gesture(x: number, y: number, z: number, rx: number, ry: number, rz: number, weight: number) {
+    gesture(
+      x: number,
+      y: number,
+      z: number,
+      rx: number,
+      ry: number,
+      rz: number,
+      weight: number,
+      options?: ArmGestureOptions,
+    ) {
       const blend = THREE.MathUtils.clamp(weight, 0, 1);
       targetPosition.set(x, y, z).sub(shoulder);
       targetRotation.setFromEuler(targetEuler.set(rx, ry, rz));
-      grip.position.copy(restPosition).lerp(targetPosition, blend);
-      grip.quaternion.copy(restRotation).slerp(targetRotation, blend);
+      requestedPosition.copy(restPosition).lerp(targetPosition, blend);
+      requestedPosition.y += (options?.arc ?? 0) * 4 * blend * (1 - blend);
+      requestedRotation.copy(restRotation).slerp(targetRotation, blend);
+      elbowTuck = THREE.MathUtils.clamp(options?.elbowTuck ?? 0, 0, 1) * blend;
+      wristAlignment = THREE.MathUtils.clamp(options?.wristAlignment ?? 0, 0, 1) * blend;
       updateArm();
     },
   };

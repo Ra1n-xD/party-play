@@ -11,6 +11,8 @@ const CUPPED = [0.2, 0.26, 0.3, 0.36];
 const FIST = [0.96, 1, 1, 0.96];
 const POINT = [0.08, 0.86, 0.94, 1];
 const RELAXED = [0.23, 0.32, 0.38, 0.46];
+const APPROVAL_ARM = { arc: 0.05, elbowTuck: 0.9, wristAlignment: 0.25 };
+const RELIEF_ARM = { arc: 0.04, elbowTuck: 0.3, wristAlignment: 0.85 };
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const ease = (value: number) => {
   const t = clamp(value);
@@ -181,20 +183,37 @@ export class TableAvatarAnimator {
     this.body.rotation.x += anticipation * 0.014;
     switch (this.reaction.id) {
       case "good-move": {
-        // A clear thumbs-up, followed by one small nod and an approving smile.
-        this.rightArm.gesture(0.34, 1.98, 0.57, 0.04, -0.28, -0.2, gesture);
-        this.rightArm.poseFingers(FIST, 0.02, 0, fingers);
-        this.head.rotation.x += pulse(t, 0.5, 0.8) * 0.12 * gesture;
-        face.smile += 0.7 * expression;
-        face.squint = 0.25 * expression;
-        face.brow = 0.12 * expression;
+        // Form the fist near the table, then raise it and reveal the thumb.
+        // Keep the fist closed while lowering; only relax it near the rest pose.
+        const lift = ease((t - 0.18) / 0.63) * ease((3 - t) / 0.7) * release;
+        const fist = ease((t - 0.035) / 0.4) * ease((3 - t) / 0.32) * release;
+        const thumb = ease((t - 0.43) / 0.36) * ease((3 - t) / 0.5);
+        const settle = pulse(t, 0.65, 0.5) * 0.014;
+        this.rightArm.gesture(
+          0.48,
+          1.99 + settle,
+          0.43 + pulse(t, 0.72, 0.68) * 0.012,
+          0,
+          -0.65,
+          -0.9,
+          lift,
+          APPROVAL_ARM,
+        );
+        this.rightArm.poseFingers(FIST, 0, 0.82, fist, thumb);
+        this.head.rotation.x += pulse(t, 0.84, 0.68) * 0.095 * lift;
+        this.head.rotation.z -= 0.025 * lift;
+        this.body.rotation.x += 0.012 * lift;
+        face.smile += 0.56 * expression;
+        face.squint = 0.24 * expression;
+        face.brow = 0.1 * expression;
         break;
       }
       case "bravo": {
         // Three measured contacts, each with a quicker closing and softer release.
         const clapTime = Math.max(0, t - 0.62);
         const cycle = (clapTime % 0.48) / 0.48;
-        const close = cycle < 0.38 ? ease(cycle / 0.38) : 1 - ease((cycle - 0.38) / 0.62);
+        const close =
+          cycle < 0.34 ? ease(cycle / 0.34) : cycle < 0.43 ? 1 : 1 - ease((cycle - 0.43) / 0.57);
         const contact = t >= 0.62 && t < 2.06 ? close : 0;
         const spread = 0.14 - contact * 0.11;
         this.leftArm.gesture(-spread, 1.91, 0.67, 0.04, Math.PI / 2, -0.12, gesture);
@@ -208,19 +227,22 @@ export class TableAvatarAnimator {
         this.cards.visible = fingers < 0.04 && gesture < 0.04;
         break;
       }
-      case "wow":
-        this.body.rotation.x -= 0.055 * gesture;
-        this.head.rotation.x -= 0.11 * gesture;
-        this.leftArm.gesture(-0.29, 2.06, 0.36, 0.02, 0.35, -0.18, gesture);
-        this.rightArm.gesture(0.29, 2.06, 0.36, 0.02, -0.35, 0.18, gesture);
-        this.leftArm.poseFingers(OPEN, 0.85, 0.06, fingers);
-        this.rightArm.poseFingers(OPEN, 0.85, 0.06, fingers);
-        face.smile = 0.08 * (1 - expression);
-        face.brow = 0.95 * expression;
-        face.open = 0.85 * expression;
+      case "wow": {
+        const recovery = ease((t - 1.1) / 0.7);
+        const rightGesture = ease((t - 0.2) / 0.5) * returnWeight;
+        this.body.rotation.x -= (0.055 - recovery * 0.025) * gesture;
+        this.head.rotation.x -= (0.11 - recovery * 0.055) * gesture;
+        this.leftArm.gesture(-0.29, 2.06 - recovery * 0.018, 0.36, 0.02, 0.35, -0.18, gesture);
+        this.rightArm.gesture(0.29, 2.04 - recovery * 0.028, 0.37, 0.02, -0.35, 0.18, rightGesture);
+        this.leftArm.poseFingers(OPEN, 0.85 - recovery * 0.2, 0.06, fingers);
+        this.rightArm.poseFingers(OPEN, 0.8 - recovery * 0.2, 0.06, fingers);
+        face.smile = 0.08 * (1 - expression) + recovery * 0.15 * expression;
+        face.brow = (0.95 - recovery * 0.28) * expression;
+        face.open = (0.85 - recovery * 0.43) * expression;
         face.blink *= 1 - expression;
         this.cards.visible = fingers < 0.04 && gesture < 0.04;
         break;
+      }
       case "nice":
         this.rightArm.gesture(0.44, 1.96, 0.6, -0.16, -0.42, -0.3, gesture);
         this.rightArm.poseFingers(POINT, 0.18, 0.35, fingers);
@@ -233,13 +255,14 @@ export class TableAvatarAnimator {
       case "lucky": {
         const wipe = ease((t - 0.82) / 0.8);
         this.rightArm.gesture(
-          -0.035 + wipe * 0.18,
-          2.28 - wipe * 0.035,
-          0.35,
-          0.15,
-          -0.1,
-          -0.6,
+          0.3 + wipe * 0.09,
+          2.2 - wipe * 0.035,
+          0.33,
+          0.02,
+          -0.35,
+          0.1,
           gesture,
+          RELIEF_ARM,
         );
         this.rightArm.poseFingers(CUPPED, 0.13, 0.35, fingers);
         this.head.rotation.x += 0.065 * gesture;
@@ -251,9 +274,11 @@ export class TableAvatarAnimator {
         break;
       }
       case "fire": {
-        const lift = pulse(t, 0.58, 0.75) * 0.06 + pulse(t, 1.42, 0.65) * 0.04;
-        this.leftArm.gesture(-0.42, 2.08 + lift, 0.43, -0.1, 0.18, -0.32, gesture);
-        this.rightArm.gesture(0.42, 2.08 + lift, 0.43, -0.1, -0.18, 0.32, gesture);
+        const leftLift = pulse(t, 0.58, 0.75) * 0.06 + pulse(t, 1.42, 0.65) * 0.04;
+        const rightLift = pulse(t, 0.67, 0.75) * 0.065 + pulse(t, 1.51, 0.65) * 0.035;
+        const rightGesture = ease((t - 0.2) / 0.5) * returnWeight;
+        this.leftArm.gesture(-0.42, 2.08 + leftLift, 0.43, -0.1, 0.18, -0.32, gesture);
+        this.rightArm.gesture(0.42, 2.06 + rightLift, 0.45, -0.1, -0.18, 0.3, rightGesture);
         this.leftArm.poseFingers(FIST, 0, 0.92, fingers);
         this.rightArm.poseFingers(FIST, 0, 0.92, fingers);
         this.body.rotation.x -= 0.025 * gesture;
