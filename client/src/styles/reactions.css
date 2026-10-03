@@ -1,0 +1,205 @@
+.reaction-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.reaction-icon
+  :is(.reaction-art, .reaction-clap-left, .reaction-clap-right, .reaction-flame, .reaction-spark) {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+body .command-game-screen .room-reactions-popover {
+  width: min(320px, calc(100vw - 24px));
+  gap: 8px;
+  padding: 12px;
+  border: 2px solid #d3c6d4;
+  border-radius: 18px;
+  background: #fff8e8;
+  box-shadow:
+    5px 6px 0 #18102180,
+    0 16px 40px #100d2040;
+  font-family: "Golos Text", sans-serif;
+}
+body .command-game-screen .room-reactions-option {
+  position: relative;
+  min-height: 66px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid #d3c6d4;
+  background: #f4ecd9;
+  color: #282335;
+}
+body .command-game-screen .room-reactions-option:hover,
+body .command-game-screen .room-reactions-option:focus-visible {
+  border-color: #69408a;
+  background: #ead8f1;
+  outline: 2px solid #69408a;
+  outline-offset: 1px;
+}
+body .command-game-screen .room-reactions-option-label {
+  color: #282335;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.room-reactions-option-icon {
+  display: block;
+  width: 42px;
+  height: 42px;
+}
+body .command-game-screen .room-reactions-shortcut {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  border: 0;
+  padding: 0;
+  color: #786584;
+  font:
+    10px "Golos Text",
+    sans-serif;
+}
+body .command-game-screen .room-reactions-trigger > .reaction-icon {
+  width: 30px;
+  height: 30px;
+}
+body .command-game-screen .room-reaction-message {
+  grid-template-columns: 48px minmax(0, 1fr);
+  min-height: 66px;
+  gap: 8px;
+  border: 2px solid #d3c6d4;
+  background: #fff8e8;
+  box-shadow: 4px 5px 0 #1d14294d;
+  font-family: "Golos Text", sans-serif;
+}
+.room-reaction-message-icon {
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+body .command-game-screen .room-reaction-message-copy strong {
+  color: #282335;
+  font-size: 13px;
+}
+body .command-game-screen .room-reaction-message-copy span {
+  color: #69408a;
+  font-size: 12px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reaction-icon-good-move.is-animated .reaction-art {
+    animation: reaction-approve 1.3s ease-in-out both;
+  }
+  .reaction-icon-bravo.is-animated .reaction-clap-left {
+    animation: reaction-clap-left 0.42s ease-in-out 4;
+  }
+  .reaction-icon-bravo.is-animated .reaction-clap-right {
+    animation: reaction-clap-right 0.42s ease-in-out 4;
+  }
+  .reaction-icon-wow.is-animated .reaction-art {
+    animation: reaction-surprise 1.5s ease-in-out both;
+  }
+  .reaction-icon-nice.is-animated .reaction-art {
+    animation: reaction-star 1.6s ease-in-out both;
+  }
+  .reaction-icon-lucky.is-animated .reaction-art {
+    animation: reaction-luck 1.6s ease-in-out both;
+  }
+  .reaction-icon-fire.is-animated :is(.reaction-art, .reaction-flame) {
+    transform-origin: center bottom;
+    animation: reaction-flame 0.55s ease-in-out 4 alternate;
+  }
+  .reaction-icon.is-animated .reaction-spark {
+    animation: reaction-spark 0.55s ease-in-out 4;
+  }
+}
+@keyframes reaction-approve {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  28%,
+  65% {
+    transform: translateY(-2px) rotate(-12deg);
+  }
+  46% {
+    transform: translateY(1px) rotate(4deg);
+  }
+}
+@keyframes reaction-clap-left {
+  0%,
+  100% {
+    transform: translateX(-2px) rotate(-8deg);
+  }
+  45% {
+    transform: translateX(2px) rotate(5deg);
+  }
+}
+@keyframes reaction-clap-right {
+  0%,
+  100% {
+    transform: translateX(2px) rotate(8deg);
+  }
+  45% {
+    transform: translateX(-2px) rotate(-5deg);
+  }
+}
+@keyframes reaction-surprise {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  24% {
+    transform: translateY(-2px) scale(1.13);
+  }
+  55% {
+    transform: scale(1.06);
+  }
+}
+@keyframes reaction-star {
+  0%,
+  100% {
+    transform: rotate(0) scale(1);
+  }
+  35% {
+    transform: rotate(18deg) scale(1.12);
+  }
+  65% {
+    transform: rotate(-6deg) scale(1.06);
+  }
+}
+@keyframes reaction-luck {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-16deg);
+  }
+  55% {
+    transform: rotate(12deg);
+  }
+  80% {
+    transform: rotate(-5deg);
+  }
+}
+@keyframes reaction-flame {
+  to {
+    transform: scale(0.94, 1.1) rotate(4deg);
+  }
+}
+@keyframes reaction-spark {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body .command-game-screen :is(.room-reactions-popover, .room-reaction-message) {
+    animation: none;
+  }
+}

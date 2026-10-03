@@ -145,10 +145,34 @@ export function makeSeatedArm(
   root.add(grip);
   const cuffMaterial = new THREE.MeshStandardMaterial({ color: 0xeee5d4, roughness: 0.85 });
   const cuff = roundedPart([0.104, 0.065, 0.084], cuffMaterial, 0.015);
+  cuff.name = "animated-cuff";
   root.add(cuff);
   let currentHolding: boolean | null = null;
   let palm: THREE.Group | null = null;
   let forearm: THREE.Mesh | null = null;
+  let forearmLength = 1;
+  let gesturing = false;
+  const restPosition = new THREE.Vector3();
+  const restRotation = new THREE.Quaternion();
+  const targetPosition = new THREE.Vector3();
+  const targetRotation = new THREE.Quaternion();
+  const targetEuler = new THREE.Euler();
+  const wristPosition = new THREE.Vector3();
+  const direction = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+  const updateForearm = () => {
+    if (!forearm) return;
+    wristPosition
+      .set(0, -0.14, currentHolding ? -0.045 : 0)
+      .applyQuaternion(grip.quaternion)
+      .add(grip.position);
+    direction.copy(wristPosition).sub(elbow);
+    forearm.position.copy(elbow).lerp(wristPosition, 0.5);
+    forearm.scale.y = direction.length() / forearmLength;
+    forearm.quaternion.setFromUnitVectors(up, direction.normalize());
+    cuff.position.copy(wristPosition);
+    cuff.quaternion.copy(forearm.quaternion);
+  };
   const setHolding = (next: boolean) => {
     if (next === currentHolding) return;
     currentHolding = next;
@@ -173,6 +197,11 @@ export function makeSeatedArm(
       forearm.geometry.dispose();
     }
     forearm = limbBetween(root, elbow, wrist, 0.092, sleeve, 0.06);
+    forearm.name = "animated-forearm";
+    forearmLength = elbow.distanceTo(wrist);
+    restPosition.copy(grip.position);
+    restRotation.copy(grip.quaternion);
+    gesturing = false;
     cuff.position.copy(wrist);
     cuff.quaternion.setFromUnitVectors(
       new THREE.Vector3(0, 1, 0),
@@ -180,5 +209,26 @@ export function makeSeatedArm(
     );
   };
   setHolding(holding);
-  return { root, grip, setHolding };
+  return {
+    root,
+    grip,
+    setHolding,
+    resetGesture() {
+      if (!gesturing) return;
+      grip.position.copy(restPosition);
+      grip.quaternion.copy(restRotation);
+      updateForearm();
+      gesturing = false;
+    },
+    // Move the wrist as well as the shoulder so applause actually brings the
+    // palms together. Reuse the existing meshes; no per-frame geometry rebuild.
+    gesture(x: number, y: number, z: number, rx: number, ry: number, rz: number, weight: number) {
+      targetPosition.set(x, y, z).sub(shoulder);
+      targetRotation.setFromEuler(targetEuler.set(rx, ry, rz));
+      grip.position.copy(restPosition).lerp(targetPosition, weight);
+      grip.quaternion.copy(restRotation).slerp(targetRotation, weight);
+      updateForearm();
+      gesturing = true;
+    },
+  };
 }

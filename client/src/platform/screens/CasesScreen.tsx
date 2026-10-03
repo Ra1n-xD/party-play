@@ -57,6 +57,18 @@ export function CasesScreen() {
     if (mounted.current && openingLock.current) {
       window.clearTimeout(timer.current);
       window.cancelAnimationFrame(frame.current ?? 0);
+      // Cancel the compositor animation too: changing React state alone can leave
+      // a running transition visible until the next frame (or a queued RAF).
+      const winnerCard = track.current?.children[WINNER_INDEX] as HTMLElement | undefined;
+      if (track.current && viewport.current && winnerCard) {
+        const finalOffset =
+          viewport.current.clientWidth / 2 - winnerCard.offsetLeft - winnerCard.offsetWidth / 2;
+        track.current.style.transition = "none";
+        track.current.style.transform = `translateX(${finalOffset}px)`;
+        track.current.getAnimations().forEach((animation) => animation.cancel());
+        setOffset(finalOffset);
+      }
+      setAnimated(false);
       sound.reveal();
       setPhase("result");
       openingLock.current = false;
@@ -85,6 +97,7 @@ export function CasesScreen() {
     setPhase("spin");
     frame.current = requestAnimationFrame(() => {
       frame.current = requestAnimationFrame(() => {
+        if (!mounted.current || !openingLock.current) return;
         if (!viewport.current || !track.current) return finish();
         const card = track.current.children[WINNER_INDEX] as HTMLElement;
         setOffset(viewport.current.clientWidth / 2 - card.offsetLeft - card.offsetWidth / 2);
@@ -94,11 +107,6 @@ export function CasesScreen() {
         timer.current = window.setTimeout(finish, reducedMotion ? 100 : 6200);
       });
     });
-  };
-  const skip = () => {
-    window.clearTimeout(timer.current);
-    setAnimated(false);
-    finish();
   };
   const winner = opening ? getCosmetic(opening.itemId) : null;
   if (!profile) return null;
@@ -135,9 +143,17 @@ export function CasesScreen() {
           <div
             className={`case-reel-track${animated ? " is-rolling" : ""}`}
             ref={track}
-            style={{ transform: `translateX(${offset}px)` }}
+            style={{
+              transform: `translateX(${offset}px)`,
+              transition: animated && phase === "spin" ? undefined : "none",
+            }}
             onTransitionEnd={(event) => {
-              if (event.target === track.current && phase === "spin") finish();
+              if (
+                event.target === track.current &&
+                event.propertyName === "transform" &&
+                phase === "spin"
+              )
+                finish();
             }}
           >
             {reel.map((item, index) => (
@@ -147,7 +163,7 @@ export function CasesScreen() {
         </div>
         <div className="case-controls">
           {phase === "spin" ? (
-            <button className="profile-text-button" onClick={skip}>
+            <button className="profile-text-button" onClick={finish}>
               Пропустить анимацию
             </button>
           ) : (

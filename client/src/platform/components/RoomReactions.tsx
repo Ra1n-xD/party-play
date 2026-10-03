@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FiSmile } from "react-icons/fi";
 import type { RoomReactionId } from "../../../../shared/platform/reactions";
 import { usePlatform } from "../context/PlatformContext";
+import { ReactionIcon } from "./ReactionIcon";
+import "../../styles/reactions.css";
 
 const LOCAL_COOLDOWN_MS = 1_200;
-const POPOVER_WIDTH = 286;
-const POPOVER_HEIGHT = 206;
+const POPOVER_WIDTH = 320;
+const POPOVER_HEIGHT = 246;
 const POPOVER_MARGIN = 12;
 const POPOVER_GAP = 9;
 
@@ -17,15 +18,14 @@ interface PopoverPosition {
 }
 
 const REACTION_CATALOG = [
-  { id: "good-move", emoji: "👍", label: "Хороший ход" },
-  { id: "bravo", emoji: "👏", label: "Браво" },
-  { id: "wow", emoji: "😮", label: "Вот это да" },
-  { id: "nice", emoji: "😄", label: "Красиво" },
-  { id: "lucky", emoji: "😅", label: "Повезло" },
-  { id: "fire", emoji: "🔥", label: "Огонь" },
+  { id: "good-move", label: "Хороший ход" },
+  { id: "bravo", label: "Браво" },
+  { id: "wow", label: "Вот это да" },
+  { id: "nice", label: "Красиво" },
+  { id: "lucky", label: "Повезло" },
+  { id: "fire", label: "Огонь" },
 ] as const satisfies readonly {
   id: RoomReactionId;
-  emoji: string;
   label: string;
 }[];
 
@@ -224,8 +224,8 @@ export function RoomReactions() {
 
         return (
           <div className="room-reaction-message" key={event.eventId}>
-            <span className="room-reaction-message-emoji" aria-hidden="true">
-              {reaction.emoji}
+            <span className="room-reaction-message-icon" aria-hidden="true">
+              <ReactionIcon id={reaction.id} animated />
             </span>
             <span className="room-reaction-message-copy">
               <strong>{event.senderName}</strong>
@@ -258,11 +258,11 @@ export function RoomReactions() {
           type="button"
           className="room-reactions-option"
           key={reaction.id}
-          aria-label={`${reaction.emoji} ${reaction.label}`}
+          aria-label={reaction.label}
           onClick={() => chooseReaction(reaction.id)}
         >
-          <span className="room-reactions-option-emoji" aria-hidden="true">
-            {reaction.emoji}
+          <span className="room-reactions-option-icon" aria-hidden="true">
+            <ReactionIcon id={reaction.id} />
           </span>
           <span className="room-reactions-option-label">{reaction.label}</span>
           <kbd className="room-reactions-shortcut">{index + 1}</kbd>
@@ -286,7 +286,7 @@ export function RoomReactions() {
             if (!cooldownActive) setPopoverOpen((current) => !current);
           }}
         >
-          <FiSmile aria-hidden="true" focusable="false" />
+          <ReactionIcon id="wow" />
         </button>
       )}
 

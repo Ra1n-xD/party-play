@@ -241,6 +241,7 @@
   font-size: calc(11 * var(--show-unit));
 }
 .show-catalog-pagination > div {
+  order: -1;
   display: flex;
   align-items: center;
   gap: calc(10 * var(--show-unit));

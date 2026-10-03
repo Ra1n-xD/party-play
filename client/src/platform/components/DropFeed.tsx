@@ -56,7 +56,6 @@ export function DropFeed({ holdUpdates = false }: { holdUpdates?: boolean }) {
                 <div className="drop-feed-copy">
                   <span className="drop-feed-nickname">{drop.nickname}</span>
                   <strong>{item.name}</strong>
-                  <small>{COSMETIC_KIND_NAMES[item.kind]}</small>
                   <span className="drop-feed-source">
                     {drop.source === "case" ? (
                       <FiPackage aria-hidden="true" />
