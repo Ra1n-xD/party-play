@@ -487,7 +487,10 @@ export class RoundTableScene {
       for (const z of [-0.28, 0.27])
         this.box(group, [0.055, 0.72, 0.055], 0x997847, [side * 0.35, 0.36, z]);
     const holdsCards = this.options.variant !== "bunker" && person.count > 0;
-    const { body, head, leftArm, rightArm, hand } = makeSeatedAvatar(person.avatarId, holdsCards);
+    const { body, head, leftArm, rightArm, hand, face } = makeSeatedAvatar(
+      person.avatarId,
+      holdsCards,
+    );
     group.add(body);
     this.cardArms.set(person.id, leftArm);
     this.updatePersonHand(
@@ -496,7 +499,15 @@ export class RoundTableScene {
       person.cardSkinId,
     );
     mergeRigidParts(group);
-    const animator = new TableAvatarAnimator(body, head, leftArm, rightArm, hand, index * 1.7);
+    const animator = new TableAvatarAnimator(
+      body,
+      head,
+      leftArm,
+      rightArm,
+      hand,
+      index * 1.7,
+      face,
+    );
     animator.setEliminated(Boolean(person.eliminated), person.eliminatedAt, true);
     this.avatars.set(person.id, animator);
     const ring = this.ring(group, 0.6, 0.024, 0x68ed9e, 0.04);

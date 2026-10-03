@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { makeArticulatedHand } from "./AvatarHand";
 
 export function roundedPart(
   size: [number, number, number],
@@ -15,79 +15,9 @@ export function roundedPart(
 /** The card plane is Z=0; its bottom edge sits this far above the palm centre. */
 export const HAND_CARD_EDGE_Y = 0.078;
 
-/** Fingers stay behind the card plane; only the thumb wraps around the bottom edge. */
+/** The same articulated skin is shared by seated avatars and the camera-local hand. */
 export function makeAvatarHand(skin: number, side: number, holding: boolean) {
-  const hand = new THREE.Group();
-  const material = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.68 });
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), material);
-  palm.scale.set(0.069, 0.081, 0.029);
-  palm.position.set(0, -0.002, holding ? -0.048 : 0);
-  hand.add(palm);
-  const wrist = new THREE.Mesh(new THREE.CapsuleGeometry(0.034, 0.064, 4, 12), material);
-  wrist.scale.z = 0.78;
-  wrist.position.set(0, -0.102, holding ? -0.045 : 0);
-  hand.add(wrist);
-
-  const finger = (points: THREE.Vector3[], radius: number) => {
-    const geometry = new THREE.TubeGeometry(
-      new THREE.CatmullRomCurve3(points),
-      12,
-      radius,
-      8,
-      false,
-    );
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = mesh.receiveShadow = true;
-    hand.add(mesh);
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 8), material);
-    tip.position.copy(points[points.length - 1]);
-    hand.add(tip);
-  };
-  for (let i = 0; i < 4; i++) {
-    const x = side * (0.047 - i * 0.031);
-    const length = [0.077, 0.088, 0.082, 0.063][i];
-    finger(
-      [
-        new THREE.Vector3(x, 0.053, holding ? -0.048 : 0),
-        new THREE.Vector3(x, 0.063 + length * 0.55, holding ? -0.064 : 0.005),
-        new THREE.Vector3(x, 0.061 + length * 0.86, holding ? -0.052 : 0.017),
-        new THREE.Vector3(
-          x,
-          holding ? 0.094 + length * 0.2 : 0.059 + length,
-          holding ? -0.027 : 0.035,
-        ),
-      ],
-      0.0125 - (i === 3 ? 0.002 : 0),
-    );
-  }
-  finger(
-    [
-      new THREE.Vector3(side * 0.05, -0.025, holding ? -0.04 : 0.008),
-      new THREE.Vector3(side * 0.082, 0.025, holding ? -0.022 : 0.014),
-      new THREE.Vector3(side * (holding ? 0.064 : 0.094), 0.061, holding ? 0.013 : 0.021),
-      new THREE.Vector3(
-        side * (holding ? 0.027 : 0.087),
-        holding ? 0.098 : 0.078,
-        holding ? 0.022 : 0.035,
-      ),
-    ],
-    0.014,
-  );
-  // A hand shares one material: merge its details instead of adding a draw call per finger.
-  hand.updateMatrixWorld(true);
-  const pieces = hand.children.map((part) => {
-    const mesh = part as THREE.Mesh;
-    const geometry = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
-    if (geometry !== mesh.geometry) mesh.geometry.dispose();
-    return geometry.applyMatrix4(mesh.matrix);
-  });
-  const geometry = mergeGeometries(pieces)!;
-  pieces.forEach((piece) => piece.dispose());
-  hand.clear();
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.castShadow = mesh.receiveShadow = true;
-  hand.add(mesh);
-  return hand;
+  return makeArticulatedHand(skin, side, holding).root;
 }
 
 export function limbBetween(
@@ -125,7 +55,7 @@ export function limbBetween(
   return mesh;
 }
 
-/** Two comparable arm segments, a visible elbow bend and a wrist aligned with the grip. */
+/** A continuous sleeve follows a two-bone solve; limb lengths stay constant during gestures. */
 export function makeSeatedArm(
   skin: number,
   sleeve: THREE.Material,
@@ -135,100 +65,188 @@ export function makeSeatedArm(
   const root = new THREE.Group();
   const shoulder = new THREE.Vector3(side * 0.33, 1.81, 0.045);
   root.position.copy(shoulder);
-  const elbow = new THREE.Vector3(side * 0.48, 1.626, 0.32).sub(shoulder);
-  limbBetween(root, new THREE.Vector3(), elbow, 0.112, sleeve, 0.096);
-  const joint = new THREE.Mesh(new THREE.SphereGeometry(0.095, 20, 14), sleeve);
-  joint.position.copy(elbow);
-  joint.castShadow = joint.receiveShadow = true;
-  root.add(joint);
   const grip = new THREE.Group();
   root.add(grip);
-  const cuffMaterial = new THREE.MeshStandardMaterial({ color: 0xeee5d4, roughness: 0.85 });
-  const cuff = roundedPart([0.104, 0.065, 0.084], cuffMaterial, 0.015);
+  const upperLength = 0.37;
+  const lowerLength = 0.38;
+  const up = new THREE.Vector3(0, 1, 0);
+  const elbow = new THREE.Vector3();
+  const wrist = new THREE.Vector3();
+  const direction = new THREE.Vector3();
+  const bend = new THREE.Vector3();
+  const wristOffset = new THREE.Vector3();
+  const upperDirection = new THREE.Vector3();
+  const lowerDirection = new THREE.Vector3();
+  const bindUpper = new THREE.Vector3();
+  const bindLower = new THREE.Vector3();
+  const cuff = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.057, 0.063, 0.061, 20),
+    new THREE.MeshStandardMaterial({ color: 0xeee5d4, roughness: 0.85 }),
+  );
   cuff.name = "animated-cuff";
+  cuff.castShadow = cuff.receiveShadow = true;
   root.add(cuff);
+  const upperBone = new THREE.Bone();
+  const lowerBone = new THREE.Bone();
+  upperBone.name = "shoulder";
+  lowerBone.name = "elbow";
+  let sleeveMesh: THREE.SkinnedMesh | null = null;
   let currentHolding: boolean | null = null;
-  let palm: THREE.Group | null = null;
-  let forearm: THREE.Mesh | null = null;
-  let forearmLength = 1;
-  let gesturing = false;
+  let gestureFingerWeight = 0;
+  let hand: ReturnType<typeof makeArticulatedHand> | null = null;
   const restPosition = new THREE.Vector3();
   const restRotation = new THREE.Quaternion();
   const targetPosition = new THREE.Vector3();
   const targetRotation = new THREE.Quaternion();
   const targetEuler = new THREE.Euler();
-  const wristPosition = new THREE.Vector3();
-  const direction = new THREE.Vector3();
-  const up = new THREE.Vector3(0, 1, 0);
-  const updateForearm = () => {
-    if (!forearm) return;
-    wristPosition
-      .set(0, -0.14, currentHolding ? -0.045 : 0)
-      .applyQuaternion(grip.quaternion)
-      .add(grip.position);
-    direction.copy(wristPosition).sub(elbow);
-    forearm.position.copy(elbow).lerp(wristPosition, 0.5);
-    forearm.scale.y = direction.length() / forearmLength;
-    forearm.quaternion.setFromUnitVectors(up, direction.normalize());
-    cuff.position.copy(wristPosition);
-    cuff.quaternion.copy(forearm.quaternion);
+
+  const updateArm = () => {
+    wristOffset
+      .set(0, -0.14, currentHolding ? -0.045 * (1 - gestureFingerWeight) : 0)
+      .applyQuaternion(grip.quaternion);
+    wrist.copy(grip.position).add(wristOffset);
+    const distance = THREE.MathUtils.clamp(wrist.length(), 0.1, upperLength + lowerLength - 0.008);
+    direction.copy(wrist).normalize();
+    wrist.copy(direction).multiplyScalar(distance);
+    // Keep the actual palm attached when a requested target exceeds arm reach.
+    grip.position.copy(wrist).sub(wristOffset);
+    const projection =
+      (upperLength * upperLength - lowerLength * lowerLength + distance * distance) /
+      (2 * distance);
+    const height = Math.sqrt(Math.max(0, upperLength * upperLength - projection * projection));
+    bend.set(side * 0.85, -0.75, -0.12).addScaledVector(direction, -bend.dot(direction));
+    if (bend.lengthSq() < 0.0001)
+      bend.set(side, 0, 0).addScaledVector(direction, -side * direction.x);
+    bend.normalize();
+    elbow.copy(direction).multiplyScalar(projection).addScaledVector(bend, height);
+    upperDirection.copy(elbow).normalize();
+    lowerDirection.copy(wrist).sub(elbow).normalize();
+    if (sleeveMesh) {
+      upperBone.quaternion.setFromUnitVectors(bindUpper, upperDirection);
+      lowerBone.position.copy(elbow);
+      lowerBone.quaternion.setFromUnitVectors(bindLower, lowerDirection);
+    }
+    cuff.position.copy(wrist);
+    cuff.quaternion.setFromUnitVectors(up, lowerDirection);
   };
+
+  const makeSleeve = () => {
+    const positions: number[] = [];
+    const indices: number[] = [];
+    const skinIndices: number[] = [];
+    const skinWeights: number[] = [];
+    const center = new THREE.Vector3();
+    const tangent = new THREE.Vector3();
+    const radialX = new THREE.Vector3();
+    const radialZ = new THREE.Vector3();
+    const vertex = new THREE.Vector3();
+    const rows = 29;
+    const sides = 20;
+    const bindElbow = elbow.clone();
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3().addScaledVector(upperDirection, -0.055),
+      elbow.clone().multiplyScalar(0.5),
+      elbow.clone(),
+      elbow.clone().lerp(wrist, 0.52),
+      wrist.clone(),
+    ]);
+    for (let row = 0; row < rows; row++) {
+      const t = row / (rows - 1);
+      curve.getPoint(t, center);
+      curve.getTangent(t, tangent).normalize();
+      radialX.set(0, 0, 1).cross(tangent).normalize();
+      radialZ.copy(tangent).cross(radialX).normalize();
+      const radius =
+        t < 0.15
+          ? THREE.MathUtils.lerp(0.086, 0.112, t / 0.15)
+          : t < 0.5
+            ? THREE.MathUtils.lerp(0.112, 0.088, (t - 0.15) / 0.35)
+            : THREE.MathUtils.lerp(0.088, 0.059, (t - 0.5) / 0.5);
+      const blend = THREE.MathUtils.smoothstep(t, 0.38, 0.62);
+      for (let segment = 0; segment <= sides; segment++) {
+        const angle = (segment / sides) * Math.PI * 2;
+        // Very shallow woven folds break a perfect cylinder silhouette without loose parts.
+        const fold = 1 + Math.sin(t * Math.PI * 10) * Math.exp(-(((t - 0.52) / 0.2) ** 2)) * 0.022;
+        vertex
+          .copy(center)
+          .addScaledVector(radialX, Math.cos(angle) * radius * fold)
+          .addScaledVector(radialZ, Math.sin(angle) * radius * 0.94 * fold);
+        positions.push(vertex.x, vertex.y, vertex.z);
+        skinIndices.push(0, 1, 0, 0);
+        skinWeights.push(1 - blend, blend, 0, 0);
+        if (row < rows - 1 && segment < sides) {
+          const a = row * (sides + 1) + segment;
+          const b = a + sides + 1;
+          indices.push(a, a + 1, b, a + 1, b + 1, b);
+        }
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(skinIndices, 4));
+    geometry.setAttribute("skinWeight", new THREE.Float32BufferAttribute(skinWeights, 4));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    sleeveMesh = new THREE.SkinnedMesh(geometry, sleeve);
+    sleeveMesh.name = "articulated-sleeve";
+    sleeveMesh.castShadow = sleeveMesh.receiveShadow = true;
+    sleeveMesh.frustumCulled = false;
+    bindUpper.copy(upperDirection);
+    bindLower.copy(lowerDirection);
+    lowerBone.position.copy(bindElbow);
+    sleeveMesh.add(upperBone, lowerBone);
+    const skeleton = new THREE.Skeleton([upperBone, lowerBone]);
+    sleeveMesh.bind(skeleton);
+    geometry.addEventListener("dispose", () => skeleton.dispose());
+    root.add(sleeveMesh);
+  };
+
   const setHolding = (next: boolean) => {
     if (next === currentHolding) return;
     currentHolding = next;
-    if (palm) {
-      grip.remove(palm);
-      palm.traverse((part) => {
+    gestureFingerWeight = 0;
+    if (hand) {
+      grip.remove(hand.root);
+      hand.root.traverse((part) => {
         if (part instanceof THREE.Mesh) {
           part.geometry.dispose();
           (part.material as THREE.Material).dispose();
         }
       });
     }
-    palm = makeAvatarHand(skin, -side, next);
-    grip.add(palm);
+    hand = makeArticulatedHand(skin, -side, next);
+    grip.add(hand.root);
     grip.position.set(side * 0.24, next ? 1.76 : 1.605, next ? 0.5 : 0.8).sub(shoulder);
     grip.rotation.set(next ? 0 : 1.88, next ? -0.12 : 0, next ? side * 0.12 : -side * 0.08);
-    const wrist = new THREE.Vector3(0, -0.14, next ? -0.045 : 0)
-      .applyEuler(grip.rotation)
-      .add(grip.position);
-    if (forearm) {
-      root.remove(forearm);
-      forearm.geometry.dispose();
-    }
-    forearm = limbBetween(root, elbow, wrist, 0.092, sleeve, 0.06);
-    forearm.name = "animated-forearm";
-    forearmLength = elbow.distanceTo(wrist);
+    updateArm();
     restPosition.copy(grip.position);
     restRotation.copy(grip.quaternion);
-    gesturing = false;
-    cuff.position.copy(wrist);
-    cuff.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      wrist.clone().sub(elbow).normalize(),
-    );
   };
   setHolding(holding);
+  makeSleeve();
   return {
     root,
     grip,
     setHolding,
     resetGesture() {
-      if (!gesturing) return;
       grip.position.copy(restPosition);
       grip.quaternion.copy(restRotation);
-      updateForearm();
-      gesturing = false;
+      gestureFingerWeight = 0;
+      hand?.reset();
+      updateArm();
     },
-    // Move the wrist as well as the shoulder so applause actually brings the
-    // palms together. Reuse the existing meshes; no per-frame geometry rebuild.
+    poseFingers(curls: readonly number[], spread: number, thumb: number, weight: number) {
+      gestureFingerWeight = THREE.MathUtils.clamp(weight, 0, 1);
+      hand?.pose(curls, spread, thumb, gestureFingerWeight);
+      updateArm();
+    },
     gesture(x: number, y: number, z: number, rx: number, ry: number, rz: number, weight: number) {
+      const blend = THREE.MathUtils.clamp(weight, 0, 1);
       targetPosition.set(x, y, z).sub(shoulder);
       targetRotation.setFromEuler(targetEuler.set(rx, ry, rz));
-      grip.position.copy(restPosition).lerp(targetPosition, weight);
-      grip.quaternion.copy(restRotation).slerp(targetRotation, weight);
-      updateForearm();
-      gesturing = true;
+      grip.position.copy(restPosition).lerp(targetPosition, blend);
+      grip.quaternion.copy(restRotation).slerp(targetRotation, blend);
+      updateArm();
     },
   };
 }
