@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BiDonateHeart } from "react-icons/bi";
 import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
-import { FiAlertCircle, FiArrowRight, FiBookOpen, FiUsers } from "react-icons/fi";
+import { FiAlertCircle, FiBookOpen, FiUsers } from "react-icons/fi";
 import { ROOM_CODE_LENGTH } from "../../../../shared/roomCode";
 import {
   PUBLIC_ROOM_SPECTATOR_LIMIT,
@@ -11,6 +11,7 @@ import {
 import { AccessibleModal } from "../components/AccessibleModal";
 import { ProfileHeader } from "../components/ProfileHeader";
 import { GameMenuArtwork } from "../components/GameMenuArtwork";
+import { GameCatalog } from "../components/GameCatalog";
 import { GameRulesModal } from "../components/GameRulesModal";
 import { RoomEntryForm, type RoomEntryMode } from "../components/RoomEntryForm";
 import { usePlatform } from "../context/PlatformContext";
@@ -19,6 +20,7 @@ import { clientGameRegistry, type RegisteredClientGameId } from "../gameRegistry
 import { gameMenuPresentation } from "../gameMenuPresentation";
 import { ReconnectScreen } from "./ReconnectScreen";
 import "../../styles/show-menu.css";
+import "../../styles/game-catalog.css";
 
 const catalogGames = Object.values(clientGameRegistry).sort(
   (a, b) => a.metadata.catalogSlot - b.metadata.catalogSlot,
@@ -70,7 +72,6 @@ export function HomeScreen() {
   } = usePlatform();
   const [name, setName] = useState(profile?.nickname ?? "");
   const [joinCode, setJoinCode] = useState("");
-  const [featuredGameId, setFeaturedGameId] = useState<RegisteredClientGameId>(catalogGames[0].id);
   const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(null);
   const [entryMode, setEntryMode] = useState<RoomEntryMode>("join");
   const [recoveryOpen, setRecoveryOpen] = useState(false);
@@ -105,8 +106,7 @@ export function HomeScreen() {
   }, [publicRoomsGameId]);
 
   const selectedGame = selectedGameId ? clientGameRegistry[selectedGameId] : null;
-  const featuredGame = clientGameRegistry[featuredGameId];
-  const currentGame = selectedGame ?? featuredGame;
+  const currentGame = selectedGame ?? catalogGames[0];
   const presentation = gameMenuPresentation[currentGame.id];
   const rulesGame = rulesGameId ? clientGameRegistry[rulesGameId] : null;
   const publicRoomsGame = publicRoomsGameId ? clientGameRegistry[publicRoomsGameId] : null;
@@ -127,7 +127,6 @@ export function HomeScreen() {
   };
   const openGame = (gameId: RegisteredClientGameId) => {
     clearError();
-    setFeaturedGameId(gameId);
     setSelectedGameId(gameId);
     setEntryMode("join");
     setCreateVisibility("private");
@@ -297,58 +296,15 @@ export function HomeScreen() {
                 </a>
               </div>
             </section>
-            <div className="show-main-layout">
-              <nav className="show-lineup" aria-label="Выберите игру">
-                {catalogGames.map((game, index) => (
-                  <button
-                    type="button"
-                    key={game.id}
-                    aria-pressed={featuredGameId === game.id}
-                    onClick={() => setFeaturedGameId(game.id)}
-                  >
-                    <span className="show-lineup-number">0{index + 1}</span>
-                    <strong>{game.metadata.title}</strong>
-                    <small>
-                      <FiUsers aria-hidden="true" />
-                      {game.metadata.minPlayers}–{game.metadata.maxPlayers} игроков
-                    </small>
-                  </button>
-                ))}
-                {["Кости лжеца", "Кто я"].map((title, index) => (
-                  <div className="show-lineup-coming" key={title} aria-label={`${title} — скоро`}>
-                    <span className="show-lineup-number">0{catalogGames.length + index + 1}</span>
-                    <strong>{title}</strong>
-                    <small className="show-coming-label">Скоро</small>
-                  </div>
-                ))}
-              </nav>
-              <article className="show-feature" aria-labelledby="show-feature-title">
-                <div className={`show-feature-art is-${featuredGameId}`}>
-                  <GameMenuArtwork gameId={featuredGameId} />
-                </div>
-                <div className="show-feature-copy">
-                  <span className="show-feature-kicker">{presentation.kicker}</span>
-                  <h2 id="show-feature-title">{featuredGame.metadata.title}</h2>
-                  <p>{presentation.description}</p>
-                  <span className="show-player-summary">
-                    <FiUsers aria-hidden="true" />
-                    {featuredGame.metadata.playerSummary}
-                  </span>
-                  <button
-                    className="show-primary"
-                    type="button"
-                    onClick={() => openGame(featuredGameId)}
-                  >
-                    Играть в {featuredGame.metadata.title}
-                    <FiArrowRight aria-hidden="true" />
-                  </button>
-                  <div className="show-feature-links">
-                    {publicRoomsButton}
-                    {rulesButton}
-                  </div>
-                </div>
-              </article>
-              <div className="show-join-column">{entryForm}</div>
+            <div className="show-catalog-layout">
+              <GameCatalog
+                games={catalogGames}
+                counts={connected ? publicRoomCounts?.counts : undefined}
+                onPlay={openGame}
+                onRooms={openPublicRoomsModal}
+                onRules={openRulesModal}
+              />
+              {entryForm}
             </div>
           </>
         )}
