@@ -308,7 +308,20 @@ export function HomeScreen() {
                 onRooms={openPublicRoomsModal}
                 onRules={openRulesModal}
               />
-              {entryForm}
+              <aside className="show-catalog-entry" aria-label="Вход в игру и первые шаги">
+                {entryForm}
+                <ol className="show-catalog-steps" aria-label="Как начать">
+                  <li>
+                    <span aria-hidden="true">01</span> Выберите игру
+                  </li>
+                  <li>
+                    <span aria-hidden="true">02</span> Поделитесь кодом
+                  </li>
+                  <li>
+                    <span aria-hidden="true">03</span> Играйте вместе
+                  </li>
+                </ol>
+              </aside>
             </div>
           </>
         )}
