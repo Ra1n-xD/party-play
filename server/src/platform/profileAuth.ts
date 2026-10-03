@@ -83,6 +83,14 @@ export function profileNicknameMatches(socket: IOSocket, nickname: string): bool
   const profile = profileStore.profiles.get(socket.data.profileKey);
   return !!profile && nicknameKey(profile.nickname) === nicknameKey(nickname);
 }
+export function assertProfileSession(socket: IOSocket, key: string): void {
+  if (
+    !socket.connected ||
+    socket.data.profileKey !== key ||
+    findSession(socket.data.profileSessionHash)?.accountId !== key
+  )
+    throw new Error("Сессия изменилась. Войдите в аккаунт и повторите действие");
+}
 function expireSocket(socket: IOSocket): void {
   if (socket.data.profileKey) socket.leave(profileRoom(socket.data.profileKey));
   socket.leave("__cosmetic_drops");
@@ -144,6 +152,7 @@ export function registerProfileAuthHandlers(
       return;
     }
     authenticating = true;
+    socket.data.profileAuthBusy = true;
     try {
       assertProfileStorage();
       const ip = getSocketClientIdentity(socket);
@@ -196,17 +205,15 @@ export function registerProfileAuthHandlers(
       const hash = tokenHash(sessionToken)!;
       const now = Date.now();
       const expiresAt = now + SESSION_TTL;
-      profileTransaction(() => {
+      await profileTransaction([], (draft) => {
+        if (!socket.connected || membershipNickname() || socket.data.profileKey)
+          throw new Error("Состояние изменилось. Повторите вход");
         // Password hashing is asynchronous: recheck uniqueness inside the committed write.
         if (register) {
-          if (
-            [...profileStore.profiles.values()].some(
-              (profile) => nicknameKey(profile.nickname) === key,
-            )
-          )
+          if ([...draft.profiles.values()].some((profile) => nicknameKey(profile.nickname) === key))
             throw new Error("Nickname already registered");
-          profileStore.accounts.set(id, { id, passwordHash: passwordHash!, createdAt: now });
-          profileStore.profiles.set(id, {
+          draft.accounts.set(id, { id, passwordHash: passwordHash!, createdAt: now });
+          draft.profiles.set(id, {
             id,
             nickname: name,
             coins: INITIAL_COINS,
@@ -218,20 +225,23 @@ export function registerProfileAuthHandlers(
             recentUpgrades: [],
           });
         }
-        for (const [sessionHash, session] of profileStore.sessions)
-          if (session.expiresAt <= now) profileStore.sessions.delete(sessionHash);
-        const sessions = [...profileStore.sessions.values()]
+        for (const [sessionHash, session] of draft.sessions)
+          if (session.expiresAt <= now) draft.sessions.delete(sessionHash);
+        const sessions = [...draft.sessions.values()]
           .filter((session) => session.accountId === id)
           .sort((a, b) => a.createdAt - b.createdAt);
         for (const session of sessions.slice(0, Math.max(0, sessions.length - 9)))
-          profileStore.sessions.delete(session.tokenHash);
-        profileStore.sessions.set(hash, {
+          draft.sessions.delete(session.tokenHash);
+        draft.sessions.set(hash, {
           tokenHash: hash,
           accountId: id,
           createdAt: now,
           expiresAt,
         });
       });
+      if (!socket.connected) return;
+      if (membershipNickname() || socket.data.profileKey)
+        throw new Error("Состояние изменилось. Выйдите из комнаты и повторите вход");
       socket.data.profileKey = id;
       socket.data.profileSessionHash = hash;
       socket.join(profileRoom(id));
@@ -247,6 +257,7 @@ export function registerProfileAuthHandlers(
       if (socket.connected) reply({ ok: false, error: (error as Error).message });
     } finally {
       authenticating = false;
+      socket.data.profileAuthBusy = false;
     }
   };
   socket.on("profile:register", (data, reply) => {
@@ -255,17 +266,24 @@ export function registerProfileAuthHandlers(
   socket.on("profile:login", (data, reply) => {
     void authenticate(false, data, reply);
   });
-  socket.on("profile:logout", (reply) => {
+  socket.on("profile:logout", async (reply) => {
     if (typeof reply !== "function") return;
+    if (authenticating) {
+      reply({ ok: false, error: "Дождитесь завершения предыдущей попытки" });
+      return;
+    }
     if (membershipNickname()) {
       reply({ ok: false, error: "Сначала выйдите из комнаты" });
       return;
     }
+    authenticating = true;
+    socket.data.profileAuthBusy = true;
     try {
       const hash = socket.data.profileSessionHash as string | undefined;
       if (hash)
-        profileTransaction(() => {
-          profileStore.sessions.delete(hash);
+        await profileTransaction([], (draft) => {
+          if (membershipNickname()) throw new Error("Сначала выйдите из комнаты");
+          return draft.sessions.delete(hash);
         });
       reply({ ok: true, value: null });
       // Revoke this browser session on every open tab, including idle sockets.
@@ -274,6 +292,9 @@ export function registerProfileAuthHandlers(
           if (peer.data.profileSessionHash === hash) expireSocket(peer);
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });
+    } finally {
+      authenticating = false;
+      socket.data.profileAuthBusy = false;
     }
   });
 }

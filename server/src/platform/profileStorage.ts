@@ -8,6 +8,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "fs";
+import { copyFile, open, rename, unlink } from "node:fs/promises";
 import { basename, dirname, resolve } from "path";
 import {
   BASIC_ITEMS,
@@ -108,21 +109,139 @@ function writeAtomic(path: string, value: string): void {
 export function assertProfileStorage(): void {
   if (!profileStorageHealthy) throw new Error("Хранилище профилей недоступно. Попробуйте позже");
 }
-export function profileTransaction(change: () => void): void {
-  assertProfileStorage();
-  const previous = profileStore;
-  profileStore = structuredClone(previous);
-  try {
-    change();
-    // Only back up snapshots from the current account generation.
-    if (savedCurrentFormat) writeAtomic(`${storagePath}.bak`, serialize(previous));
-    writeAtomic(storagePath, serialize(profileStore));
-    savedCurrentFormat = true;
-    profileStoreRevision++;
-  } catch {
-    profileStore = previous;
-    throw new Error("Не удалось сохранить профиль. Попробуйте позже");
+let transactionTail = Promise.resolve();
+let pendingWrites = 0;
+let closing = false;
+let recoveryTimer: NodeJS.Timeout | undefined;
+
+// Yield bounded chunks to asynchronous file IO instead of stringifying the whole store at once.
+function* serializeChunks(store: ProfileStore): Generator<string> {
+  yield `{"version":${STORAGE_VERSION}`;
+  const sections: [string, Iterable<unknown>][] = [
+    ["profiles", store.profiles.values()],
+    ["accounts", store.accounts.values()],
+    ["sessions", store.sessions.values()],
+    ["rewardedMatches", store.rewardedMatches],
+  ];
+  for (const [name, values] of sections) {
+    yield `,"${name}":[`;
+    let chunk = "";
+    let separator = "";
+    for (const value of values) {
+      chunk += separator + JSON.stringify(value);
+      separator = ",";
+      if (chunk.length >= 64 * 1024) {
+        yield chunk;
+        chunk = "";
+      }
+    }
+    yield `${chunk}]`;
   }
+  yield "}";
+}
+
+async function persistStore(store: ProfileStore): Promise<void> {
+  const temporaryPath = `${storagePath}.${process.pid}.tmp`;
+  const backupTemporaryPath = `${storagePath}.bak.${process.pid}.tmp`;
+  try {
+    if (savedCurrentFormat) {
+      // The previous committed snapshot already exists on disk; do not serialize it again.
+      await copyFile(storagePath, backupTemporaryPath);
+      const backup = await open(backupTemporaryPath, "r+");
+      try {
+        await backup.chmod(0o600);
+        await backup.sync();
+      } finally {
+        await backup.close();
+      }
+      await rename(backupTemporaryPath, `${storagePath}.bak`);
+    }
+    const file = await open(temporaryPath, "w", 0o600);
+    try {
+      for (const chunk of serializeChunks(store)) await file.writeFile(chunk, { encoding: "utf8" });
+      await file.sync();
+    } finally {
+      await file.close();
+    }
+    await rename(temporaryPath, storagePath);
+    savedCurrentFormat = true;
+  } finally {
+    await Promise.all([
+      unlink(temporaryPath).catch(() => {}),
+      unlink(backupTemporaryPath).catch(() => {}),
+    ]);
+  }
+}
+
+function scheduleStorageRecovery(): void {
+  if (recoveryTimer || closing) return;
+  recoveryTimer = setTimeout(() => {
+    recoveryTimer = undefined;
+    transactionTail = transactionTail.then(async () => {
+      if (closing || profileStorageHealthy) return;
+      try {
+        // Only retry runtime write failures, using the last successfully committed state.
+        // An unreadable store at startup must never be overwritten by this recovery path.
+        await persistStore(profileStore);
+        profileStorageHealthy = true;
+        console.info("Profile storage is writable again.");
+      } catch {
+        scheduleStorageRecovery();
+      }
+    });
+  }, 10_000);
+  recoveryTimer.unref();
+}
+
+/** Mutate only the supplied profile copies. Returning false skips an unchanged transaction. */
+export async function profileTransaction(
+  profileIds: readonly string[],
+  change: (draft: ProfileStore) => void | boolean,
+): Promise<void> {
+  assertProfileStorage();
+  if (closing || pendingWrites >= 64)
+    throw new Error("Сервер занят. Попробуйте через несколько секунд");
+  pendingWrites++;
+  const result = transactionTail.then(async () => {
+    assertProfileStorage();
+    const draft: ProfileStore = {
+      profiles: new Map(profileStore.profiles),
+      accounts: new Map(profileStore.accounts),
+      sessions: new Map(profileStore.sessions),
+      rewardedMatches: new Set(profileStore.rewardedMatches),
+    };
+    for (const id of new Set(profileIds)) {
+      const profile = draft.profiles.get(id);
+      if (profile) draft.profiles.set(id, structuredClone(profile));
+    }
+    // Validation errors do not mark the disk unhealthy or affect committed state.
+    if (change(draft) === false) return;
+    try {
+      await persistStore(draft);
+    } catch {
+      profileStorageHealthy = false;
+      console.error("Profile write failed; readiness disabled until storage recovers.");
+      scheduleStorageRecovery();
+      throw new Error("Не удалось сохранить профиль. Попробуйте позже");
+    }
+    profileStore = draft;
+    profileStoreRevision++;
+  });
+  transactionTail = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  try {
+    await result;
+  } finally {
+    pendingWrites--;
+  }
+}
+
+export async function closeProfileStorage(): Promise<void> {
+  closing = true;
+  clearTimeout(recoveryTimer);
+  await transactionTail;
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -142,7 +261,8 @@ try {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
-    profileTransaction(() => {});
+    writeAtomic(storagePath, serialize(profileStore));
+    savedCurrentFormat = true;
     console.info("Previous accounts reset; new accounts use profile storage version 3.");
   } else {
     if (

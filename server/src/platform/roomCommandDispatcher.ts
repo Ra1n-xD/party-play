@@ -13,6 +13,8 @@ import {
 import { getServerGameModule } from "./gameRegistry.js";
 import type { GameCommandExecution, IOServer } from "./gameModule.js";
 import { equipProfileItem } from "./profiles.js";
+import { assertProfileSession } from "./profileAuth.js";
+import { guardProfileRequest } from "./profileRateLimit.js";
 import { isAvatarId } from "../../../shared/platform/avatars.js";
 
 const MAX_PROCESSED_COMMANDS = 128;
@@ -116,13 +118,13 @@ function isPlatformCommand(value: unknown): value is AnyPlatformCommand {
   }
 }
 
-function applyCommand(
+async function applyCommand(
   room: Room,
   actorSeatId: string,
   command: AnyPlatformCommand,
   io: IOServer,
   hooks?: RoomCommandHooks,
-): GameCommandExecution {
+): Promise<GameCommandExecution> {
   const module = getServerGameModule(room.gameId);
   if (!module) {
     return { success: false, code: "INVALID_COMMAND", error: "Игра недоступна" };
@@ -147,11 +149,18 @@ function applyCommand(
       if (!player.profileKey)
         return { success: false, code: "FORBIDDEN", error: "Войдите в профиль" };
       try {
-        equipProfileItem(player.profileKey, `avatar:${command.avatarId}`, io);
+        const socket = io.sockets.sockets.get(player.controller.socketId);
+        if (!socket) throw new Error("Игрок отключён");
+        guardProfileRequest(socket);
+        const key = player.profileKey;
+        await equipProfileItem(key, `avatar:${command.avatarId}`, io, () => {
+          assertProfileSession(socket, key);
+          if (player.kicked || player.voluntarilyLeft || module.lifecycle(room) !== "lobby")
+            throw new Error("Персонажа можно выбрать до начала игры");
+        });
       } catch (error) {
         return { success: false, code: "FORBIDDEN", error: (error as Error).message };
       }
-      module.publish(room, io);
       return { success: true };
     }
     case "seat:set-ready": {
@@ -289,13 +298,13 @@ function applyCommand(
   }
 }
 
-export function dispatchRoomCommand(
+export async function dispatchRoomCommand(
   room: Room,
   actorSeatId: string,
   envelope: unknown,
   io: IOServer,
   hooks?: RoomCommandHooks,
-): RoomCommandResult {
+): Promise<RoomCommandResult> {
   if (!isRecord(envelope)) {
     return reject("", room, "INVALID_COMMAND", "Некорректная команда");
   }
@@ -320,7 +329,7 @@ export function dispatchRoomCommand(
     return reject(commandId, room, "INVALID_COMMAND", "Некорректная команда");
   }
 
-  const execution = applyCommand(room, actorSeatId, envelope.command, io, hooks);
+  const execution = await applyCommand(room, actorSeatId, envelope.command, io, hooks);
   const result = fromExecution(commandId, room, execution);
   if (result.status === "applied") remember(room, cacheKey, result);
   return result;

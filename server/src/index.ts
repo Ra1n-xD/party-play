@@ -11,7 +11,7 @@ import { createNamespaceConnectionLimiter } from "./namespaceConnectionLimiter.j
 import { isDeploymentDraining, setDeploymentDraining } from "./platform/deploymentState.js";
 import { disposeRoomsForDeployment, getAllRooms } from "./platform/roomManager.js";
 import { attachProfileSession } from "./platform/profileAuth.js";
-import { profileStorageHealthy } from "./platform/profileStorage.js";
+import { closeProfileStorage, profileStorageHealthy } from "./platform/profileStorage.js";
 
 const app = express();
 
@@ -212,7 +212,9 @@ function shutdown(signal: NodeJS.Signals): void {
   }, 10_000);
   forceExitTimer.unref();
 
-  void io.close((error) => {
+  const pendingProfileWrites = closeProfileStorage();
+  void io.close(async (error) => {
+    await pendingProfileWrites;
     clearTimeout(forceExitTimer);
     if (error) {
       console.error("Failed to stop PartyPlay server cleanly", error);

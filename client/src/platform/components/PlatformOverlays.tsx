@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { usePlatform } from "../context/PlatformContext";
 import { ReconnectPauseOverlay } from "./ReconnectPauseOverlay";
 import { AccessibleModal } from "./AccessibleModal";
@@ -26,7 +27,10 @@ function DeploymentNotice() {
 
 function AdminPauseOverlay() {
   const { snapshot } = usePlatform();
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => setDismissed(false), [snapshot?.pause.admin]);
   if (
+    dismissed ||
     !snapshot?.pause.active ||
     !snapshot.pause.admin ||
     snapshot.pause.disconnectedSeatIds.length > 0
@@ -41,15 +45,21 @@ function AdminPauseOverlay() {
   if (viewerSeat?.isHost) return null;
 
   return (
-    <div className="pause-overlay">
-      <div className="pause-content">
-        <span className="pause-icon" aria-hidden="true">
-          ⏸
-        </span>
-        <h2>Пауза</h2>
-        <p>Хост приостановил игру</p>
-      </div>
-    </div>
+    <AccessibleModal
+      labelledBy="admin-pause-title"
+      onClose={() => setDismissed(true)}
+      overlayClassName="pause-overlay reconnect-pause-overlay"
+      panelClassName="pause-content reconnect-pause-content"
+    >
+      <span className="pause-icon" aria-hidden="true">
+        ⏸
+      </span>
+      <h2 id="admin-pause-title">Пауза</h2>
+      <p>Хост приостановил игру</p>
+      <button type="button" className="btn btn-secondary" onClick={() => setDismissed(true)}>
+        Закрыть уведомление · Esc
+      </button>
+    </AccessibleModal>
   );
 }
 
