@@ -1,3 +1,4 @@
+import accountReset from "../assets/updates/accounts-6.0.0.png";
 import leaderboard from "../assets/updates/leaderboard-5.1.0.png";
 import guestPlay from "../assets/updates/guest-play-4.10.0.png";
 import bunker from "../assets/updates/bunker-4.10.1.png";
@@ -32,6 +33,28 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-0",
+    version: "6.0.0",
+    date: "2026-10-03",
+    category: "АККАУНТЫ",
+    title: "Новый старт — 20 монет",
+    summary: "Начальный баланс уменьшен, все аккаунты начинают с чистого листа.",
+    changes: [
+      "При регистрации теперь выдаётся 20 монет вместо 100.",
+      "Аккаунты прошлых версий, их монеты, коллекции и рейтинг сброшены. Для сохранения прогресса нужно зарегистрироваться заново.",
+      "На странице входа и регистрации увеличен отступ перед основной кнопкой.",
+    ],
+    screenshots: [
+      {
+        src: accountReset,
+        caption: "6.0.0 · Новый баланс и отступы на странице входа",
+        alt: "Страница входа PartyPlay: 20 монет при регистрации и увеличенный отступ перед кнопкой",
+        width: 1366,
+        height: 768,
+      },
+    ],
+  },
   {
     id: "release-5-1",
     version: "5.1.0",
