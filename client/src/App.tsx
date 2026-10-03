@@ -8,6 +8,7 @@ import { ProfileProvider, useProfile } from "./platform/context/ProfileContext";
 import { LoginScreen, ProfileScreen } from "./platform/screens/ProfileScreen";
 import { CasesScreen } from "./platform/screens/CasesScreen";
 import { UpgradeScreen } from "./platform/screens/UpgradeScreen";
+import { UpdatesScreen } from "./platform/screens/UpdatesScreen";
 import { ProfileHeader } from "./platform/components/ProfileHeader";
 import "./styles/profiles.css";
 
@@ -33,7 +34,9 @@ function ProfileApp() {
       if (
         !link ||
         link.target ||
-        !["/", "/login", "/profile", "/cases", "/upgrade"].includes(link.getAttribute("href") ?? "")
+        !["/", "/login", "/profile", "/cases", "/upgrade", "/updates"].includes(
+          link.getAttribute("href") ?? "",
+        )
       )
         return;
       event.preventDefault();
@@ -77,6 +80,8 @@ function ProfileApp() {
         <CasesScreen />
       ) : path === "/upgrade" ? (
         <UpgradeScreen />
+      ) : path === "/updates" ? (
+        <UpdatesScreen />
       ) : (
         <RoomAppContent />
       )}

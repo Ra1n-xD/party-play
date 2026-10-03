@@ -145,8 +145,11 @@
   padding: calc(4 * var(--show-unit));
   border: 0;
   background: transparent;
-  font-size: calc(11 * var(--show-unit));
   white-space: nowrap;
+}
+
+.show-menu .show-catalog-actions button {
+  font-size: calc(12 * var(--show-unit));
 }
 
 .show-catalog-actions button:hover {
