@@ -46,6 +46,9 @@ export function LoginScreen() {
             {busy ? "Входим…" : "Войти по нику →"}
           </button>
         </form>
+        <a className="profile-guest-link" href="/">
+          Играть без аккаунта
+        </a>
         <div className="profile-welcome">
           <span className="profile-welcome-coins">
             <CoinAmount amount={INITIAL_COINS} label="монет новому игроку" />

@@ -16,7 +16,7 @@ import type { RoundTableScene, TablePerformance } from "./RoundTableScene";
 import { isTableInputBlocked } from "./TableLookControls";
 
 export interface TableMenuHandle {
-  open: (error?: string) => void;
+  open: (error?: string, nativeEscape?: boolean) => void;
 }
 export interface TableMenuAction {
   label: string;
@@ -45,8 +45,8 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
   const openedAt = useRef(0);
   const game = clientGameRegistry[gameId];
   const open = useCallback(
-    (message?: string) => {
-      openedAt.current = performance.now();
+    (message?: string, nativeEscape = false) => {
+      openedAt.current = nativeEscape ? performance.now() : 0;
       scene.current?.releaseLook();
       setError(message ?? null);
       setPage("main");
@@ -54,15 +54,25 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
     [scene],
   );
   useImperativeHandle(ref, () => ({ open }), [open]);
-  const resume = () => {
-    // Pointer Lock requires the original user gesture, before any asynchronous work.
+  useEffect(() => {
+    const releaseEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") openedAt.current = 0;
+    };
+    document.addEventListener("keyup", releaseEscape, true);
+    return () => document.removeEventListener("keyup", releaseEscape, true);
+  }, []);
+  const resume = (capture = true) => {
+    // Arm gameplay before modal cleanup restores focus to the canvas. Otherwise its
+    // focus listener can reopen the menu during the same Escape event.
+    scene.current?.resumeLook(false);
     flushSync(() => {
       setPage(null);
       setError(null);
     });
-    scene.current?.resumeLook();
+    scene.current?.resumeLook(capture);
   };
   const runAction = (action: () => void) => {
+    scene.current?.resumeLook(false);
     flushSync(() => {
       setPage(null);
       action();
@@ -73,8 +83,8 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
   };
   const dismiss = () => {
     // Native pointer-lock loss can open this dialog before the same Esc reaches the page.
-    if (performance.now() - openedAt.current < 160) return;
-    resume();
+    if (openedAt.current && performance.now() - openedAt.current < 160) return;
+    resume(false);
   };
   const requestLeave = () => {
     if (snapshot?.viewer.role === "player") setPage("leave");
@@ -143,7 +153,7 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
         gameId={gameId}
         gameTitle={game.metadata.title}
         rules={game.rules}
-        onClose={resume}
+        onClose={() => resume(false)}
       />,
       document.body,
     );
@@ -151,8 +161,8 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
     <AccessibleModal
       key={page}
       labelledBy="table-session-title"
-      onClose={resume}
-      onEscape={page === "main" ? dismiss : resume}
+      onClose={() => resume(false)}
+      onEscape={page === "main" ? dismiss : () => resume(false)}
       overlayClassName="table3d-menu-overlay"
       panelClassName="table3d-menu-panel"
     >
@@ -174,7 +184,7 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
             </p>
           )}
           <div className="table3d-menu-actions" ref={buttons}>
-            <button type="button" className="is-primary" onClick={resume}>
+            <button type="button" className="is-primary" onClick={() => resume()}>
               <span>Продолжить</span>
               <kbd>Enter</kbd>
             </button>

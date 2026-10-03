@@ -57,7 +57,7 @@ export default function RoundTableView(props: Props) {
         fail,
         {
           variant: props.variant,
-          onMenuRequest: (error) => menu.current?.open(error),
+          onMenuRequest: (error, nativeEscape) => menu.current?.open(error, nativeEscape),
           onOverviewChange: setOverview,
           onSelectPerson: (id) => latest.current.onSelectPerson?.(id),
           onFocusHandCard: (id) => latest.current.onFocusHandCard?.(id),

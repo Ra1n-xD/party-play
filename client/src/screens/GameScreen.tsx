@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { CardImage } from "../components/CardImage";
+import { BunkerAttributeIcon } from "../games/bunker/BunkerAttributeIcon";
 import { useGame } from "../context/GameContext";
 import "../styles/game-screen.css";
 import { AccessibleModal } from "./game/AccessibleModal";
@@ -367,7 +367,7 @@ export function GameScreen({
                         data-attr-type={attribute.type}
                       >
                         <div className="attr-content">
-                          <CardImage type={attribute.type} className="attr-card-image" />
+                          <BunkerAttributeIcon type={attribute.type} className="attr-card-image" />
                           <div className="attr-text">
                             <span className="attr-label">{attribute.label}</span>
                             <span className="attr-value">{attribute.value}</span>
@@ -390,7 +390,7 @@ export function GameScreen({
                       data-attr-type={attribute.type}
                     >
                       <div className="attr-content">
-                        <CardImage type={attribute.type} className="attr-card-image" />
+                        <BunkerAttributeIcon type={attribute.type} className="attr-card-image" />
                         <div className="attr-text">
                           <span className="attr-label">{attribute.label}</span>
                           <span className="attr-value">{attribute.value}</span>
@@ -420,7 +420,7 @@ export function GameScreen({
                         data-attr-type="action"
                       >
                         <div className="attr-content">
-                          <CardImage type="action" className="attr-card-image" />
+                          <BunkerAttributeIcon type="action" className="attr-card-image" />
                           <div className="attr-text">
                             <span className="attr-label">Особое условие</span>
                             <span className="attr-value">{actionCard.title}</span>

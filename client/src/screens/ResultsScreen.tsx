@@ -1,5 +1,5 @@
 import { useGame } from "../context/GameContext";
-import { CardImage } from "../components/CardImage";
+import { BunkerAttributeIcon } from "../games/bunker/BunkerAttributeIcon";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { GameDockTools } from "./game/GameDockTools";
 
@@ -49,7 +49,7 @@ export function ResultsScreen() {
               data-attr-type={attr.type}
             >
               <div className="attr-content">
-                <CardImage type={attr.type} className="attr-card-image" />
+                <BunkerAttributeIcon type={attr.type} className="attr-card-image" />
                 <div className="attr-text">
                   <span className="attr-label">{attr.label}</span>
                   <span className="attr-value">{attr.value}</span>
@@ -65,7 +65,7 @@ export function ResultsScreen() {
           <div className="result-desktop action-card-display">
             <div className="attribute-card revealed" data-attr-type="action">
               <div className="attr-content">
-                <CardImage type="action" className="attr-card-image" />
+                <BunkerAttributeIcon type="action" className="attr-card-image" />
                 <div className="attr-text">
                   <span className="attr-label">Особое условие</span>
                   <span className="attr-value">{player.actionCard.title}</span>

@@ -26,10 +26,16 @@ export const BUNKER_ATTRIBUTE_COLORS: Record<BunkerCardType, string> = {
   action: "#d97632",
 };
 
-export function BunkerAttributeIcon({ type }: { type: BunkerCardType }) {
+export function BunkerAttributeIcon({
+  type,
+  className = "",
+}: {
+  type: BunkerCardType;
+  className?: string;
+}) {
   return (
     <svg
-      className="bunker-attribute-icon"
+      className={`bunker-attribute-icon ${className}`.trim()}
       data-attribute-type={type}
       style={{ color: BUNKER_ATTRIBUTE_COLORS[type] }}
       viewBox="0 0 24 24"

@@ -9,6 +9,7 @@ interface RoomEntryFormProps {
   mode?: RoomEntryMode;
   compact?: boolean;
   name: string;
+  nameReadOnly?: boolean;
   code: string;
   connected: boolean;
   pending: boolean;
@@ -27,6 +28,7 @@ export function RoomEntryForm({
   mode = "join",
   compact = false,
   name,
+  nameReadOnly = false,
   code,
   connected,
   pending,
@@ -88,7 +90,7 @@ export function RoomEntryForm({
             maxLength={20}
             autoComplete="nickname"
             placeholder="Как вас зовут"
-            readOnly
+            readOnly={nameReadOnly}
             disabled={pending}
           />
         </label>

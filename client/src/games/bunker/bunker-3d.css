@@ -321,11 +321,23 @@
 }
 
 /* Portalled dialogs share the cream dossiers and ink/orange palette of the 2D board. */
-body:has(.bunker3d-screen) .modal-overlay {
+body:has(.bunker3d-screen, .bunker-2d) .modal-overlay:not(.table3d-menu-overlay) {
   background: #0b1b2ccc;
   backdrop-filter: blur(8px);
 }
-body:has(.bunker3d-screen) .modal {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) {
+  --bg-primary: #efe4cc;
+  --bg-secondary: #e6dbc3;
+  --bg-card: #f7ecd4;
+  --text-muted: #65706e;
+  --gs-text: #172c3d;
+  --gs-muted: #65706e;
+  --gs-surface: #f7ecd4;
+  --gs-surface-strong: #e6dbc3;
+  --gs-border: #c4bba6;
+  --gs-gold: #a95121;
+  --gs-green: #356b50;
+  --gs-accent-soft: #d9763215;
   --text-primary: #172c3d;
   --text-secondary: #65706e;
   --accent: #d97632;
@@ -341,16 +353,16 @@ body:has(.bunker3d-screen) .modal {
   font-family: "Golos Text", sans-serif;
   scrollbar-color: #a99f86 transparent;
 }
-body:has(.bunker3d-screen) .modal :is(h2, h3, h4, strong) {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) :is(h2, h3, h4, strong) {
   color: #172c3d;
 }
-body:has(.bunker3d-screen) .modal :is(h2, h3) {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) :is(h2, h3) {
   font-weight: 850;
 }
-body:has(.bunker3d-screen) .modal :is(p, label) {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) :is(p, label) {
   color: #5f6968;
 }
-body:has(.bunker3d-screen) .modal .btn {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .btn {
   min-height: 40px;
   border: 1px solid #183343;
   border-radius: 9px;
@@ -359,67 +371,75 @@ body:has(.bunker3d-screen) .modal .btn {
   font-family: inherit;
   font-weight: 750;
 }
-body:has(.bunker3d-screen) .modal .btn-secondary {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .btn-secondary {
   border-color: #b1a68f;
   background: #e5dac2;
   color: #183343;
 }
-body:has(.bunker3d-screen) .modal .btn-primary {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .btn-primary {
   border-color: #bf6024;
   background: #d97632;
   color: #fff3d6;
 }
-body:has(.bunker3d-screen) .modal .btn-danger {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .btn-danger {
   border-color: #a8433b;
   background: #b95046;
   color: #fff4df;
 }
-body:has(.bunker3d-screen) .modal .btn:disabled {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .btn:disabled {
   border-color: #bcb49e;
   background: #d0c8b2;
   color: #827e70;
   opacity: 0.7;
 }
-body:has(.bunker3d-screen) .modal :is(button, a):focus-visible {
+body:has(.bunker3d-screen, .bunker-2d)
+  .modal:not(.table3d-menu-panel)
+  :is(button, a):focus-visible {
   outline: 3px solid #d97632;
   outline-offset: 3px;
 }
-body:has(.bunker3d-screen) .modal :is(.btn-target, .btn-admin) {
+body:has(.bunker3d-screen, .bunker-2d)
+  .modal:not(.table3d-menu-panel)
+  :is(.btn-target, .btn-admin) {
   border-color: #bfb49c;
   background: #e6dbc3;
   color: #183343;
 }
-body:has(.bunker3d-screen) .modal :is(.btn-target, .btn-admin):hover {
+body:has(.bunker3d-screen, .bunker-2d)
+  .modal:not(.table3d-menu-panel)
+  :is(.btn-target, .btn-admin):hover {
   border-color: #183343;
   background: #dacfb6;
 }
-body:has(.bunker3d-screen) .modal :is(.admin-form, .gs-host-control-groups section) {
+body:has(.bunker3d-screen, .bunker-2d)
+  .modal:not(.table3d-menu-panel)
+  :is(.admin-form, .gs-host-control-groups section) {
   border-color: #c0b59d;
   background: #e4d9c1;
 }
-body:has(.bunker3d-screen) .modal .admin-chip {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .admin-chip {
   border-color: #bdaf94;
   background: #f7ecd4;
   color: #183343;
 }
-body:has(.bunker3d-screen) .modal .admin-chip.active {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .admin-chip.active {
   border-color: #183343;
   background: #183343;
   color: #fff3d6;
 }
-body:has(.bunker3d-screen) .modal .gs-host-danger-zone {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .gs-host-danger-zone {
   border-color: #b9504650;
   background: #b9504610;
 }
-body:has(.bunker3d-screen) .modal .target-list .btn {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .target-list .btn {
   text-align: left;
 }
-body:has(.bunker3d-screen) .bunker3d-detail-modal {
+body:has(.bunker3d-screen, .bunker-2d) .bunker3d-detail-modal {
   width: min(820px, calc(100vw - 32px));
   max-width: none;
   padding: 26px;
 }
-body:has(.bunker3d-screen) .bunker3d-detail-modal > h2 {
+body:has(.bunker3d-screen, .bunker-2d) .bunker3d-detail-modal > h2 {
   padding-right: 38px;
   font-size: clamp(1.2rem, 3vw, 1.65rem);
 }
@@ -440,21 +460,21 @@ body:has(.bunker3d-screen) .bunker3d-detail-modal > h2 {
   cursor: pointer;
   font-size: 20px;
 }
-body:has(.bunker3d-screen) .bunker3d-public-details {
+body:has(.bunker3d-screen, .bunker-2d) .bunker3d-public-details {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-body:has(.bunker3d-screen) .bunker3d-public-details article {
+body:has(.bunker3d-screen, .bunker-2d) .bunker3d-public-details article {
   min-width: 0;
   padding: 15px;
   border: 1px solid #c4bba6;
   border-radius: 10px;
   background: #f7ecd4;
 }
-body:has(.bunker3d-screen) .bunker3d-public-details small {
+body:has(.bunker3d-screen, .bunker-2d) .bunker3d-public-details small {
   color: #65706e;
 }
-body:has(.bunker3d-screen) .bunker3d-public-details article[data-attr-type="action"] {
+body:has(.bunker3d-screen, .bunker-2d) .bunker3d-public-details article[data-attr-type="action"] {
   grid-column: 1 / -1;
   border-color: #d9763266;
   background: #d976320c;
@@ -465,87 +485,67 @@ body:has(.bunker3d-screen) .bunker3d-public-details article[data-attr-type="acti
   color: #768073;
   font-size: 0.7rem;
 }
-body:has(.bunker3d-screen) .bunker3d-roster-list {
+body:has(.bunker3d-screen, .bunker-2d) .bunker3d-roster-list {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 9px;
 }
-body:has(.bunker3d-screen) .modal .gs-scenario {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .gs-scenario {
   border: 1px solid #bcb096;
   border-radius: 10px;
   background: #f7ecd4;
 }
-body:has(.bunker3d-screen) .modal .gs-scenario-title {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .gs-scenario-title {
   color: #183343;
 }
-body:has(.bunker3d-screen) .modal :is(.gs-scenario-description, .gs-scenario-meta) {
+body:has(.bunker3d-screen, .bunker-2d)
+  .modal:not(.table3d-menu-panel)
+  :is(.gs-scenario-description, .gs-scenario-meta) {
   color: #65706e;
 }
-body:has(.bunker3d-screen) .modal .gs-bunker-card {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .gs-bunker-card {
   border-color: #c4bba6;
   background: #e6dbc3;
 }
-body:has(.bunker3d-screen) .modal .gs-bunker-card-title {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .gs-bunker-card-title {
   color: #183343;
 }
-body:has(.bunker3d-screen) .modal .gs-bunker-card-description {
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .gs-bunker-card-description {
   color: #65706e;
 }
-body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-actions button {
-  border-color: #bfb49c;
-  background: #e6dbc3;
-  color: #183343;
-}
-body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-actions button.is-primary {
-  border-color: #bf6024;
-  background: #d97632;
-  color: #fff3d6;
-}
-body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-actions button.is-danger {
-  color: #a8433b;
-}
-body:has(.bunker3d-screen) .table3d-menu-panel :is(.table3d-menu-eyebrow, dt) {
-  color: #8f623a;
-}
-body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-people span {
-  color: #65706e;
-}
-body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-people li {
-  border-color: #c4bba6;
-}
-body:has(.bunker3d-screen) .modal.game-rules-modal {
+body:has(.bunker3d-screen, .bunker-2d) .modal.game-rules-modal {
   padding: 0;
 }
-body:has(.bunker3d-screen) .game-rules-modal .game-rules-heading {
+body:has(.bunker3d-screen, .bunker-2d) .game-rules-modal .game-rules-heading {
   border-color: #c4bba6;
   background: #efe4ccf5;
 }
-body:has(.bunker3d-screen) .game-rules-modal .game-rules-close {
+body:has(.bunker3d-screen, .bunker-2d) .game-rules-modal .game-rules-close {
   border-color: #bcb096;
   background: #e3d7bd;
   color: #183343;
 }
-body:has(.bunker3d-screen)
+body:has(.bunker3d-screen, .bunker-2d)
   .modal.game-rules-modal
   :is(.game-rules-summary, .game-rules-heading p, .game-rules-sections p, li, dd) {
   color: #52615f;
 }
-body:has(.bunker3d-screen)
+body:has(.bunker3d-screen, .bunker-2d)
   .game-rules-modal
   :is(.game-rules-facts > div, .game-rules-sections > section) {
   border-color: #c4bba6;
   background: #f7ecd4;
 }
-body:has(.bunker3d-screen) .game-rules-modal dt {
+body:has(.bunker3d-screen, .bunker-2d) .game-rules-modal dt {
   color: #768073;
 }
-body:has(.bunker3d-screen) .bunker-event-panel {
+body:has(.bunker3d-screen, .bunker-2d) .bunker-event-panel {
   padding-top: 44px;
 }
-body:has(.bunker3d-screen) .bunker-event-panel .phase-announcement-title {
+body:has(.bunker3d-screen, .bunker-2d) .bunker-event-panel .phase-announcement-title {
   color: #183343;
   text-shadow: none;
 }
-body:has(.bunker3d-screen)
+body:has(.bunker3d-screen, .bunker-2d)
   .bunker-event-panel
   :is(
     .phase-announcement-subtitle,
@@ -555,27 +555,109 @@ body:has(.bunker3d-screen)
   ) {
   color: #65706e;
 }
-body:has(.bunker3d-screen) .bunker-event-panel .action-card-reveal-card {
+body:has(.bunker3d-screen, .bunker-2d) .bunker-event-panel .action-card-reveal-card {
   border-color: #c4bba6;
   background: #f7ecd4;
   box-shadow: none;
 }
-body:has(.bunker3d-screen) .bunker-event-panel .action-card-reveal-title {
+body:has(.bunker3d-screen, .bunker-2d) .bunker-event-panel .action-card-reveal-title {
   color: #183343;
 }
 @media (max-width: 680px) {
-  body:has(.bunker3d-screen) .bunker3d-detail-modal {
+  body:has(.bunker3d-screen, .bunker-2d) .bunker3d-detail-modal {
     width: calc(100vw - 24px);
     max-height: calc(100dvh - 24px);
     padding: 18px;
   }
-  body:has(.bunker3d-screen) .bunker3d-public-details {
+  body:has(.bunker3d-screen, .bunker-2d) .bunker3d-public-details {
     gap: 8px;
   }
-  body:has(.bunker3d-screen) .bunker3d-public-details article {
+  body:has(.bunker3d-screen, .bunker-2d) .bunker3d-public-details article {
     padding: 11px;
   }
-  body:has(.bunker3d-screen) .bunker3d-roster-list {
+  body:has(.bunker3d-screen, .bunker-2d) .bunker3d-roster-list {
     grid-template-columns: 1fr;
   }
+}
+
+/* Bunker dialogs use one paper surface, including their nested controls. */
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .gs-host-dialog-header {
+  background: #efe4cc;
+  border-color: #c4bba6;
+}
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .reconnect-host-controls {
+  background: #e6dbc3;
+  border-color: #c4bba6;
+}
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .reconnect-host-row {
+  background: #f7ecd4;
+  border-color: #c4bba6;
+}
+body:has(.bunker3d-screen, .bunker-2d)
+  .modal:not(.table3d-menu-panel)
+  :is(.reconnect-eyebrow, .reconnect-host-row span) {
+  color: #52615f;
+}
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .reconnect-host-action {
+  background: #183343;
+  border-color: #183343;
+  color: #fff3d6;
+}
+body:has(.bunker3d-screen, .bunker-2d)
+  .modal:not(.table3d-menu-panel)
+  .reconnect-host-action:is(.is-kick, .is-reject) {
+  background: #b95046;
+  border-color: #a8433b;
+}
+body:has(.bunker3d-screen, .bunker-2d)
+  .modal:not(.table3d-menu-panel)
+  :is(.attribute-card, .attribute-card.revealed, .attribute-card.hidden) {
+  padding: 14px;
+  border: 1px solid #c4bba6;
+  border-radius: 9px;
+  background: #f7ecd4;
+  color: #172c3d;
+  opacity: 1;
+  box-shadow: none;
+}
+body:has(.bunker3d-screen, .bunker-2d)
+  .modal:not(.table3d-menu-panel)
+  :is(.attr-label, .attr-detail, .attr-status) {
+  color: #52615f;
+}
+body:has(.bunker3d-screen, .bunker-2d) .modal:not(.table3d-menu-panel) .attr-value {
+  color: #172c3d;
+}
+body:has(.bunker3d-screen, .bunker-2d) .bunker-event-panel .action-card-reveal-player {
+  color: #995022;
+}
+body:has(.bunker3d-screen, .bunker-2d) .bunker-event-panel .action-card-reveal-image {
+  width: 86px;
+  height: 86px;
+  padding: 15px;
+  margin: 0 auto 18px;
+  border: 1px solid #c4bba6;
+  border-radius: 12px;
+  background: #efe4cc;
+}
+body:has(.bunker3d-screen, .bunker-2d) .bunker-event-panel .action-card-reveal-card {
+  border-left: 4px solid #b96a35;
+  border-radius: 12px;
+}
+
+body:has(.bunker3d-screen, .bunker-2d) .host-change-notice {
+  border-color: #c4bba6;
+  background: #efe4cc;
+  color: #172c3d;
+}
+body:has(.bunker3d-screen, .bunker-2d) .host-change-notice :is(strong, button) {
+  color: #172c3d;
+}
+body:has(.bunker3d-screen, .bunker-2d) .host-change-notice span {
+  color: #52615f;
+}
+body:has(.bunker3d-screen, .bunker-2d) .attribute-card .bunker-attribute-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
 }

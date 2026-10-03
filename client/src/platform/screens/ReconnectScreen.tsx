@@ -141,7 +141,7 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
                 type="text"
                 className="input"
                 aria-label="Ваш никнейм"
-                readOnly
+                readOnly={Boolean(profile)}
                 value={claimantName}
                 onChange={(event) => setClaimantName(event.target.value)}
                 maxLength={20}

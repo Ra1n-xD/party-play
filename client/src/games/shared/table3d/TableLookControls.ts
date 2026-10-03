@@ -32,7 +32,7 @@ export class TableLookControls {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly onCursor: (visible: boolean) => void,
-    private readonly onMenu: (error?: string) => void,
+    private readonly onMenu: (error?: string, nativeEscape?: boolean) => void,
     private readonly onOverview: () => void,
     defaultPitch = TABLE_DEFAULT_PITCH,
   ) {
@@ -88,9 +88,9 @@ export class TableLookControls {
         } else if (this.expectedUnlock) {
           this.expectedUnlock = false;
         } else if (this.gameplayActive && !this.inputBlocked) {
-          // Native Esc may release Pointer Lock without dispatching a page keydown.
+          // Native Esc may release Pointer Lock before dispatching the same page keydown.
           this.release();
-          this.onMenu();
+          this.onMenu(undefined, true);
         }
         this.syncCursor();
       },
@@ -244,7 +244,8 @@ export class TableLookControls {
       return;
     }
     if (wasBlocked && this.gameplayActive) {
-      this.resume();
+      // Closing with Esc must not immediately recapture, then lose, Pointer Lock.
+      this.resume(false);
       return;
     }
     this.setCursor(!this.gameplayActive);
