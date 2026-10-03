@@ -215,13 +215,13 @@
   min-width: 0;
   min-height: 0;
   padding: clamp(7px, 0.6vw, 13px);
-  border: 1px solid #c7b898;
+  border: 1px solid #9eb4b454;
   border-radius: 7px;
-  background: #efe4cc;
-  color: #172c3d;
+  background: linear-gradient(125deg, #2b465050, #19343fc7);
+  color: #fff4d7;
   text-align: left;
   cursor: pointer;
-  box-shadow: 2px 3px 0 #0b18294d;
+  box-shadow: inset 0 1px 0 #ffffff0b;
 }
 .b2-player-card.is-selected,
 .b2-player-card.is-vote-selected {
@@ -272,15 +272,15 @@
 .b2-player-heading strong small {
   flex: 0 0 auto;
   font-size: 0.7em;
-  color: #65706e;
+  color: #fff4d7ab;
 }
 .b2-player-heading .b2-bot-label {
   padding: 2px 4px;
   border-radius: 3px;
   font-size: 0.65em;
   line-height: 1;
-  background: #172c3d10;
-  color: #52615f;
+  background: #ffffff0d;
+  color: #d6c7a7;
 }
 .b2-player-heading > span:last-child {
   margin-left: auto;
@@ -305,7 +305,7 @@
   min-height: 23px;
   padding: 3px 5px;
   border-radius: 4px;
-  background: #fff9e8;
+  background: #ece7d5;
   color: #182e40;
   font-size: clamp(11px, 0.78vw, 17px);
   font-weight: 750;
@@ -333,8 +333,8 @@
   white-space: nowrap;
 }
 .b2-player-field.is-hidden {
-  color: #7a7b70;
-  background: #172c3d0a;
+  color: #b4c8c9a6;
+  background: #75959924;
 }
 .b2-player-field.is-hidden .bunker-attribute-icon {
   opacity: 0.85;
@@ -346,7 +346,7 @@
   gap: 5px;
   margin-top: 4px;
   min-height: 14px;
-  color: #995022;
+  color: #e9d5aa;
   font-size: clamp(10px, 0.65vw, 14px);
   line-height: 1.1;
 }
