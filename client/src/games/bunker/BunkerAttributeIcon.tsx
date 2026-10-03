@@ -16,10 +16,22 @@ export const BUNKER_ATTRIBUTE_ICONS: Record<BunkerCardType, string> = {
   action: "M13 2 3 14h8l-1 8L21 10h-8l1-8Z",
 };
 
+export const BUNKER_ATTRIBUTE_COLORS: Record<BunkerCardType, string> = {
+  profession: "#467fbd",
+  bio: "#976cb5",
+  health: "#cf5a64",
+  hobby: "#368a81",
+  baggage: "#b8852d",
+  fact: "#728d40",
+  action: "#d97632",
+};
+
 export function BunkerAttributeIcon({ type }: { type: BunkerCardType }) {
   return (
     <svg
       className="bunker-attribute-icon"
+      data-attribute-type={type}
+      style={{ color: BUNKER_ATTRIBUTE_COLORS[type] }}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

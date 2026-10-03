@@ -1,6 +1,5 @@
 import { getCardSkin, type CardSkinId } from "../../../../../shared/platform/cosmetics";
-import { drawCardFace } from "../../../platform/cardFaceArtwork";
-import { drawRoyalCardBack } from "../../../platform/royalCardArtwork";
+import { drawCardBack, drawCardFace } from "../../../platform/cardFaceArtwork";
 import * as THREE from "three";
 import { makeRoomEnvironment } from "./RoomEnvironment";
 import { CARD_HEIGHT, makeCardGeometry, type CardMesh } from "./CardGeometry";
@@ -426,134 +425,9 @@ export class RoundTableScene {
     canvas.height = 720;
     const ctx = canvas.getContext("2d")!;
     ctx.scale(2, 2);
-    ctx.fillStyle = rank ? skin.face : skin.background;
-    ctx.fillRect(0, 0, 256, 360);
-    ctx.strokeStyle = skin.id === "classic" ? (rank ? "#d7cebc" : "#b9a474") : skin.accent;
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.roundRect(10, 10, 236, 340, 13);
-    ctx.stroke();
-    if (color || this.options.variant === "uno") {
-      const colors = {
-        red: "#c83c43",
-        yellow: "#dfb73c",
-        green: "#359573",
-        blue: "#377dc6",
-        wild: "#262b39",
-      };
-      ctx.fillStyle = colors[color ?? "wild"];
-      ctx.beginPath();
-      ctx.roundRect(13, 13, 230, 334, 12);
-      ctx.fill();
-      if (color === "wild") {
-        ["#c83c43", "#dfb73c", "#359573", "#377dc6"].forEach((fill, index) => {
-          ctx.fillStyle = fill;
-          ctx.fillRect(25 + (index % 2) * 103, 77 + Math.floor(index / 2) * 103, 103, 103);
-        });
-      }
-      ctx.strokeStyle = "#fff8e9";
-      ctx.lineWidth = 8;
-      ctx.beginPath();
-      ctx.ellipse(128, 180, 83, 131, 0.36, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = "#fff8e9";
-      ctx.textAlign = "center";
-      ctx.font = `bold ${rank.length > 2 ? 58 : 92}px sans-serif`;
-      ctx.shadowColor = "#0008";
-      ctx.shadowBlur = 5;
-      ctx.fillText(rank || "UNO", 128, 211);
-      ctx.shadowBlur = 0;
-      if (rank) {
-        ctx.font = "bold 38px sans-serif";
-        ctx.fillText(rank, 55, 58);
-        ctx.save();
-        ctx.translate(256, 360);
-        ctx.rotate(Math.PI);
-        ctx.fillText(rank, 55, 58);
-        ctx.restore();
-      }
-    } else if (!rank) {
-      ctx.lineWidth = 1.5;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(18, 18, 220, 324);
-      ctx.clip();
-      for (let i = -360; i < 620; i += 24) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i + 360, 360);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i - 360, 360);
-        ctx.stroke();
-      }
-      ctx.restore();
-      ctx.fillStyle = "#284c62";
-      ctx.beginPath();
-      ctx.arc(128, 180, 52, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#d6bf82";
-      ctx.font = "62px Georgia";
-      ctx.textAlign = "center";
-      ctx.fillText("♠", 128, 201);
-    } else {
-      ctx.fillStyle = red ? "#b53838" : "#202b32";
-      for (let i = 0; i < 2; i++) {
-        ctx.save();
-        if (i) {
-          ctx.translate(256, 360);
-          ctx.rotate(Math.PI);
-        }
-        ctx.font = "bold 58px Georgia";
-        ctx.fillText(rank, 21, 66);
-        ctx.font = "48px Georgia";
-        ctx.fillText(suit, 22, 114);
-        ctx.restore();
-      }
-      ctx.textAlign = "center";
-      ctx.font = "118px Georgia";
-      ctx.fillText(suit, 128, 218);
-    }
-    if (skin.id !== "classic") {
-      if (rank) {
-        drawCardFace(
-          ctx,
-          { game: this.options.variant === "uno" ? "uno" : "durak", rank, suit, red, color },
-          skin.id,
-        );
-      } else if (skin.id === "royal") {
-        drawRoyalCardBack(ctx, this.options.variant === "uno" ? "uno" : "durak");
-      } else {
-        ctx.fillStyle = skin.background;
-        ctx.fillRect(0, 0, 256, 360);
-        ctx.strokeStyle = skin.accent;
-        ctx.lineWidth = 2;
-        ctx.globalAlpha = 0.45;
-        for (let i = -360; i < 620; i += 24) {
-          ctx.beginPath();
-          ctx.moveTo(i, 0);
-          ctx.lineTo(i + 360, 360);
-          ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = skin.background;
-        ctx.beginPath();
-        ctx.arc(128, 180, 65, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = skin.accent;
-        ctx.textAlign = "center";
-        ctx.font = "76px Georgia";
-        ctx.fillText(skin.mark, 128, 204);
-        ctx.font = "bold 20px sans-serif";
-        ctx.fillText(this.options.variant === "uno" ? "UNO" : "PARTYPLAY", 128, 266);
-      }
-      ctx.strokeStyle = skin.accent;
-      ctx.lineWidth = 8;
-      ctx.beginPath();
-      ctx.roundRect(7, 7, 242, 346, 13);
-      ctx.stroke();
-    }
+    const game = this.options.variant === "uno" ? "uno" : "durak";
+    if (rank) drawCardFace(ctx, { game, rank, suit, red, color }, skin.id);
+    else drawCardBack(ctx, game, skin.id);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = Math.min(this.renderer.capabilities.getMaxAnisotropy(), 8);

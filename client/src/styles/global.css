@@ -4261,7 +4261,8 @@ textarea {
   left: 50%;
   z-index: 800;
   display: flex;
-  width: min(460px, calc(100% - 32px));
+  width: min(460px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -4275,7 +4276,10 @@ textarea {
 
 .host-change-notice div {
   display: grid;
+  flex: 1;
+  min-width: 0;
   gap: 2px;
+  overflow-wrap: anywhere;
 }
 
 .host-change-notice strong {
@@ -4288,6 +4292,7 @@ textarea {
 }
 
 .host-change-notice button {
+  flex: 0 0 44px;
   width: 44px;
   height: 44px;
   border: 1px solid var(--border-light);

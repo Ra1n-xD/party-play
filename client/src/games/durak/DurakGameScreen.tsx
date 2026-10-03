@@ -31,12 +31,16 @@ import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
 import { GameDockTools } from "../../screens/game/GameDockTools";
 import { CardDragLayer } from "../shared/CardDragLayer";
+import { getCardSkin } from "../../../../shared/platform/cosmetics";
+import { GameViewToggle } from "../shared/GameViewToggle";
+import { CardTurnClock } from "../shared/CardTurnClock";
 import { CardPlayerSeat } from "../shared/CardPlayerSeat";
 import { HandSortButton, type HandSortMode } from "../shared/HandSortButton";
 import { useCardDrag } from "../shared/useCardDrag";
 import { useCardTransferMotion } from "../shared/useCardTransferMotion";
 import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
+import { useTableHotkeys } from "../shared/table3d/useTableHotkeys";
 import { useTableActionDock } from "../shared/table3d/useTableActionDock";
 import {
   DurakCard,
@@ -381,6 +385,15 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
     clearError();
     sendGameCommand("durak", { type: "defend", cardId: selectedCards[0].id, attackCardId });
   };
+  useTableHotkeys(
+    is3D && managementOpen,
+    (code) => {
+      if (code !== "KeyH") return false;
+      closeManagement();
+      return true;
+    },
+    true,
+  );
   useDurakKeyboard({
     enabled: is3D && !managementOpen,
     canAct,
@@ -663,7 +676,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
       ? null
       : snapshot.settings.turnTimeoutSeconds * 1000;
   const presentedDeckCount = transferPresentation.deckCountOverride ?? game.deckCount;
-  const handFanAngleStep = Math.min(1.5, 9 / Math.max(presentedHand.length - 1, 1));
+  const handFanAngleStep = Math.min(4, 32 / Math.max(presentedHand.length - 1, 1));
   const attackDragPayload =
     isDragging && session?.payload.kind === "attack" ? session.payload : null;
   const defenseDragPayload =
@@ -692,7 +705,10 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
       <CardPlayerSeat
         key={player.seatId}
         seatId={player.seatId}
-        name={player.name}
+        name={player.seatId === viewerSeatId ? "Вы" : player.name}
+        avatarId={seat?.avatarId ?? "human"}
+        cardBack={<DurakCardBack skinId={seat?.cardSkins.durak ?? "classic"} />}
+        skinName={getCardSkin(seat?.cardSkins.durak).name}
         cardCount={transferPresentation.cardCountOverrides[player.seatId] ?? player.cardCount}
         connected={player.connected}
         controllerKind={player.controllerKind}
@@ -771,49 +787,28 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
   const actorName = game.currentActorSeatId
     ? (playersById.get(game.currentActorSeatId)?.name ?? "Игрок")
     : null;
-  const actionHint = paused
-    ? "Игра на паузе"
-    : game.phase === "GAME_OVER"
-      ? "Бой завершён — подводим итоги"
-      : !game.currentActorSeatId
-        ? "Карты перемещаются — дождитесь начала хода"
-        : legalAction?.type === "attack"
-          ? "Ваш ход: выберите карты одного достоинства и нажмите «Атаковать»"
-          : legalAction?.type === "defend"
-            ? selectedCards.length > 0
-              ? "Выберите подсвеченную карту на столе, которую хотите побить"
-              : "Защищайтесь: выберите карту в руке, затем цель на столе, или нажмите «Взять»"
-            : legalAction?.type === "throw-in"
-              ? `Можно подкинуть ещё ${legalAction.maxCards}. Выберите карты и нажмите «Подкинуть»`
-              : legalAction?.type === "beat"
-                ? "Все карты побиты. Нажмите «Бито», чтобы закончить подкидывание"
-                : legalAction?.type === "pass"
-                  ? "Нажмите «Пас», чтобы закончить подкидывание"
-                  : viewerPlayer?.status === "out"
-                    ? "Вы вышли без карт и наблюдаете за окончанием партии"
-                    : `Ждём решения: ${actorName}`;
 
   return (
     <main
       ref={screenRef}
-      className={`screen command-game-screen card-game-screen durak-screen has-durak-command-dock ${is3D ? "is-3d" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
+      className={`screen command-game-screen card-game-screen durak-screen has-durak-command-dock ${is3D ? "is-3d" : "game-2d"} ${is3D && !cursorVisible ? "is-looking" : ""}`}
     >
       <GameRoomHeader
         roomCode={snapshot.roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
         confirmActiveLeave={snapshot.viewer.role === "player"}
-        gameTitle="Подкидной дурак"
+        gameTitle="Дурак"
         brandIcon="♠"
-      />
+        playerCount={!is3D ? game.players.length : undefined}
+      >
+        {!is3D && <GameViewToggle onOpen3D={() => setIs3D(true)} />}
+      </GameRoomHeader>
 
-      {!is3D && (
-        <p className="card-game-action-hint" role="status">
-          {actionHint}
-        </p>
-      )}
-
-      <div className="card-game-arena durak-arena">
+      <div
+        className="card-game-arena durak-arena"
+        style={{ "--opponent-count": Math.max(1, opponentPlayers.length) } as CSSProperties}
+      >
         {is3D ? (
           <Suspense
             fallback={
@@ -924,11 +919,6 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                     )}
                   </div>
                 )}
-                <span
-                  className="durak-discard-motion-anchor"
-                  data-card-motion-anchor="durak:discard"
-                  aria-hidden="true"
-                />
               </aside>
 
               <section
@@ -1050,6 +1040,20 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                   </div>
                 )}
               </section>
+              <aside
+                className="durak-2d-discard"
+                data-card-motion-anchor="durak:discard"
+                aria-label={"Бито, " + game.discardCount + " карт"}
+              >
+                {game.discardCount > 0 ? (
+                  <DurakCardBack />
+                ) : (
+                  <span className="durak-2d-empty-discard" aria-hidden="true">
+                    ♠
+                  </span>
+                )}
+                <strong>Бито · {game.discardCount}</strong>
+              </aside>
             </section>
           </>
         )}
@@ -1095,11 +1099,11 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                       data-durak-hand-card-source={card.id}
                       style={
                         {
-                          "--card-index": Math.min(index, 5),
+                          "--card-index": index,
                           "--fan-angle": `${
                             (index - (presentedHand.length - 1) / 2) * handFanAngleStep
                           }deg`,
-                          "--fan-rise": `${Math.abs(index - (presentedHand.length - 1) / 2) * 1.2}px`,
+                          "--fan-rise": `${Math.pow(((index - (presentedHand.length - 1) / 2) * handFanAngleStep) / 4, 2) * 0.8}px`,
                         } as CSSProperties
                       }
                       {...dragBindings}
@@ -1132,12 +1136,25 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
       </div>
 
       <aside className="durak-command-dock" aria-label="Игровые действия">
+        {!is3D && (
+          <div className="card-game-turn-status" role="status">
+            <strong>
+              {paused
+                ? "Пауза"
+                : legalAction?.type === "defend"
+                  ? "Защита"
+                  : legalAction?.type === "attack"
+                    ? "Ваш ход"
+                    : legalAction?.type === "throw-in"
+                      ? "Подкидывание"
+                      : actorName
+                        ? `Ход: ${actorName}`
+                        : "Следующий ход"}
+            </strong>
+            <CardTurnClock remainingMs={game.turnRemainingMs} paused={paused} />
+          </div>
+        )}
         <div className="durak-command-actions">
-          {!is3D && (
-            <button type="button" className="btn btn-secondary" onClick={() => setIs3D(true)}>
-              3D-стол
-            </button>
-          )}
           {privateGame && (
             <HandSortButton
               mode={handSortMode}

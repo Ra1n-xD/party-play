@@ -5,7 +5,7 @@ import { useTableHotkeys } from "../shared/table3d/useTableHotkeys";
 import { useBunkerGame } from "./context/BunkerGameContext";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { AccessibleModal } from "../../platform/components/AccessibleModal";
-import { CharacterDossier } from "../../screens/game/CharacterDossier";
+import { FiX } from "react-icons/fi";
 import { ScenarioSummary } from "../../screens/game/ScenarioSummary";
 import { buildGameScreenViewModel } from "../../screens/game/gameScreenViewModel";
 import { TableTurnIndicator } from "../shared/table3d/TableTurnIndicator";
@@ -42,6 +42,11 @@ export default function BunkerTable3D(props: Props) {
   const [details, setDetails] = useState<string | null>(null);
   const [scenario, setScenario] = useState(false);
   const [roster, setRoster] = useState(false);
+  const closeDetails = () => {
+    setDetails(null);
+    setScenario(false);
+    setRoster(false);
+  };
   const people = game?.players ?? [];
   const focusable = props.vote?.canVote
     ? people.filter((player) => props.vote?.candidates.includes(player.id))
@@ -83,6 +88,22 @@ export default function BunkerTable3D(props: Props) {
     else return false;
     return true;
   });
+  useTableHotkeys(
+    Boolean(details || scenario || roster),
+    (code) => {
+      if (
+        (scenario && code === "KeyB") ||
+        (roster && code === "KeyP") ||
+        (details && code === "Space") ||
+        (details === playerId && code === "KeyI")
+      ) {
+        closeDetails();
+        return true;
+      }
+      return false;
+    },
+    true,
+  );
   const state = useMemo<RoundTableState>(
     () => ({
       people: (game?.players ?? []).map((player) => ({
@@ -252,6 +273,14 @@ export default function BunkerTable3D(props: Props) {
           onClose={() => setScenario(false)}
           panelClassName="bunker3d-detail-modal"
         >
+          <button
+            type="button"
+            className="bunker3d-modal-close"
+            aria-label="Закрыть ситуацию"
+            onClick={() => setScenario(false)}
+          >
+            <FiX aria-hidden="true" />
+          </button>
           <h2 id="bunker3d-scenario-title">Ситуация в бункере</h2>
           <ScenarioSummary
             idPrefix="bunker3d-scenario"
@@ -266,7 +295,19 @@ export default function BunkerTable3D(props: Props) {
         </AccessibleModal>
       )}
       {roster && (
-        <AccessibleModal labelledBy="bunker3d-roster-title" onClose={() => setRoster(false)}>
+        <AccessibleModal
+          labelledBy="bunker3d-roster-title"
+          onClose={() => setRoster(false)}
+          panelClassName="bunker3d-detail-modal"
+        >
+          <button
+            type="button"
+            className="bunker3d-modal-close"
+            aria-label="Закрыть участников"
+            onClick={() => setRoster(false)}
+          >
+            <FiX aria-hidden="true" />
+          </button>
           <h2 id="bunker3d-roster-title">Участники</h2>
           <div className="bunker3d-roster-list">
             {people.map((player) => (
@@ -281,6 +322,7 @@ export default function BunkerTable3D(props: Props) {
                 }}
               >
                 {player.name}
+                {(player.isBot || player.temporaryBot) && " · бот"}
                 {player.id === playerId && !isSpectator ? " · Вы" : ""}
                 {!player.alive ? " · изгнан" : ""}
               </button>
@@ -297,17 +339,46 @@ export default function BunkerTable3D(props: Props) {
           onClose={() => setDetails(null)}
           panelClassName="bunker3d-detail-modal"
         >
+          <button
+            type="button"
+            className="bunker3d-modal-close"
+            aria-label="Закрыть досье"
+            onClick={() => setDetails(null)}
+          >
+            <FiX aria-hidden="true" />
+          </button>
           <h2 id="bunker3d-person-title">
             {chosen.name}
+            {(chosen.isBot || chosen.temporaryBot) && " · бот"}
             {myDetails ? " · Ваш персонаж" : ""}
           </h2>
           {myDetails && myCharacter ? (
-            <CharacterDossier
-              character={myCharacter}
-              revealedIndices={view.revealedIndices}
-              alive={chosen.alive}
-              actionCardRevealed={chosen.actionCardRevealed}
-            />
+            <div className="bunker3d-public-details is-own" aria-label="Личное досье">
+              {myCharacter.attributes.map((attribute, index) => (
+                <article key={attribute.type} data-attr-type={attribute.type}>
+                  <small>
+                    <BunkerAttributeIcon type={attribute.type} />
+                    {attribute.label}
+                  </small>
+                  <strong>{attribute.value}</strong>
+                  {attribute.detail && <p>{attribute.detail}</p>}
+                  <span className="bunker3d-field-visibility">
+                    {view.revealedIndices.has(index) ? "Раскрыто всем" : "Не раскрыто"}
+                  </span>
+                </article>
+              ))}
+              <article data-attr-type="action">
+                <small>
+                  <BunkerAttributeIcon type="action" />
+                  Особое условие
+                </small>
+                <strong>{myCharacter.actionCard.title}</strong>
+                <p>{myCharacter.actionCard.description}</p>
+                <span className="bunker3d-field-visibility">
+                  {chosen.actionCardRevealed ? "Раскрыто всем" : "Не раскрыто"}
+                </span>
+              </article>
+            </div>
           ) : (
             <div className="bunker3d-public-details">
               {chosen.revealedAttributes.length === 0 && <p>Характеристики ещё не раскрыты.</p>}

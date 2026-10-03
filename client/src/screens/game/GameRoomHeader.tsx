@@ -2,6 +2,8 @@ import { useState, type ReactNode } from "react";
 import { FiLogOut, FiWifi, FiWifiOff } from "react-icons/fi";
 import { GiFalloutShelter } from "react-icons/gi";
 import { AccessibleModal } from "./AccessibleModal";
+import { BrandDice } from "../../platform/components/BrandDice";
+import "../../games/shared/game-2d.css";
 
 interface GameRoomHeaderProps {
   roomCode: string | null;
@@ -10,6 +12,9 @@ interface GameRoomHeaderProps {
   confirmActiveLeave?: boolean;
   gameTitle?: string;
   brandIcon?: ReactNode;
+  children?: ReactNode;
+  playerCount?: number;
+  tools?: ReactNode;
 }
 
 export function GameRoomHeader({
@@ -19,8 +24,23 @@ export function GameRoomHeader({
   confirmActiveLeave = false,
   gameTitle = "Бункер",
   brandIcon,
+  children,
+  playerCount,
+  tools,
 }: GameRoomHeaderProps) {
   const [leaveConfirmationOpen, setLeaveConfirmationOpen] = useState(false);
+  const playerCountLabel =
+    playerCount == null
+      ? null
+      : `${playerCount} ${
+          playerCount % 100 >= 11 && playerCount % 100 <= 14
+            ? "игроков"
+            : playerCount % 10 === 1
+              ? "игрок"
+              : playerCount % 10 >= 2 && playerCount % 10 <= 4
+                ? "игрока"
+                : "игроков"
+        }`;
 
   const requestLeave = () => {
     if (confirmActiveLeave) {
@@ -33,6 +53,12 @@ export function GameRoomHeader({
   return (
     <>
       <header className="gs-room-header" aria-label="Комната игры">
+        {children && (
+          <span className="game-2d-wordmark">
+            <BrandDice />
+            partyplay
+          </span>
+        )}
         <div className="gs-room-brand">
           <span className="gs-room-brand-icon" aria-hidden="true">
             {brandIcon ?? <GiFalloutShelter />}
@@ -42,7 +68,10 @@ export function GameRoomHeader({
           </span>
         </div>
 
+        {tools && <div className="b2-header-actions">{tools}</div>}
         <div className="gs-room-controls">
+          {playerCountLabel && <span className="game-2d-player-count">{playerCountLabel}</span>}
+          {children}
           <div className="gs-room-code" aria-label={`Код комнаты ${roomCode || "неизвестен"}`}>
             <span>Комната</span>
             <strong>{roomCode || "—"}</strong>
