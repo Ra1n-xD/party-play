@@ -233,7 +233,8 @@
 .show-catalog-pagination {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   flex-shrink: 0;
   gap: calc(12 * var(--show-unit));
   padding-top: calc(12 * var(--show-unit));
@@ -241,7 +242,6 @@
   font-size: calc(11 * var(--show-unit));
 }
 .show-catalog-pagination > div {
-  order: -1;
   display: flex;
   align-items: center;
   gap: calc(10 * var(--show-unit));
@@ -572,28 +572,111 @@
 
 .show-catalog-card {
   transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease;
+    transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 380ms ease,
+    border-color 220ms ease;
 }
-@media (hover: hover) and (pointer: fine) {
-  .show-catalog-card:not(.is-coming):hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 22px #08031055;
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .show-catalog-card
+    :is(
+      .show-art,
+      .show-art-spark,
+      .show-art-card,
+      .show-art-permit,
+      .show-art-wheel,
+      .show-art-die,
+      .show-art-identity
+    ) {
+    transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .show-catalog-play-label svg {
+    transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .show-catalog-art::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(110deg, transparent 25%, #fff8e833 48%, transparent 70%);
+    transform: translateX(-110%);
+    transition: transform 650ms ease;
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)):not(.is-coming) {
+    transform: translateY(-6px) rotate(-0.5deg);
+    box-shadow:
+      3px 6px 0 #e3aff660,
+      0 16px 28px #08031055;
     border-color: var(--show-accent);
   }
+
   .show-catalog-card.is-coming:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px) rotate(0.5deg);
     border-color: #e3aff6;
   }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-catalog-art::after {
+    transform: translateX(110%);
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-art {
+    transform: translate(-50%, -50%) scale(1.025);
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-catalog-play-label svg {
+    transform: translateX(3px) rotate(-25deg);
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-art-spark {
+    transform: rotate(20deg) scale(1.18);
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-art-spark:last-child {
+    transform: rotate(-20deg) scale(0.85);
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-art-wheel {
+    transform: rotate(110deg);
+    transition-duration: 800ms;
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-art-permit {
+    transform: translateY(calc(-8 * var(--show-unit))) rotate(5deg);
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-art-card:nth-child(1) {
+    transform: translate(calc(-76 * var(--show-unit)), calc(12 * var(--show-unit))) rotate(-31deg);
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-art-card:nth-child(2) {
+    transform: translateY(calc(-10 * var(--show-unit))) rotate(0deg);
+    transition-delay: 35ms;
+  }
+
+  .show-catalog-card:is(:hover, :has(:focus-visible)) .show-art-card:nth-child(3) {
+    transform: translate(calc(73 * var(--show-unit)), calc(15 * var(--show-unit))) rotate(29deg);
+    transition-delay: 70ms;
+  }
+
+  .show-catalog-card.is-coming:hover .show-art-die:first-child {
+    transform: rotate(-24deg) translate(12%, -4%);
+  }
+
+  .show-catalog-card.is-coming:hover .show-art-die:last-child {
+    transform: rotate(24deg) translate(-10%, -24%);
+  }
+
+  .show-catalog-card.is-coming:hover .show-art-identity {
+    transform: translate(-50%, -3%) rotate(3deg);
+  }
 }
+
 @media (prefers-reduced-motion: reduce) {
   .show-catalog-card {
     transition: none;
-  }
-  .show-catalog-card:not(.is-coming):hover,
-  .show-catalog-card.is-coming:hover {
-    transform: none;
   }
 }
 .show-login {

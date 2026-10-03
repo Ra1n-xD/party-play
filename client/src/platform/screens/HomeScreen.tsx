@@ -239,6 +239,7 @@ export function HomeScreen() {
       className={`show-menu${selectedGame ? " is-game-menu" : " is-main-menu"}`}
       data-game={selectedGame?.id}
     >
+      <div className="show-menu-ambience" aria-hidden="true" />
       <div className="show-menu-shell">
         <ProfileHeader onHome={selectedGame ? backToCatalog : undefined} />
         {selectedGame && (

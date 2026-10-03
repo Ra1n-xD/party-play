@@ -128,7 +128,6 @@ export function GameCatalog({ games, counts, onPlay, onRooms, onRules }: GameCat
           })}
       </ul>
       <nav className="show-catalog-pagination" aria-label="Страницы каталога игр">
-        <span>Игр в каталоге: {entries.length}</span>
         <div>
           <button
             type="button"
@@ -151,6 +150,7 @@ export function GameCatalog({ games, counts, onPlay, onRooms, onRules }: GameCat
             <FiChevronRight aria-hidden="true" />
           </button>
         </div>
+        <span>Игр в каталоге: {entries.length}</span>
       </nav>
     </section>
   );
