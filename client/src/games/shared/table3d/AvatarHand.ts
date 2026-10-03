@@ -198,8 +198,24 @@ export function makeArticulatedHand(skin: number, side: number, holding: boolean
   const defaultCurls = holding ? grip : relaxed;
   const defaultThumb = holding ? 0.78 : 0.25;
   const defaultSpread = holding ? 0.06 : 0.14;
-  const pose = (curls: readonly number[], spread: number, thumbCurl: number, weight: number) => {
+  // Only the last part of a curl closes the fist: relaxed fingers and the card
+  // pinch retain their approved joint angles. The pads finish against the palm
+  // instead of hanging downward from almost straight proximal phalanges.
+  const closedKnuckles = [1.5, 1.56, 1.6, 1.64];
+  const closedMiddle = [1.65, 1.72, 1.7, 1.55];
+  const closedTips = [0.62, 0.6, 0.61, 0.55];
+  const pose = (
+    curls: readonly number[],
+    spread: number,
+    thumbCurl: number,
+    weight: number,
+    thumbsUp = 0,
+  ) => {
     const blend = clamp(weight, 0, 1);
+    const approval = clamp(thumbsUp, 0, 1) * blend;
+    // A fist is shorter through the metacarpals; keep its wrist anchor fixed.
+    palmBone.scale.y = 1 - approval * 0.14;
+    palmBone.position.y = -0.14 * approval * 0.14;
     // A card pinch sits behind its card plane; empty-hand gestures use the same
     // palm centre on both sides so opposed palms can actually meet when clapping.
     root.position.z = holding ? -baseZ * blend : 0;
@@ -210,10 +226,18 @@ export function makeArticulatedHand(skin: number, side: number, holding: boolean
         clamp(curls[finger] ?? 0.3, 0, 1),
         blend,
       );
+      const closure = THREE.MathUtils.smoothstep(curl, 0.55, 1);
+      const fist = THREE.MathUtils.lerp(closure, 1, approval);
       const chain = fingers[finger];
-      chain[0].rotation.set(curl * 1.05, 0, -side * (1.5 - finger) * fan * 0.2);
-      chain[1].rotation.x = curl * 1.3;
-      chain[2].rotation.x = curl * 0.85;
+      // Slight adduction removes the open-hand gaps without changing bone length.
+      chain[0].position.x = side * (0.045 - finger * 0.03) * (1 - fist * 0.055);
+      chain[0].rotation.set(
+        THREE.MathUtils.lerp(curl * 1.05, closedKnuckles[finger], fist),
+        0,
+        -side * (1.5 - finger) * fan * (1 - fist) * 0.2,
+      );
+      chain[1].rotation.x = THREE.MathUtils.lerp(curl * 1.3, closedMiddle[finger], fist);
+      chain[2].rotation.x = THREE.MathUtils.lerp(curl * 0.85, closedTips[finger], fist);
     }
     const opposition = clamp(thumbCurl, 0, 1);
     // Holding is a separate rest pose; full gestures still share the same anatomy
@@ -242,6 +266,22 @@ export function makeArticulatedHand(skin: number, side: number, holding: boolean
       side * THREE.MathUtils.lerp(defaultThumb, opposition, blend) * 0.12,
     );
     thumb[2].rotation.x = 0.12 + THREE.MathUtils.lerp(defaultThumb, opposition, blend) * 0.3;
+    // The thumb opens across the palm, perpendicular to the folded fingers.
+    // Rolling the fist in the arm pose then points the thumb upward. Extending
+    // it along the finger axis instead reads as an index finger pointing up.
+    thumb[0].position.set(side * 0.047, -0.004, baseZ + 0.015);
+    thumb[0].scale.set(1 + approval * 0.22, 1 - approval * 0.28, 1 + approval * 0.22);
+    thumb[0].rotation.set(
+      THREE.MathUtils.lerp(thumb[0].rotation.x, 0.02, approval),
+      THREE.MathUtils.lerp(thumb[0].rotation.y, -side * 0.25, approval),
+      THREE.MathUtils.lerp(thumb[0].rotation.z, -side * 0.95, approval),
+    );
+    thumb[1].rotation.set(
+      THREE.MathUtils.lerp(thumb[1].rotation.x, -0.12, approval),
+      0,
+      THREE.MathUtils.lerp(thumb[1].rotation.z, -side * 0.1, approval),
+    );
+    thumb[2].rotation.x = THREE.MathUtils.lerp(thumb[2].rotation.x, 0.1, approval);
   };
   const reset = () => pose(defaultCurls, defaultSpread, defaultThumb, 0);
   reset();
