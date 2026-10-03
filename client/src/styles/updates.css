@@ -1,7 +1,7 @@
 .updates-page .show-menu-shell {
   display: flex;
   flex-direction: column;
-  min-height: calc(100svh - 56 * var(--show-unit));
+  min-height: calc(100svh - 36 * var(--show-unit));
 }
 .updates-content {
   padding-block: calc(32 * var(--show-unit)) calc(52 * var(--show-unit));

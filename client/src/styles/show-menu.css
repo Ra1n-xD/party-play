@@ -52,7 +52,7 @@
   --bg-secondary: color-mix(in srgb, var(--show-base) 92%, white);
   --bg-card: color-mix(in srgb, var(--show-base) 90%, white);
   min-height: 100svh;
-  padding: calc(24 * var(--show-unit)) calc(36 * var(--show-unit)) calc(32 * var(--show-unit));
+  padding: calc(16 * var(--show-unit)) calc(26 * var(--show-unit)) calc(20 * var(--show-unit));
   background: radial-gradient(ellipse at 60% 5%, #66449b55, transparent 68%), var(--show-base);
   color: var(--show-ink);
   font-family: "Golos Text", sans-serif;
@@ -62,7 +62,7 @@
 
 .show-menu-shell {
   width: 100%;
-  max-width: calc(1160 * var(--show-unit));
+  max-width: calc(1600 * var(--show-unit));
   margin: 0 auto;
 }
 
@@ -194,7 +194,7 @@
   gap: calc(12 * var(--show-unit));
   font-family: var(--show-display);
   font-weight: 900;
-  font-size: calc(25 * var(--show-unit));
+  font-size: calc(28 * var(--show-unit));
   letter-spacing: calc(-1.5 * var(--show-unit));
   color: inherit;
   text-decoration: none;
@@ -278,7 +278,7 @@
 
 .show-headline h1 {
   font-family: var(--show-display);
-  font-size: clamp(calc(20 * var(--show-unit)), 2.7vw, calc(31 * var(--show-unit)));
+  font-size: clamp(calc(20 * var(--show-unit)), 2.7vw, calc(35 * var(--show-unit)));
   font-weight: 800;
   line-height: 1.35;
   letter-spacing: calc(-1.2 * var(--show-unit));
@@ -1225,7 +1225,7 @@
     padding-top: calc(16 * var(--show-unit));
   }
 
-  .show-profile-header {
+  .show-menu .show-profile-header {
     padding-bottom: calc(12 * var(--show-unit));
   }
 
@@ -1356,9 +1356,7 @@
 
 @media (max-width: 1050px) {
   .show-profile-balance {
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
+    gap: 8px;
   }
 
   .show-main-layout {
@@ -1510,13 +1508,36 @@
 
   .show-profile-balance {
     font-size: 12px;
+    gap: 6px;
   }
 
   .show-profile-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 36px;
     column-gap: 8px;
   }
 
+  .show-profile-header .show-brand {
+    grid-area: 1 / 1;
+  }
+
+  .show-profile-navigation {
+    grid-area: 2 / 1 / auto / -1;
+    gap: clamp(10px, 4vw, 16px);
+  }
+
+  .show-profile-balance {
+    grid-area: 1 / 2;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+
+  .show-profile-connection {
+    grid-column: 1 / -1;
+  }
+
   .show-logout {
+    grid-area: 1 / 3;
     width: 36px;
     padding: 8px;
     flex-shrink: 0;
@@ -1533,7 +1554,7 @@
 
   .show-profile-nickname {
     max-width: 96px;
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .show-game-navigation {
