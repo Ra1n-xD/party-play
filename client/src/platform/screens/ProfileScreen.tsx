@@ -1,73 +1,14 @@
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   COSMETICS,
   COSMETIC_KIND_NAMES,
   RARITIES,
-  INITIAL_COINS,
   type CosmeticKind,
 } from "../../../../shared/platform/cosmetics";
 import { useProfile } from "../context/ProfileContext";
 import { CosmeticPreview } from "../components/CosmeticPreview";
 import { CoinAmount } from "../components/CoinAmount";
 
-export function LoginScreen() {
-  const { login, busy, connected, error } = useProfile();
-  const [name, setName] = useState("");
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    login(name);
-  };
-  return (
-    <main className="profile-login">
-      <a href="/" className="profile-logo">
-        partyplay<span> / CLUB</span>
-      </a>
-      <section>
-        <span className="profile-eyebrow">ВАШ ПРОФИЛЬ</span>
-        <h1>
-          Свой ник.
-          <br />
-          Свой стиль.
-        </h1>
-        <p>Введите никнейм, чтобы сохранить персонажа, карты и коллекцию.</p>
-        <form onSubmit={submit}>
-          <label htmlFor="profile-nickname">Никнейм</label>
-          <input
-            id="profile-nickname"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            maxLength={20}
-            autoComplete="nickname"
-            placeholder="Ваш никнейм"
-            autoFocus
-            disabled={busy}
-          />
-          <button className="profile-primary" disabled={busy || !connected || !name.trim()}>
-            {busy ? "Входим…" : "Войти по нику →"}
-          </button>
-        </form>
-        <a className="profile-guest-link" href="/">
-          Играть без аккаунта
-        </a>
-        <div className="profile-welcome">
-          <span className="profile-welcome-coins">
-            <CoinAmount amount={INITIAL_COINS} label="монет новому игроку" />
-          </span>
-        </div>
-        <small>
-          Временные профили без пароля. Доступ есть у каждого, кто знает ник. При переходе на БД
-          коллекции будут сброшены.
-        </small>
-        {error && (
-          <p className="profile-error" role="alert">
-            {error}
-          </p>
-        )}
-        {!connected && <p role="status">Подключаемся к серверу…</p>}
-      </section>
-    </main>
-  );
-}
 export function ProfileScreen() {
   const { profile, equip, logout, busy, connected, error } = useProfile();
   const [tab, setTab] = useState<CosmeticKind>("avatar");

@@ -5,7 +5,8 @@ import { getLazyGameComponent } from "./platform/gameRegistry";
 import { HomeScreen } from "./platform/screens/HomeScreen";
 import { StatsScreen } from "./platform/screens/StatsScreen";
 import { ProfileProvider, useProfile } from "./platform/context/ProfileContext";
-import { LoginScreen, ProfileScreen } from "./platform/screens/ProfileScreen";
+import { ProfileScreen } from "./platform/screens/ProfileScreen";
+import { LoginScreen } from "./platform/screens/LoginScreen";
 import { CasesScreen } from "./platform/screens/CasesScreen";
 import { UpgradeScreen } from "./platform/screens/UpgradeScreen";
 import { UpdatesScreen } from "./platform/screens/UpdatesScreen";
@@ -13,7 +14,7 @@ import { ProfileHeader } from "./platform/components/ProfileHeader";
 import "./styles/profiles.css";
 
 function ProfileApp() {
-  const { profile } = useProfile();
+  const { profile, loading } = useProfile();
   const [path, setPath] = useState(window.location.pathname.replace(/\/$/, "") || "/");
   useEffect(() => {
     const update = () => {
@@ -60,6 +61,8 @@ function ProfileApp() {
     previousProfile.current = profile;
   }, [profile, path]);
   const profilePage = path === "/profile" || path === "/cases" || path === "/upgrade";
+  if (loading && (path === "/login" || profilePage))
+    return <RoomLoading message="Проверяем вход…" />;
   if (!profile && (path === "/login" || profilePage)) return <LoginScreen />;
   return (
     <>

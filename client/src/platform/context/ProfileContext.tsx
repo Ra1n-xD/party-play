@@ -22,16 +22,17 @@ import type {
 } from "../../../../shared/platform/upgrades";
 import { getUpgradeQuote } from "../../../../shared/platform/upgrades";
 
-const STORAGE_KEY = "partyplay_nickname_v1";
-const OPENING_KEY = "partyplay_pending_case_v1";
-const UPGRADE_KEY = "partyplay_pending_upgrade_v1";
+import type { ProfileSession } from "../../../../shared/platform/auth";
+import { PROFILE_SESSION_KEY, readProfileSession, saveProfileSession } from "../profileSession";
+const OPENING_KEY = "partyplay_pending_case_v2";
+const UPGRADE_KEY = "partyplay_pending_upgrade_v2";
 function readPendingUpgrade(name: string): UpgradeRequest | null {
   try {
     const saved = JSON.parse(
       localStorage.getItem(`${UPGRADE_KEY}:${name.toLocaleLowerCase("ru-RU")}`) ?? "null",
     );
     const request = saved?.request;
-    return saved?.nickname === name &&
+    return saved?.accountId === name &&
       typeof request?.requestId === "string" &&
       typeof request?.targetItemId === "string" &&
       getUpgradeQuote(request?.inputs, request?.targetItemId)
@@ -44,40 +45,28 @@ function readPendingUpgrade(name: string): UpgradeRequest | null {
 function pendingCase(name: string): string | null {
   try {
     const saved = JSON.parse(localStorage.getItem(OPENING_KEY) ?? "null");
-    return saved?.nickname === name ? saved.requestId : null;
+    return saved?.accountId === name ? saved.requestId : null;
   } catch {
     return null;
   }
 }
 function savePendingCase(name: string, requestId: string | null) {
   try {
-    if (requestId) localStorage.setItem(OPENING_KEY, JSON.stringify({ nickname: name, requestId }));
+    if (requestId)
+      localStorage.setItem(OPENING_KEY, JSON.stringify({ accountId: name, requestId }));
     else localStorage.removeItem(OPENING_KEY);
   } catch {
     /* The in-memory key still prevents retry charges. */
   }
 }
-function savedNickname() {
-  try {
-    return localStorage.getItem(STORAGE_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-function saveNickname(name: string) {
-  try {
-    if (name) localStorage.setItem(STORAGE_KEY, name);
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* Login still works without browser storage. */
-  }
-}
 interface ProfileContextValue {
   profile: ProfileSnapshot | null;
   busy: boolean;
+  loading: boolean;
   connected: boolean;
   error: string | null;
-  login(name: string): void;
+  login(name: string, password: string): Promise<boolean>;
+  register(name: string, password: string): Promise<boolean>;
   logout(): void;
   equip(itemId: string): void;
   openCase(): Promise<CaseOpening | null>;
@@ -94,7 +83,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmLogout, setConfirmLogout] = useState(false);
-  const nickname = useRef(savedNickname());
+  const accountId = useRef("");
   const pendingOpening = useRef<string | null>(null);
   const pendingUpgradeRef = useRef<UpgradeRequest | null>(null);
   const [pendingUpgrade, setPendingUpgrade] = useState<UpgradeRequest | null>(null);
@@ -102,9 +91,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     pendingUpgradeRef.current = request;
     setPendingUpgrade(request);
     try {
-      const key = `${UPGRADE_KEY}:${nickname.current.toLocaleLowerCase("ru-RU")}`;
+      const key = `${UPGRADE_KEY}:${accountId.current}`;
       if (request)
-        localStorage.setItem(key, JSON.stringify({ nickname: nickname.current, request }));
+        localStorage.setItem(key, JSON.stringify({ accountId: accountId.current, request }));
       else localStorage.removeItem(key);
     } catch {
       /* Keep the same request in memory if browser storage is unavailable. */
@@ -112,75 +101,133 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, []);
   const requestBusy = useRef(false);
   const accept = useCallback((next: ProfileSnapshot) => {
-    nickname.current = next.nickname;
-    saveNickname(next.nickname);
+    accountId.current = next.id;
     setProfile(next);
   }, []);
-  const login = useCallback(
-    (name: string) => {
-      if (!socket.connected || requestBusy.current) return;
+  const clearProfile = useCallback(() => {
+    saveProfileSession(null);
+    accountId.current = "";
+    pendingOpening.current = null;
+    pendingUpgradeRef.current = null;
+    setPendingUpgrade(null);
+    setProfile(null);
+  }, []);
+  const acceptSession = useCallback(
+    (next: ProfileSnapshot) => {
+      accept(next);
+      pendingOpening.current = pendingCase(next.id);
+      rememberUpgrade(readPendingUpgrade(next.id));
+    },
+    [accept, rememberUpgrade],
+  );
+  const authenticate = useCallback(
+    (
+      event: "profile:login" | "profile:register",
+      name: string,
+      password: string,
+    ): Promise<boolean> => {
+      if (!socket.connected || requestBusy.current) return Promise.resolve(false);
       requestBusy.current = true;
       setBusy(true);
       setError(null);
       const connectionId = socket.id;
-      socket
-        .timeout(8000)
-        .emit(
-          "profile:login",
-          { nickname: name },
-          (timeout: Error | null, result: ProfileReply<ProfileSnapshot>) => {
-            requestBusy.current = false;
-            setBusy(false);
-            if (socket.id !== connectionId) return;
-            setReady(true);
-            if (timeout) {
-              setProfile(null);
-              setError("Сервер не ответил. Попробуйте войти ещё раз");
-            } else if (!result.ok) {
-              setProfile(null);
-              setError(result.error);
-            } else {
-              accept(result.value);
-              pendingOpening.current = pendingCase(result.value.nickname);
-              rememberUpgrade(readPendingUpgrade(result.value.nickname));
-            }
-          },
-        );
+      return new Promise((resolve) => {
+        socket
+          .timeout(15_000)
+          .emit(
+            event,
+            { nickname: name, password },
+            (timeout: Error | null, result: ProfileReply<ProfileSession>) => {
+              if (socket.id !== connectionId) {
+                resolve(false);
+                return;
+              }
+              requestBusy.current = false;
+              setBusy(false);
+              setReady(true);
+              if (timeout) {
+                setError(
+                  "Сервер не ответил. Если аккаунт уже создан, попробуйте войти с тем же паролем",
+                );
+                resolve(false);
+              } else if (!result.ok) {
+                setError(result.error);
+                resolve(false);
+              } else {
+                saveProfileSession(result.value.sessionToken);
+                acceptSession(result.value.profile);
+                resolve(true);
+              }
+            },
+          );
+      });
     },
-    [accept, rememberUpgrade],
+    [acceptSession],
+  );
+  const login = useCallback(
+    (name: string, password: string) => authenticate("profile:login", name, password),
+    [authenticate],
+  );
+  const register = useCallback(
+    (name: string, password: string) => authenticate("profile:register", name, password),
+    [authenticate],
   );
   useEffect(() => {
-    let retry: ReturnType<typeof setTimeout> | undefined;
-    const restore = () => {
-      if (!socket.connected) return;
-      if (requestBusy.current) {
-        retry = setTimeout(restore, 150);
-        return;
-      }
-      if (nickname.current) login(nickname.current);
-      else setReady(true);
-    };
     const connect = () => {
       setConnected(true);
       setReady(false);
-      clearTimeout(retry);
-      restore();
+      const connectionId = socket.id;
+      socket
+        .timeout(8000)
+        .emit(
+          "profile:session",
+          (timeout: Error | null, result: ProfileReply<ProfileSnapshot | null>) => {
+            if (socket.id !== connectionId) return;
+            setReady(true);
+            if (timeout) {
+              setError("Сервер не ответил. Обновите страницу");
+              return;
+            }
+            if (!result.ok) {
+              setError(result.error);
+              return;
+            }
+            if (result.value) acceptSession(result.value);
+            else clearProfile();
+          },
+        );
     };
-    const disconnect = () => {
+    const disconnect = (reason: string) => {
       setConnected(false);
       setReady(false);
+      requestBusy.current = false;
+      setBusy(false);
+      if (reason === "io server disconnect") socket.connect();
+    };
+    const expired = () => {
+      clearProfile();
+      setError(null);
+    };
+    const storage = (event: StorageEvent) => {
+      if (event.key !== PROFILE_SESSION_KEY && event.key !== null) return;
+      readProfileSession();
+      socket.disconnect();
+      socket.connect();
     };
     socket.on("connect", connect);
     socket.on("disconnect", disconnect);
     socket.on("profile:snapshot", accept);
+    socket.on("profile:expired", expired);
+    window.addEventListener("storage", storage);
     if (socket.connected) connect();
     return () => {
-      clearTimeout(retry);
       socket.off("connect", connect);
       socket.off("disconnect", disconnect);
       socket.off("profile:snapshot", accept);
+      socket.off("profile:expired", expired);
+      window.removeEventListener("storage", storage);
     };
-  }, [accept, login]);
+  }, [accept, acceptSession, clearProfile]);
   const performLogout = () => {
     if (!socket.connected || !ready || requestBusy.current) return;
     requestBusy.current = true;
@@ -199,12 +246,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         if (timeout) setError("Сервер не ответил");
         else if (!result.ok) setError(result.error);
         else {
-          nickname.current = "";
-          saveNickname("");
-          pendingOpening.current = null;
-          pendingUpgradeRef.current = null;
-          setPendingUpgrade(null);
-          setProfile(null);
+          clearProfile();
         }
       });
   };
@@ -215,6 +257,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   };
   const equip = (itemId: string) => {
     if (!socket.connected || requestBusy.current) return;
+    const connectionId = socket.id;
     requestBusy.current = true;
     setBusy(true);
     setError(null);
@@ -224,6 +267,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         "profile:equip",
         { itemId },
         (timeout: Error | null, result: ProfileReply<ProfileSnapshot>) => {
+          if (socket.id !== connectionId) return;
           requestBusy.current = false;
           setBusy(false);
           if (timeout) setError("Сервер не ответил. Обновите профиль перед повторной попыткой");
@@ -234,12 +278,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   };
   const openCase = (): Promise<CaseOpening | null> => {
     if (!socket.connected || requestBusy.current) return Promise.resolve(null);
+    const connectionId = socket.id;
     requestBusy.current = true;
     setBusy(true);
     setError(null);
     const requestId = pendingOpening.current ?? crypto.randomUUID();
     pendingOpening.current = requestId;
-    savePendingCase(nickname.current, requestId);
+    savePendingCase(accountId.current, requestId);
     return new Promise((resolve) =>
       socket
         .timeout(8000)
@@ -250,6 +295,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
             timeout: Error | null,
             result: ProfileReply<{ profile: ProfileSnapshot; opening: CaseOpening }>,
           ) => {
+            if (socket.id !== connectionId) {
+              resolve(null);
+              return;
+            }
             requestBusy.current = false;
             setBusy(false);
             if (timeout) {
@@ -257,12 +306,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
               resolve(null);
             } else if (!result.ok) {
               pendingOpening.current = null;
-              savePendingCase(nickname.current, null);
+              savePendingCase(accountId.current, null);
               setError(result.error);
               resolve(null);
             } else {
               pendingOpening.current = null;
-              savePendingCase(nickname.current, null);
+              savePendingCase(accountId.current, null);
               accept(result.value.profile);
               resolve(result.value.opening);
             }
@@ -275,6 +324,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     targetItemId: string,
   ): Promise<UpgradeAttempt | null> => {
     if (!socket.connected || !ready || requestBusy.current) return Promise.resolve(null);
+    const connectionId = socket.id;
     requestBusy.current = true;
     setBusy(true);
     setError(null);
@@ -294,6 +344,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
             timeout: Error | null,
             result: ProfileReply<{ profile: ProfileSnapshot; attempt: UpgradeAttempt }>,
           ) => {
+            if (socket.id !== connectionId) {
+              resolve(null);
+              return;
+            }
             requestBusy.current = false;
             setBusy(false);
             if (timeout) {
@@ -317,9 +371,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       value={{
         profile,
         busy,
+        loading: !ready,
         connected: connected && ready,
         error,
         login,
+        register,
         logout,
         equip,
         openCase,
@@ -334,7 +390,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           <h2 id="profile-logout-title">Выйти из аккаунта?</h2>
           <p className="profile-logout-note">
             Вы также покинете текущую комнату. Если в ней больше нет людей, она закроется. Коллекция
-            сохранится за вашим ником.
+            сохранится в вашем аккаунте.
           </p>
           <div className="modal-actions">
             <button className="btn btn-secondary" onClick={() => setConfirmLogout(false)}>

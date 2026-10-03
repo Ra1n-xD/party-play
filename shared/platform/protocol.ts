@@ -20,6 +20,7 @@ import type { ProjectStatsSnapshot } from "./projectStats.js";
 import type { CaseOpening, ProfileReply, ProfileSnapshot } from "./cosmetics.js";
 import type { UpgradeAttempt, UpgradeRequest } from "./upgrades.js";
 import type { CosmeticDrop } from "./dropFeed.js";
+import type { ProfileCredentials, ProfileSession } from "./auth.js";
 import type { AnyRoomCommandEnvelope, AnyRoomSnapshot, RoomCommandResult, SeatId } from "./room.js";
 
 export type HostChangeReason = "disconnect" | "manual" | "recovery";
@@ -63,9 +64,14 @@ export interface ClientEvents {
   "drops:subscribe": () => void;
   "drops:unsubscribe": () => void;
   "profile:login": (
-    data: { nickname: string },
-    reply: (result: ProfileReply<ProfileSnapshot>) => void,
+    data: ProfileCredentials,
+    reply: (result: ProfileReply<ProfileSession>) => void,
   ) => void;
+  "profile:register": (
+    data: ProfileCredentials,
+    reply: (result: ProfileReply<ProfileSession>) => void,
+  ) => void;
+  "profile:session": (reply: (result: ProfileReply<ProfileSnapshot | null>) => void) => void;
   "profile:logout": (reply: (result: ProfileReply<null>) => void) => void;
   "profile:equip": (
     data: { itemId: string },
@@ -150,6 +156,7 @@ export interface ClientEvents {
 
 // Server -> Client
 export interface ServerEvents {
+  "profile:expired": () => void;
   "drops:snapshot": (data: CosmeticDrop[]) => void;
   "profile:snapshot": (data: ProfileSnapshot) => void;
   "room:created": (data: RoomCreatedPayload) => void;
