@@ -827,3 +827,10 @@ body:has(.show-menu, .profile-login),
   margin: 16px 0 24px;
   line-height: 1.6;
 }
+
+.profile-guest-link {
+  display: inline-block;
+  margin-top: 20px;
+  color: #fff8e8;
+  text-underline-offset: 4px;
+}

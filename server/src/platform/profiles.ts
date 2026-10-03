@@ -187,8 +187,14 @@ function publishDrop(drop: CosmeticDrop, io: IOServer): void {
 export function getProfile(name: string): ProfileSnapshot | undefined {
   return profiles.get(nicknameKey(name));
 }
-export function applyProfileToPlayer(player: Player): void {
-  const profile = getProfile(player.owner.name);
+export function applyProfileToPlayer(
+  player: Player,
+  profileKey: string | null = player.profileKey,
+): void {
+  const profile =
+    profileKey && profileKey === nicknameKey(player.owner.name)
+      ? profiles.get(profileKey)
+      : undefined;
   player.profileKey = profile ? nicknameKey(profile.nickname) : null;
   player.avatarId = profile?.equipped.avatar ?? "human";
   player.cardSkins = profile

@@ -16,7 +16,6 @@ import {
 import { CONFIG } from "../config.js";
 import { AVATARS, DEFAULT_AVATAR_ID, type AvatarId } from "../../../shared/platform/avatars.js";
 import type { CardSkinId } from "../../../shared/platform/cosmetics.js";
-import { applyProfileToPlayer } from "./profiles.js";
 
 export interface Player {
   id: string;
@@ -264,7 +263,6 @@ export function createRoom<G extends GameId = "bunker">(
     temporaryBot: false,
   };
 
-  applyProfileToPlayer(player);
   const room: Room<G> = {
     code,
     visibility,
@@ -343,7 +341,6 @@ export function joinRoom(
     temporaryBot: false,
   };
 
-  if (player.owner.kind === "human") applyProfileToPlayer(player);
   room.players.set(playerId, player);
   room.allPlayerIds.push(playerId);
   touchRoom(roomCode);

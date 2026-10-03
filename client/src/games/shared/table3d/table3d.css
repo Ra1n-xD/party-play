@@ -836,7 +836,13 @@
   background: #07110fe0;
   backdrop-filter: blur(9px);
 }
-.table3d-menu-panel {
+.modal.table3d-menu-panel {
+  --text-primary: #f4ead8;
+  --text-secondary: #b9c4b9;
+  --text-muted: #aaafa5;
+  --accent: #d6b771;
+  --glass-border: #c9ac6b55;
+  font-family: "Golos Text", sans-serif;
   width: min(430px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
@@ -994,7 +1000,28 @@
   }
 }
 @media (max-width: 600px) {
-  .table3d-menu-panel {
+  .modal.table3d-menu-panel {
     padding: 20px;
   }
+}
+
+/* The same session menu is portalled for every 3D game. */
+.modal.table3d-menu-panel :is(h2, strong, label, dd) {
+  color: #f4ead8;
+}
+.modal.table3d-menu-panel .btn {
+  border: 1px solid #d6c39940;
+  border-radius: 8px;
+  background: #ffffff0c;
+  color: #f4ead8;
+  box-shadow: none;
+  font-family: inherit;
+}
+.modal.table3d-menu-panel .btn-danger {
+  background: #743e34;
+  border-color: #b87560;
+}
+.modal.table3d-menu-panel :is(button, input):focus-visible {
+  outline: 2px solid #e2c486;
+  outline-offset: 2px;
 }

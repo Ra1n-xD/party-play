@@ -85,7 +85,7 @@ export interface TableSceneOptions {
   onSelectPerson?: (id: string) => void;
   onFocusHandCard?: (id: string) => void;
   onSelectHandCard?: (id: string) => void;
-  onMenuRequest: (error?: string) => void;
+  onMenuRequest: (error?: string, nativeEscape?: boolean) => void;
   onOverviewChange: (overview: boolean) => void;
 }
 

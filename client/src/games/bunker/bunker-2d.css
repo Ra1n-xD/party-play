@@ -215,13 +215,13 @@
   min-width: 0;
   min-height: 0;
   padding: clamp(7px, 0.6vw, 13px);
-  border: 1px solid #9eb4b454;
+  border: 1px solid #c7b898;
   border-radius: 7px;
-  background: linear-gradient(125deg, #2b465050, #19343fc7);
-  color: #fff4d7;
+  background: #efe4cc;
+  color: #172c3d;
   text-align: left;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 #ffffff0b;
+  box-shadow: 2px 3px 0 #0b18294d;
 }
 .b2-player-card.is-selected,
 .b2-player-card.is-vote-selected {
@@ -272,15 +272,15 @@
 .b2-player-heading strong small {
   flex: 0 0 auto;
   font-size: 0.7em;
-  color: #fff4d7ab;
+  color: #65706e;
 }
 .b2-player-heading .b2-bot-label {
   padding: 2px 4px;
   border-radius: 3px;
   font-size: 0.65em;
   line-height: 1;
-  background: #ffffff0d;
-  color: #d6c7a7;
+  background: #172c3d10;
+  color: #52615f;
 }
 .b2-player-heading > span:last-child {
   margin-left: auto;
@@ -305,7 +305,7 @@
   min-height: 23px;
   padding: 3px 5px;
   border-radius: 4px;
-  background: #ece7d5;
+  background: #fff9e8;
   color: #182e40;
   font-size: clamp(11px, 0.78vw, 17px);
   font-weight: 750;
@@ -333,8 +333,8 @@
   white-space: nowrap;
 }
 .b2-player-field.is-hidden {
-  color: #b4c8c9a6;
-  background: #75959924;
+  color: #7a7b70;
+  background: #172c3d0a;
 }
 .b2-player-field.is-hidden .bunker-attribute-icon {
   opacity: 0.85;
@@ -346,7 +346,7 @@
   gap: 5px;
   margin-top: 4px;
   min-height: 14px;
-  color: #e9d5aa;
+  color: #995022;
   font-size: clamp(10px, 0.65vw, 14px);
   line-height: 1.1;
 }
@@ -901,4 +901,65 @@ button.b2-dossier-field:focus-visible,
   .b2-player-heading {
     gap: 4px;
   }
+}
+
+/* Keep the desktop navigation on the header surface, without the old floating dock. */
+.screen.command-game-screen.bunker-2d .gs-room-header {
+  background: #102a35;
+}
+.screen.bunker-2d .gs-command-button {
+  border: 1px solid #fff4d73d;
+  border-radius: 7px;
+  background: #24414c;
+  color: #fff4d7;
+  box-shadow: none;
+}
+.screen.bunker-2d .gs-command-button:hover {
+  background: #345461;
+}
+@media (min-width: 901px) {
+  .screen.bunker-2d .b2-header-actions :is(.gs-action-bar, .vote-command-bar) {
+    position: static;
+    inset: auto;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+.screen.bunker-2d .b2-scenario-details .gs-bunker-details {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.screen.bunker-2d .b2-scenario-details .gs-bunker-heading {
+  color: #172c3d;
+}
+.screen.bunker-2d .b2-scenario-details .gs-bunker-card {
+  position: relative;
+  padding: 12px;
+  border: 1px solid #c0b397;
+  border-left: 4px solid #b96a35;
+  border-radius: 7px;
+  background: #fff5df;
+  box-shadow: 2px 3px 0 #172c3d12;
+}
+.screen.bunker-2d .b2-scenario-details .gs-bunker-card-title {
+  color: #172c3d;
+  font-weight: 800;
+}
+.screen.bunker-2d .b2-scenario-details .gs-bunker-card-description {
+  color: #52615f;
+  line-height: 1.45;
+}
+.screen.bunker-2d .b2-scenario-details .gs-bunker-card.is-new {
+  border-color: #b96a35;
+  animation: none;
+}
+.screen.bunker-2d .b2-scenario-details .gs-bunker-threat-card {
+  border-color: #a8433b;
+  background: #f4dfcc;
 }

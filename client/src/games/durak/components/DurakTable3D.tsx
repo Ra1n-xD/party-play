@@ -88,7 +88,7 @@ export default function DurakTable3D({
           cursorCallback.current(true);
         },
         {
-          onMenuRequest: (error) => menu.current?.open(error),
+          onMenuRequest: (error, nativeEscape) => menu.current?.open(error, nativeEscape),
           onOverviewChange: setOverview,
           onFocusHandCard: (id) => handCallbacks.current.onFocusCard(id),
           onSelectHandCard: (id) => handCallbacks.current.onSelectCard(id),

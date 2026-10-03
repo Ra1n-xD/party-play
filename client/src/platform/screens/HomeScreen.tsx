@@ -71,6 +71,10 @@ export function HomeScreen() {
     error,
   } = usePlatform();
   const [name, setName] = useState(profile?.nickname ?? "");
+  useEffect(() => {
+    setName(profile?.nickname ?? "");
+    setPublicRoomName(profile?.nickname ?? "");
+  }, [profile?.nickname]);
   const [joinCode, setJoinCode] = useState("");
   const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(null);
   const [entryMode, setEntryMode] = useState<RoomEntryMode>("join");
@@ -180,6 +184,7 @@ export function HomeScreen() {
       compact={!selectedGame}
       mode={selectedGame ? entryMode : "join"}
       name={name}
+      nameReadOnly={Boolean(profile)}
       code={joinCode}
       connected={connected}
       pending={sessionPending}
@@ -372,7 +377,7 @@ export function HomeScreen() {
                 onChange={(event) => setPublicRoomName(event.target.value)}
                 maxLength={20}
                 autoComplete="nickname"
-                readOnly
+                readOnly={Boolean(profile)}
                 placeholder="Как вас зовут"
               />
             </label>

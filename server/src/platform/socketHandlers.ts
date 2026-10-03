@@ -393,6 +393,7 @@ function emitPublicRoomError(
 }
 
 function completePlayerJoin(socket: IOSocket, room: Room, player: Player, io: IOServer): void {
+  applyProfileToPlayer(player, socket.data.profileKey ?? null);
   attachRoomDisposalHandler(room, io);
   removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
   unsubscribeFromPublicRoomDirectory(socket);
@@ -610,7 +611,7 @@ function resolveSeatClaimCommand(
     socketId: claimantSocket.id,
     epoch: player.controller.epoch + 1,
   };
-  applyProfileToPlayer(player);
+  applyProfileToPlayer(player, claimantSocket.data.profileKey ?? null);
   player.isBot = false;
   player.temporaryBot = false;
   player.voluntarilyLeft = false;
@@ -692,8 +693,12 @@ export function registerHandlers(io: IOServer): void {
         const name = normalizeNickname(
           data?.playerName ?? data?.spectatorName ?? data?.claimantName,
         );
-        if (!name || !socket.data.profileKey || nicknameKey(name) !== socket.data.profileKey) {
-          socket.emit("room:error", { message: "Войдите в профиль и используйте его никнейм" });
+        if (!name || (socket.data.profileKey && nicknameKey(name) !== socket.data.profileKey)) {
+          socket.emit("room:error", {
+            message: name
+              ? "Используйте никнейм своего профиля"
+              : "Введите никнейм от 1 до 20 символов без специальных знаков",
+          });
           return;
         }
         for (const field of ["playerName", "spectatorName", "claimantName"]) {
@@ -992,6 +997,7 @@ export function registerHandlers(io: IOServer): void {
         module.maxSeats,
         visibility,
       );
+      applyProfileToPlayer(player, socket.data.profileKey ?? null);
       attachRoomDisposalHandler(room, io);
       recordRoomCreated(room, getSocketAnalyticsId(socket), io);
       socket.join(room.code);

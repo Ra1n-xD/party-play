@@ -112,7 +112,7 @@ export function GameCatalog({ games, counts, onPlay, onRooms, onRules }: GameCat
                     aria-label={`Открытые комнаты — ${game.metadata.title}${roomCount === undefined ? "" : `: ${roomCount}`}`}
                   >
                     <FiUsers aria-hidden="true" /> Комнаты
-                    {roomCount !== undefined && <span>· {roomCount}</span>}
+                    {roomCount !== undefined && <span>{roomCount}</span>}
                   </button>
                   <button
                     type="button"

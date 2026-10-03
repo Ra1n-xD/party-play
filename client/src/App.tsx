@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PlatformOverlays } from "./platform/components/PlatformOverlays";
 import { PlatformProvider, usePlatform } from "./platform/context/PlatformContext";
 import { getLazyGameComponent } from "./platform/gameRegistry";
@@ -33,7 +33,7 @@ function ProfileApp() {
       if (
         !link ||
         link.target ||
-        !["/", "/profile", "/cases", "/upgrade"].includes(link.getAttribute("href") ?? "")
+        !["/", "/login", "/profile", "/cases", "/upgrade"].includes(link.getAttribute("href") ?? "")
       )
         return;
       event.preventDefault();
@@ -47,8 +47,17 @@ function ProfileApp() {
       window.removeEventListener("popstate", update);
     };
   }, []);
-  if (!profile) return <LoginScreen />;
+  const previousProfile = useRef(profile);
+  useEffect(() => {
+    if ((profile && path === "/login") || (previousProfile.current && !profile)) {
+      history.replaceState(null, "", "/");
+      setPath("/");
+      window.scrollTo(0, 0);
+    }
+    previousProfile.current = profile;
+  }, [profile, path]);
   const profilePage = path === "/profile" || path === "/cases" || path === "/upgrade";
+  if (!profile && (path === "/login" || profilePage)) return <LoginScreen />;
   return (
     <>
       {profilePage && (

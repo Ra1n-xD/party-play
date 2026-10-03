@@ -155,7 +155,7 @@ export function Bunker2DLayout({
                     {attribute?.value ?? (isOwn ? "Нет характеристики" : "Не раскрыто")}
                   </strong>
                   {attribute?.detail && <span className="b2-field-detail">{attribute.detail}</span>}
-                  {isOwn && <em>{isRevealed ? "Раскрыто всем" : "Видно только вам"}</em>}
+                  {isOwn && isRevealed && <em>Раскрыто всем</em>}
                 </span>
                 {selectable && selectedAttribute === privateIndex && (
                   <FiCheck className="b2-field-selected-mark" aria-label="Выбрано для раскрытия" />
@@ -192,7 +192,7 @@ export function Bunker2DLayout({
                 <small>Особое условие</small>
                 <strong>{actionCard.title}</strong>
                 <span className="b2-field-detail">{actionCard.description}</span>
-                {isOwn && <em>{me?.actionCardRevealed ? "Раскрыто всем" : "Видно только вам"}</em>}
+                {isOwn && me?.actionCardRevealed && <em>Раскрыто всем</em>}
                 {isOwn && canRevealAction && (
                   <button type="button" className="b2-special-action" onClick={onRevealAction}>
                     Раскрыть условие <FiArrowRight aria-hidden="true" />

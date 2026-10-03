@@ -1,8 +1,7 @@
 import { useLayoutEffect, useState } from "react";
 import { FiX } from "react-icons/fi";
 import type { AttributeType } from "../../../../shared/games/bunker/types";
-import BackgroundParticles from "../../components/BackgroundParticles";
-import { CardImage } from "../../components/CardImage";
+import { BunkerAttributeIcon } from "./BunkerAttributeIcon";
 import { GameScreen } from "../../screens/GameScreen";
 import { ResultsScreen } from "../../screens/ResultsScreen";
 import { VoteScreen } from "../../screens/VoteScreen";
@@ -46,7 +45,7 @@ function OverlayRenderer({ item }: { item: OverlayItem }) {
           <div className="action-card-reveal-player">{item.playerName}</div>
           <div className="action-card-reveal-label">{ATTRIBUTE_LABELS[cardType]}</div>
           <div className="action-card-reveal-card" data-card-type={cardType}>
-            <CardImage type={cardType} className="action-card-reveal-image" />
+            <BunkerAttributeIcon type={cardType} className="action-card-reveal-image" />
             <div className="action-card-reveal-title">{item.attribute.value}</div>
             {item.attribute.detail && (
               <div className="action-card-reveal-description">{item.attribute.detail}</div>
@@ -63,7 +62,7 @@ function OverlayRenderer({ item }: { item: OverlayItem }) {
         <div className="action-card-reveal-player">{item.playerName}</div>
         <div className="action-card-reveal-label">раскрывает особое условие</div>
         <div className="action-card-reveal-card" data-card-type="action">
-          <CardImage type="action" className="action-card-reveal-image" />
+          <BunkerAttributeIcon type="action" className="action-card-reveal-image" />
           <div className="action-card-reveal-title">{item.actionCard.title}</div>
           <div className="action-card-reveal-description">{item.actionCard.description}</div>
         </div>
@@ -165,7 +164,6 @@ function BunkerView() {
 export default function BunkerModule() {
   return (
     <BunkerGameProvider>
-      <BackgroundParticles />
       <BunkerView />
     </BunkerGameProvider>
   );

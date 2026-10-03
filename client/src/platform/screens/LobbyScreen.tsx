@@ -3,6 +3,7 @@ import { FiArrowLeft, FiCheck, FiCopy, FiEdit2, FiUsers } from "react-icons/fi";
 import "../../styles/show-menu.css";
 import { AccessibleModal } from "../components/AccessibleModal";
 import { ReconnectHostControls, type RecoverySeat } from "../components/ReconnectHostControls";
+import { useProfile } from "../context/ProfileContext";
 import { usePlatform } from "../context/PlatformContext";
 import { getClientGameModule } from "../gameRegistry";
 import { AvatarPicker } from "../components/AvatarPicker";
@@ -15,6 +16,7 @@ interface LobbyScreenProps {
 }
 
 export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
+  const { profile } = useProfile();
   const {
     snapshot,
     connected,
@@ -136,7 +138,8 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
                 type="button"
                 className="show-lobby-avatar-trigger"
                 onClick={() => setAvatarOpen(true)}
-                disabled={!connected || reconnectState !== "connected"}
+                title={!profile ? "Выбор персонажей доступен в аккаунте" : undefined}
+                disabled={!profile || !connected || reconnectState !== "connected"}
                 aria-haspopup="dialog"
                 aria-expanded={avatarOpen}
                 aria-label={`Выбрать персонажа, сейчас ${getAvatar(me.avatarId).name}`}
@@ -147,7 +150,13 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
                   <strong>{getAvatar(me.avatarId).name}</strong>
                 </span>
                 <span className="show-lobby-avatar-edit">
-                  Сменить <FiEdit2 aria-hidden="true" />
+                  {profile ? (
+                    <>
+                      Сменить <FiEdit2 aria-hidden="true" />
+                    </>
+                  ) : (
+                    "Гость"
+                  )}
                 </span>
               </button>
             )}
