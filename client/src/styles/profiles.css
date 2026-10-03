@@ -110,7 +110,68 @@ body:has(.show-menu, .profile-login),
 }
 .profile-login section {
   max-width: 490px;
-  margin: 70px auto 30px;
+  margin: 40px auto 30px;
+}
+.profile-auth-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  margin-top: 24px;
+  border: 1px solid var(--profile-line);
+  border-radius: 14px;
+  background: #ffffff08;
+}
+.profile-auth-tabs button {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--profile-muted);
+  background: transparent;
+  font:
+    600 14px "Golos Text",
+    sans-serif;
+  cursor: pointer;
+}
+.profile-auth-tabs button[aria-pressed="true"] {
+  background: #e3aff6;
+  color: #221930;
+}
+.profile-auth-tabs button:disabled {
+  cursor: wait;
+}
+.profile-password-field {
+  position: relative;
+}
+.profile-password-field input {
+  padding-right: 56px;
+}
+.profile-password-toggle {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  width: 48px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #d8fc61;
+  font-size: 20px;
+  cursor: pointer;
+}
+.profile-password-hint {
+  color: var(--profile-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.profile-reset-note {
+  margin-top: 14px;
+}
+.profile-auth-tabs button:focus-visible,
+.profile-password-toggle:focus-visible {
+  outline: 2px solid #d8fc61;
+  outline-offset: 2px;
 }
 .profile-eyebrow {
   color: #d8fc61;

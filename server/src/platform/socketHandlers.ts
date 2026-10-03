@@ -87,7 +87,8 @@ import {
   syncRoomProfileRewards,
   applyProfileToPlayer,
 } from "./profiles.js";
-import { nicknameKey, normalizeNickname } from "../../../shared/platform/cosmetics.js";
+import { normalizeNickname } from "../../../shared/platform/cosmetics.js";
+import { profileNicknameMatches } from "./profileAuth.js";
 import { setRoomPublishedHook } from "./statePublisher.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
@@ -693,7 +694,7 @@ export function registerHandlers(io: IOServer): void {
         const name = normalizeNickname(
           data?.playerName ?? data?.spectatorName ?? data?.claimantName,
         );
-        if (!name || (socket.data.profileKey && nicknameKey(name) !== socket.data.profileKey)) {
+        if (!name || !profileNicknameMatches(socket, name)) {
           socket.emit("room:error", {
             message: name
               ? "Используйте никнейм своего профиля"

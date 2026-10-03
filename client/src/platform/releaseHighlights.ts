@@ -9,6 +9,7 @@ import firstBunker from "../assets/updates/bunker-1.0.0.png";
 import firstCatalog from "../assets/updates/catalog-3.0.0.png";
 import firstShowMenu from "../assets/updates/menu-4.2.0.png";
 import legendaryCards from "../assets/updates/cards-4.5.2.png";
+import accountRegistration from "../assets/updates/auth-5.0.0.png";
 
 export interface ReleaseScreenshot {
   src: string;
@@ -30,6 +31,29 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-5-0",
+    version: "5.0.0",
+    date: "2026-10-03",
+    category: "АККАУНТЫ",
+    title: "Ваш ник. Ваш пароль. Ваша коллекция.",
+    summary: "Появились регистрация и вход по никнейму и паролю.",
+    changes: [
+      "Монеты, персонажи и карты сохраняются в защищённом паролем аккаунте. Новым игрокам — 100 монет.",
+      "Вход сохраняется между посещениями. Можно выйти из аккаунта и играть гостем.",
+      "Старые профили без пароля сброшены. Для сохранения коллекции нужно зарегистрироваться заново.",
+      "Почта пока не требуется. Сохраните пароль: восстановление через почту ещё недоступно.",
+    ],
+    screenshots: [
+      {
+        src: accountRegistration,
+        caption: "5.0.0 · Регистрация по никнейму и паролю",
+        alt: "Форма регистрации PartyPlay с никнеймом, паролем и его подтверждением",
+        width: 1440,
+        height: 1170,
+      },
+    ],
+  },
   {
     id: "release-4-11",
     version: "4.11.0",

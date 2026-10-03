@@ -10,6 +10,8 @@ import { registerHandlers } from "./socketHandlers.js";
 import { createNamespaceConnectionLimiter } from "./namespaceConnectionLimiter.js";
 import { isDeploymentDraining, setDeploymentDraining } from "./platform/deploymentState.js";
 import { disposeRoomsForDeployment, getAllRooms } from "./platform/roomManager.js";
+import { attachProfileSession } from "./platform/profileAuth.js";
+import { profileStorageHealthy } from "./platform/profileStorage.js";
 
 const app = express();
 
@@ -109,10 +111,17 @@ app.get("/healthz", (_req, res) => {
 });
 
 app.get("/readyz", (_req, res) => {
-  const acceptingTraffic = ready && !shuttingDown && !isDeploymentDraining();
+  const acceptingTraffic =
+    ready && !shuttingDown && !isDeploymentDraining() && profileStorageHealthy;
   res.set("Cache-Control", "no-store");
   res.status(acceptingTraffic ? 200 : 503).json({
-    status: acceptingTraffic ? "ready" : isDeploymentDraining() ? "draining" : "stopping",
+    status: acceptingTraffic
+      ? "ready"
+      : !profileStorageHealthy
+        ? "storage-unavailable"
+        : isDeploymentDraining()
+          ? "draining"
+          : "stopping",
   });
 });
 
@@ -171,6 +180,7 @@ const connectionLimiter = createNamespaceConnectionLimiter(
   ipConnectionCounts,
 );
 io.use(connectionLimiter);
+io.use(attachProfileSession);
 
 registerHandlers(io);
 

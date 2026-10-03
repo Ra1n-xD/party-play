@@ -142,6 +142,7 @@ export interface CaseOpening {
   openedAt: number;
 }
 export interface ProfileSnapshot {
+  id: string;
   nickname: string;
   coins: number;
   completedGames: number;
