@@ -1,5 +1,6 @@
 import { AVATARS, type AvatarId } from "./avatars.js";
 import type { UpgradeAttempt } from "./upgrades.js";
+import { ROOM_REACTIONS, type RoomReactionId } from "./reactions.js";
 
 export const RARITIES = {
   basic: { name: "Базовый", color: "#9da7b5", chance: 0 },
@@ -9,7 +10,7 @@ export const RARITIES = {
   legendary: { name: "Легендарный", color: "#ffc35d", chance: 3 },
 } as const;
 export type Rarity = keyof typeof RARITIES;
-export type CosmeticKind = "avatar" | "durak" | "uno";
+export type CosmeticKind = "avatar" | "durak" | "uno" | "reaction";
 export const CARD_SKINS = [
   {
     id: "classic",
@@ -74,6 +75,7 @@ export interface Cosmetic {
   rarity: Rarity;
   avatarId?: AvatarId;
   cardSkinId?: CardSkinId;
+  reactionId?: RoomReactionId;
 }
 const avatarRarities: Record<AvatarId, Rarity> = {
   human: "basic",
@@ -88,6 +90,15 @@ const avatarRarities: Record<AvatarId, Rarity> = {
   astronaut: "legendary",
 };
 export const COSMETICS: Cosmetic[] = [
+  ...ROOM_REACTIONS.map(
+    (reaction): Cosmetic => ({
+      id: `reaction:${reaction.id}`,
+      kind: "reaction",
+      name: reaction.label,
+      rarity: reaction.rarity,
+      reactionId: reaction.id,
+    }),
+  ),
   ...AVATARS.map(
     (avatar): Cosmetic => ({
       id: `avatar:${avatar.id}`,
@@ -110,11 +121,12 @@ export const COSMETICS: Cosmetic[] = [
   ),
 ];
 export const CASE_ITEMS = COSMETICS.filter((item) => item.rarity !== "basic");
-export const BASIC_ITEMS = ["avatar:human", "durak:classic", "uno:classic"];
+export const BASIC_ITEMS = ["avatar:human", "durak:classic", "uno:classic", "reaction:good-move"];
 export const COSMETIC_KIND_NAMES: Record<CosmeticKind, string> = {
   avatar: "Персонажи",
   durak: "Карты Дурака",
   uno: "Карты UNO",
+  reaction: "Эмоции",
 };
 export const CASE_COST = 1;
 export const GAME_REWARD = 1;
@@ -151,5 +163,11 @@ export interface ProfileSnapshot {
   equipped: { avatar: AvatarId; durak: CardSkinId; uno: CardSkinId };
   recentOpenings: CaseOpening[];
   recentUpgrades?: UpgradeAttempt[];
+}
+/** Unlocked reactions are always available; their last copy is protected in upgrades. */
+export function isCosmeticInUse(profile: ProfileSnapshot, item: Cosmetic): boolean {
+  return item.kind === "reaction"
+    ? (profile.inventory[item.id] ?? 0) > 0
+    : `${item.kind}:${profile.equipped[item.kind]}` === item.id;
 }
 export type ProfileReply<T> = { ok: true; value: T } | { ok: false; error: string };

@@ -438,6 +438,9 @@
   top: 2px;
   left: calc(var(--card2d-table-width) * 0.4);
 }
+.durak-trump-label {
+  display: none;
+}
 .screen.command-game-screen.card-game-screen.game-2d
   .durak-deck-panel
   :is(.durak-card, .durak-empty-deck),
@@ -661,13 +664,45 @@
     min-height: 140px;
   }
   .screen.command-game-screen.card-game-screen.game-2d .durak-deck-panel {
-    flex-basis: 75px;
-    width: 75px;
-    min-height: 95px;
+    flex-basis: 86px;
+    width: 86px;
+    min-height: 124px;
+  }
+  .screen.command-game-screen.card-game-screen.game-2d .durak-deck-visual {
+    width: 45px;
+    height: 64px;
   }
   .screen.command-game-screen.card-game-screen.game-2d .durak-trump {
-    left: 18px;
-    top: 2px;
+    left: 28px;
+    top: 12px;
+  }
+  .screen.command-game-screen.card-game-screen.game-2d .durak-trump-label {
+    position: absolute;
+    top: 88px;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #fff7d8;
+    line-height: 1.15;
+  }
+  .durak-trump-label > b {
+    font-size: 25px;
+  }
+  .durak-trump-label.is-red > b {
+    color: #ff9993;
+  }
+  .durak-trump-label span {
+    display: grid;
+    gap: 2px;
+  }
+  .durak-trump-label small {
+    color: #c8d8cf;
+    font-size: 9px;
+  }
+  .durak-trump-label strong {
+    font-size: 11px;
+    text-transform: capitalize;
   }
   .screen.command-game-screen.card-game-screen.game-2d
     .durak-deck-panel
@@ -799,10 +834,10 @@
 }
 @media (max-width: 760px) {
   .screen.command-game-screen.card-game-screen.game-2d .durak-arena-table-zone {
-    grid-template-columns: 60px minmax(0, 1fr) 60px;
+    grid-template-columns: 86px minmax(0, 1fr) 43px;
   }
   .screen.command-game-screen.card-game-screen.game-2d .durak-deck-panel {
-    width: 60px;
+    width: 86px;
   }
   .screen.command-game-screen.card-game-screen.game-2d .card-arena-self-seat .card-player-seat {
     --card2d-portrait-size: 32px;

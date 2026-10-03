@@ -6,6 +6,7 @@ import {
   GAME_REWARD,
   RARITIES,
   getCosmetic,
+  isCosmeticInUse,
   nicknameKey,
   type ProfileSnapshot,
   type CaseOpening,
@@ -121,7 +122,8 @@ export async function equipProfileItem(
     const current = draft.profiles.get(key);
     if (!item || !current?.inventory[itemId])
       throw new Error("Этот предмет ещё не открыт. Найдите его в кейсе");
-    if (`${item.kind}:${current.equipped[item.kind]}` === item.id) return false;
+    if (isCosmeticInUse(current, item)) return false;
+    if (item.kind === "reaction") return false;
     for (const room of getAllRooms().values()) {
       if (
         room.lifecycle === "playing" &&
@@ -273,10 +275,10 @@ export function registerProfileHandlers(
         }
         for (const input of data.inputs) {
           const item = getCosmetic(input.itemId)!;
-          const protectedCopy = `${item.kind}:${current.equipped[item.kind]}` === item.id ? 1 : 0;
+          const protectedCopy = isCosmeticInUse(current, item) ? 1 : 0;
           if ((current.inventory[item.id] ?? 0) - protectedCopy < input.count)
             throw new Error(
-              "Предметов недостаточно. Используемый экземпляр защищён: сначала смените его в коллекции",
+              "Предметов недостаточно. Используемый экземпляр и последняя копия эмоции защищены",
             );
         }
         const roll = randomInt(10_000);

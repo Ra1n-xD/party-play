@@ -3,6 +3,7 @@ import { getAvatar, type AvatarId } from "../../../../../shared/platform/avatars
 import { makeAvatarFace, type AvatarFaceRig } from "./AvatarFace";
 import { makeSeatedArm, roundedPart } from "./AvatarParts";
 import { mergeRigidParts } from "./mergeRigidParts";
+import { makeAvatarLegs } from "./AvatarLegs";
 import { faceSurfaceDepth } from "./AvatarSculpt";
 
 type Point = [number, number, number];
@@ -371,47 +372,8 @@ export function makeSeatedAvatar(avatarId: AvatarId, holdingCards: boolean) {
   const space = avatar.id === "astronaut";
   const jacket = material(avatar.outfit, mechanical ? 0.4 : 0);
   const trousers = space ? 0xdbd2c0 : mechanical ? 0x526f82 : 0x29333b;
-  for (const side of [-1, 1]) {
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(side * 0.2, 0.965, 0.015),
-      new THREE.Vector3(side * 0.209, 0.937, 0.305),
-      new THREE.Vector3(side * 0.211, 0.81, 0.534),
-      new THREE.Vector3(side * 0.21, 0.5, 0.563),
-      new THREE.Vector3(side * 0.21, 0.213, 0.567),
-    ]);
-    const legGeometry = new THREE.TubeGeometry(curve, 32, 1, 16, false);
-    const position = legGeometry.getAttribute("position");
-    for (let i = 0; i < position.count; i++) {
-      const progress = Math.floor(i / 17) / 32;
-      const center = curve.getPointAt(progress);
-      const radius = 0.146 - progress * 0.045;
-      position.setXYZ(
-        i,
-        center.x + (position.getX(i) - center.x) * radius,
-        center.y + (position.getY(i) - center.y) * radius,
-        center.z + (position.getZ(i) - center.z) * radius,
-      );
-    }
-    legGeometry.computeVertexNormals();
-    mesh(model, legGeometry, trousers, [0, 0, 0]);
-    const shoe = oval(model, [0.143, 0.082, 0.24], space ? 0xb8bebb : 0x342e31, [
-      side * 0.21,
-      0.172,
-      0.679,
-    ]);
-    shoe.rotation.x = -0.045;
-    box(model, [0.276, 0.032, 0.443], 0x202329, [side * 0.21, 0.105, 0.694]);
-    seam(
-      model,
-      [
-        [side * 0.21 - 0.093, 0.204, 0.785],
-        [side * 0.21, 0.228, 0.819],
-        [side * 0.21 + 0.093, 0.204, 0.785],
-      ],
-      space ? 0x8b9695 : 0x55484b,
-      0.003,
-    );
-  }
+  const legs = makeAvatarLegs(trousers, space ? 0xb8bebb : 0x342e31, space ? 0x8b9695 : 0x55484b);
+  model.add(legs.root);
   model.add(tailoredTorso(jacket));
   if (mechanical || space) {
     box(model, [0.269, 0.299, 0.033], mechanical ? 0x273f50 : 0x516d85, [0, 1.566, 0.221]);
@@ -530,5 +492,5 @@ export function makeSeatedAvatar(avatarId: AvatarId, holdingCards: boolean) {
   leftArm.grip.add(hand);
   mergeRigidParts(head);
   mergeRigidParts(model);
-  return { body, head, face: faces.get(head)!, leftArm, rightArm, hand };
+  return { body, head, face: faces.get(head)!, leftArm, rightArm, hand, legs };
 }

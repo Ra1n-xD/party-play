@@ -3,8 +3,17 @@ import { getCardSkin, type Cosmetic } from "../../../../shared/platform/cosmetic
 import { AvatarPortrait } from "./AvatarPortrait";
 import { CardFaceArtwork } from "./CardFaceArtwork";
 import { RoyalCardBackArtwork } from "./RoyalCardBackArtwork";
+import { ReactionIcon } from "./ReactionIcon";
+import "../../styles/reactions.css";
 
 export function CosmeticPreview({ item }: { item: Cosmetic }) {
+  if (item.reactionId)
+    return (
+      <div className={`cosmetic-reaction${item.rarity === "legendary" ? " is-legendary" : ""}`}>
+        <ReactionIcon id={item.reactionId} />
+        <span>{item.reactionId === "laugh" ? "Смех стоя · со звуком" : "Эмоция за столом"}</span>
+      </div>
+    );
   if (item.avatarId)
     return (
       <div className="cosmetic-avatar">

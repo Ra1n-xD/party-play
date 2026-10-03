@@ -10,6 +10,8 @@ import { useTablePresence } from "../../shared/table3d/useTablePresence";
 import { TableSessionMenu, type TableMenuHandle } from "../../shared/table3d/TableSessionMenu";
 import { TableTurnIndicator } from "../../shared/table3d/TableTurnIndicator";
 
+const SUIT_NAMES = { clubs: "Трефы", diamonds: "Бубны", hearts: "Черви", spades: "Пики" };
+
 interface Props {
   game: DurakPublicState;
   isHost: boolean;
@@ -305,9 +307,15 @@ export default function DurakTable3D({
       <div className="table3d-information">
         <span
           className={`table3d-trump ${game.trumpSuit === "hearts" || game.trumpSuit === "diamonds" ? "is-red" : ""}`}
+          aria-label={
+            game.trumpSuit ? `Козырь: ${SUIT_NAMES[game.trumpSuit]}` : "Козырь не определён"
+          }
         >
-          {game.trumpSuit ? getSuitSymbol(game.trumpSuit) : "—"}
+          <b className="table3d-trump-symbol" aria-hidden="true">
+            {game.trumpSuit ? getSuitSymbol(game.trumpSuit) : "—"}
+          </b>
           <small>козырь</small>
+          {game.trumpSuit && <b className="table3d-trump-name">{SUIT_NAMES[game.trumpSuit]}</b>}
         </span>
         <span>
           <strong>{game.deckCount}</strong>

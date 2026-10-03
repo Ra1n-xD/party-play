@@ -375,6 +375,7 @@ body:has(.show-menu, .profile-login),
   background: #ffffff04;
 }
 .collection-item.is-locked .cosmetic-avatar,
+.collection-item.is-locked .cosmetic-reaction,
 .collection-item.is-locked .cosmetic-deck {
   opacity: 0.35;
   filter: grayscale(0.6);
@@ -424,6 +425,28 @@ body:has(.show-menu, .profile-login),
   display: grid;
   place-items: center;
   padding: 12px 0;
+}
+.cosmetic-reaction {
+  height: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.cosmetic-reaction .reaction-icon {
+  width: 86px;
+  height: 86px;
+}
+.cosmetic-reaction > span {
+  color: #bcb0cc;
+  font-size: 10px;
+}
+.cosmetic-reaction.is-legendary .reaction-icon {
+  filter: drop-shadow(0 0 12px #ffc35d40);
+}
+.cosmetic-reaction.is-legendary > span {
+  color: #ffc35d;
 }
 .cosmetic-avatar .avatar-portrait {
   width: 100px;
@@ -565,6 +588,7 @@ body:has(.show-menu, .profile-login),
   text-align: center;
 }
 .case-reel-item .cosmetic-avatar,
+.case-reel-item .cosmetic-reaction,
 .case-reel-item .cosmetic-deck {
   height: 125px;
 }

@@ -13,6 +13,7 @@ import {
   COSMETIC_KIND_NAMES,
   RARITIES,
   getCosmetic,
+  isCosmeticInUse,
   type Cosmetic,
   type CosmeticKind,
   type ProfileSnapshot,
@@ -88,7 +89,7 @@ export function UpgradeScreen() {
   const available = (item: Cosmetic) => {
     if (!profile) return 0;
     const current = phase === "request" || phase === "spin" ? (previewProfile ?? profile) : profile;
-    const protectedCopy = `${item.kind}:${current.equipped[item.kind]}` === item.id ? 1 : 0;
+    const protectedCopy = isCosmeticInUse(current, item) ? 1 : 0;
     return Math.max(0, (current.inventory[item.id] ?? 0) - protectedCopy);
   };
   useEffect(() => {
@@ -125,7 +126,7 @@ export function UpgradeScreen() {
       UPGRADE_VALUES[item.rarity] > Math.max(1, inputValue) &&
       UPGRADE_VALUES[item.rarity] >= inputValue * multiplier,
   );
-  const equipped = target && `${target.kind}:${profile.equipped[target.kind]}` === target.id;
+  const equipped = target && isCosmeticInUse(profile, target);
 
   const add = (item: Cosmetic) => {
     if (inactive || selectedCount >= MAX_UPGRADE_ITEMS) return;
@@ -370,7 +371,11 @@ export function UpgradeScreen() {
               onClick={() => equip(target.id)}
               disabled={busy || !connected || !!equipped}
             >
-              {equipped ? "✓ Используется" : "Использовать предмет"}
+              {target.kind === "reaction"
+                ? "✓ Доступна в игре"
+                : equipped
+                  ? "✓ Используется"
+                  : "Использовать предмет"}
             </button>
           )}
         </div>
@@ -393,7 +398,7 @@ export function UpgradeScreen() {
             </span>
           </div>
           <p className="upgrade-catalog-note">
-            Базовые предметы и последний используемый экземпляр защищены.
+            Базовые предметы, используемые скины и последняя копия каждой эмоции защищены.
           </p>
           {owned.length ? (
             <div className="upgrade-grid">
@@ -441,7 +446,7 @@ export function UpgradeScreen() {
             <span>{targets.length} предметов</span>
           </div>
           <nav className="upgrade-filters" aria-label="Тип цели">
-            {(["all", "avatar", "durak", "uno"] as const).map((kind) => (
+            {(["all", "avatar", "durak", "uno", "reaction"] as const).map((kind) => (
               <button
                 type="button"
                 key={kind}
@@ -455,7 +460,9 @@ export function UpgradeScreen() {
                     ? "Персонажи"
                     : kind === "durak"
                       ? "Дурак"
-                      : "UNO"}
+                      : kind === "uno"
+                        ? "UNO"
+                        : "Эмоции"}
               </button>
             ))}
           </nav>

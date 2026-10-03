@@ -3,6 +3,7 @@ import {
   COSMETICS,
   COSMETIC_KIND_NAMES,
   RARITIES,
+  isCosmeticInUse,
   type CosmeticKind,
 } from "../../../../shared/platform/cosmetics";
 import { useProfile } from "../context/ProfileContext";
@@ -20,7 +21,7 @@ export function ProfileScreen() {
         <div>
           <span className="profile-eyebrow">КОЛЛЕКЦИЯ</span>
           <h1>Ваш стиль игры</h1>
-          <p>Персонажи и карты, которые узнают за любым столом.</p>
+          <p>Персонажи, карты и эмоции для вашего вечера за столом.</p>
         </div>
       </div>
       <section className="profile-summary">
@@ -55,7 +56,7 @@ export function ProfileScreen() {
       <div className="collection-grid">
         {COSMETICS.filter((item) => item.kind === tab).map((item) => {
           const count = profile.inventory[item.id] ?? 0;
-          const selected = `${item.kind}:${profile.equipped[item.kind]}` === item.id;
+          const selected = isCosmeticInUse(profile, item);
           const rarity = RARITIES[item.rarity];
           return (
             <article
@@ -74,7 +75,13 @@ export function ProfileScreen() {
                 onClick={() => equip(item.id)}
                 disabled={!count || selected || busy || !connected}
               >
-                {selected ? "✓ Выбран" : count ? "Выбрать" : "В кейсе"}
+                {selected
+                  ? item.kind === "reaction"
+                    ? "✓ Доступна в игре"
+                    : "✓ Выбран"
+                  : count
+                    ? "Выбрать"
+                    : "В кейсе"}
               </button>
             </article>
           );

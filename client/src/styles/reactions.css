@@ -20,6 +20,30 @@ body .command-game-screen .room-reactions-popover {
     5px 6px 0 #18102180,
     0 16px 40px #100d2040;
   font-family: "Golos Text", sans-serif;
+  max-height: min(440px, calc(100dvh - 40px));
+  overflow-y: auto;
+}
+.room-reactions-footer {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  color: #786584;
+  font-size: 12px;
+}
+body .command-game-screen .room-reaction-sound {
+  justify-self: start;
+  border: 0;
+  padding: 4px 0;
+  color: #69408a;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+  pointer-events: auto;
+}
+body .command-game-screen .room-reactions-option-label {
+  overflow-wrap: anywhere;
 }
 body .command-game-screen .room-reactions-option {
   position: relative;
@@ -86,6 +110,9 @@ body .command-game-screen .room-reaction-message-copy span {
   font-size: 12px;
 }
 @media (prefers-reduced-motion: no-preference) {
+  .reaction-icon-laugh.is-animated .reaction-art {
+    animation: reaction-laugh 0.3s ease-in-out 12 alternate;
+  }
   .reaction-icon-good-move.is-animated .reaction-art {
     animation: reaction-approve 1.3s ease-in-out both;
   }
@@ -110,6 +137,14 @@ body .command-game-screen .room-reaction-message-copy span {
   }
   .reaction-icon.is-animated .reaction-spark {
     animation: reaction-spark 0.55s ease-in-out 4;
+  }
+}
+@keyframes reaction-laugh {
+  from {
+    transform: translateY(0) rotate(-8deg);
+  }
+  to {
+    transform: translateY(-3px) rotate(7deg);
   }
 }
 @keyframes reaction-approve {
