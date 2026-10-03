@@ -1523,7 +1523,8 @@
 
   .show-profile-navigation {
     grid-area: 2 / 1 / auto / -1;
-    gap: clamp(10px, 4vw, 16px);
+    gap: clamp(8px, 2.5vw, 16px);
+    flex-wrap: wrap;
   }
 
   .show-profile-balance {

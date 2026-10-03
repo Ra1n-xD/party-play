@@ -500,6 +500,18 @@ export const durakModule: ServerGameModule<"durak"> = {
     return { success: true };
   },
   lifecycle: (room) => room.lifecycle,
+  completedMatchResult: (room) => {
+    const state = room.gameState;
+    if (room.lifecycle !== "results" || !state?.result || state.result.type === "aborted")
+      return null;
+    return {
+      participantSeatIds: state.seatOrder.filter((id) => state.statusBySeatId[id] !== "excluded"),
+      winnerSeatIds:
+        state.result.type === "fool"
+          ? state.seatOrder.filter((id) => state.statusBySeatId[id] === "out")
+          : [],
+    };
+  },
   parseCommand: parseDurakCommand,
   start: (room, io) => {
     const durakRoom = requireDurakRoom(room);

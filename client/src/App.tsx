@@ -9,6 +9,7 @@ import { ProfileScreen } from "./platform/screens/ProfileScreen";
 import { LoginScreen } from "./platform/screens/LoginScreen";
 import { CasesScreen } from "./platform/screens/CasesScreen";
 import { UpgradeScreen } from "./platform/screens/UpgradeScreen";
+import { LeaderboardScreen } from "./platform/screens/LeaderboardScreen";
 import { UpdatesScreen } from "./platform/screens/UpdatesScreen";
 import { ProfileHeader } from "./platform/components/ProfileHeader";
 import "./styles/profiles.css";
@@ -35,7 +36,7 @@ function ProfileApp() {
       if (
         !link ||
         link.target ||
-        !["/", "/login", "/profile", "/cases", "/upgrade", "/updates"].includes(
+        !["/", "/login", "/profile", "/cases", "/upgrade", "/updates", "/leaderboard"].includes(
           link.getAttribute("href") ?? "",
         )
       )
@@ -83,6 +84,8 @@ function ProfileApp() {
         <CasesScreen />
       ) : path === "/upgrade" ? (
         <UpgradeScreen />
+      ) : path === "/leaderboard" ? (
+        <LeaderboardScreen />
       ) : path === "/updates" ? (
         <UpdatesScreen />
       ) : (

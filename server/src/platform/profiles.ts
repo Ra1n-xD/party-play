@@ -22,6 +22,9 @@ import {
 import { profileRoom, registerProfileAuthHandlers } from "./profileAuth.js";
 import { getAllRooms, type Player, type Room } from "./roomManager.js";
 
+import { registerLeaderboardHandlers } from "./leaderboard.js";
+import { getServerGameModule } from "./gameRegistry.js";
+
 type IOSocket = Socket<ClientEvents, ServerEvents>;
 const DROP_FEED_ROOM = "__cosmetic_drops";
 function makeDrop(
@@ -124,6 +127,7 @@ export function registerProfileHandlers(
   membershipNickname: () => string | null,
   publishRooms: () => void,
 ): void {
+  registerLeaderboardHandlers(socket);
   let requests: number[] = [];
   const guard = () => {
     const now = Date.now();
@@ -279,6 +283,7 @@ interface ProfileRound {
   players: Map<string, string>;
   paid: boolean;
   rewardKeys?: Set<string>;
+  winnerKeys?: Set<string>;
   retry?: NodeJS.Timeout;
 }
 const rounds = new WeakMap<Room, ProfileRound>();
@@ -293,6 +298,7 @@ function payRound(round: ProfileRound, io: IOServer): void {
           if (!profile) continue;
           profile.coins += GAME_REWARD;
           profile.completedGames += 1;
+          if (round.winnerKeys?.has(key)) profile.wins += 1;
         }
         profileStore.rewardedMatches.add(round.id);
       });
@@ -334,31 +340,29 @@ export function syncRoomProfileRewards(room: Room, io: IOServer): void {
   }
   const round = rounds.get(room);
   if (room.lifecycle !== "results" || !round || round.paid) return;
-  const state = room.gameState as {
-    result?: { type: string };
-    statusBySeatId?: Record<string, string>;
-  } | null;
-  const complete =
-    room.gameId === "bunker"
-      ? room.completedNaturally
-      : state?.result && state.result.type !== "aborted";
-  if (!complete) {
+  const result = getServerGameModule(room.gameId)?.completedMatchResult(room);
+  if (!result) {
     round.paid = true;
     return;
   }
-  round.rewardKeys ??= new Set(
-    [...round.players]
-      .filter(([id, key]) => {
-        const player = room.players.get(id);
-        return (
-          player &&
-          player.profileKey === key &&
-          !player.kicked &&
-          !player.voluntarilyLeft &&
-          state?.statusBySeatId?.[id] !== "excluded"
-        );
-      })
-      .map(([, key]) => key),
-  );
+  if (!round.rewardKeys) {
+    const participants = new Set(result.participantSeatIds);
+    const winners = new Set(result.winnerSeatIds);
+    round.rewardKeys = new Set();
+    round.winnerKeys = new Set();
+    for (const [id, key] of round.players) {
+      const player = room.players.get(id);
+      if (
+        !player ||
+        player.profileKey !== key ||
+        player.kicked ||
+        player.voluntarilyLeft ||
+        !participants.has(id)
+      )
+        continue;
+      round.rewardKeys.add(key);
+      if (winners.has(id)) round.winnerKeys.add(key);
+    }
+  }
   payRound(round, io);
 }

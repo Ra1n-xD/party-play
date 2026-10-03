@@ -45,6 +45,7 @@ function emptyStore(): ProfileStore {
 }
 export let profileStore = emptyStore();
 export let profileStorageHealthy = true;
+export let profileStoreRevision = 0;
 const storagePath =
   process.env.PARTYPLAY_PROFILES_FILE?.trim() ||
   resolve(
@@ -116,6 +117,7 @@ export function profileTransaction(change: () => void): void {
     if (savedCurrentFormat) writeAtomic(`${storagePath}.bak`, serialize(previous));
     writeAtomic(storagePath, serialize(profileStore));
     savedCurrentFormat = true;
+    profileStoreRevision++;
   } catch {
     profileStore = previous;
     throw new Error("Не удалось сохранить профиль. Попробуйте позже");
@@ -155,6 +157,15 @@ try {
         !Array.isArray(profile.recentOpenings)
       )
         throw new Error("Invalid profile");
+      // Existing password accounts retain their coins and completed games.
+      // Historical winners were not stored, so their win counter starts at zero.
+      profile.wins ??= 0;
+      if (
+        !Number.isSafeInteger(profile.wins) ||
+        profile.wins < 0 ||
+        profile.wins > profile.completedGames
+      )
+        throw new Error("Invalid profile wins");
       for (const [id, count] of Object.entries(profile.inventory))
         if (!getCosmetic(id) || !Number.isSafeInteger(count) || count < 1)
           throw new Error("Invalid inventory");

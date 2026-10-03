@@ -385,6 +385,14 @@ export const unoModule: ServerGameModule<"uno"> = {
     return { success: true };
   },
   lifecycle: (room) => room.lifecycle,
+  completedMatchResult: (room) => {
+    const state = room.gameState;
+    if (room.lifecycle !== "results" || state?.result?.type !== "winner") return null;
+    return {
+      participantSeatIds: state.seatOrder.filter((id) => state.statusBySeatId[id] !== "excluded"),
+      winnerSeatIds: [state.result.winnerSeatId],
+    };
+  },
   parseCommand: parseUnoCommand,
   start: (room, io) => {
     const unoRoom = requireUnoRoom(room);

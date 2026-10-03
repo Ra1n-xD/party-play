@@ -304,6 +304,16 @@ export const bunkerModule: ServerGameModule<"bunker"> = {
     return { success: true };
   },
   lifecycle: (room) => room.lifecycle,
+  completedMatchResult: (room) => {
+    if (room.lifecycle !== "results" || !room.completedNaturally) return null;
+    const players = [...room.players.values()].filter(
+      (player) => !player.kicked && !player.voluntarilyLeft,
+    );
+    return {
+      participantSeatIds: players.map((player) => player.id),
+      winnerSeatIds: players.filter((player) => player.alive).map((player) => player.id),
+    };
+  },
   parseCommand: parseBunkerCommand,
   start: (room, io) => {
     const bunkerRoom = requireBunkerRoom(room);
