@@ -4,19 +4,12 @@ import { useGame } from "../context/GameContext";
 import "../styles/game-screen.css";
 import { AccessibleModal } from "./game/AccessibleModal";
 import { CharacterLoadingState } from "./game/CharacterLoadingState";
-import { CharacterDossier } from "./game/CharacterDossier";
 import { GameCommandBar } from "./game/GameCommandBar";
-import { GameStatusHeader } from "./game/GameStatusHeader";
+import { Bunker2DLayout } from "../games/bunker/Bunker2DLayout";
+import { GameViewToggle } from "../games/shared/GameViewToggle";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { HostControlDialog } from "./game/HostControlDialog";
-import { MobileGameTabs } from "./game/MobileGameTabs";
-import { PlayerBoard } from "./game/PlayerBoard";
-import { ScenarioSummary } from "./game/ScenarioSummary";
-import {
-  buildGameScreenViewModel,
-  isExpandedActionCardPublic,
-  type MobileGameTab,
-} from "./game/gameScreenViewModel";
+import { buildGameScreenViewModel, isExpandedActionCardPublic } from "./game/gameScreenViewModel";
 
 import { useTableHotkeys } from "../games/shared/table3d/useTableHotkeys";
 import { useTableActionDock } from "../games/shared/table3d/useTableActionDock";
@@ -68,7 +61,6 @@ export function GameScreen({
   const screenRef = useTableActionDock(is3D && Boolean(gameState));
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [confirmRevealAction, setConfirmRevealAction] = useState(false);
-  const [activeMobileTab, setActiveMobileTab] = useState<MobileGameTab>("players");
   const [hostControlsOpen, setHostControlsOpen] = useState(false);
   const hostPauseActiveRef = useRef(false);
   const isCurrentHost =
@@ -153,6 +145,18 @@ export function GameScreen({
   }, [hasLiveConnection, isCurrentHost]);
 
   useTableHotkeys(
+    is3D && (showAttrPicker || confirmRevealAction || hostControlsOpen),
+    (code) => {
+      if (code === "KeyE" && showAttrPicker) closeLocalModals();
+      else if (code === "KeyF" && confirmRevealAction) closeLocalModals();
+      else if (code === "KeyH" && hostControlsOpen) closeHostControls();
+      else return false;
+      return true;
+    },
+    true,
+  );
+
+  useTableHotkeys(
     is3D && showAttrPicker && canUseRoomActions,
     (code) => {
       const index = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6"].indexOf(code);
@@ -183,51 +187,46 @@ export function GameScreen({
     closeLocalModals();
   };
 
-  const playerBoard = (
-    <PlayerBoard
-      players={gameState.players}
-      playerId={playerId}
-      currentTurnPlayerId={gameState.currentTurnPlayerId}
-      lastEliminatedPlayerId={gameState.lastEliminatedPlayerId}
-      onSelectPlayer={openExpandedPlayer}
+  const commandBar = (
+    <GameCommandBar
+      currentTurnPlayer={view.currentTurnPlayer}
+      isMyTurn={view.isMyTurn}
+      phaseLabel={view.phaseLabel}
+      phaseDescription={view.phaseDescription}
+      canReveal={is3D && canUseRoomActions && view.canReveal}
+      canRevealAction={is3D && canUseRoomActions && view.canRevealAction}
+      canManageGame={canUseRoomActions && Boolean(view.me?.isHost)}
+      canSkipDiscussion={canUseRoomActions && view.canSkipDiscussion}
+      managementAttentionCount={managementAttentionCount}
+      hostControlsOpen={hostControlsOpen}
+      onReveal={() => {
+        if (gameState.roundNumber === 1) {
+          revealAttribute(0);
+        } else {
+          openAttributePicker();
+        }
+      }}
+      onRevealAction={openRevealActionConfirmation}
+      onOpenHostControls={openHostControls}
+      onSkipDiscussion={adminSkipDiscussion}
     />
   );
-
-  const characterDossier =
-    !isSpectator && myCharacter ? (
-      <CharacterDossier
-        character={myCharacter}
-        revealedIndices={view.revealedIndices}
-        alive={view.me?.alive ?? false}
-        actionCardRevealed={view.me?.actionCardRevealed ?? false}
-      />
-    ) : null;
 
   return (
     <main
       ref={screenRef}
-      className={`screen command-game-screen has-game-command-bar ${is3D ? "is-3d bunker3d-screen" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
+      className={`screen command-game-screen has-game-command-bar ${is3D ? "is-3d bunker3d-screen" : "game-2d bunker-2d"} ${is3D && !cursorVisible ? "is-looking" : ""}`}
     >
       <GameRoomHeader
         roomCode={roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
         confirmActiveLeave={!isSpectator}
-      />
-      {!is3D && (
-        <GameStatusHeader
-          gameState={gameState}
-          phaseLabel={view.phaseLabel}
-          phaseDescription={view.phaseDescription}
-          isMyTurn={view.isMyTurn}
-        />
-      )}
-
-      {!is3D && isSpectator && (
-        <div className="gs-spectator-status" role="status">
-          Режим наблюдателя
-        </div>
-      )}
+        playerCount={!is3D ? gameState.players.length : undefined}
+        tools={!is3D ? commandBar : undefined}
+      >
+        {!is3D && <GameViewToggle onOpen3D={onToggle3D} />}
+      </GameRoomHeader>
 
       {is3D ? (
         <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
@@ -251,60 +250,23 @@ export function GameScreen({
           />
         </Suspense>
       ) : (
-        <>
-          <button type="button" className="bunker3d-return btn btn-secondary" onClick={onToggle3D}>
-            3D-стол
-          </button>
-          <div className="gs-desktop-layout">
-            <div className="gs-workspace">
-              {playerBoard}
-              {characterDossier && <div className="gs-dossier-column">{characterDossier}</div>}
-            </div>
-          </div>
-
-          <div className="gs-mobile-layout">
-            <MobileGameTabs
-              activeTab={activeMobileTab}
-              showCharacter={!isSpectator}
-              onChange={setActiveMobileTab}
-              players={playerBoard}
-              character={characterDossier}
-              situation={
-                <ScenarioSummary
-                  idPrefix="gs-scenario-mobile"
-                  gameState={gameState}
-                  expanded
-                  alwaysExpanded
-                  onToggle={() => undefined}
-                />
-              }
-            />
-          </div>
-        </>
+        <Bunker2DLayout
+          gameState={gameState}
+          playerId={playerId}
+          character={isSpectator ? null : myCharacter}
+          phaseLabel={view.phaseLabel}
+          phaseDescription={
+            isSpectator ? "Вы наблюдаете · " + view.phaseDescription : view.phaseDescription
+          }
+          revealedIndices={view.revealedIndices}
+          canReveal={canUseRoomActions && view.canReveal}
+          onReveal={handleReveal}
+          canRevealAction={canUseRoomActions && view.canRevealAction}
+          onRevealAction={openRevealActionConfirmation}
+        />
       )}
 
-      <GameCommandBar
-        currentTurnPlayer={view.currentTurnPlayer}
-        isMyTurn={view.isMyTurn}
-        phaseLabel={view.phaseLabel}
-        phaseDescription={view.phaseDescription}
-        canReveal={canUseRoomActions && view.canReveal}
-        canRevealAction={canUseRoomActions && view.canRevealAction}
-        canManageGame={canUseRoomActions && Boolean(view.me?.isHost)}
-        canSkipDiscussion={canUseRoomActions && view.canSkipDiscussion}
-        managementAttentionCount={managementAttentionCount}
-        hostControlsOpen={hostControlsOpen}
-        onReveal={() => {
-          if (gameState.roundNumber === 1) {
-            revealAttribute(0);
-          } else {
-            openAttributePicker();
-          }
-        }}
-        onRevealAction={openRevealActionConfirmation}
-        onOpenHostControls={openHostControls}
-        onSkipDiscussion={adminSkipDiscussion}
-      />
+      {is3D && commandBar}
 
       {isCurrentHost && hasLiveConnection && (
         <HostControlDialog

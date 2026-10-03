@@ -8,6 +8,7 @@ import { UnoLobbySettings, getUnoTurnTimeoutLabel } from "./UnoLobbySettings";
 import { UnoResultsScreen } from "./UnoResultsScreen";
 import "./uno.css";
 import "../shared/table3d/table3d.css";
+import "../shared/card-game-2d.css";
 import "./uno-3d.css";
 import "../shared/card-game-arena.css";
 import { useTableExitTransition } from "../shared/table3d/useTableExitTransition";

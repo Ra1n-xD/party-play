@@ -39,6 +39,16 @@
 .is-3d.is-looking * {
   cursor: none !important;
 }
+.is-3d .modal-overlay,
+.is-3d .modal-overlay *,
+.is-3d [data-table-input-block],
+.is-3d [data-table-input-block] * {
+  cursor: auto !important;
+}
+.is-3d .modal-overlay button,
+.is-3d [data-table-input-block] button {
+  cursor: pointer !important;
+}
 
 .table3d-person-label {
   position: absolute;
@@ -548,10 +558,6 @@
 @media (pointer: coarse) {
   .table3d-keyboard {
     display: none;
-  }
-  .is-3d.is-looking,
-  .is-3d.is-looking * {
-    cursor: auto !important;
   }
 }
 @media (max-height: 540px) and (min-width: 681px) and (pointer: fine) {

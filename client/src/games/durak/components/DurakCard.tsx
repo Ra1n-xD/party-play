@@ -1,6 +1,6 @@
 import { useCardSkin } from "../../../platform/useCardSkin";
 import { CardFaceArtwork } from "../../../platform/components/CardFaceArtwork";
-import { RoyalCardBackArtwork } from "../../../platform/components/RoyalCardBackArtwork";
+import { CardBackArtwork } from "../../../platform/components/CardBackArtwork";
 import type { CardSkinId } from "../../../../../shared/platform/cosmetics";
 import type {
   DurakCard as DurakCardData,
@@ -93,7 +93,7 @@ export function DurakCard({
   const { skin, props: skinProps } = useCardSkin("durak", skinId);
   const accessibleName = ariaLabel ?? getCardName(card);
   const className = [
-    "durak-card",
+    "durak-card has-shared-artwork",
     `is-${size}`,
     card.suit === "diamonds" || card.suit === "hearts" ? "is-red" : "is-black",
     selected ? "is-selected" : "",
@@ -102,24 +102,9 @@ export function DurakCard({
   ]
     .filter(Boolean)
     .join(" ");
-  const content =
-    skin.id !== "classic" ? (
-      <CardFaceArtwork face={{ game: "durak", ...getDurakCardFace(card) }} skinId={skin.id} />
-    ) : (
-      <>
-        <span className="durak-card-corner">
-          <strong>{RANK_LABELS[card.rank]}</strong>
-          <span>{SUIT_SYMBOLS[card.suit]}</span>
-        </span>
-        <span className="durak-card-suit" aria-hidden="true">
-          {SUIT_SYMBOLS[card.suit]}
-        </span>
-        <span className="durak-card-corner is-bottom" aria-hidden="true">
-          <strong>{RANK_LABELS[card.rank]}</strong>
-          <span>{SUIT_SYMBOLS[card.suit]}</span>
-        </span>
-      </>
-    );
+  const content = (
+    <CardFaceArtwork face={{ game: "durak", ...getDurakCardFace(card) }} skinId={skin.id} />
+  );
 
   if (onClick || onDoubleClick || onKeyboardActivate) {
     const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -165,20 +150,22 @@ export function DurakCard({
   );
 }
 
-export function DurakCardBack({ label = "Карта рубашкой вверх" }: { label?: string }) {
-  const { skin, props: skinProps } = useCardSkin("durak");
+export function DurakCardBack({
+  label = "Карта рубашкой вверх",
+  skinId,
+}: {
+  label?: string;
+  skinId?: CardSkinId;
+}) {
+  const { skin, props: skinProps } = useCardSkin("durak", skinId);
   return (
     <div
       {...skinProps}
-      className="durak-card durak-card-back is-table"
+      className="durak-card durak-card-back has-shared-artwork is-table"
       role="img"
       aria-label={label}
     >
-      {skin.id === "royal" ? (
-        <RoyalCardBackArtwork game="durak" />
-      ) : (
-        <span aria-hidden="true">{skin.mark}</span>
-      )}
+      <CardBackArtwork game="durak" skinId={skin.id} />
     </div>
   );
 }

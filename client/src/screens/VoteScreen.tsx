@@ -1,14 +1,17 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { FiSettings } from "react-icons/fi";
-import { Timer } from "../components/Timer";
 import { VoteProgressBar } from "../components/VoteProgressBar";
 import { useGame } from "../context/GameContext";
 import "../styles/game-screen.css";
 import { AccessibleModal } from "./game/AccessibleModal";
+import { Bunker2DLayout } from "../games/bunker/Bunker2DLayout";
+import { GameViewToggle } from "../games/shared/GameViewToggle";
+import { buildGameScreenViewModel } from "./game/gameScreenViewModel";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { GameDockTools } from "./game/GameDockTools";
 import { HostControlDialog } from "./game/HostControlDialog";
 import { useTableActionDock } from "../games/shared/table3d/useTableActionDock";
+import { useTableHotkeys } from "../games/shared/table3d/useTableHotkeys";
 
 const BunkerTable3D = lazy(() => import("../games/bunker/BunkerTable3D"));
 
@@ -129,55 +132,63 @@ export function VoteScreen({
     if (isCurrentHost && canUseRoomActions) openAdminPanel();
   }, [canUseRoomActions, consumePendingAdminOpen, isCurrentHost, openAdminPanel, pendingAdminOpen]);
 
+  useTableHotkeys(
+    is3D && Boolean(confirmTarget || confirmRevealAction || adminOpen),
+    (code) => {
+      if (code === "KeyE" && confirmTarget) setConfirmTarget(null);
+      else if (code === "KeyF" && confirmRevealAction) setConfirmRevealAction(false);
+      else if (code === "KeyH" && adminOpen) closeAdminPanel();
+      else return false;
+      return true;
+    },
+    true,
+  );
+
   if (!gameState) return null;
 
   const me = isSpectator ? undefined : gameState.players.find((player) => player.id === playerId);
   const isTiebreak = gameState.phase === "ROUND_VOTE_TIEBREAK";
 
   if (isSpectator) {
+    const spectatorTools = (
+      <aside className="vote-command-bar is-tools-only" aria-label="Правила и эмоции">
+        <GameDockTools gameId="bunker" />
+      </aside>
+    );
     return (
       <main
         ref={screenRef}
-        className={`screen command-game-screen vote-screen has-vote-command-bar ${is3D ? "is-3d bunker3d-screen" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
+        className={`screen command-game-screen vote-screen has-vote-command-bar ${is3D ? "is-3d bunker3d-screen" : "game-2d bunker-2d"} ${is3D && !cursorVisible ? "is-looking" : ""}`}
       >
-        <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
+        <GameRoomHeader
+          roomCode={roomCode}
+          connected={connected}
+          onLeaveRoom={leaveRoom}
+          playerCount={!is3D ? gameState.players.length : undefined}
+          tools={!is3D ? spectatorTools : undefined}
+        >
+          {!is3D && <GameViewToggle onOpen3D={onToggle3D} />}
+        </GameRoomHeader>
         {is3D ? (
           <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
             <BunkerTable3D onCursorChange={setCursorVisible} onClassic={onToggle3D} />
           </Suspense>
         ) : (
-          <>
-            <button
-              type="button"
-              className="bunker3d-return btn btn-secondary"
-              onClick={onToggle3D}
-            >
-              3D-стол
-            </button>
-            <div className="sticky-top-bar">
-              <div className="top-bar-content">
-                <div className="top-bar-left">
-                  <span className="top-bar-phase">
-                    {isTiebreak ? "Переголосование" : "Голосование"}
-                  </span>
-                  <span className="top-bar-desc">Вы наблюдаете</span>
-                </div>
-                <div className="top-bar-right">
-                  <Timer endTime={gameState.phaseEndTime} size="large" />
-                </div>
-              </div>
-            </div>
-            <div className="vote-container">
+          <Bunker2DLayout
+            gameState={gameState}
+            playerId={null}
+            character={null}
+            phaseLabel={isTiebreak ? "Переголосование" : "Голосование"}
+            phaseDescription="Вы наблюдаете за голосованием"
+            progress={
               <VoteProgressBar
                 votesCount={gameState.votesCount}
                 totalVotesExpected={gameState.totalVotesExpected}
               />
-            </div>
-          </>
+            }
+          />
         )}
-        <aside className="vote-command-bar is-tools-only" aria-label="Правила и эмоции">
-          <GameDockTools gameId="bunker" />
-        </aside>
+        {is3D && spectatorTools}
       </main>
     );
   }
@@ -209,17 +220,77 @@ export function VoteScreen({
     setConfirmTarget(null);
   };
 
+  const voteTools = (
+    <aside className="vote-command-bar" aria-label="Действия голосования">
+      <div className="vote-command-status" role="status" aria-live="polite">
+        <small>{isTiebreak ? "Переголосование" : "Голосование"}</small>
+        <strong>
+          {selectedTarget
+            ? `Выбран: ${gameState.players.find((player) => player.id === selectedTarget)?.name ?? "игрок"}`
+            : voted
+              ? "Ваш голос принят"
+              : canVote
+                ? "Выберите кандидата"
+                : "Вы наблюдаете за голосованием"}
+        </strong>
+      </div>
+      <div className="vote-command-actions">
+        <GameDockTools gameId="bunker" />
+        {is3D && canRevealAction && (
+          <button
+            type="button"
+            className="btn btn-reveal-action"
+            disabled={voteLocked}
+            onClick={() => setConfirmRevealAction(true)}
+          >
+            Раскрыть особое условие
+          </button>
+        )}
+        {isCurrentHost && hasLiveConnection && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={openAdminPanel}
+            disabled={!canUseRoomActions}
+            aria-label="Управление игрой"
+            aria-haspopup="dialog"
+            aria-expanded={adminOpen}
+          >
+            <FiSettings aria-hidden="true" />
+            <span>
+              Админ-панель{hostSeatClaims.length > 0 ? ` · ${hostSeatClaims.length}` : ""}
+            </span>
+          </button>
+        )}
+        {canVote && !voted && (
+          <button
+            type="button"
+            className="btn btn-danger"
+            disabled={!selectedTarget || voteLocked}
+            onClick={() => setConfirmTarget(selectedTarget)}
+          >
+            Изгнать выбранного
+          </button>
+        )}
+      </div>
+    </aside>
+  );
+
   return (
     <main
       ref={screenRef}
-      className={`screen command-game-screen vote-screen has-vote-command-bar ${is3D ? "is-3d bunker3d-screen" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
+      className={`screen command-game-screen vote-screen has-vote-command-bar ${is3D ? "is-3d bunker3d-screen" : "game-2d bunker-2d"} ${is3D && !cursorVisible ? "is-looking" : ""}`}
     >
       <GameRoomHeader
         roomCode={roomCode}
         connected={connected}
         onLeaveRoom={leaveRoom}
         confirmActiveLeave
-      />
+        playerCount={!is3D ? gameState.players.length : undefined}
+        tools={!is3D ? voteTools : undefined}
+      >
+        {!is3D && <GameViewToggle onOpen3D={onToggle3D} />}
+      </GameRoomHeader>
 
       {is3D ? (
         <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
@@ -251,197 +322,49 @@ export function VoteScreen({
           />
         </Suspense>
       ) : (
-        <>
-          <button type="button" className="bunker3d-return btn btn-secondary" onClick={onToggle3D}>
-            3D-стол
-          </button>
-          <div className="sticky-top-bar vote-top-bar">
-            <div className="top-bar-content">
-              <div className="top-bar-left">
-                <span className="top-bar-phase">
-                  {!canVote || voted
-                    ? isTiebreak
-                      ? "Переголосование"
-                      : "Голосование"
+        <Bunker2DLayout
+          gameState={gameState}
+          playerId={playerId}
+          character={myCharacter}
+          canRevealAction={Boolean(canUseRoomActions && canRevealAction && !voteLocked)}
+          onRevealAction={() => setConfirmRevealAction(true)}
+          revealedIndices={
+            buildGameScreenViewModel({ gameState, playerId, isSpectator, myCharacter })
+              .revealedIndices
+          }
+          phaseLabel={isTiebreak ? "Переголосование" : "Кого оставить за бортом?"}
+          phaseDescription={
+            !canVote
+              ? "Вы наблюдаете за голосованием"
+              : voted
+                ? "Ваш голос принят · ждём остальных"
+                : voteSubmitting
+                  ? "Голос отправляется…"
+                  : voteUnavailable
+                    ? "Голосование приостановлено"
                     : isTiebreak
-                      ? "Переголосование"
-                      : "Кого изгнать?"}
-                </span>
-                <span className="top-bar-desc">
-                  {!canVote
-                    ? "Вы изгнаны"
-                    : voted
-                      ? "Голос принят"
-                      : voteSubmitting
-                        ? "Голос отправляется…"
-                        : voteUnavailable
-                          ? "Голосование приостановлено до восстановления связи"
-                          : isTiebreak
-                            ? "Ничья! Выберите одного из кандидатов"
-                            : "Выберите игрока для изгнания"}
-                </span>
-              </div>
-              <div className="top-bar-right">
-                <Timer endTime={gameState.phaseEndTime} size="large" />
-              </div>
-            </div>
-          </div>
-
-          <div className="vote-container">
-            {!canVote ? (
-              <>
-                <div className="vote-waiting-card">
-                  <p>Вы были изгнаны и не можете голосовать</p>
-                </div>
-                <VoteProgressBar
-                  votesCount={gameState.votesCount}
-                  totalVotesExpected={gameState.totalVotesExpected}
-                />
-              </>
-            ) : voted ? (
-              <>
-                <div className="vote-waiting-card vote-accepted">
-                  <p>Ваш голос принят! Ожидаем остальных...</p>
-                  {isLastEliminated && !me?.alive && (
-                    <p className="last-elim-note">Вы голосуете как последний изгнанный</p>
-                  )}
-                </div>
-                <VoteProgressBar
-                  votesCount={gameState.votesCount}
-                  totalVotesExpected={gameState.totalVotesExpected}
-                />
-              </>
-            ) : (
-              <>
-                {isLastEliminated && !me?.alive && (
-                  <div className="last-elim-banner">
-                    Вы голосуете как последний изгнанный — от лица всех изгнанных
-                  </div>
-                )}
-
-                <div className="vote-candidates">
-                  {candidates.map((player) => {
-                    const playerNumber =
-                      gameState.players.findIndex((candidate) => candidate.id === player.id) + 1;
-                    return (
-                      <label
-                        key={player.id}
-                        className={`vote-candidate ${selectedTarget === player.id ? "is-selected" : ""}`}
-                      >
-                        <input
-                          className="vote-candidate-radio"
-                          type="radio"
-                          name="vote-target"
-                          value={player.id}
-                          checked={selectedTarget === player.id}
-                          disabled={voteLocked}
-                          onChange={() => handleVote(player.id)}
-                        />
-                        <div className="candidate-info">
-                          <span className="candidate-name">
-                            <span className="player-number">{playerNumber}</span>
-                            {player.isBot && <span className="bot-badge">BOT</span>}
-                            {player.name}
-                          </span>
-                          <div className="candidate-attrs">
-                            {player.revealedAttributes.map((attribute, index) => (
-                              <span
-                                key={index}
-                                className="mini-tag"
-                                data-attr-type={attribute.type}
-                              >
-                                <span className="mini-tag-label">{attribute.label}:</span>{" "}
-                                {attribute.value}
-                              </span>
-                            ))}
-                            {player.actionCard && (
-                              <span className="mini-tag" data-attr-type="action">
-                                <span className="mini-tag-label">Особое условие:</span>{" "}
-                                {player.actionCard.title}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <span className="vote-candidate-mark" aria-hidden="true">
-                          {selectedTarget === player.id ? "Выбрано" : "Выбрать"}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                <div className="vote-progress-bar">
-                  <div className="vote-progress-label">
-                    Проголосовало: {gameState.votesCount} / {gameState.totalVotesExpected}
-                  </div>
-                  <div className="vote-progress-track">
-                    <div
-                      className="vote-progress-fill"
-                      style={{
-                        width: `${(gameState.votesCount / gameState.totalVotesExpected) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </>
+                      ? "Ничья · выберите одного из кандидатов"
+                      : isLastEliminated && !me?.alive
+                        ? "Вы голосуете как последний изгнанный"
+                        : "Выберите кандидата и подтвердите голос"
+          }
+          voting={{
+            candidateIds: candidates.map((player) => player.id),
+            selectedId: selectedTarget,
+            canSelect: canVote && !voted && !voteLocked,
+            onSelect: handleVote,
+            onConfirm: setConfirmTarget,
+          }}
+          progress={
+            <VoteProgressBar
+              votesCount={gameState.votesCount}
+              totalVotesExpected={gameState.totalVotesExpected}
+            />
+          }
+        />
       )}
 
-      <aside className="vote-command-bar" aria-label="Действия голосования">
-        <div className="vote-command-status" role="status" aria-live="polite">
-          <small>{isTiebreak ? "Переголосование" : "Голосование"}</small>
-          <strong>
-            {selectedTarget
-              ? `Выбран: ${gameState.players.find((player) => player.id === selectedTarget)?.name ?? "игрок"}`
-              : voted
-                ? "Ваш голос принят"
-                : canVote
-                  ? "Выберите кандидата"
-                  : "Вы наблюдаете за голосованием"}
-          </strong>
-        </div>
-        <div className="vote-command-actions">
-          <GameDockTools gameId="bunker" />
-          {canRevealAction && (
-            <button
-              type="button"
-              className="btn btn-reveal-action"
-              disabled={voteLocked}
-              onClick={() => setConfirmRevealAction(true)}
-            >
-              Раскрыть особое условие
-            </button>
-          )}
-          {isCurrentHost && hasLiveConnection && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={openAdminPanel}
-              disabled={!canUseRoomActions}
-              aria-label="Управление игрой"
-              aria-haspopup="dialog"
-              aria-expanded={adminOpen}
-            >
-              <FiSettings aria-hidden="true" />
-              <span>
-                Админ-панель{hostSeatClaims.length > 0 ? ` · ${hostSeatClaims.length}` : ""}
-              </span>
-            </button>
-          )}
-          {canVote && !voted && (
-            <button
-              type="button"
-              className="btn btn-danger"
-              disabled={!selectedTarget || voteLocked}
-              onClick={() => setConfirmTarget(selectedTarget)}
-            >
-              Изгнать выбранного
-            </button>
-          )}
-        </div>
-      </aside>
+      {is3D && voteTools}
 
       {error && <div className="error-toast">{error}</div>}
 

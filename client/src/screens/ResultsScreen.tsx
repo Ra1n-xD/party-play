@@ -36,8 +36,8 @@ export function ResultsScreen() {
       >
         <div className="result-player-name">
           <span className="player-number">{playerNumber}</span>
-          {player.isBot && <span className="bot-badge">BOT</span>}
           {player.name} {!isSpectator && player.id === playerId && "(вы)"}
+          {player.isBot && <span className="bot-badge">бот</span>}
           {player.kicked && <span className="result-kicked-label">Удалён администратором</span>}
         </div>
         {/* Desktop: card grid */}

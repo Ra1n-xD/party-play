@@ -12,7 +12,15 @@ export function useTableHotkeys(
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const state = latest.current;
-      if (!state.enabled || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (
+        !state.enabled ||
+        event.defaultPrevented ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+      )
+        return;
       if (
         event.target instanceof HTMLElement &&
         event.target.closest("input, textarea, select, [contenteditable]")
@@ -25,7 +33,10 @@ export function useTableHotkeys(
         event.target.closest("button:not([data-table-hand-card]), summary")
       )
         return;
-      if (state.handle(event.code)) event.preventDefault();
+      if (state.handle(event.code)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);

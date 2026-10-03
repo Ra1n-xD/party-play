@@ -20,6 +20,15 @@ export function GameDockTools({ gameId, gameTitle = "Бункер" }: GameDockTo
     setRulesOpen(true);
     return true;
   });
+  useTableHotkeys(
+    rulesOpen,
+    (code) => {
+      if (code !== "KeyL" || !root.current?.closest(".is-3d")) return false;
+      setRulesOpen(false);
+      return true;
+    },
+    true,
+  );
 
   return (
     <>

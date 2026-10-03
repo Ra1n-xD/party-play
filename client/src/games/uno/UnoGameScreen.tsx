@@ -17,6 +17,9 @@ import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
 import { GameDockTools } from "../../screens/game/GameDockTools";
 import { CardDragLayer } from "../shared/CardDragLayer";
+import { getCardSkin } from "../../../../shared/platform/cosmetics";
+import { GameViewToggle } from "../shared/GameViewToggle";
+import { CardTurnClock } from "../shared/CardTurnClock";
 import { CardPlayerSeat } from "../shared/CardPlayerSeat";
 import { HandSortButton, type HandSortMode } from "../shared/HandSortButton";
 import { useCardDrag } from "../shared/useCardDrag";
@@ -316,6 +319,21 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     if (!canAct || (!playableCardIds.has(id) && !bluffableWildDrawFourIds.has(id))) return;
     setSelectedCardId((current) => (current === id ? null : id));
   };
+  useTableHotkeys(
+    is3D && (managementOpen || Boolean(colorChoice)),
+    (code) => {
+      if (managementOpen && code === "KeyH") {
+        closeManagement();
+        return true;
+      }
+      if (colorChoice && code === "KeyE") {
+        setColorChoice(null);
+        return true;
+      }
+      return false;
+    },
+    true,
+  );
   useTableHotkeys(is3D && !managementOpen && !colorChoice, (code) => {
     if (code === "KeyH") {
       openManagement();
@@ -389,7 +407,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     snapshot.settings.turnTimeoutSeconds == null
       ? null
       : snapshot.settings.turnTimeoutSeconds * 1000;
-  const handFanAngleStep = Math.min(1.35, 9 / Math.max(displayedHand.length - 1, 1));
+  const handFanAngleStep = Math.min(4, 32 / Math.max(displayedHand.length - 1, 1));
   const pendingWildDrawFour = game.pendingWildDrawFour;
   const unoSubject = game.unoWindow ? playersById.get(game.unoWindow.subjectSeatId) : null;
   const recoverySeats: RecoverySeat[] = snapshot.seats
@@ -414,7 +432,10 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
       <CardPlayerSeat
         key={player.seatId}
         seatId={player.seatId}
-        name={player.name}
+        name={player.seatId === viewerSeatId ? "Вы" : player.name}
+        avatarId={seat?.avatarId ?? "human"}
+        cardBack={<UnoCardBack skinId={seat?.cardSkins.uno ?? "classic"} />}
+        skinName={getCardSkin(seat?.cardSkins.uno).name}
         cardCount={player.cardCount}
         connected={player.connected}
         controllerKind={player.controllerKind}
@@ -466,28 +487,11 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   };
 
   const actorName = playersById.get(game.currentActorSeatId ?? "")?.name ?? "Игрок";
-  const actionHint = paused
-    ? "Игра на паузе"
-    : ownWdfResponse
-      ? "Ваше решение: принять +4 или оспорить ход. Неудачная проверка — 6 карт"
-      : legalActions?.canChooseInitialColor
-        ? "Ваш ход: выберите начальный цвет"
-        : legalActions?.canEndTurn
-          ? legalActions.playableCardIds.length > 0
-            ? "Можно сыграть взятую карту двойным нажатием или завершить ход"
-            : "Взятая карта не подходит — нажмите «Завершить ход»"
-          : legalActions?.canDraw
-            ? "Подходящих карт нет — нажмите «Взять карту»"
-            : playableCardIds.size > 0
-              ? "Ваш ход: сыграйте подсвеченную карту двойным нажатием или перетащите её в сброс"
-              : pendingWildDrawFour
-                ? `Ждём решения по +4: ${actorName}`
-                : `Сейчас ходит: ${actorName}`;
 
   return (
     <main
       ref={screenRef}
-      className={`screen command-game-screen card-game-screen uno-screen has-uno-command-dock ${is3D ? "is-3d" : ""} ${is3D && !cursorVisible ? "is-looking" : ""}`}
+      className={`screen command-game-screen card-game-screen uno-screen has-uno-command-dock ${is3D ? "is-3d" : "game-2d"} ${is3D && !cursorVisible ? "is-looking" : ""}`}
     >
       <GameRoomHeader
         roomCode={snapshot.roomCode}
@@ -496,15 +500,15 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
         confirmActiveLeave={snapshot.viewer.role === "player"}
         gameTitle="UNO"
         brandIcon="◆"
-      />
+        playerCount={!is3D ? game.players.length : undefined}
+      >
+        {!is3D && <GameViewToggle onOpen3D={() => setIs3D(true)} />}
+      </GameRoomHeader>
 
-      {!is3D && (
-        <p className="card-game-action-hint" role="status">
-          {actionHint}
-        </p>
-      )}
-
-      <div className="card-game-arena uno-arena">
+      <div
+        className="card-game-arena uno-arena"
+        style={{ "--opponent-count": Math.max(1, opponentPlayers.length) } as CSSProperties}
+      >
         {is3D ? (
           <Suspense fallback={<div className="table3d-loading">Готовим 3D-стол…</div>}>
             <UnoTable3D
@@ -616,15 +620,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                     data-card-motion-anchor="uno:discard"
                   >
                     {game.topDiscard ? (
-                      <div
-                        className="uno-discard-card-shell"
-                        key={game.topDiscard.id}
-                        style={
-                          {
-                            "--discard-tilt": `${game.discardPileCount % 2 === 0 ? -1.4 : 1.4}deg`,
-                          } as CSSProperties
-                        }
-                      >
+                      <div className="uno-discard-card-shell" key={game.topDiscard.id}>
                         <div
                           className="uno-discard-flight-target"
                           data-table-card-flight={`uno-discard-flight:${game.topDiscard.id}`}
@@ -687,14 +683,6 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                 {renderPlayerSeat(viewerPlayer)}
               </div>
             )}
-
-            <button
-              type="button"
-              className="uno3d-return btn btn-secondary"
-              onClick={() => setIs3D(true)}
-            >
-              3D-стол
-            </button>
           </>
         )}
         {privateGame ? (
@@ -722,11 +710,11 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                       className={`uno-hand-card-shell ${dragClassName ?? "card-motion-shell"}`}
                       style={
                         {
-                          "--card-index": Math.min(index, 5),
+                          "--card-index": index,
                           "--fan-angle": `${
                             (index - (displayedHand.length - 1) / 2) * handFanAngleStep
                           }deg`,
-                          "--fan-rise": `${Math.abs(index - (displayedHand.length - 1) / 2)}px`,
+                          "--fan-rise": `${Math.pow(((index - (displayedHand.length - 1) / 2) * handFanAngleStep) / 4, 2) * 0.8}px`,
                         } as CSSProperties
                       }
                       {...dragBindings}
@@ -734,6 +722,8 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                       <UnoCard
                         card={card}
                         size="hand"
+                        selected={selectedCardId === card.id}
+                        onClick={allowed && canAct ? () => selectCard(card.id) : undefined}
                         playable={playable && canAct}
                         bluffable={bluffable && canAct}
                         disabled={!canAct || !allowed}
@@ -760,6 +750,20 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
       </div>
 
       <aside className="uno-command-dock" aria-label="Игровые действия">
+        {!is3D && (
+          <div className="card-game-turn-status" role="status">
+            <strong>
+              {paused
+                ? "Пауза"
+                : ownWdfResponse
+                  ? "Решение по +4"
+                  : game.currentActorSeatId === viewerSeatId
+                    ? "Ваш ход"
+                    : `Ход: ${actorName}`}
+            </strong>
+            <CardTurnClock remainingMs={game.turnRemainingMs} paused={paused} />
+          </div>
+        )}
         <div className="uno-command-actions">
           {privateGame && (
             <HandSortButton
@@ -768,14 +772,14 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
             />
           )}
           <GameDockTools gameId="uno" gameTitle="UNO" />
-          {is3D && privateGame && !ownWdfResponse && !legalActions?.canChooseInitialColor && (
+          {privateGame && !ownWdfResponse && !legalActions?.canChooseInitialColor && (
             <button
               type="button"
               className="btn btn-primary"
               disabled={!canAct || !selectedCard}
               onClick={() => selectedCard && playCard(selectedCard)}
             >
-              Сыграть <kbd>E</kbd>
+              Сыграть карту {is3D && <kbd>E</kbd>}
             </button>
           )}
           {ownWdfResponse && (

@@ -319,3 +319,263 @@
     overflow: auto;
   }
 }
+
+/* Portalled dialogs share the cream dossiers and ink/orange palette of the 2D board. */
+body:has(.bunker3d-screen) .modal-overlay {
+  background: #0b1b2ccc;
+  backdrop-filter: blur(8px);
+}
+body:has(.bunker3d-screen) .modal {
+  --text-primary: #172c3d;
+  --text-secondary: #65706e;
+  --accent: #d97632;
+  --glass-border: #c4bba6;
+  --rules-accent: #d97632;
+  --rules-accent-soft: #d9763215;
+  position: relative;
+  border: 2px solid #172c3d;
+  border-radius: 16px;
+  background: #efe4cc;
+  color: #172c3d;
+  box-shadow: 7px 8px 0 #071b2ac9;
+  font-family: "Golos Text", sans-serif;
+  scrollbar-color: #a99f86 transparent;
+}
+body:has(.bunker3d-screen) .modal :is(h2, h3, h4, strong) {
+  color: #172c3d;
+}
+body:has(.bunker3d-screen) .modal :is(h2, h3) {
+  font-weight: 850;
+}
+body:has(.bunker3d-screen) .modal :is(p, label) {
+  color: #5f6968;
+}
+body:has(.bunker3d-screen) .modal .btn {
+  min-height: 40px;
+  border: 1px solid #183343;
+  border-radius: 9px;
+  background: #183343;
+  color: #fff3d6;
+  font-family: inherit;
+  font-weight: 750;
+}
+body:has(.bunker3d-screen) .modal .btn-secondary {
+  border-color: #b1a68f;
+  background: #e5dac2;
+  color: #183343;
+}
+body:has(.bunker3d-screen) .modal .btn-primary {
+  border-color: #bf6024;
+  background: #d97632;
+  color: #fff3d6;
+}
+body:has(.bunker3d-screen) .modal .btn-danger {
+  border-color: #a8433b;
+  background: #b95046;
+  color: #fff4df;
+}
+body:has(.bunker3d-screen) .modal .btn:disabled {
+  border-color: #bcb49e;
+  background: #d0c8b2;
+  color: #827e70;
+  opacity: 0.7;
+}
+body:has(.bunker3d-screen) .modal :is(button, a):focus-visible {
+  outline: 3px solid #d97632;
+  outline-offset: 3px;
+}
+body:has(.bunker3d-screen) .modal :is(.btn-target, .btn-admin) {
+  border-color: #bfb49c;
+  background: #e6dbc3;
+  color: #183343;
+}
+body:has(.bunker3d-screen) .modal :is(.btn-target, .btn-admin):hover {
+  border-color: #183343;
+  background: #dacfb6;
+}
+body:has(.bunker3d-screen) .modal :is(.admin-form, .gs-host-control-groups section) {
+  border-color: #c0b59d;
+  background: #e4d9c1;
+}
+body:has(.bunker3d-screen) .modal .admin-chip {
+  border-color: #bdaf94;
+  background: #f7ecd4;
+  color: #183343;
+}
+body:has(.bunker3d-screen) .modal .admin-chip.active {
+  border-color: #183343;
+  background: #183343;
+  color: #fff3d6;
+}
+body:has(.bunker3d-screen) .modal .gs-host-danger-zone {
+  border-color: #b9504650;
+  background: #b9504610;
+}
+body:has(.bunker3d-screen) .modal .target-list .btn {
+  text-align: left;
+}
+body:has(.bunker3d-screen) .bunker3d-detail-modal {
+  width: min(820px, calc(100vw - 32px));
+  max-width: none;
+  padding: 26px;
+}
+body:has(.bunker3d-screen) .bunker3d-detail-modal > h2 {
+  padding-right: 38px;
+  font-size: clamp(1.2rem, 3vw, 1.65rem);
+}
+.bunker3d-modal-close {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #bcb096;
+  border-radius: 9px;
+  background: #e3d7bd;
+  color: #183343;
+  cursor: pointer;
+  font-size: 20px;
+}
+body:has(.bunker3d-screen) .bunker3d-public-details {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+body:has(.bunker3d-screen) .bunker3d-public-details article {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #c4bba6;
+  border-radius: 10px;
+  background: #f7ecd4;
+}
+body:has(.bunker3d-screen) .bunker3d-public-details small {
+  color: #65706e;
+}
+body:has(.bunker3d-screen) .bunker3d-public-details article[data-attr-type="action"] {
+  grid-column: 1 / -1;
+  border-color: #d9763266;
+  background: #d976320c;
+}
+.bunker3d-field-visibility {
+  display: block;
+  margin-top: 10px;
+  color: #768073;
+  font-size: 0.7rem;
+}
+body:has(.bunker3d-screen) .bunker3d-roster-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+body:has(.bunker3d-screen) .modal .gs-scenario {
+  border: 1px solid #bcb096;
+  border-radius: 10px;
+  background: #f7ecd4;
+}
+body:has(.bunker3d-screen) .modal .gs-scenario-title {
+  color: #183343;
+}
+body:has(.bunker3d-screen) .modal :is(.gs-scenario-description, .gs-scenario-meta) {
+  color: #65706e;
+}
+body:has(.bunker3d-screen) .modal .gs-bunker-card {
+  border-color: #c4bba6;
+  background: #e6dbc3;
+}
+body:has(.bunker3d-screen) .modal .gs-bunker-card-title {
+  color: #183343;
+}
+body:has(.bunker3d-screen) .modal .gs-bunker-card-description {
+  color: #65706e;
+}
+body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-actions button {
+  border-color: #bfb49c;
+  background: #e6dbc3;
+  color: #183343;
+}
+body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-actions button.is-primary {
+  border-color: #bf6024;
+  background: #d97632;
+  color: #fff3d6;
+}
+body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-actions button.is-danger {
+  color: #a8433b;
+}
+body:has(.bunker3d-screen) .table3d-menu-panel :is(.table3d-menu-eyebrow, dt) {
+  color: #8f623a;
+}
+body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-people span {
+  color: #65706e;
+}
+body:has(.bunker3d-screen) .table3d-menu-panel .table3d-menu-people li {
+  border-color: #c4bba6;
+}
+body:has(.bunker3d-screen) .modal.game-rules-modal {
+  padding: 0;
+}
+body:has(.bunker3d-screen) .game-rules-modal .game-rules-heading {
+  border-color: #c4bba6;
+  background: #efe4ccf5;
+}
+body:has(.bunker3d-screen) .game-rules-modal .game-rules-close {
+  border-color: #bcb096;
+  background: #e3d7bd;
+  color: #183343;
+}
+body:has(.bunker3d-screen)
+  .modal.game-rules-modal
+  :is(.game-rules-summary, .game-rules-heading p, .game-rules-sections p, li, dd) {
+  color: #52615f;
+}
+body:has(.bunker3d-screen)
+  .game-rules-modal
+  :is(.game-rules-facts > div, .game-rules-sections > section) {
+  border-color: #c4bba6;
+  background: #f7ecd4;
+}
+body:has(.bunker3d-screen) .game-rules-modal dt {
+  color: #768073;
+}
+body:has(.bunker3d-screen) .bunker-event-panel {
+  padding-top: 44px;
+}
+body:has(.bunker3d-screen) .bunker-event-panel .phase-announcement-title {
+  color: #183343;
+  text-shadow: none;
+}
+body:has(.bunker3d-screen)
+  .bunker-event-panel
+  :is(
+    .phase-announcement-subtitle,
+    .phase-announcement-description,
+    .action-card-reveal-label,
+    .action-card-reveal-description
+  ) {
+  color: #65706e;
+}
+body:has(.bunker3d-screen) .bunker-event-panel .action-card-reveal-card {
+  border-color: #c4bba6;
+  background: #f7ecd4;
+  box-shadow: none;
+}
+body:has(.bunker3d-screen) .bunker-event-panel .action-card-reveal-title {
+  color: #183343;
+}
+@media (max-width: 680px) {
+  body:has(.bunker3d-screen) .bunker3d-detail-modal {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    padding: 18px;
+  }
+  body:has(.bunker3d-screen) .bunker3d-public-details {
+    gap: 8px;
+  }
+  body:has(.bunker3d-screen) .bunker3d-public-details article {
+    padding: 11px;
+  }
+  body:has(.bunker3d-screen) .bunker3d-roster-list {
+    grid-template-columns: 1fr;
+  }
+}

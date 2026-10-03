@@ -17,6 +17,7 @@ import { DurakResultsScreen } from "./DurakResultsScreen";
 import "./durak.css";
 import "../shared/card-game-arena.css";
 import "../shared/table3d/table3d.css";
+import "../shared/card-game-2d.css";
 import { useTableExitTransition } from "../shared/table3d/useTableExitTransition";
 
 function isTableResolutionTransfer(event: DurakVisualEvent): event is CardTransferVisualEvent {

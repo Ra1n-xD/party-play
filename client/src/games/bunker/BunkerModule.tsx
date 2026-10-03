@@ -1,4 +1,5 @@
 import { useLayoutEffect, useState } from "react";
+import { FiX } from "react-icons/fi";
 import type { AttributeType } from "../../../../shared/games/bunker/types";
 import BackgroundParticles from "../../components/BackgroundParticles";
 import { CardImage } from "../../components/CardImage";
@@ -141,9 +142,20 @@ function BunkerView() {
               Игровое событие
             </h2>
             <OverlayRenderer item={currentOverlay} />
-            <button type="button" className="btn btn-secondary" onClick={dismissOverlays}>
-              Продолжить игру
-            </button>
+            {is3D ? (
+              <button
+                type="button"
+                className="bunker3d-modal-close"
+                aria-label="Закрыть игровое событие"
+                onClick={dismissOverlays}
+              >
+                <FiX aria-hidden="true" />
+              </button>
+            ) : (
+              <button type="button" className="btn btn-secondary" onClick={dismissOverlays}>
+                Продолжить игру
+              </button>
+            )}
           </AccessibleModal>
         ))}
     </>

@@ -1,15 +1,9 @@
 import { useCardSkin } from "../../../platform/useCardSkin";
 import { CardFaceArtwork } from "../../../platform/components/CardFaceArtwork";
-import { RoyalCardBackArtwork } from "../../../platform/components/RoyalCardBackArtwork";
+import { CardBackArtwork } from "../../../platform/components/CardBackArtwork";
 import type { CardSkinId } from "../../../../../shared/platform/cosmetics";
 import type { UnoCard as UnoCardData, UnoColor } from "../../../../../shared/games/uno/types";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import cardBack from "../assets/card-back.svg";
-import drawTwoIcon from "../assets/draw-two.svg";
-import reverseIcon from "../assets/reverse.svg";
-import skipIcon from "../assets/skip.svg";
-import wildDrawFourIcon from "../assets/wild-draw-four.svg";
-import wildIcon from "../assets/wild.svg";
 
 const COLOR_NAMES: Record<UnoColor, string> = {
   red: "красный",
@@ -33,15 +27,6 @@ export function getUnoCardMark(card: UnoCardData): string {
   if (card.kind === "draw-two") return "+2";
   if (card.kind === "wild") return "✦";
   return "+4";
-}
-
-function actionIcon(card: UnoCardData): string | null {
-  if (card.kind === "skip") return skipIcon;
-  if (card.kind === "reverse") return reverseIcon;
-  if (card.kind === "draw-two") return drawTwoIcon;
-  if (card.kind === "wild") return wildIcon;
-  if (card.kind === "wild-draw-four") return wildDrawFourIcon;
-  return null;
 }
 
 export function getUnoCardName(card: UnoCardData): string {
@@ -80,7 +65,7 @@ export function UnoCard({
 }: UnoCardProps) {
   const { skin, props: skinProps } = useCardSkin("uno", skinId);
   const className = [
-    "uno-card",
+    "uno-card has-shared-artwork",
     `is-${size}`,
     card.color ? `is-${card.color}` : "is-wild",
     selected ? "is-selected" : "",
@@ -90,27 +75,12 @@ export function UnoCard({
   ]
     .filter(Boolean)
     .join(" ");
-  const mark = getUnoCardMark(card);
-  const icon = actionIcon(card);
-  const content =
-    skin.id !== "classic" ? (
-      <CardFaceArtwork
-        face={{ game: "uno", rank: mark, color: card.color ?? "wild" }}
-        skinId={skin.id}
-      />
-    ) : (
-      <>
-        <span className="uno-card-corner" aria-hidden="true">
-          {mark}
-        </span>
-        <span className="uno-card-core" aria-hidden="true">
-          {icon ? <img src={icon} alt="" draggable={false} /> : mark}
-        </span>
-        <span className="uno-card-corner is-bottom" aria-hidden="true">
-          {mark}
-        </span>
-      </>
-    );
+  const content = (
+    <CardFaceArtwork
+      face={{ game: "uno", rank: getUnoCardMark(card), color: card.color ?? "wild" }}
+      skinId={skin.id}
+    />
+  );
 
   if (onClick || onDoubleClick || onKeyboardActivate) {
     const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -156,17 +126,22 @@ export function UnoCard({
   );
 }
 
-export function UnoCardBack({ label = "Карта рубашкой вверх" }: { label?: string }) {
-  const { skin, props: skinProps } = useCardSkin("uno");
+export function UnoCardBack({
+  label = "Карта рубашкой вверх",
+  skinId,
+}: {
+  label?: string;
+  skinId?: CardSkinId;
+}) {
+  const { skin, props: skinProps } = useCardSkin("uno", skinId);
   return (
-    <div {...skinProps} className="uno-card uno-card-back is-table" role="img" aria-label={label}>
-      {skin.id === "classic" ? (
-        <img src={cardBack} alt="" aria-hidden="true" draggable={false} />
-      ) : skin.id === "royal" ? (
-        <RoyalCardBackArtwork game="uno" />
-      ) : (
-        <span aria-hidden="true">{skin.mark}</span>
-      )}
+    <div
+      {...skinProps}
+      className="uno-card uno-card-back has-shared-artwork is-table"
+      role="img"
+      aria-label={label}
+    >
+      <CardBackArtwork game="uno" skinId={skin.id} />
     </div>
   );
 }

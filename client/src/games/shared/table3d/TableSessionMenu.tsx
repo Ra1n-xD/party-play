@@ -63,17 +63,18 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
     scene.current?.resumeLook();
   };
   const runAction = (action: () => void) => {
-    flushSync(() => setPage(null));
-    action();
-  };
-  const dismissWithCursor = () => {
-    // Native pointer-lock loss can open this dialog before the same Esc reaches the page.
-    if (performance.now() - openedAt.current < 160) return;
     flushSync(() => {
       setPage(null);
-      setError(null);
+      action();
     });
+    // The external dialog now owns the mouse. Arm a direct return to the game
+    // when it closes, instead of opening the session menu again.
     scene.current?.resumeLook(false);
+  };
+  const dismiss = () => {
+    // Native pointer-lock loss can open this dialog before the same Esc reaches the page.
+    if (performance.now() - openedAt.current < 160) return;
+    resume();
   };
   const requestLeave = () => {
     if (snapshot?.viewer.role === "player") setPage("leave");
@@ -98,6 +99,11 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
         if (event.code === "Digit2" || event.code === "Numpad2") onClassic();
         else if (event.code === "KeyP" && gameId !== "bunker") setPage("people");
         else return;
+      } else if (
+        (page === "rules" && event.code === "KeyL") ||
+        (page === "people" && event.code === "KeyP")
+      ) {
+        resume();
       } else if (page === "main") {
         const action = actions.find((item) => event.code === `Key${item.key}`);
         if (event.code === "Digit2" || event.code === "Numpad2") onClassic();
@@ -137,7 +143,7 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
         gameId={gameId}
         gameTitle={game.metadata.title}
         rules={game.rules}
-        onClose={() => setPage("main")}
+        onClose={resume}
       />,
       document.body,
     );
@@ -145,8 +151,8 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
     <AccessibleModal
       key={page}
       labelledBy="table-session-title"
-      onClose={page === "main" ? resume : () => setPage("main")}
-      onEscape={page === "main" ? dismissWithCursor : () => setPage("main")}
+      onClose={resume}
+      onEscape={page === "main" ? dismiss : resume}
       overlayClassName="table3d-menu-overlay"
       panelClassName="table3d-menu-panel"
     >
@@ -211,7 +217,7 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
             </button>
           </div>
           <p className="table3d-menu-help">
-            ↑ ↓ или Tab — выбор · Enter — подтвердить · Esc — вернуться с курсором
+            ↑ ↓ или Tab — выбор · Enter — подтвердить · Esc — вернуться в игру
           </p>
         </>
       )}

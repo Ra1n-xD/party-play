@@ -15,7 +15,7 @@ export function isTableInputBlocked(target: EventTarget | null): boolean {
   );
 }
 
-/** Esc releases the camera; a trusted click/Enter can capture it again. */
+/** Dialogs release the mouse; closing them returns directly to the camera. */
 export class TableLookControls {
   readonly target: AvatarLook = { yaw: 0, pitch: TABLE_DEFAULT_PITCH };
   private readonly abort = new AbortController();
@@ -25,7 +25,8 @@ export class TableLookControls {
   private readonly modalObserver: MutationObserver;
   private requestPending = false;
   private disposed = false;
-  private cursorPlay = false;
+  private gameplayActive = false;
+  private expectedUnlock = false;
   private inputBlocked = false;
 
   constructor(
@@ -36,6 +37,8 @@ export class TableLookControls {
     defaultPitch = TABLE_DEFAULT_PITCH,
   ) {
     this.target.pitch = defaultPitch;
+    // Touch navigation starts directly at the table and does not need Pointer Lock.
+    this.gameplayActive = this.coarse.matches;
     const options = { signal: this.abort.signal };
     this.onCursor(true);
     document.addEventListener(
@@ -43,7 +46,9 @@ export class TableLookControls {
       (event) => {
         // High polling-rate mice can send thousands of events per second. Dialog state is
         // refreshed on DOM/focus changes instead of searching the entire page for each event.
-        if (document.pointerLockElement !== canvas || this.inputBlocked) return;
+        if (!this.gameplayActive || this.inputBlocked) return;
+        // Esc can temporarily prevent a new Pointer Lock request. Keep the cursor hidden
+        // and allow camera motion until the next click/key can capture it again.
         this.move(event.movementX, event.movementY);
       },
       options,
@@ -68,6 +73,7 @@ export class TableLookControls {
           event.preventDefault();
           this.onOverview();
         }
+        if (event.code !== "Escape" && this.gameplayActive) this.resume();
       },
       options,
     );
@@ -75,11 +81,17 @@ export class TableLookControls {
       "pointerlockchange",
       () => {
         this.requestPending = false;
-        if (this.cursorPlay && document.pointerLockElement === canvas) {
+        const locked = document.pointerLockElement === canvas;
+        if (locked) {
+          this.expectedUnlock = false;
+          if (!this.inputBlocked) canvas.focus({ preventScroll: true });
+        } else if (this.expectedUnlock) {
+          this.expectedUnlock = false;
+        } else if (this.gameplayActive && !this.inputBlocked) {
+          // Native Esc may release Pointer Lock without dispatching a page keydown.
           this.release();
-          return;
+          this.onMenu();
         }
-        if (document.pointerLockElement === canvas) canvas.focus({ preventScroll: true });
         this.syncCursor();
       },
       options,
@@ -96,18 +108,15 @@ export class TableLookControls {
     const syncCursor = () => this.syncCursor();
     window.addEventListener("focus", syncCursor, options);
     document.addEventListener("visibilitychange", syncCursor, options);
-    const syncInput = () => {
-      this.inputBlocked = isTableInputBlocked(document.activeElement);
-    };
-    document.addEventListener("focusin", syncInput, options);
-    document.addEventListener("focusout", syncInput, options);
+    document.addEventListener("focusin", syncCursor, options);
+    document.addEventListener("focusout", syncCursor, options);
     this.coarse.addEventListener("change", syncCursor, options);
     canvas.addEventListener(
       "pointerdown",
       (event) => {
         if (isTableInputBlocked(event.target)) return;
         if (event.pointerType !== "touch") {
-          if (this.cursorPlay) this.resume();
+          if (this.gameplayActive) this.resume();
           return;
         }
         this.touch = { id: event.pointerId, x: event.clientX, y: event.clientY };
@@ -159,10 +168,16 @@ export class TableLookControls {
   /** Call synchronously from a trusted click/key, after removing the menu. */
   resume(capture = true) {
     if (this.disposed) return;
-    this.cursorPlay = !capture;
+    this.gameplayActive = true;
+    if (isTableInputBlocked(null)) {
+      this.inputBlocked = true;
+      this.unlock();
+      this.setCursor(true);
+      return;
+    }
+    this.setCursor(false);
     if (!capture) {
       this.requestPending = false;
-      this.release();
       this.canvas.focus({ preventScroll: true });
       return;
     }
@@ -172,6 +187,7 @@ export class TableLookControls {
     }
     if (document.pointerLockElement === this.canvas || this.requestPending) return;
     if (!this.canvas.requestPointerLock) {
+      this.release();
       this.onMenu("Захват мыши недоступен в этом браузере. Можно продолжить партию в 2D.");
       return;
     }
@@ -186,17 +202,25 @@ export class TableLookControls {
   }
 
   release() {
+    this.gameplayActive = false;
     this.touch = null;
-    if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+    this.unlock();
     this.setCursor(true);
   }
 
+  private unlock() {
+    if (document.pointerLockElement !== this.canvas) return;
+    this.expectedUnlock = true;
+    document.exitPointerLock();
+  }
+
   private captureFailed(error?: unknown) {
-    if (this.disposed || this.cursorPlay) return;
+    if (this.disposed) return;
     if (error && import.meta.env.DEV) console.debug("3D mouse capture was denied", error);
     this.requestPending = false;
-    this.setCursor(true);
-    this.onMenu("Не удалось захватить мышь. Нажмите Enter или «Продолжить» ещё раз.");
+    // Browser security may deny recapture after Esc. It must not reopen a menu that
+    // the player just closed; the next trusted click/key retries capture.
+    this.syncCursor();
   }
 
   private setCursor(visible: boolean) {
@@ -207,17 +231,29 @@ export class TableLookControls {
 
   private syncCursor() {
     if (this.disposed) return;
+    const wasBlocked = this.inputBlocked;
     const blocked = isTableInputBlocked(document.activeElement);
     this.inputBlocked = blocked;
-    // Keyboard dialogs suspend camera motion but retain capture. Esc/the main menu releases it.
-    if (document.hidden || !document.hasFocus()) this.release();
-    else this.setCursor(document.pointerLockElement !== this.canvas);
+    if (document.hidden || !document.hasFocus()) {
+      this.release();
+      return;
+    }
+    if (blocked) {
+      this.unlock();
+      this.setCursor(true);
+      return;
+    }
+    if (wasBlocked && this.gameplayActive) {
+      this.resume();
+      return;
+    }
+    this.setCursor(!this.gameplayActive);
     if (
       !this.coarse.matches &&
       this.cursorVisible &&
       !blocked &&
       !this.requestPending &&
-      !this.cursorPlay
+      !this.gameplayActive
     )
       this.onMenu();
   }

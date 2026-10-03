@@ -1,4 +1,6 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import type { AvatarId } from "../../../../shared/platform/avatars";
+import { AvatarPortrait } from "../../platform/components/AvatarPortrait";
 
 interface CardPlayerAction {
   eventId: string | number;
@@ -25,6 +27,9 @@ interface CardPlayerSeatProps {
   turnAnimationKey: string;
   turnSemantics?: CardPlayerTurnSemantics;
   action?: CardPlayerAction;
+  avatarId?: AvatarId;
+  cardBack?: ReactNode;
+  skinName?: string;
 }
 
 function formatCardCount(count: number): string {
@@ -63,6 +68,9 @@ export function CardPlayerSeat({
   turnAnimationKey,
   turnSemantics,
   action,
+  avatarId,
+  cardBack,
+  skinName,
 }: CardPlayerSeatProps) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const resolvedTurnSemantics = turnSemantics ?? "exclusive-turn";
@@ -173,7 +181,11 @@ export function CardPlayerSeat({
       )}
 
       <span className="card-player-seat-initial" aria-hidden="true">
-        {name.trim().charAt(0).toLocaleUpperCase("ru-RU") || "?"}
+        {avatarId ? (
+          <AvatarPortrait avatarId={avatarId} />
+        ) : (
+          name.trim().charAt(0).toLocaleUpperCase("ru-RU") || "?"
+        )}
       </span>
 
       <span className="card-player-seat-count" aria-label={cardCountLabel}>
@@ -181,6 +193,24 @@ export function CardPlayerSeat({
       </span>
 
       <strong className="card-player-seat-name">{name}</strong>
+      <span className="card-player-seat-detail">
+        {statusLabel ?? cardCountLabel}
+        {temporaryBot ? (
+          " · временный бот"
+        ) : controllerKind === "bot" ? (
+          <span className="card-player-bot-label"> · бот</span>
+        ) : !connected ? (
+          " · нет связи"
+        ) : (
+          ""
+        )}
+      </span>
+      {cardCount > 0 && !isMe && cardBack && (
+        <span className="card-player-seat-back" aria-hidden="true">
+          {cardBack}
+        </span>
+      )}
+      {isMe && skinName && <span className="card-player-seat-skin">{skinName}</span>}
 
       {action && (
         <span className="card-player-action" key={action.eventId}>
