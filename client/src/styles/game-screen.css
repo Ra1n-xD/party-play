@@ -1669,28 +1669,28 @@
   -webkit-backdrop-filter: blur(8px);
 }
 
-.command-game-screen > .modal-overlay > .modal {
+.command-game-screen > .modal-overlay > .modal:where(:not(.party-dialog)) {
   color: var(--gs-text);
   background: var(--gs-surface);
   border-color: rgba(178, 199, 185, 0.24);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.56);
 }
 
-.command-game-screen > .modal-overlay > .modal h3 {
+.command-game-screen > .modal-overlay > .modal:where(:not(.party-dialog)) h3 {
   color: var(--gs-gold);
 }
 
-.command-game-screen > .modal-overlay > .modal p {
+.command-game-screen > .modal-overlay > .modal:where(:not(.party-dialog)) p {
   color: var(--gs-muted);
 }
 
-.command-game-screen > .modal-overlay > .modal .btn-target {
+.command-game-screen > .modal-overlay > .modal:where(:not(.party-dialog)) .btn-target {
   color: var(--gs-text);
   background: var(--gs-surface-strong);
   border-color: var(--gs-border);
 }
 
-.command-game-screen > .modal-overlay > .modal .btn-target:hover {
+.command-game-screen > .modal-overlay > .modal:where(:not(.party-dialog)) .btn-target:hover {
   color: var(--gs-gold);
   border-color: rgba(239, 189, 88, 0.34);
 }

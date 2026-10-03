@@ -300,7 +300,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
           labelledBy="lobby-management-title"
           onClose={() => setManagementOpen(false)}
           overlayClassName="lobby-management-modal"
-          panelClassName="lobby-management-panel"
+          panelClassName="lobby-management-panel party-dialog"
         >
           <div className="lobby-management-header">
             <h2 id="lobby-management-title">Управление комнатой</h2>

@@ -1,0 +1,172 @@
+:root {
+  --dialog-paper: #fff8e8;
+  --dialog-surface: #f4ecd9;
+  --dialog-ink: #282335;
+  --dialog-muted: #6b6275;
+  --dialog-line: #d3c6d4;
+  --dialog-accent: #d8fc61;
+  --dialog-purple: #69408a;
+  --dialog-lilac: #e4b5f3;
+  --dialog-danger: #a43643;
+}
+
+/* Explicitly shared by platform dialogs and the portalled 3D session menu. */
+body .modal.party-dialog {
+  --text-primary: var(--dialog-ink);
+  --text-secondary: var(--dialog-muted);
+  --text-muted: var(--dialog-muted);
+  --accent: var(--dialog-purple);
+  --success: #36624b;
+  --danger: var(--dialog-danger);
+  --border: var(--dialog-line);
+  --border-light: var(--dialog-line);
+  --bg-card: var(--dialog-surface);
+  --bg-secondary: var(--dialog-paper);
+  --glass-border: var(--dialog-line);
+  border: 2px solid var(--dialog-line);
+  border-radius: 20px;
+  background: var(--dialog-paper);
+  color: var(--dialog-ink);
+  box-shadow:
+    7px 9px 0 #17102080,
+    0 24px 80px #100b2040;
+  font-family: "Golos Text", sans-serif;
+  color-scheme: light;
+  scrollbar-color: #bda8c5 var(--dialog-paper);
+}
+
+body .modal.party-dialog h2 {
+  color: var(--dialog-ink);
+  font-family: "Unbounded", sans-serif;
+  font-size: clamp(1.2rem, 3.4vw, 1.65rem);
+  font-weight: 850;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+body .modal.party-dialog :is(h3, h4, strong, label, dd) {
+  color: var(--dialog-ink);
+}
+
+body .modal.party-dialog > p {
+  color: var(--dialog-muted);
+}
+
+body .modal.party-dialog .btn {
+  min-height: 44px;
+  padding: 11px 16px;
+  border: 1px solid var(--dialog-line);
+  border-radius: 10px;
+  background: var(--dialog-surface);
+  color: var(--dialog-ink);
+  box-shadow: none;
+  font-family: inherit;
+  font-weight: 750;
+  text-transform: none;
+}
+
+body .modal.party-dialog .btn-primary {
+  border: 2px solid var(--dialog-ink);
+  background: var(--dialog-accent);
+  box-shadow: 3px 4px 0 var(--dialog-lilac);
+}
+
+body .modal.party-dialog .btn-danger {
+  border-color: var(--dialog-danger);
+  background: var(--dialog-danger);
+  color: #fff8e8;
+}
+
+body .modal.party-dialog .btn-text {
+  border-color: transparent;
+  background: transparent;
+  color: var(--dialog-purple);
+}
+
+body .modal.party-dialog :is(.btn, .reconnect-host-action):hover:not(:disabled) {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+}
+
+body .modal.party-dialog button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+body .modal.party-dialog .input {
+  min-height: 48px;
+  border: 2px solid var(--dialog-line);
+  border-radius: 10px;
+  background: #fffdf6;
+  color: var(--dialog-ink);
+  font-family: inherit;
+}
+
+body .modal.party-dialog .input::placeholder {
+  color: #817589;
+}
+
+body .modal.party-dialog :is(button, input, a):focus-visible {
+  outline: 3px solid var(--dialog-purple);
+  outline-offset: 3px;
+}
+
+body .modal.party-dialog .reconnect-screen {
+  padding: 26px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body .modal.party-dialog.platform-recovery-panel {
+  padding: 0;
+}
+
+body .modal.party-dialog :is(.durak-section-eyebrow, .uno-eyebrow, .reconnect-eyebrow) {
+  color: var(--dialog-purple);
+}
+
+body .modal.party-dialog:is(.durak-management-panel, .uno-management-panel) {
+  width: min(760px, calc(100vw - 32px));
+  max-width: 760px;
+}
+
+body .modal.party-dialog :is(.durak-management-heading, .uno-management-heading) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+body .modal.party-dialog :is(.durak-inline-error, .uno-inline-error) {
+  color: var(--dialog-danger);
+}
+
+@media (max-width: 520px) {
+  body .modal.party-dialog {
+    border-radius: 16px;
+  }
+
+  body .modal.party-dialog .reconnect-screen {
+    padding: 22px 18px;
+  }
+
+  body .modal.party-dialog :is(.durak-management-heading, .uno-management-heading) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body .modal.party-dialog button {
+    transition: none;
+  }
+
+  body .modal.party-dialog :is(.btn, .reconnect-host-action):hover:not(:disabled) {
+    transform: none;
+  }
+}

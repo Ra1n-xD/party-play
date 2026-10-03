@@ -1193,20 +1193,6 @@
   line-height: 1.6;
 }
 
-.show-menu .modal:is(.platform-public-rooms-panel, .platform-recovery-panel, .game-rules-modal) {
-  border-color: #fff8e850;
-  background: var(--bg-secondary);
-}
-
-.show-menu .platform-public-rooms-heading {
-  background: var(--bg-secondary);
-}
-
-.show-menu .platform-public-room {
-  background: #ffffff08;
-  border-color: #fff8e830;
-}
-
 @media (min-width: 901px) {
   .is-main-menu,
   .is-game-menu {
@@ -2365,23 +2351,6 @@
   color: #222636;
   font-size: calc(13 * var(--show-unit)) !important;
   font-weight: 700 !important;
-}
-
-.show-lobby .lobby-management-panel {
-  max-width: calc(820 * var(--show-unit));
-  padding: calc(26 * var(--show-unit));
-  background: var(--show-base);
-  color: var(--show-ink);
-  border-color: var(--show-line);
-}
-
-.show-lobby .lobby-management-header h2 {
-  font-size: calc(22 * var(--show-unit));
-}
-
-.show-lobby .reconnect-host-row {
-  background: #ffffff08;
-  border-color: #fff4d530;
 }
 
 @media (max-width: 680px) {

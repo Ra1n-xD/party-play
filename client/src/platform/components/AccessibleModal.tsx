@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import "../../styles/dialog-theme.css";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",

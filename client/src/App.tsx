@@ -36,9 +36,16 @@ function ProfileApp() {
       if (
         !link ||
         link.target ||
-        !["/", "/login", "/profile", "/cases", "/upgrade", "/updates", "/leaderboard"].includes(
-          link.getAttribute("href") ?? "",
-        )
+        ![
+          "/",
+          "/login",
+          "/profile",
+          "/cases",
+          "/upgrade",
+          "/updates",
+          "/leaderboard",
+          "/stats",
+        ].includes(link.getAttribute("href") ?? "")
       )
         return;
       event.preventDefault();
@@ -86,6 +93,8 @@ function ProfileApp() {
         <UpgradeScreen />
       ) : path === "/leaderboard" ? (
         <LeaderboardScreen />
+      ) : path === "/stats" ? (
+        <StatsScreen />
       ) : path === "/updates" ? (
         <UpdatesScreen />
       ) : (
@@ -160,20 +169,13 @@ function RoomAppContent() {
 }
 
 export default function App() {
-  const statsRoute =
-    window.location.pathname === "/stats" || window.location.pathname === "/stats/";
-
   return (
     <>
-      {statsRoute ? (
-        <StatsScreen />
-      ) : (
-        <PlatformProvider>
-          <ProfileProvider>
-            <ProfileApp />
-          </ProfileProvider>
-        </PlatformProvider>
-      )}
+      <PlatformProvider>
+        <ProfileProvider>
+          <ProfileApp />
+        </ProfileProvider>
+      </PlatformProvider>
       <div className="app-version">v{__APP_VERSION__}</div>
     </>
   );

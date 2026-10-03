@@ -848,7 +848,7 @@ textarea {
   top: -24px;
   margin: -24px -24px 0;
   padding: 24px 24px 16px;
-  background: linear-gradient(#15191d 76%, rgba(21, 25, 29, 0.93));
+  background: var(--dialog-paper);
 }
 
 .platform-public-rooms-intro {
@@ -864,7 +864,7 @@ textarea {
   min-height: 44px;
   align-items: center;
   gap: 8px;
-  color: rgba(247, 240, 229, 0.62);
+  color: var(--dialog-muted);
   font-size: 0.75rem;
   white-space: nowrap;
 }
@@ -884,7 +884,7 @@ textarea {
 
 .platform-public-rooms-note {
   margin: 13px 0 16px;
-  color: rgba(247, 240, 229, 0.58);
+  color: var(--dialog-muted);
   font-size: 0.78rem;
   line-height: 1.45;
 }
@@ -895,23 +895,23 @@ textarea {
   gap: 6px;
   margin-top: 12px;
   padding: 16px;
-  border: 1px solid rgba(247, 240, 229, 0.12);
+  border: 1px solid var(--dialog-line);
   border-radius: 11px;
-  background: rgba(8, 11, 14, 0.42);
-  color: rgba(247, 240, 229, 0.64);
+  background: var(--dialog-surface);
+  color: var(--dialog-muted);
   font-size: 0.8rem;
 }
 
 .platform-public-state.is-stale {
   border-color: rgba(243, 198, 107, 0.25);
-  color: #e2c68d;
+  color: #705218;
 }
 
 .platform-public-state.is-error {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   border-color: rgba(217, 120, 108, 0.38);
-  color: #f0a399;
+  color: var(--dialog-danger);
 }
 
 .platform-public-state button {
@@ -945,9 +945,9 @@ textarea {
   align-items: center;
   gap: 14px;
   padding: 13px;
-  border: 1px solid rgba(247, 240, 229, 0.12);
+  border: 1px solid var(--dialog-line);
   border-radius: 11px;
-  background: rgba(8, 11, 14, 0.48);
+  background: #fffdf6;
 }
 
 .platform-public-room-main,
@@ -958,13 +958,13 @@ textarea {
 }
 
 .platform-public-room-main strong {
-  color: #f7f0e5;
+  color: var(--dialog-ink);
   font-size: 0.85rem;
 }
 
 .platform-public-room-main small,
 .platform-public-room-meta span {
-  color: rgba(247, 240, 229, 0.52);
+  color: var(--dialog-muted);
   font-size: 0.68rem;
   line-height: 1.35;
 }
@@ -974,7 +974,7 @@ textarea {
   padding: 3px 7px;
   border-radius: 999px;
   background: rgba(127, 199, 141, 0.1);
-  color: #9bd2a6;
+  color: #36624b;
   font-size: 0.62rem;
   font-weight: 850;
   letter-spacing: 0.04em;
@@ -983,17 +983,17 @@ textarea {
 
 .platform-public-room-status.is-playing {
   background: rgba(237, 150, 80, 0.12);
-  color: #f3b77d;
+  color: #885423;
 }
 
 .platform-public-room-status.is-paused {
   background: rgba(243, 198, 107, 0.12);
-  color: #f3c66b;
+  color: #705218;
 }
 
 .platform-public-room-status.is-results {
   background: rgba(163, 142, 205, 0.12);
-  color: #bca8e1;
+  color: var(--dialog-purple);
 }
 
 .platform-public-room-action {
@@ -1016,8 +1016,8 @@ textarea {
 }
 
 .modal.game-rules-modal {
-  --rules-accent: #efbd58;
-  --rules-accent-soft: rgba(239, 189, 88, 0.12);
+  --rules-accent: var(--dialog-purple);
+  --rules-accent-soft: #ecdafa;
   width: min(760px, calc(100vw - 32px));
   max-width: none;
   max-height: calc(100dvh - 32px);
@@ -1031,23 +1031,23 @@ textarea {
       transparent 18rem
     ),
     #101713;
-  color: #f3f1e8;
+  color: var(--dialog-ink);
   scrollbar-color: color-mix(in srgb, var(--rules-accent) 45%, transparent) transparent;
 }
 
 .game-rules-modal.is-green {
-  --rules-accent: #72d6aa;
-  --rules-accent-soft: rgba(114, 214, 170, 0.12);
+  --rules-accent: var(--dialog-purple);
+  --rules-accent-soft: #ecdafa;
 }
 
 .game-rules-modal.is-amber {
-  --rules-accent: #efbd58;
-  --rules-accent-soft: rgba(239, 189, 88, 0.12);
+  --rules-accent: var(--dialog-purple);
+  --rules-accent-soft: #ecdafa;
 }
 
 .game-rules-modal.is-blue {
-  --rules-accent: #5cbbe8;
-  --rules-accent-soft: rgba(92, 187, 232, 0.12);
+  --rules-accent: var(--dialog-purple);
+  --rules-accent-soft: #ecdafa;
 }
 
 .game-rules-heading {
@@ -1059,8 +1059,8 @@ textarea {
   justify-content: space-between;
   gap: 18px;
   padding: 24px 24px 20px;
-  border-bottom: 1px solid rgba(178, 199, 185, 0.13);
-  background: rgba(16, 23, 19, 0.94);
+  border-bottom: 1px solid var(--dialog-line);
+  background: var(--dialog-paper);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
@@ -1082,7 +1082,7 @@ textarea {
 }
 
 .game-rules-heading h2 {
-  color: #f3f1e8;
+  color: var(--dialog-ink);
   font-size: clamp(1.65rem, 4vw, 2.45rem);
   line-height: 1.05;
 }
@@ -1090,7 +1090,7 @@ textarea {
 .modal.game-rules-modal .game-rules-heading p {
   max-width: 600px;
   margin: 9px 0 0;
-  color: rgba(243, 241, 232, 0.68);
+  color: var(--dialog-muted);
   font-size: 0.98rem;
   line-height: 1.5;
 }
@@ -1102,10 +1102,10 @@ textarea {
   flex: 0 0 44px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(178, 199, 185, 0.16);
+  border: 1px solid var(--dialog-line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
-  color: rgba(243, 241, 232, 0.72);
+  background: var(--dialog-surface);
+  color: var(--dialog-muted);
   font: inherit;
   font-size: 1.25rem;
   cursor: pointer;
@@ -1126,7 +1126,7 @@ textarea {
 .modal.game-rules-modal > .game-rules-summary {
   margin: 0;
   padding: 22px 24px 0;
-  color: rgba(243, 241, 232, 0.86);
+  color: var(--dialog-ink);
   font-size: 1.08rem;
   line-height: 1.65;
 }
@@ -1143,13 +1143,13 @@ textarea {
   gap: 4px;
   min-width: 0;
   padding: 13px 14px;
-  border: 1px solid rgba(178, 199, 185, 0.13);
+  border: 1px solid var(--dialog-line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--dialog-surface);
 }
 
 .game-rules-facts dt {
-  color: rgba(243, 241, 232, 0.47);
+  color: var(--dialog-muted);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1158,7 +1158,7 @@ textarea {
 
 .game-rules-facts dd {
   margin: 0;
-  color: #f3f1e8;
+  color: var(--dialog-ink);
   font-size: 0.98rem;
   font-weight: 750;
   line-height: 1.35;
@@ -1175,9 +1175,9 @@ textarea {
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 14px;
   padding: 18px;
-  border: 1px solid rgba(178, 199, 185, 0.12);
+  border: 1px solid var(--dialog-line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.018);
+  background: #fffdf6;
 }
 
 .game-rules-sections > section > span {
@@ -1197,13 +1197,13 @@ textarea {
 
 .game-rules-sections h3 {
   margin: 1px 0 9px;
-  color: #f3f1e8;
+  color: var(--dialog-ink);
   font-size: 1.08rem;
 }
 
 .modal.game-rules-modal .game-rules-sections p {
   margin: 0 0 9px;
-  color: rgba(243, 241, 232, 0.62);
+  color: var(--dialog-muted);
   font-size: 1rem;
   line-height: 1.62;
 }
@@ -1221,7 +1221,7 @@ textarea {
 .game-rules-tips li {
   position: relative;
   padding-left: 16px;
-  color: rgba(243, 241, 232, 0.72);
+  color: var(--dialog-muted);
   font-size: 0.98rem;
   line-height: 1.62;
 }
@@ -2317,278 +2317,6 @@ textarea {
   }
 }
 
-/* ============ PROJECT STATISTICS ============ */
-.platform-stats {
-  min-height: 100vh;
-  padding: 24px;
-}
-
-.platform-stats-shell {
-  width: min(1180px, 100%);
-  margin: 0 auto;
-}
-
-.platform-stats-header,
-.platform-stats-hero,
-.platform-stats-section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.platform-stats-header {
-  margin-bottom: 30px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--border);
-}
-
-.platform-stats-back {
-  min-height: 44px;
-  padding: 10px 16px;
-  border: 1px solid var(--border-light);
-  border-radius: 999px;
-  color: var(--text-primary);
-  font-size: 0.88rem;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.platform-stats-hero {
-  margin-bottom: 26px;
-}
-
-.platform-stats-hero p,
-.platform-stats-section-heading span {
-  margin-bottom: 5px;
-  color: var(--accent);
-  font-size: 0.74rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.platform-stats-hero h1 {
-  max-width: 760px;
-  font-size: clamp(2rem, 5vw, 4rem);
-  line-height: 1.02;
-}
-
-.platform-stats-connection {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  min-height: 40px;
-  padding: 8px 14px;
-  border: 1px solid var(--border-light);
-  border-radius: 999px;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.platform-stats-connection.is-online {
-  border-color: rgba(118, 198, 158, 0.4);
-  color: var(--success);
-}
-
-.platform-stats-connection.is-offline {
-  border-color: rgba(217, 120, 108, 0.42);
-  color: var(--danger);
-}
-
-.platform-stats-state {
-  padding: 24px;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-.platform-stats-state.is-stale {
-  margin-bottom: 18px;
-  border-color: rgba(239, 189, 88, 0.36);
-  color: var(--accent);
-}
-
-.platform-stats-section {
-  margin-top: 18px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  background: rgba(12, 25, 18, 0.76);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.16);
-}
-
-.platform-stats-section-heading {
-  align-items: flex-end;
-  margin-bottom: 18px;
-}
-
-.platform-stats-section-heading h2 {
-  font-size: clamp(1.3rem, 3vw, 2rem);
-}
-
-.platform-stats-section-heading small {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  text-align: right;
-}
-
-.platform-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.platform-stats-grid article,
-.platform-stats-games article {
-  min-width: 0;
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.platform-stats-grid article {
-  display: grid;
-  gap: 7px;
-}
-
-.platform-stats-grid article > span {
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.platform-stats-grid article > strong {
-  color: var(--accent);
-  font-size: clamp(1.8rem, 4vw, 2.8rem);
-  line-height: 1;
-}
-
-.platform-stats-grid article > small,
-.platform-stats-privacy {
-  color: var(--text-muted);
-  font-size: 0.72rem;
-}
-
-.platform-stats-live {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.platform-stats-live span {
-  display: grid;
-  gap: 4px;
-  padding: 16px;
-  border-radius: 14px;
-  background: rgba(118, 198, 158, 0.075);
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-}
-
-.platform-stats-live strong {
-  color: var(--success);
-  font-size: 1.55rem;
-}
-
-.platform-stats-games {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.platform-stats-games article > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.platform-stats-games article > div > strong {
-  font-size: 1.1rem;
-}
-
-.platform-stats-games article > div > span {
-  color: var(--success);
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-.platform-stats-games dl {
-  display: grid;
-  gap: 8px;
-}
-
-.platform-stats-games dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-
-.platform-stats-games dt {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
-
-.platform-stats-games dd {
-  font-weight: 900;
-}
-
-.platform-stats-privacy {
-  max-width: 760px;
-  margin: 20px auto 44px;
-  text-align: center;
-}
-
-@media (max-width: 820px) {
-  .platform-stats-grid,
-  .platform-stats-games {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .platform-stats-live {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 520px) {
-  .platform-stats {
-    padding: 16px;
-  }
-
-  .platform-stats-header {
-    margin-bottom: 22px;
-  }
-
-  .platform-stats-hero,
-  .platform-stats-section-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .platform-stats-section-heading small {
-    text-align: left;
-  }
-
-  .platform-stats-section {
-    padding: 16px;
-    border-radius: 18px;
-  }
-
-  .platform-stats-grid,
-  .platform-stats-games,
-  .platform-stats-live {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* ============ PLAYERS GRID ============ */
 .players-grid {
   margin-top: 8px;
@@ -2861,194 +2589,6 @@ textarea {
   color: var(--text-muted);
   font-size: 0.9rem;
   margin-top: 16px;
-}
-
-/* ============ RESULTS SCREEN ============ */
-.results-screen {
-  justify-content: flex-start;
-  padding-top: 32px;
-}
-
-.results-container {
-  max-width: 900px;
-  margin: 0 auto;
-  width: 100%;
-  text-align: center;
-}
-
-.results-container h2 {
-  font-size: 1.8rem;
-  background: linear-gradient(135deg, #efbd58, #76c69e);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 12px;
-}
-
-.results-scenario {
-  color: var(--text-secondary);
-  margin-bottom: 24px;
-}
-
-.results-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  margin-bottom: 24px;
-  text-align: left;
-}
-
-.results-group h3 {
-  margin-bottom: 12px;
-}
-.survivors h3 {
-  color: var(--success);
-}
-.eliminated-group h3 {
-  color: var(--danger);
-}
-.kicked-group h3 {
-  color: var(--accent);
-}
-
-.result-player {
-  background: var(--bg-card);
-  border-radius: var(--radius-sm);
-  padding: 14px;
-  margin-bottom: 8px;
-  border: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-}
-
-.result-player.is-me {
-  border-color: var(--accent);
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-
-.result-player.is-kicked {
-  border-color: rgba(239, 189, 88, 0.34);
-  box-shadow: inset 3px 0 0 rgba(239, 189, 88, 0.58);
-}
-
-.result-kicked-label {
-  margin-left: 8px;
-  padding: 3px 7px;
-  border: 1px solid rgba(239, 189, 88, 0.34);
-  border-radius: 999px;
-  color: var(--accent);
-  font-size: 0.68rem;
-  font-weight: 800;
-}
-
-.result-player-name {
-  font-weight: 700;
-  font-size: 1.05rem;
-  margin-bottom: 8px;
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  overflow-wrap: anywhere;
-}
-
-.result-player .attributes-grid {
-  text-align: left;
-}
-
-.result-desktop {
-  display: grid;
-}
-
-.results-screen .attribute-card.hidden {
-  opacity: 1;
-  filter: none;
-  border-style: dashed;
-}
-
-.result-mobile {
-  display: none;
-}
-
-.result-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 0.78rem;
-  border: 1px solid transparent;
-}
-
-.result-tag.tag-revealed {
-  background: rgba(118, 198, 158, 0.1);
-  border-color: rgba(118, 198, 158, 0.25);
-  color: var(--text-primary);
-}
-
-.result-tag.tag-hidden {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.16);
-  border-style: dashed;
-  color: var(--text-secondary);
-}
-
-.result-tag-label {
-  font-weight: 600;
-}
-
-.result-tag[data-attr-type="profession"] .result-tag-label {
-  color: var(--card-profession-color);
-}
-.result-tag[data-attr-type="bio"] .result-tag-label {
-  color: var(--card-bio-color);
-}
-.result-tag[data-attr-type="health"] .result-tag-label {
-  color: var(--card-health-color);
-}
-.result-tag[data-attr-type="hobby"] .result-tag-label {
-  color: var(--card-hobby-color);
-}
-.result-tag[data-attr-type="baggage"] .result-tag-label {
-  color: var(--card-baggage-color);
-}
-.result-tag[data-attr-type="fact"] .result-tag-label {
-  color: var(--card-fact-color);
-}
-.result-tag[data-attr-type="action"] .result-tag-label {
-  color: var(--card-action-color);
-}
-
-.result-attr-detail {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-left: 4px;
-}
-
-.results-bunker {
-  margin-bottom: 20px;
-  text-align: left;
-}
-
-.results-bunker h3 {
-  color: var(--info);
-  margin-bottom: 8px;
-}
-
-.results-my-full {
-  background: var(--bg-card);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 20px;
-  border: 1px solid rgba(239, 189, 88, 0.34);
-  text-align: left;
-  backdrop-filter: blur(12px);
-}
-
-.results-my-full h3 {
-  color: var(--accent);
-  margin-bottom: 12px;
 }
 
 /* ============ VOTE BARS ============ */
@@ -3752,15 +3292,6 @@ textarea {
     width: 32px;
   }
 
-  .result-desktop {
-    display: none !important;
-  }
-  .result-mobile {
-    display: flex !important;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
   .round-dot {
     width: 24px;
     height: 24px;
@@ -3921,9 +3452,9 @@ textarea {
 
 .reconnect-screen {
   padding: 20px;
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--dialog-line);
   border-radius: var(--radius);
-  background: rgba(16, 23, 19, 0.94);
+  background: var(--dialog-paper);
   box-shadow: var(--shadow);
   text-align: left;
 }
@@ -3944,17 +3475,17 @@ textarea {
 }
 
 .reconnect-screen-heading h2 {
-  color: var(--accent);
+  color: var(--dialog-purple);
   font-size: 1.55rem;
 }
 
 .reconnect-screen-heading p,
 .reconnect-claim-status p {
-  color: var(--text-secondary);
+  color: var(--dialog-muted);
 }
 
 .reconnect-eyebrow {
-  color: var(--success);
+  color: #36624b;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.13em;
@@ -3964,7 +3495,7 @@ textarea {
 .reconnect-field {
   display: grid;
   gap: 6px;
-  color: var(--text-secondary);
+  color: var(--dialog-muted);
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -3983,10 +3514,10 @@ textarea {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--dialog-line);
   border-radius: var(--radius-sm);
-  background: rgba(7, 16, 12, 0.78);
-  color: var(--text-primary);
+  background: #fffdf6;
+  color: var(--dialog-ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -3999,13 +3530,13 @@ textarea {
 }
 
 .reconnect-seat strong {
-  color: var(--accent);
+  color: var(--dialog-purple);
   font-size: 0.76rem;
 }
 
 .reconnect-seat.is-selected {
-  border-color: var(--success);
-  box-shadow: inset 3px 0 0 var(--success);
+  border-color: #36624b;
+  box-shadow: inset 3px 0 0 #36624b;
 }
 
 .reconnect-claim-status {
@@ -4026,7 +3557,7 @@ textarea {
   padding: 10px 12px;
   border: 1px solid rgba(217, 120, 108, 0.36);
   border-radius: var(--radius-sm);
-  color: var(--danger);
+  color: var(--dialog-danger);
 }
 
 .reconnect-pause-overlay {
@@ -4077,9 +3608,9 @@ textarea {
   display: grid;
   gap: 18px;
   padding: 16px;
-  border: 1px solid rgba(118, 198, 158, 0.22);
+  border: 1px solid var(--dialog-line);
   border-radius: var(--radius-sm);
-  background: rgba(7, 16, 12, 0.5);
+  background: var(--dialog-surface);
 }
 
 .reconnect-host-controls.is-compact {
@@ -4106,8 +3637,8 @@ textarea {
   padding: 10px 14px;
   border: 1px solid rgba(239, 189, 88, 0.42);
   border-radius: var(--radius-sm);
-  background: rgba(239, 189, 88, 0.1);
-  color: var(--text-primary);
+  background: var(--dialog-surface);
+  color: var(--dialog-ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -4122,17 +3653,17 @@ textarea {
 }
 
 .reconnect-host-banner strong {
-  color: var(--accent);
+  color: var(--dialog-purple);
 }
 
 .reconnect-host-banner span span {
-  color: var(--text-secondary);
+  color: var(--dialog-muted);
   font-size: 0.78rem;
 }
 
 .reconnect-host-banner-action {
   flex: 0 0 auto;
-  color: var(--success);
+  color: #36624b;
   font-size: 0.78rem;
   font-weight: 800;
 }
@@ -4148,7 +3679,7 @@ textarea {
 
 .reconnect-host-heading h3,
 .reconnect-host-section h4 {
-  color: var(--text-primary);
+  color: var(--dialog-ink);
 }
 
 .reconnect-claim-count {
@@ -4158,8 +3689,8 @@ textarea {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--accent);
-  color: #17150e;
+  background: var(--dialog-purple);
+  color: #fff8e8;
   font-weight: 900;
 }
 
@@ -4170,9 +3701,9 @@ textarea {
 
 .reconnect-host-row {
   padding: 11px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--dialog-line);
   border-radius: var(--radius-sm);
-  background: var(--bg-card);
+  background: #fffdf6;
 }
 
 .reconnect-host-row > div:first-child {
@@ -4183,7 +3714,7 @@ textarea {
 
 .reconnect-host-row span,
 .reconnect-empty {
-  color: var(--text-muted);
+  color: var(--dialog-muted);
   font-size: 0.76rem;
 }
 
@@ -4197,10 +3728,10 @@ textarea {
 .reconnect-host-action {
   min-height: 44px;
   padding: 8px 11px;
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--dialog-line);
   border-radius: 9px;
-  background: rgba(16, 23, 19, 0.92);
-  color: var(--text-primary);
+  background: var(--dialog-paper);
+  color: var(--dialog-ink);
   font: inherit;
   font-size: 0.76rem;
   font-weight: 800;
@@ -4210,13 +3741,13 @@ textarea {
 .reconnect-host-action.is-approve,
 .reconnect-host-action.is-transfer {
   border-color: rgba(118, 198, 158, 0.4);
-  color: var(--success);
+  color: #36624b;
 }
 
 .reconnect-host-action.is-reject,
 .reconnect-host-action.is-kick {
   border-color: rgba(217, 120, 108, 0.38);
-  color: var(--danger);
+  color: var(--dialog-danger);
 }
 
 .lobby-management-modal {

@@ -18,7 +18,7 @@ export function GameRulesModal({ gameId, gameTitle, rules, onClose }: GameRulesM
       labelledBy={titleId}
       onClose={onClose}
       overlayClassName="game-rules-overlay"
-      panelClassName={`game-rules-modal is-${rules.accent}`}
+      panelClassName={`game-rules-modal party-dialog is-${rules.accent}`}
     >
       <header className="game-rules-heading">
         <div>

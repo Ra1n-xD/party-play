@@ -922,7 +922,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
           labelledBy="uno-management-title"
           onClose={closeManagement}
           overlayClassName="uno-management-modal"
-          panelClassName="uno-management-panel"
+          panelClassName="uno-management-panel party-dialog"
         >
           <div className="uno-management-heading">
             <div>
