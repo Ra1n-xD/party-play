@@ -3,7 +3,7 @@ import type { RegisteredClientGameId } from "../gameRegistry";
 export function GameMenuArtwork({
   gameId,
 }: {
-  gameId: RegisteredClientGameId | "liar-dice" | "who-am-i";
+  gameId: RegisteredClientGameId | "liar-dice" | "who-am-i" | "alias";
 }) {
   return (
     <div className={`show-art show-art-${gameId}`} aria-hidden="true">
@@ -31,6 +31,11 @@ export function GameMenuArtwork({
         </div>
       ) : gameId === "who-am-i" ? (
         <span className="show-art-identity">?</span>
+      ) : gameId === "alias" ? (
+        <div className="show-art-words">
+          <span className="show-art-word">СЛОВО</span>
+          <span className="show-art-word">Ага!</span>
+        </div>
       ) : (
         <div className="show-art-fan">
           {(gameId === "durak"

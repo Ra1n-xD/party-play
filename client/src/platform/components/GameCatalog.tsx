@@ -7,6 +7,7 @@ import { GameMenuArtwork } from "./GameMenuArtwork";
 const upcomingGames = [
   { id: "liar-dice", title: "Кости лжеца" },
   { id: "who-am-i", title: "Кто я" },
+  { id: "alias", title: "Алиас" },
 ] as const;
 
 interface GameCatalogProps {
