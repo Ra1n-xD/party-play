@@ -72,7 +72,7 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
         </>
       ) : (
         <a className="show-login" href="/login">
-          <FiLogIn aria-hidden="true" /> Войти за монетами
+          <FiLogIn aria-hidden="true" /> Войти
         </a>
       )}
       {profile && (!connected || busy) && (

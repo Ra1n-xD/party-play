@@ -62,7 +62,7 @@
 
 .show-menu-shell {
   width: 100%;
-  max-width: calc(1600 * var(--show-unit));
+  max-width: calc(1280 * var(--show-unit));
   margin: 0 auto;
 }
 
