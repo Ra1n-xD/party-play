@@ -1,10 +1,10 @@
 .drop-feed {
   display: flex;
   align-items: stretch;
-  gap: 18px;
+  gap: 12px;
   min-width: 0;
-  margin-bottom: 28px;
-  padding: 14px;
+  margin-bottom: 18px;
+  padding: 8px;
   border: 1px solid #ffffff16;
   border-radius: 16px;
   background: #ffffff04;
@@ -13,7 +13,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: 5px;
   flex-shrink: 0;
   padding: 0 8px;
 }
@@ -43,7 +43,7 @@
   display: flex;
   min-width: 0;
   flex: 1;
-  gap: 10px;
+  gap: 8px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
@@ -59,10 +59,10 @@
 .drop-feed-item {
   display: flex;
   align-items: center;
-  flex: 0 0 220px;
+  flex: 0 0 190px;
   min-width: 0;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 6px 8px;
   border: 1px solid #ffffff12;
   border-bottom: 2px solid var(--drop-color);
   border-radius: 10px;
@@ -72,9 +72,9 @@
 .drop-feed-preview {
   display: grid;
   place-items: center;
-  flex: 0 0 56px;
-  width: 56px;
-  height: 68px;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 48px;
   overflow: hidden;
 }
 .drop-feed-preview .cosmetic-avatar {
@@ -83,18 +83,18 @@
   padding: 0;
 }
 .drop-feed-preview .cosmetic-avatar .avatar-portrait {
-  width: 56px;
-  height: 56px;
+  width: 40px;
+  height: 40px;
 }
 .drop-feed-preview .cosmetic-deck {
   margin: 0;
-  zoom: 0.43;
+  zoom: 0.3;
 }
 .drop-feed-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .drop-feed-copy > strong,
 .drop-feed-nickname {
@@ -117,13 +117,13 @@
 .drop-feed-source {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   color: #bcb0cc;
   font-size: 9px;
 }
 .drop-feed-empty {
   align-self: center;
-  min-height: 68px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   margin: 0;
@@ -144,9 +144,9 @@
 @media (max-width: 760px) {
   .drop-feed {
     flex-direction: column;
-    gap: 12px;
-    padding: 12px;
-    margin-bottom: 22px;
+    gap: 6px;
+    padding: 8px;
+    margin-bottom: 16px;
   }
   .drop-feed-heading {
     flex-direction: row;
@@ -155,14 +155,14 @@
     padding: 0;
   }
   .drop-feed-item {
-    flex-basis: 202px;
+    flex-basis: 180px;
   }
 }
 @media (max-width: 360px) {
   .drop-feed-heading {
     align-items: flex-start;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

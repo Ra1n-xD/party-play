@@ -58,10 +58,35 @@ class CollectionAudio {
 
   reveal(success = true) {
     this.stop();
-    if (!this.context) return;
+    if (!this.context || !this.output) return;
     const start = this.context.currentTime;
-    (success ? [523.25, 659.25, 783.99] : [392, 329.63]).forEach((frequency, index) => {
-      this.tone(frequency, start + index * 0.09, 0.42, 0.2);
+    // A short, soft bell flourish. Stable pitches replace the old sliding tones;
+    // the reel ticks above keep their original sound and timing.
+    const notes = success ? [587.33, 880, 1174.66] : [349.23, 293.66];
+    notes.forEach((frequency, index) => {
+      const at = start + index * (success ? 0.085 : 0.13);
+      const length = success ? 0.6 : 0.34;
+      [1, 2, 3].forEach((harmonic, partial) => {
+        const oscillator = this.context!.createOscillator();
+        const envelope = this.context!.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(frequency * harmonic, at);
+        const volume = (success ? 0.17 : 0.14) / (harmonic * harmonic);
+        const decay = length / (1 + partial * 0.6);
+        envelope.gain.setValueAtTime(0, at);
+        envelope.gain.linearRampToValueAtTime(volume, at + 0.012);
+        envelope.gain.exponentialRampToValueAtTime(0.0001, at + decay);
+        oscillator.connect(envelope);
+        envelope.connect(this.output!);
+        this.voices.add(oscillator);
+        oscillator.onended = () => {
+          oscillator.disconnect();
+          envelope.disconnect();
+          this.voices.delete(oscillator);
+        };
+        oscillator.start(at);
+        oscillator.stop(at + decay + 0.02);
+      });
     });
   }
 

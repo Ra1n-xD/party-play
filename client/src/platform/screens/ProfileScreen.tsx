@@ -22,9 +22,6 @@ export function ProfileScreen() {
           <h1>Ваш стиль игры</h1>
           <p>Персонажи и карты, которые узнают за любым столом.</p>
         </div>
-        <a href="/cases" className="profile-primary">
-          Открыть кейс ↗
-        </a>
       </div>
       <section className="profile-summary">
         <strong>{profile.nickname}</strong>

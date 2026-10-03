@@ -496,14 +496,7 @@ export class RoundTableScene {
       person.cardSkinId,
     );
     mergeRigidParts(group);
-    const animator = new TableAvatarAnimator(
-      body,
-      head,
-      leftArm.root,
-      rightArm.root,
-      hand,
-      index * 1.7,
-    );
+    const animator = new TableAvatarAnimator(body, head, leftArm, rightArm, hand, index * 1.7);
     animator.setEliminated(Boolean(person.eliminated), person.eliminatedAt, true);
     this.avatars.set(person.id, animator);
     const ring = this.ring(group, 0.6, 0.024, 0x68ed9e, 0.04);

@@ -70,6 +70,8 @@ export function UpgradeScreen() {
   const [previewProfile, setPreviewProfile] = useState<ProfileSnapshot | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const frame = useRef<number>();
+  const needle = useRef<HTMLDivElement>(null);
+  const finalRotation = useRef(0);
   const mounted = useRef(true);
   const locked = useRef(false);
   const revealSuccess = useRef(false);
@@ -148,7 +150,14 @@ export function UpgradeScreen() {
   };
   const finish = () => {
     clearTimeout(timer.current);
+    cancelAnimationFrame(frame.current ?? 0);
     if (mounted.current && locked.current) {
+      if (needle.current) {
+        needle.current.style.transition = "none";
+        needle.current.style.transform = `rotate(${finalRotation.current}deg)`;
+        needle.current.getAnimations().forEach((animation) => animation.cancel());
+      }
+      setRotation(finalRotation.current);
       sound.reveal(revealSuccess.current);
       setPhase("result");
     }
@@ -173,8 +182,10 @@ export function UpgradeScreen() {
     revealSuccess.current = result.success;
     setPhase("spin");
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    finalRotation.current = (reduced ? 0 : 1800) + (result.roll / 10_000) * 360;
     frame.current = requestAnimationFrame(() => {
-      setRotation((reduced ? 0 : 1800) + (result.roll / 10_000) * 360);
+      if (!mounted.current || !locked.current) return;
+      setRotation(finalRotation.current);
       sound.spin(reduced ? 0 : 4.1);
       timer.current = setTimeout(finish, reduced ? 100 : 4300);
     });
@@ -250,7 +261,14 @@ export function UpgradeScreen() {
             style={{ "--upgrade-chance": chance / 100 } as CSSProperties}
           >
             <div className="upgrade-wheel-ticks" />
-            <div className="upgrade-needle" style={{ transform: `rotate(${rotation}deg)` }} />
+            <div
+              className="upgrade-needle"
+              ref={needle}
+              style={{
+                transform: `rotate(${rotation}deg)`,
+                transition: phase === "spin" ? undefined : "none",
+              }}
+            />
             <div className="upgrade-wheel-core">
               <span>
                 {phase === "result"
