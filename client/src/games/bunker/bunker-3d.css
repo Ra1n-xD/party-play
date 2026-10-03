@@ -543,6 +543,8 @@ body:has(.bunker3d-screen, .bunker-2d) .bunker-event-panel {
 }
 body:has(.bunker3d-screen, .bunker-2d) .bunker-event-panel .phase-announcement-title {
   color: #183343;
+  background: none;
+  -webkit-text-fill-color: currentColor;
   text-shadow: none;
 }
 body:has(.bunker3d-screen, .bunker-2d)

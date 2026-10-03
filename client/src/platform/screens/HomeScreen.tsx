@@ -334,7 +334,7 @@ export function HomeScreen() {
           labelledBy="public-rooms-title"
           onClose={() => setPublicRoomsGameId(null)}
           overlayClassName="platform-public-rooms-modal"
-          panelClassName="platform-public-rooms-panel"
+          panelClassName="platform-public-rooms-panel party-dialog"
         >
           <div className="platform-create-heading platform-public-rooms-heading">
             <div>
@@ -474,7 +474,7 @@ export function HomeScreen() {
           labelledBy="seat-recovery-title"
           onClose={closeRecoveryModal}
           overlayClassName="platform-recovery-modal"
-          panelClassName="platform-recovery-panel"
+          panelClassName="platform-recovery-panel party-dialog"
         >
           <ReconnectScreen onBack={() => setRecoveryOpen(false)} />
         </AccessibleModal>

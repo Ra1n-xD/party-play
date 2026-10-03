@@ -1,9 +1,14 @@
+import { FiCheckCircle, FiLogOut, FiShield } from "react-icons/fi";
 import { useGame } from "../context/GameContext";
 import { BunkerAttributeIcon } from "../games/bunker/BunkerAttributeIcon";
+import { usePlatform } from "../platform/context/PlatformContext";
+import { AvatarPortrait } from "../platform/components/AvatarPortrait";
 import { GameRoomHeader } from "./game/GameRoomHeader";
 import { GameDockTools } from "./game/GameDockTools";
+import "../games/bunker/bunker-results.css";
 
 export function ResultsScreen() {
+  const { snapshot } = usePlatform();
   const {
     connected,
     commandPending,
@@ -15,7 +20,6 @@ export function ResultsScreen() {
     playAgain,
     leaveRoom,
   } = useGame();
-
   if (!gameState) return null;
 
   const me = isSpectator ? undefined : gameState.players.find((p) => p.id === playerId);
@@ -25,175 +29,144 @@ export function ResultsScreen() {
   const kicked = gameState.players.filter((p) => p.kicked);
 
   const renderPlayerCard = (player: (typeof gameState.players)[0]) => {
-    const attrs =
+    const attributes =
       player.allAttributes || player.revealedAttributes.map((a) => ({ ...a, wasRevealed: true }));
-    const playerNumber = gameState.players.findIndex((p) => p.id === player.id) + 1;
-
+    const isMe = !isSpectator && player.id === playerId;
     return (
-      <div
-        key={player.id}
-        className={`result-player ${!isSpectator && player.id === playerId ? "is-me" : ""} ${player.kicked ? "is-kicked" : ""}`}
-      >
-        <div className="result-player-name">
-          <span className="player-number">{playerNumber}</span>
-          {player.name} {!isSpectator && player.id === playerId && "(вы)"}
-          {player.isBot && <span className="bot-badge">бот</span>}
-          {player.kicked && <span className="result-kicked-label">Удалён администратором</span>}
-        </div>
-        {/* Desktop: card grid */}
-        <div className="result-desktop attributes-grid">
-          {attrs.map((attr, i) => (
-            <div
-              key={i}
-              className={`attribute-card ${attr.wasRevealed ? "revealed" : "hidden"}`}
-              data-attr-type={attr.type}
-            >
-              <div className="attr-content">
-                <BunkerAttributeIcon type={attr.type} className="attr-card-image" />
-                <div className="attr-text">
-                  <span className="attr-label">{attr.label}</span>
-                  <span className="attr-value">{attr.value}</span>
-                  {attr.detail && <span className="attr-detail">{attr.detail}</span>}
-                </div>
-              </div>
-              {!attr.wasRevealed && <span className="attr-status">Не раскрывалось в игре</span>}
+      <article key={player.id} className={`bunker-result-player${isMe ? " is-me" : ""}`}>
+        <header>
+          <AvatarPortrait
+            avatarId={
+              snapshot?.seats.find((seat) => seat.seatId === player.id)?.avatarId ?? "human"
+            }
+          />
+          <h3>{player.name}</h3>
+          {isMe && <span className="bunker-result-badge">Вы</span>}
+          {player.isBot && <span className="bunker-result-badge">Бот</span>}
+        </header>
+        <div className="bunker-result-attributes">
+          {attributes.map((attribute) => (
+            <div className="bunker-result-attribute" key={attribute.type}>
+              <span className="bunker-result-label">
+                <BunkerAttributeIcon type={attribute.type} /> {attribute.label}
+              </span>
+              <strong>{attribute.value}</strong>
+              {attribute.detail && <p>{attribute.detail}</p>}
+              {!attribute.wasRevealed && <small>Не раскрывалось в игре</small>}
             </div>
-          ))}
-        </div>
-        {/* Action card (desktop) */}
-        {player.actionCard && (
-          <div className="result-desktop action-card-display">
-            <div className="attribute-card revealed" data-attr-type="action">
-              <div className="attr-content">
-                <BunkerAttributeIcon type="action" className="attr-card-image" />
-                <div className="attr-text">
-                  <span className="attr-label">Особое условие</span>
-                  <span className="attr-value">{player.actionCard.title}</span>
-                  <span className="attr-detail">{player.actionCard.description}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Mobile: compact tags */}
-        <div className="result-mobile">
-          {attrs.map((attr, i) => (
-            <span
-              key={i}
-              className={`result-tag ${attr.wasRevealed ? "tag-revealed" : "tag-hidden"}`}
-              data-attr-type={attr.type}
-            >
-              <span className="result-tag-label">{attr.label}:</span> {attr.value}
-            </span>
           ))}
           {player.actionCard && (
-            <span className="result-tag tag-revealed" data-attr-type="action">
-              <span className="result-tag-label">Особое условие:</span> {player.actionCard.title}
-            </span>
+            <div className="bunker-result-attribute is-action">
+              <span className="bunker-result-label">
+                <BunkerAttributeIcon type="action" /> Особое условие
+              </span>
+              <strong>{player.actionCard.title}</strong>
+              <p>{player.actionCard.description}</p>
+            </div>
           )}
         </div>
-      </div>
+      </article>
     );
   };
 
   return (
-    <main className="screen command-game-screen results-screen has-results-command-bar">
+    <main className="screen command-game-screen bunker-results has-results-command-bar">
       <GameRoomHeader roomCode={roomCode} connected={connected} onLeaveRoom={leaveRoom} />
-      <div className="results-container">
-        <h2>
-          {isSpectator ? "Игра окончена" : me?.alive ? "Вы попали в бункер!" : "Вы были изгнаны..."}
-        </h2>
+      <div className="bunker-results-content">
+        <header className="bunker-results-hero">
+          <span className="bunker-results-eyebrow">Бункер / Итоги партии</span>
+          <h1>
+            {isSpectator ? "Совет сделал выбор" : me?.alive ? "Вы в бункере!" : "Вы за порогом…"}
+          </h1>
+          {gameState.catastrophe && <p>{gameState.catastrophe.title}</p>}
+          <span className="bunker-results-count">
+            <FiShield aria-hidden="true" /> В убежище: {survivors.length}
+          </span>
+        </header>
 
-        {gameState.catastrophe && (
-          <div className="results-scenario">
-            <span className="scenario-name">{gameState.catastrophe.title}</span>
-          </div>
+        {(gameState.revealedBunkerCards.length > 0 || gameState.threatCard) && (
+          <section className="bunker-results-scenario" aria-label="Условия выживания">
+            {gameState.revealedBunkerCards.map((card, index) => (
+              <article key={index}>
+                <span className="bunker-results-eyebrow">Карта бункера</span>
+                <h2>{card.title}</h2>
+                <p>{card.description}</p>
+              </article>
+            ))}
+            {gameState.threatCard && (
+              <article className="is-threat">
+                <span className="bunker-results-eyebrow">Угроза</span>
+                <h2>{gameState.threatCard.title}</h2>
+                <p>{gameState.threatCard.description}</p>
+              </article>
+            )}
+          </section>
         )}
 
-        {/* Bunker cards summary */}
-        {gameState.revealedBunkerCards.length > 0 && (
-          <div className="results-bunker">
-            <h3>Карты бункера</h3>
-            <div className="bunker-cards-list">
-              {gameState.revealedBunkerCards.map((card, i) => (
-                <div key={i} className="bunker-card-item">
-                  <span className="bunker-card-title">{card.title}</span>
-                  <span className="bunker-card-desc">{card.description}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        <section className="bunker-results-group" aria-labelledby="bunker-survivors-title">
+          <h2 id="bunker-survivors-title">
+            <FiCheckCircle aria-hidden="true" /> В бункере <span>{survivors.length}</span>
+          </h2>
+          <div className="bunker-results-players">{survivors.map(renderPlayerCard)}</div>
+          {survivors.length === 0 && <p>В бункере никого не осталось.</p>}
+        </section>
+        {eliminated.length > 0 && (
+          <section
+            className="bunker-results-group is-eliminated"
+            aria-labelledby="bunker-eliminated-title"
+          >
+            <h2 id="bunker-eliminated-title">
+              <FiLogOut aria-hidden="true" /> За порогом <span>{eliminated.length}</span>
+            </h2>
+            <div className="bunker-results-players">{eliminated.map(renderPlayerCard)}</div>
+          </section>
         )}
-
-        {/* Threat card */}
-        {gameState.threatCard && (
-          <div className="threat-card-panel">
-            <h3>Угроза</h3>
-            <div className="threat-card-item">
-              <span className="threat-card-title">{gameState.threatCard.title}</span>
-              <span className="threat-card-desc">{gameState.threatCard.description}</span>
-            </div>
-          </div>
+        {kicked.length > 0 && (
+          <section className="bunker-results-group" aria-labelledby="bunker-kicked-title">
+            <h2 id="bunker-kicked-title">
+              Удалены из комнаты <span>{kicked.length}</span>
+            </h2>
+            <div className="bunker-results-players">{kicked.map(renderPlayerCard)}</div>
+          </section>
         )}
-
-        <div className="results-groups">
-          <div className="results-group survivors">
-            <h3>В бункере ({survivors.length})</h3>
-            {survivors.map(renderPlayerCard)}
-          </div>
-
-          <div className="results-group eliminated-group">
-            <h3>Изгнанные ({eliminated.length})</h3>
-            {eliminated.map(renderPlayerCard)}
-          </div>
-
-          {kicked.length > 0 && (
-            <div className="results-group kicked-group">
-              <h3>Удалённые администратором ({kicked.length})</h3>
-              {kicked.map(renderPlayerCard)}
-            </div>
-          )}
-        </div>
-
-        {/* Vote Results */}
         {gameState.voteResults && Object.keys(gameState.voteResults).length > 0 && (
-          <div className="last-vote-results">
-            <h3>Последнее голосование</h3>
-            <div className="vote-bars">
+          <section className="bunker-results-votes" aria-labelledby="bunker-last-vote-title">
+            <h2 id="bunker-last-vote-title">Последнее голосование</h2>
+            <ul>
               {Object.entries(gameState.voteResults)
                 .sort(([, a], [, b]) => b - a)
-                .map(([pid, count]) => {
-                  const player = gameState.players.find((p) => p.id === pid);
-                  return (
-                    <div key={pid} className="vote-bar-row">
-                      <span className="vote-bar-name">{player?.name || "???"}</span>
-                      <div className="vote-bar">
-                        <div
-                          className="vote-bar-fill"
-                          style={{ width: `${(count / gameState.totalVotesExpected) * 100}%` }}
-                        />
-                      </div>
-                      <span className="vote-bar-count">{count}</span>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
+                .map(([id, count]) => (
+                  <li key={id}>
+                    <span>
+                      {gameState.players.find((player) => player.id === id)?.name ?? "Игрок"}
+                    </span>
+                    <meter
+                      min={0}
+                      max={Math.max(1, gameState.totalVotesExpected)}
+                      value={count}
+                      aria-label="Голосов"
+                    />
+                    <strong>{count}</strong>
+                  </li>
+                ))}
+            </ul>
+          </section>
         )}
       </div>
-      <aside className="results-command-bar" aria-label="Действия после игры">
+      <aside
+        className={`results-command-bar${isHost ? " is-host" : ""}`}
+        aria-label="Действия после игры"
+      >
         <GameDockTools gameId="bunker" />
+        <strong>{isHost ? "Партия завершена" : "Ждём решения хоста о новой партии"}</strong>
         {isHost && (
-          <>
-            <strong>Партия завершена</strong>
-            <button
-              className="btn btn-primary"
-              onClick={playAgain}
-              disabled={!connected || reconnectState !== "connected" || commandPending}
-            >
-              {commandPending ? "Возвращаем в лобби…" : "Сыграть ещё"}
-            </button>
-          </>
+          <button
+            className="btn btn-primary"
+            onClick={playAgain}
+            disabled={!connected || reconnectState !== "connected" || commandPending}
+          >
+            {commandPending ? "Возвращаем в лобби…" : "Сыграть ещё"}
+          </button>
         )}
       </aside>
     </main>

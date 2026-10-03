@@ -99,7 +99,7 @@ export function GameRoomHeader({
           labelledBy="active-leave-title"
           onClose={() => setLeaveConfirmationOpen(false)}
           overlayClassName="active-leave-modal"
-          panelClassName="active-leave-panel"
+          panelClassName="active-leave-panel party-dialog"
         >
           <h2 id="active-leave-title">Покинуть активную игру?</h2>
           <p>

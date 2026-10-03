@@ -1246,7 +1246,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
           labelledBy="durak-management-title"
           onClose={closeManagement}
           overlayClassName="durak-management-modal"
-          panelClassName="durak-management-panel"
+          panelClassName="durak-management-panel party-dialog"
         >
           <div className="durak-management-heading">
             <div>
