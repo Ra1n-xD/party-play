@@ -9,6 +9,11 @@ type SnapshotProjector<G extends GameId> = Pick<
 
 type RoomPublishedHook = (room: Room, io: IOServer) => void;
 let roomPublishedHook: RoomPublishedHook = () => {};
+let roomPreparingHook: (room: Room) => void = () => {};
+
+export function setRoomPreparingHook(hook: (room: Room) => void): void {
+  roomPreparingHook = hook;
+}
 
 export function setRoomPublishedHook(hook: RoomPublishedHook): void {
   roomPublishedHook = hook;
@@ -59,6 +64,7 @@ export function publishRoomSnapshots<G extends GameId>(
   io: IOServer,
   module: SnapshotProjector<G>,
 ): void {
+  roomPreparingHook(room);
   const base = snapshotBase(room, module);
 
   for (const player of room.players.values()) {

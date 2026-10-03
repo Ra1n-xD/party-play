@@ -86,10 +86,11 @@ import {
   registerProfileHandlers,
   syncRoomProfileRewards,
   applyProfileToPlayer,
+  syncLobbyProfileCosmetics,
 } from "./profiles.js";
 import { normalizeNickname } from "../../../shared/platform/cosmetics.js";
 import { profileNicknameMatches } from "./profileAuth.js";
-import { setRoomPublishedHook } from "./statePublisher.js";
+import { setRoomPreparingHook, setRoomPublishedHook } from "./statePublisher.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 type IOSocket = Socket<ClientEvents, ServerEvents>;
@@ -642,6 +643,7 @@ function resolveSeatClaimCommand(
 
 export function registerHandlers(io: IOServer): void {
   installGameLifecycleHooks();
+  setRoomPreparingHook(syncLobbyProfileCosmetics);
   setRoomPublishedHook((room, publishedIo) => {
     syncPublishedRoomWithPublicDirectory(room, publishedIo);
     syncPublishedRoomWithProjectStats(room, publishedIo);

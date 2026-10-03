@@ -90,6 +90,20 @@ export function applyProfileToPlayer(
     ? { durak: profile.equipped.durak, uno: profile.equipped.uno }
     : { durak: "classic", uno: "classic" };
 }
+export function syncLobbyProfileCosmetics(room: Room): void {
+  if (room.lifecycle !== "lobby") return;
+  // A saved equip can finish after the game starts. Apply it before the next lobby snapshot,
+  // including human-owned seats whose controller was temporarily replaced by a bot.
+  for (const player of room.players.values()) {
+    if (
+      player.owner.kind === "human" &&
+      player.profileKey &&
+      !player.kicked &&
+      !player.voluntarilyLeft
+    )
+      applyProfileToPlayer(player);
+  }
+}
 function publishProfile(key: string, io: IOServer): void {
   const profile = profileStore.profiles.get(key);
   if (profile) io.to(profileRoom(key)).emit("profile:snapshot", profile);
