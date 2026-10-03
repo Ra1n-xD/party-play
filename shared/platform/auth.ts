@@ -1,6 +1,6 @@
 import type { ProfileSnapshot } from "./cosmetics.js";
 
-export const PASSWORD_MIN_LENGTH = 15;
+export const PASSWORD_MIN_LENGTH = 6;
 export const PASSWORD_MAX_LENGTH = 128;
 
 export interface ProfileCredentials {
