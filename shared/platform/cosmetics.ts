@@ -1,13 +1,15 @@
 import { AVATARS, type AvatarId } from "./avatars.js";
 import type { UpgradeAttempt } from "./upgrades.js";
 import { ROOM_REACTIONS, type RoomReactionId } from "./reactions.js";
+import type { CaseId } from "./cases.js";
+import type { DailyReward } from "./dailyRewards.js";
 
 export const RARITIES = {
-  basic: { name: "Базовый", color: "#9da7b5", chance: 0 },
-  common: { name: "Обычный", color: "#79a6f6", chance: 60 },
-  rare: { name: "Редкий", color: "#9277ff", chance: 25 },
-  epic: { name: "Эпический", color: "#e16be5", chance: 12 },
-  legendary: { name: "Легендарный", color: "#ffc35d", chance: 3 },
+  basic: { name: "Базовый", color: "#9da7b5" },
+  common: { name: "Обычный", color: "#79a6f6" },
+  rare: { name: "Редкий", color: "#9277ff" },
+  epic: { name: "Эпический", color: "#e16be5" },
+  legendary: { name: "Легендарный", color: "#ffc35d" },
 } as const;
 export type Rarity = keyof typeof RARITIES;
 export type CosmeticKind = "avatar" | "durak" | "uno" | "reaction";
@@ -130,6 +132,7 @@ export const COSMETIC_KIND_NAMES: Record<CosmeticKind, string> = {
 };
 export const CASE_COST = 1;
 export const GAME_REWARD = 1;
+export const WIN_REWARD = 5;
 export const INITIAL_COINS = 20;
 export function getCosmetic(id: unknown) {
   return COSMETICS.find((item) => item.id === id);
@@ -149,6 +152,7 @@ export function nicknameKey(name: string): string {
 }
 export interface CaseOpening {
   requestId: string;
+  caseId?: CaseId;
   itemId: string;
   duplicate: boolean;
   openedAt: number;
@@ -163,6 +167,7 @@ export interface ProfileSnapshot {
   equipped: { avatar: AvatarId; durak: CardSkinId; uno: CardSkinId };
   recentOpenings: CaseOpening[];
   recentUpgrades?: UpgradeAttempt[];
+  dailyReward?: DailyReward | null;
 }
 /** Unlocked reactions are always available; their last copy is protected in upgrades. */
 export function isCosmeticInUse(profile: ProfileSnapshot, item: Cosmetic): boolean {

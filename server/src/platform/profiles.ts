@@ -1,16 +1,16 @@
 import { createHash, randomInt, randomUUID } from "crypto";
 import type { Socket } from "socket.io";
 import {
-  CASE_COST,
-  CASE_ITEMS,
   GAME_REWARD,
-  RARITIES,
+  WIN_REWARD,
   getCosmetic,
   isCosmeticInUse,
   nicknameKey,
   type ProfileSnapshot,
   type CaseOpening,
 } from "../../../shared/platform/cosmetics.js";
+import { getCase, getCaseItems, getCaseRarities } from "../../../shared/platform/cases.js";
+import { nextDailyReward, type DailyReward } from "../../../shared/platform/dailyRewards.js";
 import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
 import { getUpgradeQuote, type UpgradeAttempt } from "../../../shared/platform/upgrades.js";
 import { DROP_FEED_LIMIT, type CosmeticDrop } from "../../../shared/platform/dropFeed.js";
@@ -176,6 +176,32 @@ export function registerProfileHandlers(
     socket.leave(DROP_FEED_ROOM);
   });
   registerProfileAuthHandlers(socket, io, membershipNickname);
+  socket.on("profile:claim-daily", async (reply) => {
+    if (typeof reply !== "function") return;
+    try {
+      guard();
+      const key = socket.data.profileKey as string | undefined;
+      if (!key) throw new Error("Сначала войдите в аккаунт");
+      assertProfileSession(socket, key);
+      let reward: DailyReward | null = null;
+      if (nextDailyReward(profileStore.profiles.get(key)?.dailyReward)) {
+        await transaction([key], (draft) => {
+          assertProfileSession(socket, key);
+          const profile = draft.profiles.get(key)!;
+          reward = nextDailyReward(profile.dailyReward);
+          if (!reward) return false;
+          if (!Number.isSafeInteger(profile.coins + reward.coins))
+            throw new Error("Достигнут предел монет");
+          profile.coins += reward.coins;
+          profile.dailyReward = reward;
+        });
+      }
+      if (reward) publishProfile(key, io);
+      reply({ ok: true, value: { profile: profileStore.profiles.get(key)!, reward } });
+    } catch (error) {
+      reply({ ok: false, error: (error as Error).message });
+    }
+  });
   socket.on("profile:equip", async (data, reply) => {
     if (typeof reply !== "function") return;
     try {
@@ -197,6 +223,8 @@ export function registerProfileHandlers(
       guard();
       const key = socket.data.profileKey as string | undefined;
       const requestId = data?.requestId;
+      const definition = getCase(data?.caseId ?? "partyplay");
+      if (!definition) throw new Error("Такого кейса нет");
       if (!key || !profileStore.profiles.has(key)) throw new Error("Сначала войдите в аккаунт");
       if (typeof requestId !== "string" || !/^[a-f0-9-]{36}$/.test(requestId))
         throw new Error("Некорректный запрос открытия");
@@ -210,23 +238,26 @@ export function registerProfileHandlers(
           opening = existing;
           return false;
         }
-        if (profile.coins < CASE_COST)
-          throw new Error("Недостаточно монет. Завершите партию, чтобы получить монету");
-        const roll = randomInt(100);
+        if (profile.coins < definition.cost)
+          throw new Error("Недостаточно монет. Завершите партию или получите ежедневную награду");
+        const roll = randomInt(1_000_000) / 10_000;
         let cumulative = 0;
-        const rarity = Object.entries(RARITIES).find(([, definition]) => {
-          cumulative += definition.chance;
+        const rarity = getCaseRarities(definition.id).find((entry) => {
+          cumulative += entry.chance;
           return roll < cumulative;
-        })![0];
-        const pool = CASE_ITEMS.filter((item) => item.rarity === rarity);
+        })!.rarity;
+        const pool = getCaseItems(definition.id).filter((item) => item.rarity === rarity);
         const item = pool[randomInt(pool.length)];
         opening = {
           requestId,
+          caseId: definition.id,
           itemId: item.id,
           duplicate: !!profile.inventory[item.id],
           openedAt: Date.now(),
         };
-        profile.coins -= CASE_COST;
+        profile.coins -= definition.cost;
+        if (!Number.isSafeInteger((profile.inventory[item.id] ?? 0) + 1))
+          throw new Error("Inventory limit exceeded");
         profile.inventory[item.id] = (profile.inventory[item.id] ?? 0) + 1;
         profile.recentOpenings.unshift(opening);
         profile.recentOpenings = profile.recentOpenings.slice(0, 100);
@@ -342,7 +373,9 @@ async function payRound(round: ProfileRound, io: IOServer): Promise<void> {
       for (const key of keys) {
         const profile = draft.profiles.get(key);
         if (!profile) continue;
-        profile.coins += GAME_REWARD;
+        const reward = round.winnerKeys?.has(key) ? WIN_REWARD : GAME_REWARD;
+        if (!Number.isSafeInteger(profile.coins + reward)) throw new Error("Coin limit exceeded");
+        profile.coins += reward;
         profile.completedGames += 1;
         if (round.winnerKeys?.has(key)) profile.wins += 1;
       }

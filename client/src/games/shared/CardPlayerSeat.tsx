@@ -76,7 +76,7 @@ export function CardPlayerSeat({
   const resolvedTurnSemantics = turnSemantics ?? "exclusive-turn";
   const usesSimultaneousDecision = resolvedTurnSemantics === "simultaneous-decision";
   const cardCountLabel = formatCardCount(cardCount);
-  const statusLabel = status === "out" ? "Вышел" : status === "excluded" ? "Исключён" : null;
+  const statusLabel = status === "out" ? "Без карт" : status === "excluded" ? "Исключён" : null;
   const isInactive = status !== "active";
   const remainingRatio =
     turnRemainingMs != null && turnTimeoutMs != null && turnTimeoutMs > 0
@@ -169,12 +169,10 @@ export function CardPlayerSeat({
             className={`card-player-turn-border ${
               turnRemainingMs == null || turnTimeoutMs == null ? "is-unlimited" : ""
             } ${paused ? "is-paused" : ""}`}
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
             aria-hidden="true"
             style={turnBorderStyle}
           >
-            <rect x="2" y="2" width="96" height="96" rx="15" pathLength="100" />
+            <rect x="1" y="1" rx="16" pathLength="100" />
           </svg>
           <span className="card-player-turn-status">{turnStatusLabel}</span>
         </>

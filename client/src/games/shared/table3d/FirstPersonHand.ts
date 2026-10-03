@@ -202,32 +202,38 @@ export class FirstPersonHand {
 
   private layout() {
     this.hitAreasDirty = true;
-    const maxVisible = this.width <= 680 ? 5 : 9;
-    const count = Math.min(this.hand.length, maxVisible);
+    const count = this.hand.length;
     const focus = Math.max(
       0,
       this.hand.findIndex((card) => card.focused),
     );
-    const start = Math.max(0, Math.min(this.hand.length - count, focus - Math.floor(count / 2)));
     const scale = Math.min(1, this.camera.aspect * 1.1);
-    const spacing = Math.min(0.105, 0.7 / Math.max(count - 1, 1)) * scale;
-    const offsetY = this.overview ? -0.2 : 0;
-    const centerY = -0.57 + offsetY;
+    const halfHeight = 1.52 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const availableSpan = Math.max(
+      0,
+      halfHeight * this.camera.aspect * 1.8 - CARD_WIDTH * 0.42 * scale,
+    );
+    const spacing = Math.min(0.105 * scale, availableSpan / Math.max(count - 1, 1));
+    const angleStep = Math.min(0.085, 0.52 / Math.max(count - 1, 1));
+    const centerY = -halfHeight + 0.105 * scale;
     this.gripScale = scale;
     this.hand.forEach((card, index) => {
       const entry = this.cards.get(card.id)!;
-      const visible = index >= start && index < start + count;
-      entry.pivot.visible = visible;
-      entry.button.hidden = !visible;
-      if (!visible) return;
-      const offset = index - start - (count - 1) / 2;
-      const lift = card.selected ? 0.13 : card.focused ? 0.055 : 0;
+      // Every card keeps its place in the fan; focus only raises the chosen card.
+      entry.pivot.visible = true;
+      entry.button.hidden = false;
+      const offset = index - (count - 1) / 2;
+      const normalizedOffset = count > 1 ? offset / ((count - 1) / 2) : 0;
+      const lift = (card.selected ? 0.13 : card.focused ? 0.075 : 0) * scale;
       entry.target.set(
         offset * spacing,
-        centerY - Math.abs(offset) * 0.009 + lift,
-        -1.52 + (index - start) * 0.002 + (card.focused ? 0.025 : 0) + (card.selected ? 0.02 : 0),
+        centerY - normalizedOffset ** 2 * 0.018 * scale + lift,
+        -1.52 +
+          (index / Math.max(count - 1, 1)) * 0.018 +
+          (card.focused ? 0.025 : 0) +
+          (card.selected ? 0.05 : 0),
       );
-      entry.angle = -offset * 0.085;
+      entry.angle = -offset * angleStep;
       entry.mesh.scale.setScalar(0.34 * scale);
       entry.mesh.position.y = 0.12 * scale;
       entry.button.style.zIndex = String(

@@ -107,9 +107,9 @@ function commitUnoState(room: UnoRoom, nextState: UnoGameState, io: IOServer): v
   publishUno(room, io);
 }
 
-function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
+function scheduleUnoActions(room: UnoRoom, io: IOServer, retry = false): void {
   const state = room.gameState;
-  if (state && !isPaused(room) && pendingActions.get(room.code)?.state === state) return;
+  if (!retry && state && !isPaused(room) && pendingActions.get(room.code)?.state === state) return;
   clearUnoActions(room.code);
   const turn = state?.turn;
   if (
@@ -145,7 +145,12 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
           ) {
             return;
           }
-          const result = applyUnoTurnTimeout(currentState, expectedTurnId, Date.now());
+          const timeoutNow = Date.now();
+          if (timeoutNow < expectedDeadline) {
+            scheduleUnoActions(room, io, true);
+            return;
+          }
+          const result = applyUnoTurnTimeout(currentState, expectedTurnId, timeoutNow);
           if (result.success) commitUnoState(room, result.state, io);
         }).catch(() => {});
       },
@@ -181,9 +186,13 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer): void {
           privateState,
           () => randomInt(1_000_000) / 1_000_000,
         );
-        if (!command) return;
+        if (!command) {
+          scheduleUnoActions(room, io, true);
+          return;
+        }
         const result = applyUnoCommand(currentState, currentActor.id, command, Date.now(), false);
         if (result.success) commitUnoState(room, result.state, io);
+        else scheduleUnoActions(room, io, true);
       }).catch(() => {});
     }, delay);
     botTimer.unref();

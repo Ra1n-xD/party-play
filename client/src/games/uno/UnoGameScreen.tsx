@@ -772,18 +772,84 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
             />
           )}
           <GameDockTools gameId="uno" gameTitle="UNO" />
-          {privateGame && !ownWdfResponse && !legalActions?.canChooseInitialColor && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!canAct || !selectedCard}
-              onClick={() => selectedCard && playCard(selectedCard)}
+          {privateGame && (
+            <div
+              className="card-actions-stable is-uno"
+              role="group"
+              aria-label="Действия с картами"
             >
-              Сыграть карту {is3D && <kbd>E</kbd>}
-            </button>
-          )}
-          {ownWdfResponse && (
-            <>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={
+                  !canAct ||
+                  Boolean(ownWdfResponse) ||
+                  (!legalActions?.canChooseInitialColor && !selectedCard)
+                }
+                onClick={() => {
+                  if (legalActions?.canChooseInitialColor) setColorChoice({ mode: "initial" });
+                  else if (selectedCard) playCard(selectedCard);
+                }}
+              >
+                {legalActions?.canChooseInitialColor ? "Выбрать цвет" : "Сыграть"}
+                {is3D && <kbd>E</kbd>}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={!canAct || !legalActions?.canDraw}
+                onClick={() => sendGameCommand("uno", { type: "draw-card" })}
+              >
+                Взять карту
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={!canAct || !legalActions?.canEndTurn}
+                onClick={() => sendGameCommand("uno", { type: "end-turn" })}
+              >
+                Завершить ход
+              </button>
+              <button
+                type="button"
+                className={`btn btn-secondary uno-declare-intent ${declareWithPlay ? "is-active" : ""}`}
+                aria-pressed={canOfferAtomicUnoIntent ? declareWithPlay : undefined}
+                title={
+                  canOfferAtomicUnoIntent
+                    ? "Объявить UNO вместе с выбранной картой"
+                    : "Объявить UNO"
+                }
+                disabled={
+                  !canAct || !(canOfferAtomicUnoIntent || canPreDeclareUno || canPostDeclareUno)
+                }
+                onClick={() => {
+                  if (canOfferAtomicUnoIntent) setDeclareWithPlay((value) => !value);
+                  else
+                    sendGameCommand("uno", {
+                      type: "declare-uno",
+                      ...(legalActions?.declareUnoWindowId != null
+                        ? { windowId: legalActions.declareUnoWindowId }
+                        : {}),
+                    });
+                }}
+              >
+                {declareWithPlay ? "✓ UNO!" : "UNO!"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={!canAct || !legalActions?.catchUno}
+                title={unoSubject ? `Поймать: ${unoSubject.name}` : "Поймать игрока без UNO"}
+                onClick={() =>
+                  legalActions?.catchUno &&
+                  sendGameCommand("uno", {
+                    type: "catch-uno",
+                    windowId: legalActions.catchUno.windowId,
+                  })
+                }
+              >
+                Поймать
+              </button>
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -794,96 +860,13 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-secondary"
                 disabled={!canAct || !legalActions?.canChallengeWildDrawFour}
                 onClick={() => respondToWildDrawFour("challenge")}
               >
                 Оспорить
               </button>
-            </>
-          )}
-          {legalActions?.canChooseInitialColor && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!canAct}
-              onClick={() => setColorChoice({ mode: "initial" })}
-            >
-              Выбрать цвет
-            </button>
-          )}
-          {canOfferAtomicUnoIntent && (
-            <button
-              type="button"
-              className={`uno-declare-intent ${declareWithPlay ? "is-active" : ""}`}
-              aria-pressed={declareWithPlay}
-              disabled={!canAct}
-              onClick={() => setDeclareWithPlay((value) => !value)}
-            >
-              {declareWithPlay ? "UNO включено" : "UNO с ходом"}
-            </button>
-          )}
-          {canPreDeclareUno && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={!canAct}
-              onClick={() => sendGameCommand("uno", { type: "declare-uno" })}
-            >
-              Объявить UNO
-            </button>
-          )}
-          {legalActions?.canDraw && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={!canAct}
-              onClick={() => sendGameCommand("uno", { type: "draw-card" })}
-            >
-              Взять карту
-            </button>
-          )}
-          {legalActions?.canEndTurn && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!canAct}
-              onClick={() => sendGameCommand("uno", { type: "end-turn" })}
-            >
-              Завершить ход
-            </button>
-          )}
-          {canPostDeclareUno && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!canAct}
-              onClick={() =>
-                sendGameCommand("uno", {
-                  type: "declare-uno",
-                  ...(legalActions?.declareUnoWindowId != null
-                    ? { windowId: legalActions.declareUnoWindowId }
-                    : {}),
-                })
-              }
-            >
-              Сказать UNO!
-            </button>
-          )}
-          {legalActions?.catchUno && (
-            <button
-              type="button"
-              className="btn btn-danger"
-              disabled={!canAct}
-              onClick={() =>
-                sendGameCommand("uno", {
-                  type: "catch-uno",
-                  windowId: legalActions.catchUno!.windowId,
-                })
-              }
-            >
-              Поймать {unoSubject?.name ?? "игрока"}
-            </button>
+            </div>
           )}
           {isHost && (
             <button

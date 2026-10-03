@@ -1176,60 +1176,70 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
             />
           )}
           <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
-          {is3D && legalAction?.type === "defend" && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!canAct || !selectedCards[0] || !focusedTarget}
-              onClick={() => focusedTarget && defendSelected(focusedTarget)}
-            >
-              Побить <kbd>E</kbd>
-            </button>
-          )}
-          {(legalAction?.type === "attack" || legalAction?.type === "throw-in") && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!canAct || selectedCards.length === 0}
-              onClick={() => {
-                if (selectedCards[0]) activateHandCard(selectedCards[0]);
-              }}
-            >
-              {legalAction.type === "attack" ? "Атаковать" : "Подкинуть"}
-              {selectedCards.length > 0 ? ` (${selectedCards.length})` : ""}
-            </button>
-          )}
-          {legalAction?.type === "defend" && (
-            <button
-              type="button"
-              className="btn btn-danger"
-              disabled={!canAct}
-              onClick={() => sendGameCommand("durak", { type: "take" })}
-            >
-              Взять
-            </button>
-          )}
-          {(legalAction?.type === "pass" ||
-            (legalAction?.type === "throw-in" && legalAction.canPass)) && (
-            <button
-              type="button"
-              className="btn durak-finish-action"
-              disabled={!canAct}
-              onClick={() => sendGameCommand("durak", { type: "pass" })}
-            >
-              Пас
-            </button>
-          )}
-          {(legalAction?.type === "beat" ||
-            (legalAction?.type === "throw-in" && legalAction.canBeat)) && (
-            <button
-              type="button"
-              className="btn durak-finish-action"
-              disabled={!canAct}
-              onClick={() => sendGameCommand("durak", { type: "beat" })}
-            >
-              Бито
-            </button>
+          {privateGame && (
+            <div className="card-actions-stable" role="group" aria-label="Действия с картами">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={
+                  !canAct ||
+                  selectedCards.length === 0 ||
+                  !(
+                    legalAction?.type === "attack" ||
+                    legalAction?.type === "throw-in" ||
+                    (legalAction?.type === "defend" && focusedTarget)
+                  )
+                }
+                onClick={() => {
+                  if (legalAction?.type === "defend" && focusedTarget)
+                    defendSelected(focusedTarget);
+                  else if (selectedCards[0]) activateHandCard(selectedCards[0]);
+                }}
+                title={
+                  legalAction?.type === "defend"
+                    ? "Побить выбранной картой"
+                    : "Сыграть выбранные карты"
+                }
+              >
+                Сыграть {is3D && <kbd>E</kbd>}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={!canAct || legalAction?.type !== "defend"}
+                onClick={() => sendGameCommand("durak", { type: "take" })}
+              >
+                Взять
+              </button>
+              <button
+                type="button"
+                className="btn durak-finish-action"
+                disabled={
+                  !canAct ||
+                  !(
+                    legalAction?.type === "pass" ||
+                    (legalAction?.type === "throw-in" && legalAction.canPass)
+                  )
+                }
+                onClick={() => sendGameCommand("durak", { type: "pass" })}
+              >
+                Пас
+              </button>
+              <button
+                type="button"
+                className="btn durak-finish-action"
+                disabled={
+                  !canAct ||
+                  !(
+                    legalAction?.type === "beat" ||
+                    (legalAction?.type === "throw-in" && legalAction.canBeat)
+                  )
+                }
+                onClick={() => sendGameCommand("durak", { type: "beat" })}
+              >
+                Бито
+              </button>
+            </div>
           )}
           {isHost && (
             <button

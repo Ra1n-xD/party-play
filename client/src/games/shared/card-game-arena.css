@@ -159,14 +159,17 @@
 .card-player-turn-border {
   position: absolute;
   z-index: 5;
-  inset: -3px;
-  width: calc(100% + 6px);
-  height: calc(100% + 6px);
+  inset: -1px;
+  width: calc(100% + 2px);
+  height: calc(100% + 2px);
   overflow: visible;
   pointer-events: none;
 }
 
 .card-player-turn-border rect {
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  rx: var(--card-seat-radius, 16px);
   fill: none;
   stroke: #ffd164;
   stroke-width: 3;
@@ -1890,5 +1893,57 @@
 
   .durak-screen .durak-arena .durak-hand-card-shell.is-arriving {
     animation: none;
+  }
+}
+
+/* Action slots stay in place across turns, draws and challenges. */
+.card-game-screen :is(.durak-command-actions, .uno-command-actions):has(.card-actions-stable) {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.card-game-screen .card-actions-stable {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: 1 1 380px;
+  max-width: 560px;
+  gap: 6px;
+}
+.card-game-screen .card-actions-stable.is-uno {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  flex-basis: 650px;
+  max-width: 840px;
+}
+.screen.command-game-screen.card-game-screen .card-actions-stable .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: normal;
+}
+.card-game-screen .card-actions-stable .btn:disabled {
+  opacity: 0.38;
+  box-shadow: none;
+  cursor: default;
+  transform: none;
+}
+@media (max-width: 1000px) {
+  .card-game-screen .card-actions-stable,
+  .card-game-screen .card-actions-stable.is-uno {
+    order: 10;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    flex: 1 0 100%;
+    max-width: none;
+  }
+  .screen.command-game-screen.card-game-screen .card-actions-stable .btn {
+    font-size: 11px;
+    padding-inline: 4px;
+    min-height: 36px;
   }
 }

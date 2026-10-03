@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { FiVolume2, FiVolumeX } from "react-icons/fi";
 import {
-  CASE_ITEMS,
   COSMETIC_KIND_NAMES,
   RARITIES,
   getCosmetic,
   isCosmeticInUse,
-  CASE_COST,
   type CaseOpening,
   type Cosmetic,
 } from "../../../../shared/platform/cosmetics";
@@ -15,10 +13,17 @@ import { useProfile } from "../context/ProfileContext";
 import { useCollectionAudio } from "../useCollectionAudio";
 import { CoinAmount } from "../components/CoinAmount";
 import { DropFeed } from "../components/DropFeed";
+import {
+  CASES,
+  getCase,
+  getCaseItems,
+  getCaseRarities,
+  type CaseId,
+} from "../../../../shared/platform/cases";
 
 const WINNER_INDEX = 38;
-function randomItem() {
-  return CASE_ITEMS[Math.floor(Math.random() * CASE_ITEMS.length)];
+function randomItem(items: Cosmetic[]) {
+  return items[Math.floor(Math.random() * items.length)];
 }
 function ReelItem({ item }: { item: Cosmetic }) {
   return (
@@ -34,9 +39,15 @@ function ReelItem({ item }: { item: Cosmetic }) {
 }
 export function CasesScreen() {
   const sound = useCollectionAudio();
-  const { profile, openCase, equip, busy, connected, error } = useProfile();
+  const { profile, openCase, pendingCaseId, equip, busy, connected, error } = useProfile();
+  const [caseId, setCaseId] = useState<CaseId>(pendingCaseId ?? "partyplay");
+  const definition = getCase(caseId)!;
+  const caseItems = getCaseItems(caseId);
+  const caseRarities = getCaseRarities(caseId);
   const [opening, setOpening] = useState<CaseOpening | null>(null);
-  const [reel, setReel] = useState<Cosmetic[]>(() => Array.from({ length: 8 }, randomItem));
+  const [reel, setReel] = useState<Cosmetic[]>(() =>
+    Array.from({ length: 8 }, () => randomItem(getCaseItems(pendingCaseId ?? "partyplay"))),
+  );
   const [phase, setPhase] = useState<"idle" | "request" | "spin" | "result">("idle");
   const [offset, setOffset] = useState(0);
   const [animated, setAnimated] = useState(false);
@@ -46,6 +57,18 @@ export function CasesScreen() {
   const frame = useRef<number>();
   const mounted = useRef(true);
   const openingLock = useRef(false);
+  useEffect(() => {
+    if (pendingCaseId) setCaseId(pendingCaseId);
+  }, [pendingCaseId]);
+  const chooseCase = (id: CaseId) => {
+    if (openingLock.current || pendingCaseId || busy) return;
+    setCaseId(id);
+    setOpening(null);
+    setPhase("idle");
+    setAnimated(false);
+    setOffset(0);
+    setReel(Array.from({ length: 8 }, () => randomItem(getCaseItems(id))));
+  };
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -81,7 +104,7 @@ export function CasesScreen() {
     openingLock.current = true;
     setPhase("request");
     setOpening(null);
-    const result = await openCase();
+    const result = await openCase(caseId);
     if (!mounted.current) return;
     if (!result) {
       setPhase("idle");
@@ -89,7 +112,9 @@ export function CasesScreen() {
       return;
     }
     const winner = getCosmetic(result.itemId)!;
-    const items = Array.from({ length: 46 }, randomItem);
+    const resultCaseId = result.caseId ?? "partyplay";
+    setCaseId(resultCaseId);
+    const items = Array.from({ length: 46 }, () => randomItem(getCaseItems(resultCaseId)));
     items[WINNER_INDEX] = winner;
     setReel(items);
     setOpening(result);
@@ -115,6 +140,23 @@ export function CasesScreen() {
   return (
     <main className="cases-page">
       <DropFeed holdUpdates={phase === "request" || phase === "spin"} />
+      <div className="case-selector" role="group" aria-label="Выберите кейс">
+        {CASES.map((entry) => (
+          <button
+            type="button"
+            key={entry.id}
+            aria-pressed={caseId === entry.id}
+            className={`case-choice${caseId === entry.id ? " is-active" : ""}`}
+            disabled={busy || phase === "request" || phase === "spin" || Boolean(pendingCaseId)}
+            onClick={() => chooseCase(entry.id)}
+          >
+            <strong>{entry.name}</strong>
+            <span>{entry.description}</span>
+            <CoinAmount amount={entry.cost} />
+          </button>
+        ))}
+      </div>
+      <h1 className="case-title">{definition.name}</h1>
       <section className={`case-stage phase-${phase}`} aria-label="Открытие кейса">
         <div className="case-stage-light" />
         <div className="case-caption">
@@ -124,9 +166,11 @@ export function CasesScreen() {
                 ? "Ищем ваш стиль…"
                 : phase === "result"
                   ? "Ваша награда"
-                  : "Коллекция PartyPlay"}
+                  : definition.name}
             </span>
-            <small>{CASE_ITEMS.length} предметов · 4 редкости</small>
+            <small>
+              {caseItems.length} предметов · {caseRarities.length} редкостей
+            </small>
           </div>
           <button
             type="button"
@@ -171,15 +215,22 @@ export function CasesScreen() {
             <button
               className="profile-primary"
               onClick={start}
-              disabled={phase === "request" || busy || !connected || profile.coins < 1}
+              disabled={
+                phase === "request" ||
+                busy ||
+                !connected ||
+                (!pendingCaseId && profile.coins < definition.cost)
+              }
             >
               {phase === "request" ? (
                 "Открываем…"
-              ) : profile.coins < 1 ? (
+              ) : pendingCaseId ? (
+                "Получить результат"
+              ) : profile.coins < definition.cost ? (
                 "Нужна 1 монета"
               ) : (
                 <>
-                  Открыть кейс <CoinAmount amount={CASE_COST} label="монета" />
+                  Открыть кейс <CoinAmount amount={definition.cost} label="монета" />
                 </>
               )}
             </button>
@@ -228,17 +279,15 @@ export function CasesScreen() {
       <section className="case-contents">
         <h2>Что внутри</h2>
         <div className="case-chances">
-          {Object.entries(RARITIES)
-            .filter(([, rarity]) => rarity.chance)
-            .map(([id, rarity]) => (
-              <span key={id} style={{ color: rarity.color }}>
-                {rarity.name} · {rarity.chance}%
-              </span>
-            ))}
+          {caseRarities.map(({ rarity, chance }) => (
+            <span key={rarity} style={{ color: RARITIES[rarity].color }}>
+              {RARITIES[rarity].name} · {Number(chance.toFixed(2))}%
+            </span>
+          ))}
         </div>
         <p>Внутри одной редкости все предметы равновероятны. Повторы возможны.</p>
         <div className="collection-grid">
-          {CASE_ITEMS.map((item) => (
+          {caseItems.map((item) => (
             <article
               key={item.id}
               className="collection-item"

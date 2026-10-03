@@ -126,9 +126,21 @@ export default function DurakTable3D({
         isBot: player.controllerKind === "bot",
         eliminated: player.status !== "active",
         muted: player.status !== "active",
+        role:
+          player.status !== "active"
+            ? undefined
+            : player.isDefender
+              ? game.takeDeclared
+                ? "Берёт карты"
+                : "Защищается"
+              : player.isAttacker
+                ? "Атакует"
+                : player.isCurrentActor
+                  ? "Подкидывает"
+                  : undefined,
         detail:
           player.status === "out"
-            ? "вышел"
+            ? "без карт"
             : player.status === "excluded"
               ? "покинул игру"
               : game.takeDeclared && player.isDefender
@@ -340,7 +352,7 @@ export default function DurakTable3D({
               <span>
                 {player.cardCount} карт ·{" "}
                 {player.status === "out"
-                  ? "вышел"
+                  ? "без карт"
                   : player.controllerKind === "bot"
                     ? "бот"
                     : !player.connected
@@ -355,16 +367,20 @@ export default function DurakTable3D({
       </details>
       <TableTurnIndicator
         label={
-          actor?.seatId === viewerSeatId ? "Ваш ход" : actor ? `Ход: ${actor.name}` : "Смена хода"
+          actor?.isDefender && !game.takeDeclared
+            ? actor.seatId === viewerSeatId
+              ? "Вы защищаетесь"
+              : `Защита: ${actor.name}`
+            : actor?.seatId === viewerSeatId
+              ? "Ваш ход"
+              : actor
+                ? `Ход: ${actor.name}`
+                : "Смена хода"
         }
         detail={
-          actor
-            ? actor.isDefender && !game.takeDeclared
-              ? "Защита"
-              : game.table.length
-                ? "Подкидывание карт"
-                : "Атака"
-            : "Карты перемещаются"
+          !actor
+            ? "Карты перемещаются"
+            : `Атакует: ${game.players.find((player) => player.isAttacker)?.name ?? "—"} · ${game.takeDeclared ? "Берёт" : "Защита"}: ${game.players.find((player) => player.isDefender)?.name ?? "—"}`
         }
         isYourTurn={Boolean(actor && actor.seatId === viewerSeatId)}
         paused={paused}

@@ -36,6 +36,7 @@ export interface TablePerson {
   count: number;
   active: boolean;
   detail: string;
+  role?: string;
   isBot: boolean;
   traits?: { label: string; value: string; detail?: string; kind?: string; iconPath?: string }[];
   selected?: boolean;
@@ -557,13 +558,20 @@ export class RoundTableScene {
     node.classList.toggle("is-active", active);
     node.classList.toggle("is-selected", Boolean(person.selected));
     node.classList.toggle("is-muted", Boolean(person.muted));
-    const key = JSON.stringify([person.name, person.count, person.detail, person.traits, active]);
+    const key = JSON.stringify([
+      person.name,
+      person.count,
+      person.detail,
+      person.role,
+      person.traits,
+      active,
+    ]);
     if (node.dataset.content === key) return;
     node.dataset.content = key;
     const turn = document.createElement("span");
     turn.className = "table3d-person-turn";
-    turn.textContent = "Ходит";
-    turn.hidden = !active;
+    turn.textContent = person.role ?? "Ходит";
+    turn.hidden = !active && !person.role;
     const name = document.createElement("strong");
     name.textContent = person.name;
     if (!person.traits) {

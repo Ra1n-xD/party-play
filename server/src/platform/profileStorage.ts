@@ -18,6 +18,7 @@ import {
   type ProfileSnapshot,
 } from "../../../shared/platform/cosmetics.js";
 import { getUpgradeQuote } from "../../../shared/platform/upgrades.js";
+import { getCase } from "../../../shared/platform/cases.js";
 
 export interface StoredAccount {
   id: string;
@@ -300,6 +301,15 @@ try {
           throw new Error("Invalid inventory");
       // Existing accounts predate collectible reactions. Grant only the free like.
       profile.inventory["reaction:good-move"] ??= 1;
+      profile.dailyReward ??= null;
+      if (
+        profile.dailyReward &&
+        (!/^\d{4}-\d{2}-\d{2}$/.test(profile.dailyReward.date) ||
+          !Number.isSafeInteger(profile.dailyReward.streak) ||
+          profile.dailyReward.streak < 1 ||
+          profile.dailyReward.coins !== profile.dailyReward.streak)
+      )
+        throw new Error("Invalid daily reward");
       for (const id of BASIC_ITEMS)
         if (!profile.inventory[id]) throw new Error("Missing basic item");
       for (const kind of ["avatar", "durak", "uno"] as const)
@@ -309,6 +319,7 @@ try {
         profile.recentOpenings.some(
           (opening) =>
             !getCosmetic(opening.itemId) ||
+            (opening.caseId !== undefined && !getCase(opening.caseId)) ||
             typeof opening.requestId !== "string" ||
             !Number.isFinite(opening.openedAt),
         )

@@ -89,17 +89,32 @@
       color-mix(in srgb, var(--show-accent) 7%, transparent),
       transparent 42%
     );
-  animation: show-menu-glow-drift 22s ease-in-out infinite alternate;
+  animation: show-menu-glow-drift 13s ease-in-out infinite alternate;
 }
 
 .show-menu-ambience::after {
   background:
+    radial-gradient(circle at 5% 52%, #e3aff660 0 1px, transparent 2px),
+    radial-gradient(circle at 17% 79%, #fff8e842 0 1px, transparent 2px),
+    radial-gradient(circle at 25% 9%, #e3aff650 0 1px, transparent 2px),
+    radial-gradient(circle at 31% 36%, #fff8e850 0 1px, transparent 2px),
+    radial-gradient(circle at 41% 85%, #e3aff655 0 1px, transparent 2px),
+    radial-gradient(circle at 47% 23%, #fff8e846 0 1px, transparent 2px),
+    radial-gradient(circle at 52% 51%, #e3aff644 0 1px, transparent 2px),
+    radial-gradient(circle at 63% 70%, #fff8e840 0 1px, transparent 2px),
+    radial-gradient(circle at 69% 32%, #e3aff660 0 1px, transparent 2px),
+    radial-gradient(circle at 79% 10%, #fff8e850 0 1px, transparent 2px),
+    radial-gradient(circle at 84% 60%, #e3aff655 0 1px, transparent 2px),
+    radial-gradient(circle at 95% 27%, #fff8e84a 0 1px, transparent 2px),
+    radial-gradient(circle at 92% 91%, #e3aff660 0 1px, transparent 2px),
+    radial-gradient(circle at 7% 94%, #fff8e838 0 1px, transparent 2px),
+    radial-gradient(circle at 38% 48%, #fff8e855 0 1px, transparent 2px),
     radial-gradient(circle at 12% 22%, #e3aff644 0 1px, transparent 3px),
     radial-gradient(circle at 34% 62%, #fff8e826 0 1px, transparent 3px),
     radial-gradient(circle at 58% 12%, #e3aff638 0 1px, transparent 3px),
     radial-gradient(circle at 73% 82%, #e3aff63d 0 1px, transparent 3px),
     radial-gradient(circle at 88% 42%, #fff8e82e 0 1px, transparent 3px);
-  animation: show-menu-particles-drift 28s ease-in-out infinite alternate;
+  animation: show-menu-particles-drift 11s ease-in-out infinite alternate;
 }
 
 @keyframes show-menu-glow-drift {
@@ -113,11 +128,11 @@
 
 @keyframes show-menu-particles-drift {
   from {
-    transform: translate3d(-10px, 12px, 0);
+    transform: translate3d(-16px, 22px, 0);
     opacity: 0.45;
   }
   to {
-    transform: translate3d(12px, -18px, 0);
+    transform: translate3d(20px, -30px, 0);
     opacity: 0.8;
   }
 }
@@ -2344,6 +2359,9 @@
   margin: 0;
   padding: 0;
   border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
   background: transparent;
 }
 
