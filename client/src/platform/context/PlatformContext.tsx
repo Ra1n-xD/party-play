@@ -19,7 +19,11 @@ import type {
   SeatClaimInfo,
   ServerEvents,
 } from "../../../../shared/platform/protocol";
-import type { RoomReactionEvent, RoomReactionId } from "../../../../shared/platform/reactions";
+import {
+  getRoomReactionDuration,
+  type RoomReactionEvent,
+  type RoomReactionId,
+} from "../../../../shared/platform/reactions";
 import type { AvatarId } from "../../../../shared/platform/avatars";
 import type {
   AnyPublicRoomDirectorySnapshot,
@@ -974,11 +978,16 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       seenReactionIdsRef.current.add(reaction.eventId);
       setRoomReactions((current) => [...current, reaction].slice(-4));
 
-      const timer = setTimeout(() => {
-        reactionTimersRef.current.delete(reaction.eventId);
-        seenReactionIdsRef.current.delete(reaction.eventId);
-        setRoomReactions((current) => current.filter((item) => item.eventId !== reaction.eventId));
-      }, 3_600);
+      const timer = setTimeout(
+        () => {
+          reactionTimersRef.current.delete(reaction.eventId);
+          seenReactionIdsRef.current.delete(reaction.eventId);
+          setRoomReactions((current) =>
+            current.filter((item) => item.eventId !== reaction.eventId),
+          );
+        },
+        getRoomReactionDuration(reaction.reactionId) + 600,
+      );
       reactionTimersRef.current.set(reaction.eventId, timer);
     };
 

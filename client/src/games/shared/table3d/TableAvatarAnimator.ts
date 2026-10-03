@@ -1,10 +1,14 @@
 import type * as THREE from "three";
-import type { RoomReactionId } from "../../../../../shared/platform/reactions";
+import {
+  getRoomReactionDuration,
+  LAUGH_BEATS_SECONDS,
+  type RoomReactionId,
+} from "../../../../../shared/platform/reactions";
 import type { AvatarFaceRig } from "./AvatarFace";
 import type { makeSeatedArm } from "./AvatarParts";
+import { AVATAR_STAND_RISE, AVATAR_STAND_FORWARD, type AvatarLegRig } from "./AvatarLegs";
 
 export const AVATAR_EXIT_DURATION_MS = 2200;
-const REACTION_DURATION_MS = 3000;
 const HIP_HEIGHT = 0.92;
 const OPEN = [0.08, 0.12, 0.16, 0.22];
 const CUPPED = [0.2, 0.26, 0.3, 0.36];
@@ -52,7 +56,12 @@ export class TableAvatarAnimator {
     private readonly cards: THREE.Group,
     private readonly idlePhase = 0,
     private readonly face?: AvatarFaceRig,
+    private readonly legs?: AvatarLegRig,
   ) {}
+
+  get heightOffset() {
+    return Math.max(0, this.body.position.y - HIP_HEIGHT);
+  }
 
   setEliminated(eliminated: boolean, startedAt?: number, initial = false) {
     if (eliminated === this.eliminated) return;
@@ -66,7 +75,10 @@ export class TableAvatarAnimator {
 
   react(id: RoomReactionId, time: number) {
     if (this.eliminated) return;
-    if (this.reaction && time - this.reaction.startedAt < REACTION_DURATION_MS) {
+    if (
+      this.reaction &&
+      time - this.reaction.startedAt < getRoomReactionDuration(this.reaction.id)
+    ) {
       this.queuedReaction = id;
       this.releaseStartedAt ??= time;
     } else {
@@ -100,6 +112,7 @@ export class TableAvatarAnimator {
     this.lookPitch += (pitch - this.lookPitch) * smoothing;
     this.body.position.set(0, HIP_HEIGHT, 0);
     this.body.rotation.set(0, 0, 0);
+    this.legs?.pose(0);
     this.leftArm.resetGesture();
     this.rightArm.resetGesture();
     this.leftArm.root.rotation.set(0, 0, 0);
@@ -155,16 +168,18 @@ export class TableAvatarAnimator {
       this.head.rotation.z = Math.sin(this.idleTime * 0.0008 + this.idlePhase) * 0.008;
       this.rightArm.poseFingers(RELAXED, 0.08, 0.25, 0.1 + (breath + 1) * 0.035);
     }
+    const releaseDuration = this.reaction?.id === "laugh" ? 700 : 180;
+    const duration = this.reaction ? getRoomReactionDuration(this.reaction.id) : 3000;
     if (
       this.queuedReaction &&
       this.releaseStartedAt !== null &&
-      (time - this.releaseStartedAt >= 180 ||
-        (this.reaction && time - this.reaction.startedAt >= REACTION_DURATION_MS))
+      (time - this.releaseStartedAt >= releaseDuration ||
+        (this.reaction && time - this.reaction.startedAt >= duration))
     ) {
       this.reaction = { id: this.queuedReaction, startedAt: time };
       this.queuedReaction = null;
       this.releaseStartedAt = null;
-    } else if (this.reaction && time - this.reaction.startedAt >= REACTION_DURATION_MS) {
+    } else if (this.reaction && time - this.reaction.startedAt >= duration) {
       this.reaction = null;
     }
     if (!this.reaction || reducedMotion) {
@@ -174,14 +189,49 @@ export class TableAvatarAnimator {
 
     const t = Math.max(0, time - this.reaction.startedAt) / 1000;
     const release =
-      this.releaseStartedAt === null ? 1 : 1 - ease((time - this.releaseStartedAt) / 180);
-    const returnWeight = ease((REACTION_DURATION_MS / 1000 - t) / 0.65) * release;
+      this.releaseStartedAt === null
+        ? 1
+        : 1 - ease((time - this.releaseStartedAt) / releaseDuration);
+    const seconds = getRoomReactionDuration(this.reaction.id) / 1000;
+    const returnWeight = ease((seconds - t) / 0.65) * release;
     const gesture = ease((t - 0.12) / 0.5) * returnWeight;
     const fingers = ease((t - 0.04) / 0.38) * returnWeight;
-    const expression = ease(t / 0.3) * ease((3 - t) / 0.5) * release;
+    const expression = ease(t / 0.3) * ease((seconds - t) / 0.5) * release;
     const anticipation = pulse(t, 0, 0.48) * release;
     this.body.rotation.x += anticipation * 0.014;
     switch (this.reaction.id) {
+      case "laugh": {
+        const standing = ease((t - 0.28) / 0.95) * ease((seconds - t) / 1.15) * release;
+        const hands = ease((t - 0.2) / 0.7) * ease((seconds - t) / 0.85) * release;
+        let chuckle = 0;
+        for (const beat of LAUGH_BEATS_SECONDS) chuckle += pulse(t, beat, 0.24);
+        chuckle *= release;
+        this.legs?.pose(standing);
+        this.body.position.y += AVATAR_STAND_RISE * standing;
+        this.body.position.z += AVATAR_STAND_FORWARD * standing;
+        this.body.rotation.x += pulse(t, 0.1, 0.8) * 0.09 + (0.012 + chuckle * 0.018) * standing;
+        this.head.rotation.x -= (0.14 - chuckle * 0.06) * standing;
+        this.head.rotation.z += Math.sin(t * 2.5) * 0.045 * standing;
+        this.leftArm.gesture(-0.16, 1.46, 0.32, -0.65, 0.3, 0.45, hands, RELIEF_ARM);
+        this.rightArm.gesture(
+          0.5,
+          1.73 + chuckle * 0.025,
+          0.38,
+          0.3,
+          -0.25,
+          -0.3,
+          hands,
+          RELIEF_ARM,
+        );
+        this.leftArm.poseFingers(CUPPED, 0.12, 0.35, hands);
+        this.rightArm.poseFingers(RELAXED, 0.18, 0.3, hands);
+        face.smile = 0.08 + 0.9 * expression;
+        face.open = (0.25 + chuckle * 0.62) * standing;
+        face.squint = (0.62 + chuckle * 0.22) * expression;
+        face.brow = 0.18 * expression;
+        this.cards.visible = hands < 0.025 && standing < 0.025;
+        break;
+      }
       case "good-move": {
         // Form the fist near the table, then raise it and reveal the thumb.
         // Keep the fist closed while lowering; only relax it near the rest pose.

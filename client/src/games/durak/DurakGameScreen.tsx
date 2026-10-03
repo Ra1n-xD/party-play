@@ -919,6 +919,20 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                     )}
                   </div>
                 )}
+                {game.trumpSuit && (
+                  <div
+                    className={`durak-trump-label ${
+                      game.trumpSuit === "diamonds" || game.trumpSuit === "hearts" ? "is-red" : ""
+                    }`}
+                    aria-label={`Козырь — ${DURAK_SUIT_LABELS[game.trumpSuit]}`}
+                  >
+                    <b aria-hidden="true">{getSuitSymbol(game.trumpSuit)}</b>
+                    <span>
+                      <small>Козырь</small>
+                      <strong>{DURAK_SUIT_LABELS[game.trumpSuit]}</strong>
+                    </span>
+                  </div>
+                )}
               </aside>
 
               <section

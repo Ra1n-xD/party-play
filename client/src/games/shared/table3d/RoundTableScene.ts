@@ -487,7 +487,7 @@ export class RoundTableScene {
       for (const z of [-0.28, 0.27])
         this.box(group, [0.055, 0.72, 0.055], 0x997847, [side * 0.35, 0.36, z]);
     const holdsCards = this.options.variant !== "bunker" && person.count > 0;
-    const { body, head, leftArm, rightArm, hand, face } = makeSeatedAvatar(
+    const { body, head, leftArm, rightArm, hand, face, legs } = makeSeatedAvatar(
       person.avatarId,
       holdsCards,
     );
@@ -507,6 +507,7 @@ export class RoundTableScene {
       hand,
       index * 1.7,
       face,
+      legs,
     );
     animator.setEliminated(Boolean(person.eliminated), person.eliminatedAt, true);
     this.avatars.set(person.id, animator);
@@ -715,19 +716,25 @@ export class RoundTableScene {
         );
         trump.position.set(-1.86, TABLE_Y + 0.046, 0.1);
         trump.rotation.y = Math.PI / 2;
+        trump.name = "stock-trump";
         this.pile.add(trump);
       }
-      for (let i = 0; i < Math.min(state.deckCount, 12); i++) {
+      const coveredCount = Math.max(0, state.deckCount - (state.trump ? 1 : 0));
+      for (let i = 0; i < Math.min(coveredCount, 12); i++) {
         const card = this.makeTableCard("", "", false, undefined, state.cardSkinId);
+        card.name = "stock-card";
         card.position.set(-2.06, TABLE_Y + 0.06 + i * 0.006, -0.12);
         this.pile.add(card);
       }
       for (let i = 0; i < Math.min(state.discardCount, 7); i++) {
         const card = this.makeTableCard("", "", false, undefined, state.cardSkinId);
+        card.name = "discard-card";
+        card.userData.layer = i;
         card.position.set(2.03, TABLE_Y + 0.05 + i * 0.006, -0.1);
         card.rotation.y = i * 0.12;
         this.pile.add(card);
       }
+      this.layoutPiles();
     }
     const activeIds = new Set(state.cards.map((card) => card.id));
     this.cards.forEach((entry, id) => {
@@ -826,6 +833,27 @@ export class RoundTableScene {
     this.options.onOverviewChange(this.overview);
   }
 
+  private layoutPiles() {
+    const compact =
+      this.viewportWidth <= 600 &&
+      this.options.variant !== "uno" &&
+      this.options.variant !== "bunker";
+    for (const card of this.pile.children) {
+      card.scale.setScalar(TABLE_CARD_SCALE * (compact ? 0.9 : 1));
+      if (card.name === "stock-trump") {
+        card.position.x = compact ? -0.12 : -1.86;
+        card.position.z = compact ? -1.43 : 0.1;
+      } else if (card.name === "stock-card") {
+        card.position.x = compact ? -0.61 : -2.06;
+        card.position.z = compact ? -1.64 : -0.12;
+      } else if (card.name === "discard-card") {
+        card.position.x = compact ? 0.93 : 2.03;
+        card.position.z = compact ? -1.68 : -0.1;
+        card.rotation.y = card.userData.layer * (compact ? 0.035 : 0.12);
+      }
+    }
+  }
+
   private resize() {
     const width = this.host.clientWidth;
     const height = this.host.clientHeight;
@@ -844,6 +872,7 @@ export class RoundTableScene {
     if (this.renderer.getPixelRatio() !== pixelRatio) this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(width, height);
     this.ownHand.resize(width, height);
+    this.layoutPiles();
   }
 
   private frame(time: number) {
@@ -939,8 +968,10 @@ export class RoundTableScene {
       );
     });
     const projected = this.projectedLabel;
-    this.labels.forEach((label) => {
+    this.labels.forEach((label, id) => {
       const { node, position, width, height } = label;
+      const rise = Math.max(0, this.avatars.get(id)?.heightOffset ?? 0);
+      position.y = 2.87 + rise;
       projected.copy(position).project(this.camera);
       const visible =
         !this.overview &&
@@ -950,8 +981,12 @@ export class RoundTableScene {
         Math.abs(projected.y) < 1.1;
       if (node.hidden === visible) node.hidden = !visible;
       if (!visible) return;
+      // A standing head can reach the top edge. Move its label beside the face,
+      // instead of clamping the label down over the laughing expression.
+      const side = projected.x > 0.35 ? -1 : 1;
+      const standingOffset = THREE.MathUtils.smoothstep(rise, 0.02, 0.3) * (width / 2 + 48) * side;
       const x = THREE.MathUtils.clamp(
-        (projected.x * 0.5 + 0.5) * this.viewportWidth,
+        (projected.x * 0.5 + 0.5) * this.viewportWidth + standingOffset,
         width / 2 + 6,
         this.viewportWidth - width / 2 - 6,
       );

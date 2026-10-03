@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from "crypto";
 import { Server, Socket } from "socket.io";
-import { isRoomReactionId } from "../../../shared/platform/reactions.js";
+import { isRoomReactionId, ownsRoomReaction } from "../../../shared/platform/reactions.js";
 import { isAvatarLook, AVATAR_LOOK_INTERVAL_MS } from "../../../shared/platform/avatarLook.js";
 import { normalizeRoomCode } from "../../../shared/roomCode.js";
 import {
@@ -89,7 +89,8 @@ import {
   syncLobbyProfileCosmetics,
 } from "./profiles.js";
 import { normalizeNickname } from "../../../shared/platform/cosmetics.js";
-import { profileNicknameMatches } from "./profileAuth.js";
+import { profileNicknameMatches, assertProfileSession } from "./profileAuth.js";
+import { profileStore } from "./profileStorage.js";
 import { setRoomPreparingHook, setRoomPublishedHook } from "./statePublisher.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
@@ -1453,6 +1454,18 @@ export function registerHandlers(io: IOServer): void {
         player.controller.socketId !== socket.id
       ) {
         return;
+      }
+
+      // Ownership is authoritative: hiding a locked option in the UI is not enough.
+      if (!ownsRoomReaction(reactionId)) {
+        const key = socket.data.profileKey as string | undefined;
+        if (!key || key !== player.profileKey) return;
+        try {
+          assertProfileSession(socket, key);
+        } catch {
+          return;
+        }
+        if (!ownsRoomReaction(reactionId, profileStore.profiles.get(key)?.inventory)) return;
       }
 
       const now = Date.now();

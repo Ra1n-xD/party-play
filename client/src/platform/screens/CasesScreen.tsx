@@ -5,6 +5,7 @@ import {
   COSMETIC_KIND_NAMES,
   RARITIES,
   getCosmetic,
+  isCosmeticInUse,
   CASE_COST,
   type CaseOpening,
   type Cosmetic,
@@ -110,7 +111,7 @@ export function CasesScreen() {
   };
   const winner = opening ? getCosmetic(opening.itemId) : null;
   if (!profile) return null;
-  const equipped = winner && `${winner.kind}:${profile.equipped[winner.kind]}` === winner.id;
+  const equipped = winner && isCosmeticInUse(profile, winner);
   return (
     <main className="cases-page">
       <DropFeed holdUpdates={phase === "request" || phase === "spin"} />
@@ -207,7 +208,11 @@ export function CasesScreen() {
               disabled={busy || !connected || !!equipped}
               className="collection-equip"
             >
-              {equipped ? "✓ Выбран" : "Использовать"}
+              {winner.kind === "reaction"
+                ? "✓ Доступна в игре"
+                : equipped
+                  ? "✓ Выбран"
+                  : "Использовать"}
             </button>
           </div>
         )}

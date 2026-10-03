@@ -1,41 +1,40 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { RoomReactionId } from "../../../../shared/platform/reactions";
+import {
+  ROOM_REACTIONS,
+  ownsRoomReaction,
+  type RoomReactionId,
+} from "../../../../shared/platform/reactions";
 import { usePlatform } from "../context/PlatformContext";
+import { useProfile } from "../context/ProfileContext";
+import { useReactionAudio } from "../useReactionAudio";
 import { ReactionIcon } from "./ReactionIcon";
 import "../../styles/reactions.css";
 
 const LOCAL_COOLDOWN_MS = 1_200;
 const POPOVER_WIDTH = 320;
-const POPOVER_HEIGHT = 246;
+const POPOVER_HEIGHT = 390;
 const POPOVER_MARGIN = 12;
 const POPOVER_GAP = 9;
 
 interface PopoverPosition {
   bottom?: number;
   left: number;
+  maxHeight: number;
   top?: number;
 }
 
-const REACTION_CATALOG = [
-  { id: "good-move", label: "Хороший ход" },
-  { id: "bravo", label: "Браво" },
-  { id: "wow", label: "Вот это да" },
-  { id: "nice", label: "Красиво" },
-  { id: "lucky", label: "Повезло" },
-  { id: "fire", label: "Огонь" },
-] as const satisfies readonly {
-  id: RoomReactionId;
-  label: string;
-}[];
-
-const REACTIONS_BY_ID = new Map(
-  REACTION_CATALOG.map((reaction) => [reaction.id, reaction] as const),
-);
+const REACTIONS_BY_ID = new Map(ROOM_REACTIONS.map((reaction) => [reaction.id, reaction] as const));
 
 export function RoomReactions() {
   const { connected, reconnectState, isSpectator, snapshot, roomReactions, sendReaction } =
     usePlatform();
+  const { profile } = useProfile();
+  const availableReactions = useMemo(
+    () => ROOM_REACTIONS.filter((reaction) => ownsRoomReaction(reaction.id, profile?.inventory)),
+    [profile?.inventory],
+  );
+  const sound = useReactionAudio(roomReactions, !connected || Boolean(snapshot?.pause.active));
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [cooldownActive, setCooldownActive] = useState(false);
   const [overlayRoot, setOverlayRoot] = useState<HTMLElement | null>(null);
@@ -87,7 +86,11 @@ export function RoomReactions() {
     const viewportHeight = window.innerHeight;
     const popoverWidth = Math.min(POPOVER_WIDTH, viewportWidth - POPOVER_MARGIN * 2);
     if (!triggerRect.width && trigger.closest(".is-3d")) {
-      setPopoverPosition({ bottom: 24, left: Math.max(12, viewportWidth - popoverWidth - 24) });
+      setPopoverPosition({
+        bottom: 24,
+        left: Math.max(12, viewportWidth - popoverWidth - 24),
+        maxHeight: viewportHeight - 24 - POPOVER_MARGIN,
+      });
       return;
     }
     const maxLeft = Math.max(POPOVER_MARGIN, viewportWidth - popoverWidth - POPOVER_MARGIN);
@@ -101,8 +104,13 @@ export function RoomReactions() {
         ? {
             bottom: Math.max(POPOVER_MARGIN, viewportHeight - triggerRect.top + POPOVER_GAP),
             left,
+            maxHeight: triggerRect.top - POPOVER_GAP - POPOVER_MARGIN,
           }
-        : { left, top: triggerRect.bottom + POPOVER_GAP },
+        : {
+            left,
+            top: triggerRect.bottom + POPOVER_GAP,
+            maxHeight: viewportHeight - triggerRect.bottom - POPOVER_GAP - POPOVER_MARGIN,
+          },
     );
   }, []);
 
@@ -162,7 +170,13 @@ export function RoomReactions() {
 
   const chooseReaction = useCallback(
     (reactionId: RoomReactionId) => {
-      if (!eligible || cooldownActiveRef.current || !sendReaction(reactionId)) return;
+      if (
+        !eligible ||
+        !ownsRoomReaction(reactionId, profile?.inventory) ||
+        cooldownActiveRef.current ||
+        !sendReaction(reactionId)
+      )
+        return;
 
       cooldownActiveRef.current = true;
       setCooldownActive(true);
@@ -175,7 +189,7 @@ export function RoomReactions() {
         setCooldownActive(false);
       }, LOCAL_COOLDOWN_MS);
     },
-    [eligible, sendReaction, restoreFocus],
+    [eligible, profile?.inventory, sendReaction, restoreFocus],
   );
 
   useEffect(() => {
@@ -198,14 +212,15 @@ export function RoomReactions() {
           setPopoverOpen((open) => !open);
           if (popoverOpen) restoreFocus();
         }
-      } else if (popoverOpen && /^(Digit|Numpad)[1-6]$/.test(event.code)) {
+      } else if (popoverOpen && /^(Digit|Numpad)[1-7]$/.test(event.code)) {
         event.preventDefault();
-        chooseReaction(REACTION_CATALOG[Number(event.code.slice(-1)) - 1].id);
+        const reaction = availableReactions[Number(event.code.slice(-1)) - 1];
+        if (reaction) chooseReaction(reaction.id);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [eligible, popoverOpen, chooseReaction, restoreFocus]);
+  }, [eligible, popoverOpen, chooseReaction, restoreFocus, availableReactions]);
 
   useEffect(() => {
     if (popoverOpen) popoverRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -230,6 +245,16 @@ export function RoomReactions() {
             <span className="room-reaction-message-copy">
               <strong>{event.senderName}</strong>
               <span>{reaction.label}</span>
+              {reaction.id === "laugh" && (
+                <button
+                  type="button"
+                  className="room-reaction-sound"
+                  onClick={sound.toggle}
+                  aria-pressed={sound.enabled}
+                >
+                  {sound.enabled ? "Выключить звук эмоций" : "Включить звук эмоций"}
+                </button>
+              )}
             </span>
           </div>
         );
@@ -251,9 +276,10 @@ export function RoomReactions() {
         right: "auto",
         bottom: popoverPosition.bottom ?? "auto",
         left: popoverPosition.left,
+        maxHeight: popoverPosition.maxHeight,
       }}
     >
-      {REACTION_CATALOG.map((reaction, index) => (
+      {availableReactions.map((reaction, index) => (
         <button
           type="button"
           className="room-reactions-option"
@@ -268,6 +294,19 @@ export function RoomReactions() {
           <kbd className="room-reactions-shortcut">{index + 1}</kbd>
         </button>
       ))}
+      <div className="room-reactions-footer">
+        {availableReactions.length < ROOM_REACTIONS.length && (
+          <span>Другие эмоции открываются в кейсах.</span>
+        )}
+        <button
+          type="button"
+          className="room-reaction-sound"
+          onClick={sound.toggle}
+          aria-pressed={sound.enabled}
+        >
+          {sound.enabled ? "Звук эмоций включён" : "Звук эмоций выключен"}
+        </button>
+      </div>
     </div>
   );
 

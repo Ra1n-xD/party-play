@@ -255,6 +255,39 @@
 .table3d-information .table3d-trump.is-red {
   color: #f09b8d;
 }
+.table3d-trump-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.table3d-trump-symbol {
+  font: inherit;
+}
+@media (max-width: 600px) {
+  .durak-table3d .table3d-information {
+    top: 88px;
+    right: 10px;
+    left: auto;
+    gap: 10px;
+    padding: 7px 10px;
+  }
+  .durak-table3d .table3d-trump {
+    display: grid;
+    grid-template-columns: 28px auto;
+    gap: 2px 6px;
+    text-align: left;
+  }
+  .durak-table3d .table3d-trump-symbol {
+    grid-row: 1 / 3;
+    font-size: 28px;
+  }
+  .durak-table3d .table3d-trump small {
+    display: block;
+    font-size: 10px;
+  }
+  .durak-table3d .table3d-trump-name {
+    font-size: 12px;
+  }
+}
 .table3d-roster {
   position: absolute;
   z-index: 4;

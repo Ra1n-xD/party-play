@@ -298,6 +298,8 @@ try {
       for (const [id, count] of Object.entries(profile.inventory))
         if (!getCosmetic(id) || !Number.isSafeInteger(count) || count < 1)
           throw new Error("Invalid inventory");
+      // Existing accounts predate collectible reactions. Grant only the free like.
+      profile.inventory["reaction:good-move"] ??= 1;
       for (const id of BASIC_ITEMS)
         if (!profile.inventory[id]) throw new Error("Missing basic item");
       for (const kind of ["avatar", "durak", "uno"] as const)
