@@ -7,7 +7,7 @@ import { CoinAmount } from "./CoinAmount";
 import { CASE_COST, GAME_REWARD } from "../../../../shared/platform/cosmetics";
 
 interface ProfileHeaderProps {
-  activePage?: "games" | "profile" | "cases" | "upgrade";
+  activePage?: "games" | "profile" | "cases" | "upgrade" | "updates";
   onHome?: () => void;
 }
 
