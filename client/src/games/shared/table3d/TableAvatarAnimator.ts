@@ -1,24 +1,46 @@
 import type * as THREE from "three";
 import type { RoomReactionId } from "../../../../../shared/platform/reactions";
+import type { AvatarFaceRig } from "./AvatarFace";
 import type { makeSeatedArm } from "./AvatarParts";
 
 export const AVATAR_EXIT_DURATION_MS = 2200;
-const REACTION_DURATION_MS = 2600;
+const REACTION_DURATION_MS = 3000;
 const HIP_HEIGHT = 0.92;
+const OPEN = [0.08, 0.12, 0.16, 0.22];
+const CUPPED = [0.2, 0.26, 0.3, 0.36];
+const FIST = [0.96, 1, 1, 0.96];
+const POINT = [0.08, 0.86, 0.94, 1];
+const RELAXED = [0.23, 0.32, 0.38, 0.46];
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const ease = (value: number) => {
   const t = clamp(value);
-  return t * t * (3 - 2 * t);
+  // Zero velocity and acceleration at both ends of each gesture.
+  return t * t * t * (t * (t * 6 - 15) + 10);
 };
+const pulse = (time: number, start: number, duration: number) =>
+  Math.sin(clamp((time - start) / duration) * Math.PI) ** 2;
 
-/** Procedural poses on a small rigid-part rig; the chair stays outside the animated body. */
+/** Face and fingers lead each gesture; the wrist, elbow and torso follow and settle. */
 export class TableAvatarAnimator {
   private eliminated = false;
+  private poseDirty = true;
   private exitStartedAt: number | null = null;
   private reaction: { id: RoomReactionId; startedAt: number } | null = null;
+  private queuedReaction: RoomReactionId | null = null;
+  private releaseStartedAt: number | null = null;
   private lookYaw = 0;
   private lookPitch = 0.18;
   private lastFrameAt = performance.now();
+  private idleTime = 0;
+  private readonly expression = {
+    smile: 0,
+    open: 0,
+    brow: 0,
+    squint: 0,
+    blink: 0,
+    gazeX: 0,
+    gazeY: 0,
+  };
 
   constructor(
     private readonly body: THREE.Group,
@@ -27,17 +49,29 @@ export class TableAvatarAnimator {
     private readonly rightArm: ReturnType<typeof makeSeatedArm>,
     private readonly cards: THREE.Group,
     private readonly idlePhase = 0,
+    private readonly face?: AvatarFaceRig,
   ) {}
 
   setEliminated(eliminated: boolean, startedAt?: number, initial = false) {
     if (eliminated === this.eliminated) return;
     this.eliminated = eliminated;
+    this.poseDirty = true;
     this.reaction = null;
+    this.queuedReaction = null;
+    this.releaseStartedAt = null;
     this.exitStartedAt = eliminated ? (startedAt ?? (initial ? null : performance.now())) : null;
   }
 
   react(id: RoomReactionId, time: number) {
-    if (!this.eliminated) this.reaction = { id, startedAt: time };
+    if (this.eliminated) return;
+    if (this.reaction && time - this.reaction.startedAt < REACTION_DURATION_MS) {
+      this.queuedReaction = id;
+      this.releaseStartedAt ??= time;
+    } else {
+      this.reaction = { id, startedAt: time };
+      this.queuedReaction = null;
+      this.releaseStartedAt = null;
+    }
   }
 
   frame(
@@ -50,15 +84,16 @@ export class TableAvatarAnimator {
   ) {
     const elapsed = Math.max(0, time - this.lastFrameAt);
     this.lastFrameAt = time;
-    // Host controls obscure the table while paused. Continue fresh gestures after they close.
     if (paused) {
-      if (
-        this.exitStartedAt !== null &&
-        time - this.exitStartedAt < AVATAR_EXIT_DURATION_MS + elapsed
-      )
-        this.exitStartedAt += elapsed;
+      if (this.exitStartedAt !== null) this.exitStartedAt += elapsed;
       if (this.reaction) this.reaction.startedAt += elapsed;
+      if (this.releaseStartedAt !== null) this.releaseStartedAt += elapsed;
+      // Keep the exact pose, including eyelids and finger joints, during room pause.
+      if (!reducedMotion && !this.poseDirty) return;
+    } else {
+      this.idleTime += Math.min(elapsed, 80);
     }
+    this.poseDirty = false;
     this.lookYaw += (yaw - this.lookYaw) * smoothing;
     this.lookPitch += (pitch - this.lookPitch) * smoothing;
     this.body.position.set(0, HIP_HEIGHT, 0);
@@ -69,6 +104,19 @@ export class TableAvatarAnimator {
     this.rightArm.root.rotation.set(0, 0, 0);
     this.head.rotation.set(this.lookPitch, this.lookYaw, 0);
     this.cards.visible = !this.eliminated;
+
+    const face = this.expression;
+    face.smile = 0.08;
+    face.open = face.brow = face.squint = face.blink = 0;
+    face.gazeX = clamp(0.5 + this.lookYaw * 0.45) * 2 - 1;
+    face.gazeY = -this.lookPitch * 0.3;
+    if (!reducedMotion) {
+      const clock = this.idleTime / 1000 + this.idlePhase;
+      const blinkTime = clock % 5.3;
+      face.blink = pulse(blinkTime, 4.66, 0.23) + pulse(blinkTime, 5.02, 0.19) * 0.65;
+      face.gazeX += Math.sin(clock * 0.67) * 0.06;
+      face.gazeY += Math.sin(clock * 0.43) * 0.025;
+    }
 
     if (this.eliminated) {
       const progress =
@@ -85,72 +133,138 @@ export class TableAvatarAnimator {
       this.head.rotation.set(-0.18 * fall, 0.1 * fall, 0.12 * fall);
       this.leftArm.root.rotation.set(-Math.sin(fall * Math.PI) * 1.8 - fall * 0.2, 0, fall * 0.4);
       this.rightArm.root.rotation.set(-Math.sin(fall * Math.PI) * 1.6 - fall * 0.3, 0, -fall * 0.5);
+      face.smile = 0;
+      face.blink = 0;
+      face.squint = 0.5 * landing;
+      face.brow = 0.7 * recoil;
+      face.open = 0.45 * recoil;
+      if (!reducedMotion) {
+        this.leftArm.poseFingers(OPEN, 0.8, 0.1, recoil);
+        this.rightArm.poseFingers(OPEN, 0.8, 0.1, recoil);
+      }
+      this.face?.pose(face);
       return;
     }
 
-    if (!this.reaction) {
-      if (!reducedMotion && !paused) {
-        const breath = Math.sin(time * 0.0016 + this.idlePhase);
-        this.body.position.y += breath * 0.005;
-        this.head.rotation.z = Math.sin(time * 0.0008 + this.idlePhase) * 0.009;
-        this.rightArm.root.rotation.x = -(0.5 + breath * 0.5) * 0.012;
-      }
-      return;
+    if (!reducedMotion && !paused) {
+      const breath = Math.sin(this.idleTime * 0.0016 + this.idlePhase);
+      this.body.position.y += breath * 0.004;
+      this.body.rotation.x = breath * 0.003;
+      this.head.rotation.z = Math.sin(this.idleTime * 0.0008 + this.idlePhase) * 0.008;
+      this.rightArm.poseFingers(RELAXED, 0.08, 0.25, 0.1 + (breath + 1) * 0.035);
     }
-    const reactionElapsed = time - this.reaction.startedAt;
-    if (reactionElapsed >= REACTION_DURATION_MS) {
+    if (
+      this.queuedReaction &&
+      this.releaseStartedAt !== null &&
+      (time - this.releaseStartedAt >= 180 ||
+        (this.reaction && time - this.reaction.startedAt >= REACTION_DURATION_MS))
+    ) {
+      this.reaction = { id: this.queuedReaction, startedAt: time };
+      this.queuedReaction = null;
+      this.releaseStartedAt = null;
+    } else if (this.reaction && time - this.reaction.startedAt >= REACTION_DURATION_MS) {
       this.reaction = null;
+    }
+    if (!this.reaction || reducedMotion) {
+      this.face?.pose(face);
       return;
     }
-    // Reduced motion keeps the normal pose; the sticker and reaction label remain visible.
-    if (reducedMotion) return;
-    const t = reactionElapsed / 1000;
-    const envelope =
-      ease(reactionElapsed / 260) * ease((REACTION_DURATION_MS - reactionElapsed) / 420);
-    // A deliberate gesture with a quiet hold and soft return, instead of shaking
-    // the whole body throughout every emotion.
-    const nod = Math.sin(clamp((t - 0.35) / 0.9) * Math.PI * 2);
+
+    const t = Math.max(0, time - this.reaction.startedAt) / 1000;
+    const release =
+      this.releaseStartedAt === null ? 1 : 1 - ease((time - this.releaseStartedAt) / 180);
+    const returnWeight = ease((REACTION_DURATION_MS / 1000 - t) / 0.65) * release;
+    const gesture = ease((t - 0.12) / 0.5) * returnWeight;
+    const fingers = ease((t - 0.04) / 0.38) * returnWeight;
+    const expression = ease(t / 0.3) * ease((3 - t) / 0.5) * release;
+    const anticipation = pulse(t, 0, 0.48) * release;
+    this.body.rotation.x += anticipation * 0.014;
     switch (this.reaction.id) {
-      case "good-move":
-        this.rightArm.gesture(0.36, 1.96, 0.62, 0.1, -0.3, -0.12, envelope);
-        this.head.rotation.x += nod * 0.16 * envelope;
+      case "good-move": {
+        // A clear thumbs-up, followed by one small nod and an approving smile.
+        this.rightArm.gesture(0.34, 1.98, 0.57, 0.04, -0.28, -0.2, gesture);
+        this.rightArm.poseFingers(FIST, 0.02, 0, fingers);
+        this.head.rotation.x += pulse(t, 0.5, 0.8) * 0.12 * gesture;
+        face.smile += 0.7 * expression;
+        face.squint = 0.25 * expression;
+        face.brow = 0.12 * expression;
         break;
+      }
       case "bravo": {
-        const clap = (1 - Math.cos(clamp((t - 0.3) / 1.6) * Math.PI * 8)) / 2;
-        const spread = 0.065 + clap * 0.15;
-        this.leftArm.gesture(-spread, 1.82, 0.72, 0, Math.PI / 2, -0.1, envelope);
-        this.rightArm.gesture(spread, 1.82, 0.72, 0, -Math.PI / 2, 0.1, envelope);
-        this.head.rotation.x += 0.06 * envelope;
-        this.cards.visible = envelope < 0.1;
+        // Three measured contacts, each with a quicker closing and softer release.
+        const clapTime = Math.max(0, t - 0.62);
+        const cycle = (clapTime % 0.48) / 0.48;
+        const close = cycle < 0.38 ? ease(cycle / 0.38) : 1 - ease((cycle - 0.38) / 0.62);
+        const contact = t >= 0.62 && t < 2.06 ? close : 0;
+        const spread = 0.14 - contact * 0.11;
+        this.leftArm.gesture(-spread, 1.91, 0.67, 0.04, Math.PI / 2, -0.12, gesture);
+        this.rightArm.gesture(spread, 1.92, 0.66, 0.04, -Math.PI / 2, 0.12, gesture);
+        this.leftArm.poseFingers(CUPPED, 0.06, 0.35, fingers);
+        this.rightArm.poseFingers(CUPPED, 0.06, 0.35, fingers);
+        this.head.rotation.x += (0.035 + contact * 0.02) * gesture;
+        face.smile += 0.85 * expression;
+        face.squint = 0.38 * expression;
+        face.open = 0.1 * expression;
+        this.cards.visible = fingers < 0.04 && gesture < 0.04;
         break;
       }
       case "wow":
-        this.body.rotation.x = -0.07 * envelope;
-        this.head.rotation.x -= 0.14 * envelope;
-        this.leftArm.gesture(-0.28, 2.05, 0.32, 0, 0.6, -0.2, envelope);
-        this.rightArm.gesture(0.28, 2.05, 0.32, 0, -0.6, 0.2, envelope);
-        this.cards.visible = envelope < 0.1;
+        this.body.rotation.x -= 0.055 * gesture;
+        this.head.rotation.x -= 0.11 * gesture;
+        this.leftArm.gesture(-0.29, 2.06, 0.36, 0.02, 0.35, -0.18, gesture);
+        this.rightArm.gesture(0.29, 2.06, 0.36, 0.02, -0.35, 0.18, gesture);
+        this.leftArm.poseFingers(OPEN, 0.85, 0.06, fingers);
+        this.rightArm.poseFingers(OPEN, 0.85, 0.06, fingers);
+        face.smile = 0.08 * (1 - expression);
+        face.brow = 0.95 * expression;
+        face.open = 0.85 * expression;
+        face.blink *= 1 - expression;
+        this.cards.visible = fingers < 0.04 && gesture < 0.04;
         break;
       case "nice":
-        this.rightArm.gesture(0.56, 1.84, 0.65, -1.1, -0.35, -0.25, envelope);
-        this.head.rotation.z = -0.1 * envelope;
-        this.head.rotation.x += 0.1 * envelope;
+        this.rightArm.gesture(0.44, 1.96, 0.6, -0.16, -0.42, -0.3, gesture);
+        this.rightArm.poseFingers(POINT, 0.18, 0.35, fingers);
+        this.head.rotation.z -= 0.075 * gesture;
+        this.head.rotation.x += pulse(t, 0.68, 0.72) * 0.065 * gesture;
+        face.smile += 0.65 * expression;
+        face.squint = 0.45 * expression;
+        face.brow = -0.12 * expression;
         break;
       case "lucky": {
-        const wipe = ease((t - 0.55) / 0.9);
-        this.rightArm.gesture(0.02 + wipe * 0.28, 2.14, 0.34, 0, -0.4, -0.7, envelope);
-        this.head.rotation.x += 0.09 * envelope;
-        this.body.position.y -= 0.018 * envelope;
+        const wipe = ease((t - 0.82) / 0.8);
+        this.rightArm.gesture(
+          -0.035 + wipe * 0.18,
+          2.28 - wipe * 0.035,
+          0.35,
+          0.15,
+          -0.1,
+          -0.6,
+          gesture,
+        );
+        this.rightArm.poseFingers(CUPPED, 0.13, 0.35, fingers);
+        this.head.rotation.x += 0.065 * gesture;
+        this.body.position.y -= pulse(t, 0.6, 1.6) * 0.012 * gesture;
+        face.smile += 0.5 * expression * ease((t - 0.5) / 0.6);
+        face.squint = 0.7 * expression;
+        face.brow = 0.28 * expression;
+        face.open = 0.14 * expression * (1 - wipe);
         break;
       }
       case "fire": {
-        const cheer = Math.sin(clamp((t - 0.35) / 1.5) * Math.PI * 4) * 0.07;
-        this.leftArm.gesture(-0.45, 2.12 + cheer, 0.5, 0, 0.15, -0.3, envelope);
-        this.rightArm.gesture(0.45, 2.12 + cheer, 0.5, 0, -0.15, 0.3, envelope);
-        this.body.rotation.x = -0.035 * envelope;
-        this.cards.visible = envelope < 0.1;
+        const lift = pulse(t, 0.58, 0.75) * 0.06 + pulse(t, 1.42, 0.65) * 0.04;
+        this.leftArm.gesture(-0.42, 2.08 + lift, 0.43, -0.1, 0.18, -0.32, gesture);
+        this.rightArm.gesture(0.42, 2.08 + lift, 0.43, -0.1, -0.18, 0.32, gesture);
+        this.leftArm.poseFingers(FIST, 0, 0.92, fingers);
+        this.rightArm.poseFingers(FIST, 0, 0.92, fingers);
+        this.body.rotation.x -= 0.025 * gesture;
+        face.smile += 0.9 * expression;
+        face.open = 0.38 * expression;
+        face.squint = 0.32 * expression;
+        face.brow = 0.22 * expression;
+        this.cards.visible = fingers < 0.04 && gesture < 0.04;
         break;
       }
     }
+    this.face?.pose(face);
   }
 }
