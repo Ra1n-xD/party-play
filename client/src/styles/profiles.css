@@ -813,7 +813,7 @@ body:has(.show-menu, .profile-login),
     height: 22px;
   }
   .coin-wallet .coin-label {
-    font-size: 9px;
+    display: none;
   }
 }
 
@@ -829,8 +829,10 @@ body:has(.show-menu, .profile-login),
 }
 
 .profile-guest-link {
-  display: inline-block;
-  margin-top: 20px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: 24px;
   color: #fff8e8;
   text-underline-offset: 4px;
 }
