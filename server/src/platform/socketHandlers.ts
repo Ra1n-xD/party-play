@@ -576,7 +576,8 @@ function resolveSeatClaimCommand(
   const { claim, player } = resolution;
   const claimantSocket = io.sockets.sockets.get(claim.socketId);
   const claimantMembership = claimantSocket ? getCurrentSocketMembership(claimantSocket) : null;
-  if (!claimantSocket?.connected || claimantMembership !== null || claimantSocket.rooms.size > 1) {
+  // Account, drop-feed and directory subscriptions are not game memberships.
+  if (!claimantSocket?.connected || claimantMembership !== null) {
     removeClaimsForSocket(claim.socketId, io, "Заявитель больше недоступен", true);
     return { success: false, code: "CONFLICT", error: "Заявитель больше недоступен" };
   }
@@ -647,22 +648,14 @@ export function registerHandlers(io: IOServer): void {
     syncRoomProfileRewards(room, publishedIo);
   });
   io.on("connection", (socket: IOSocket) => {
-    registerProfileHandlers(
-      socket,
-      io,
-      () => {
-        const info = socketRoomMap.get(socket.id);
-        if (!info) return null;
-        const room = getRoom(info.roomCode);
-        return info.role === "player"
-          ? (room?.players.get(info.playerId)?.owner.name ?? null)
-          : (room?.spectators.get(info.playerId)?.name ?? null);
-      },
-      () => {
-        for (const room of getAllRooms().values())
-          if (room.lifecycle !== "playing") publishRoom(room, io);
-      },
-    );
+    registerProfileHandlers(socket, io, () => {
+      const info = socketRoomMap.get(socket.id);
+      if (!info) return null;
+      const room = getRoom(info.roomCode);
+      return info.role === "player"
+        ? (room?.players.get(info.playerId)?.owner.name ?? null)
+        : (room?.spectators.get(info.playerId)?.name ?? null);
+    });
     socket.use(([event, data], next) => {
       const membershipEvents = [
         "room:create",
@@ -675,6 +668,10 @@ export function registerHandlers(io: IOServer): void {
         "publicRooms:join",
         "publicRooms:watch",
       ];
+      if (socket.data.profileAuthBusy && membershipEvents.includes(event)) {
+        socket.emit("room:error", { message: "Дождитесь завершения входа или выхода из аккаунта" });
+        return;
+      }
       if (isDeploymentDraining() && membershipEvents.includes(event)) {
         socket.emit("room:kicked", {
           message: DEPLOYMENT_STOP_MESSAGE,
@@ -1383,7 +1380,7 @@ export function registerHandlers(io: IOServer): void {
         return;
       }
       const roomCode = info.roomCode;
-      void executeInRoom(roomCode, () => {
+      void executeInRoom(roomCode, async () => {
         const current = getCurrentSocketMembership(socket);
         const room = getRoom(roomCode);
         if (
@@ -1395,7 +1392,7 @@ export function registerHandlers(io: IOServer): void {
         ) {
           return;
         }
-        const result = dispatchRoomCommand(room, current.playerId, data, io, {
+        const result = await dispatchRoomCommand(room, current.playerId, data, io, {
           resolveSeatClaim: (requestId, approved) =>
             resolveSeatClaimCommand(socket, room, current.playerId, requestId, approved, io),
         });

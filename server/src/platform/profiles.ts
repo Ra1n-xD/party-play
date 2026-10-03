@@ -19,7 +19,8 @@ import {
   profileStorageHealthy,
   profileTransaction as transaction,
 } from "./profileStorage.js";
-import { profileRoom, registerProfileAuthHandlers } from "./profileAuth.js";
+import { assertProfileSession, profileRoom, registerProfileAuthHandlers } from "./profileAuth.js";
+import { guardProfileRequest } from "./profileRateLimit.js";
 import { getAllRooms, type Player, type Room } from "./roomManager.js";
 
 import { registerLeaderboardHandlers } from "./leaderboard.js";
@@ -93,31 +94,47 @@ function publishProfile(key: string, io: IOServer): void {
   const profile = profileStore.profiles.get(key);
   if (profile) io.to(profileRoom(key)).emit("profile:snapshot", profile);
 }
-export function equipProfileItem(key: string, itemId: string, io: IOServer): ProfileSnapshot {
+export async function equipProfileItem(
+  key: string,
+  itemId: string,
+  io: IOServer,
+  assertAllowed: () => void,
+): Promise<ProfileSnapshot> {
   const item = getCosmetic(itemId);
-  const profile = profileStore.profiles.get(key);
-  if (!item || !profile?.inventory[itemId])
-    throw new Error("Этот предмет ещё не открыт. Найдите его в кейсе");
-  for (const room of getAllRooms().values()) {
-    if (
-      room.lifecycle === "playing" &&
-      [...room.players.values()].some(
-        (player) => player.profileKey === key && !player.kicked && !player.voluntarilyLeft,
+  let changed = false;
+  await transaction([key], (draft) => {
+    assertAllowed();
+    const current = draft.profiles.get(key);
+    if (!item || !current?.inventory[itemId])
+      throw new Error("Этот предмет ещё не открыт. Найдите его в кейсе");
+    if (`${item.kind}:${current.equipped[item.kind]}` === item.id) return false;
+    for (const room of getAllRooms().values()) {
+      if (
+        room.lifecycle === "playing" &&
+        [...room.players.values()].some(
+          (player) => player.profileKey === key && !player.kicked && !player.voluntarilyLeft,
+        )
       )
-    )
-      throw new Error("Сменить скин можно после завершения партии");
-  }
-  transaction(() => {
-    const current = profileStore.profiles.get(key)!;
+        throw new Error("Сменить скин можно после завершения партии");
+    }
     if (item.kind === "avatar") current.equipped.avatar = item.avatarId!;
     else current.equipped[item.kind] = item.cardSkinId!;
+    changed = true;
   });
+  if (!changed) return profileStore.profiles.get(key)!;
   publishProfile(key, io);
-  for (const room of getAllRooms().values())
+  for (const room of getAllRooms().values()) {
+    // A game may have started while the disk write was in flight. Keep its chosen cosmetics.
+    if (room.lifecycle === "playing") continue;
+    let affected = false;
     for (const player of room.players.values()) {
-      if (player.profileKey === key && !player.kicked && !player.voluntarilyLeft)
+      if (player.profileKey === key && !player.kicked && !player.voluntarilyLeft) {
         applyProfileToPlayer(player);
+        affected = true;
+      }
     }
+    if (affected) getServerGameModule(room.gameId)?.publish(room, io);
+  }
   return profileStore.profiles.get(key)!;
 }
 
@@ -125,16 +142,9 @@ export function registerProfileHandlers(
   socket: IOSocket,
   io: IOServer,
   membershipNickname: () => string | null,
-  publishRooms: () => void,
 ): void {
   registerLeaderboardHandlers(socket);
-  let requests: number[] = [];
-  const guard = () => {
-    const now = Date.now();
-    requests = requests.filter((time) => now - time < 60_000);
-    if (requests.length >= 40) throw new Error("Слишком много действий. Подождите минуту");
-    requests.push(now);
-  };
+  const guard = () => guardProfileRequest(socket);
   socket.on("drops:subscribe", () => {
     const key = socket.data.profileKey as string | undefined;
     if (!key || !profileStore.profiles.has(key)) return;
@@ -150,20 +160,22 @@ export function registerProfileHandlers(
     socket.leave(DROP_FEED_ROOM);
   });
   registerProfileAuthHandlers(socket, io, membershipNickname);
-  socket.on("profile:equip", (data, reply) => {
+  socket.on("profile:equip", async (data, reply) => {
     if (typeof reply !== "function") return;
     try {
       guard();
       if (!socket.data.profileKey || typeof data?.itemId !== "string")
         throw new Error("Сначала войдите в аккаунт");
-      const profile = equipProfileItem(socket.data.profileKey, data.itemId, io);
-      publishRooms();
+      const key = socket.data.profileKey as string;
+      const profile = await equipProfileItem(key, data.itemId, io, () =>
+        assertProfileSession(socket, key),
+      );
       reply({ ok: true, value: profile });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });
     }
   });
-  socket.on("profile:open-case", (data, reply) => {
+  socket.on("profile:open-case", async (data, reply) => {
     if (typeof reply !== "function") return;
     try {
       guard();
@@ -172,48 +184,57 @@ export function registerProfileHandlers(
       if (!key || !profileStore.profiles.has(key)) throw new Error("Сначала войдите в аккаунт");
       if (typeof requestId !== "string" || !/^[a-f0-9-]{36}$/.test(requestId))
         throw new Error("Некорректный запрос открытия");
-      const existing = profileStore.profiles
-        .get(key)!
-        .recentOpenings.find((opening) => opening.requestId === requestId);
-      if (existing)
-        return reply({
-          ok: true,
-          value: { profile: profileStore.profiles.get(key)!, opening: existing },
-        });
-      if (profileStore.profiles.get(key)!.coins < CASE_COST)
-        throw new Error("Недостаточно монет. Завершите партию, чтобы получить монету");
-      const roll = randomInt(100);
-      let cumulative = 0;
-      const rarity = Object.entries(RARITIES).find(([, definition]) => {
-        cumulative += definition.chance;
-        return roll < cumulative;
-      })![0];
-      const pool = CASE_ITEMS.filter((item) => item.rarity === rarity);
-      const item = pool[randomInt(pool.length)];
-      const opening: CaseOpening = {
-        requestId,
-        itemId: item.id,
-        duplicate: !!profileStore.profiles.get(key)!.inventory[item.id],
-        openedAt: Date.now(),
-      };
-      transaction(() => {
-        const profile = profileStore.profiles.get(key)!;
+      let opening!: CaseOpening;
+      let created = false;
+      await transaction([key], (draft) => {
+        assertProfileSession(socket, key);
+        const profile = draft.profiles.get(key)!;
+        const existing = profile.recentOpenings.find((entry) => entry.requestId === requestId);
+        if (existing) {
+          opening = existing;
+          return false;
+        }
+        if (profile.coins < CASE_COST)
+          throw new Error("Недостаточно монет. Завершите партию, чтобы получить монету");
+        const roll = randomInt(100);
+        let cumulative = 0;
+        const rarity = Object.entries(RARITIES).find(([, definition]) => {
+          cumulative += definition.chance;
+          return roll < cumulative;
+        })![0];
+        const pool = CASE_ITEMS.filter((item) => item.rarity === rarity);
+        const item = pool[randomInt(pool.length)];
+        opening = {
+          requestId,
+          itemId: item.id,
+          duplicate: !!profile.inventory[item.id],
+          openedAt: Date.now(),
+        };
         profile.coins -= CASE_COST;
         profile.inventory[item.id] = (profile.inventory[item.id] ?? 0) + 1;
         profile.recentOpenings.unshift(opening);
         profile.recentOpenings = profile.recentOpenings.slice(0, 100);
+        created = true;
       });
-      publishProfile(key, io);
-      publishDrop(
-        makeDrop(profileStore.profiles.get(key)!, "case", requestId, item.id, opening.openedAt),
-        io,
-      );
+      if (created) {
+        publishProfile(key, io);
+        publishDrop(
+          makeDrop(
+            profileStore.profiles.get(key)!,
+            "case",
+            requestId,
+            opening.itemId,
+            opening.openedAt,
+          ),
+          io,
+        );
+      }
       reply({ ok: true, value: { profile: profileStore.profiles.get(key)!, opening } });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });
     }
   });
-  socket.on("profile:upgrade", (data, reply) => {
+  socket.on("profile:upgrade", async (data, reply) => {
     if (typeof reply !== "function") return;
     try {
       guard();
@@ -222,32 +243,38 @@ export function registerProfileHandlers(
       if (!key || !profile) throw new Error("Сначала войдите в аккаунт");
       if (typeof data?.requestId !== "string" || !/^[a-f0-9-]{36}$/.test(data.requestId))
         throw new Error("Некорректный запрос улучшения");
-      const existing = profile.recentUpgrades?.find(
-        (attempt) => attempt.requestId === data.requestId,
-      );
-      if (existing) return reply({ ok: true, value: { profile, attempt: existing } });
       const quote = getUpgradeQuote(data.inputs, data.targetItemId);
       if (!quote) throw new Error("Выберите от 1 до 5 предметов и более ценную цель");
-      for (const input of data.inputs) {
-        const item = getCosmetic(input.itemId)!;
-        const protectedCopy = `${item.kind}:${profile.equipped[item.kind]}` === item.id ? 1 : 0;
-        if ((profile.inventory[item.id] ?? 0) - protectedCopy < input.count)
-          throw new Error(
-            "Предметов недостаточно. Используемый экземпляр защищён: сначала смените его в коллекции",
-          );
-      }
-      const roll = randomInt(10_000);
-      const attempt: UpgradeAttempt = {
-        requestId: data.requestId,
-        inputs: data.inputs.map(({ itemId, count }) => ({ itemId, count })),
-        targetItemId: data.targetItemId,
-        ...quote,
-        roll,
-        success: roll < quote.chanceBasisPoints,
-        createdAt: Date.now(),
-      };
-      transaction(() => {
-        const current = profileStore.profiles.get(key)!;
+      let attempt!: UpgradeAttempt;
+      let created = false;
+      await transaction([key], (draft) => {
+        assertProfileSession(socket, key);
+        const current = draft.profiles.get(key)!;
+        const existing = current.recentUpgrades?.find(
+          (entry) => entry.requestId === data.requestId,
+        );
+        if (existing) {
+          attempt = existing;
+          return false;
+        }
+        for (const input of data.inputs) {
+          const item = getCosmetic(input.itemId)!;
+          const protectedCopy = `${item.kind}:${current.equipped[item.kind]}` === item.id ? 1 : 0;
+          if ((current.inventory[item.id] ?? 0) - protectedCopy < input.count)
+            throw new Error(
+              "Предметов недостаточно. Используемый экземпляр защищён: сначала смените его в коллекции",
+            );
+        }
+        const roll = randomInt(10_000);
+        attempt = {
+          requestId: data.requestId,
+          inputs: data.inputs.map(({ itemId, count }) => ({ itemId, count })),
+          targetItemId: data.targetItemId,
+          ...quote,
+          roll,
+          success: roll < quote.chanceBasisPoints,
+          createdAt: Date.now(),
+        };
         for (const input of attempt.inputs) {
           current.inventory[input.itemId] -= input.count;
           if (!current.inventory[input.itemId]) delete current.inventory[input.itemId];
@@ -258,9 +285,10 @@ export function registerProfileHandlers(
           current.inventory[attempt.targetItemId] = count;
         }
         current.recentUpgrades = [attempt, ...(current.recentUpgrades ?? [])].slice(0, 100);
+        created = true;
       });
-      publishProfile(key, io);
-      if (attempt.success)
+      if (created) publishProfile(key, io);
+      if (created && attempt.success)
         publishDrop(
           makeDrop(
             profileStore.profiles.get(key)!,
@@ -282,26 +310,28 @@ interface ProfileRound {
   id: string;
   players: Map<string, string>;
   paid: boolean;
+  paying?: boolean;
   rewardKeys?: Set<string>;
   winnerKeys?: Set<string>;
   retry?: NodeJS.Timeout;
 }
 const rounds = new WeakMap<Room, ProfileRound>();
-function payRound(round: ProfileRound, io: IOServer): void {
-  if (round.paid || !round.rewardKeys) return;
+async function payRound(round: ProfileRound, io: IOServer): Promise<void> {
+  if (round.paid || round.paying || !round.rewardKeys) return;
+  round.paying = true;
   const keys = round.rewardKeys;
   try {
-    if (!profileStore.rewardedMatches.has(round.id))
-      transaction(() => {
-        for (const key of keys) {
-          const profile = profileStore.profiles.get(key);
-          if (!profile) continue;
-          profile.coins += GAME_REWARD;
-          profile.completedGames += 1;
-          if (round.winnerKeys?.has(key)) profile.wins += 1;
-        }
-        profileStore.rewardedMatches.add(round.id);
-      });
+    await transaction([...keys], (draft) => {
+      if (draft.rewardedMatches.has(round.id)) return false;
+      for (const key of keys) {
+        const profile = draft.profiles.get(key);
+        if (!profile) continue;
+        profile.coins += GAME_REWARD;
+        profile.completedGames += 1;
+        if (round.winnerKeys?.has(key)) profile.wins += 1;
+      }
+      draft.rewardedMatches.add(round.id);
+    });
     round.paid = true;
     clearTimeout(round.retry);
     for (const key of keys) publishProfile(key, io);
@@ -310,9 +340,11 @@ function payRound(round: ProfileRound, io: IOServer): void {
     console.warn("Game reward could not be persisted; retrying shortly.");
     round.retry = setTimeout(() => {
       round.retry = undefined;
-      payRound(round, io);
+      void payRound(round, io);
     }, 5000);
     round.retry.unref();
+  } finally {
+    round.paying = false;
   }
 }
 export function syncRoomProfileRewards(room: Room, io: IOServer): void {
@@ -364,5 +396,5 @@ export function syncRoomProfileRewards(room: Room, io: IOServer): void {
       if (winners.has(id)) round.winnerKeys.add(key);
     }
   }
-  payRound(round, io);
+  void payRound(round, io);
 }
