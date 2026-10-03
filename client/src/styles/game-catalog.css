@@ -70,8 +70,13 @@
 
 .show-catalog-art .show-art {
   --show-unit: min(calc(100cqh / 240), calc(100cqw / 350));
-  height: 100%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(350 * var(--show-unit));
+  height: calc(240 * var(--show-unit));
   min-height: 0;
+  transform: translate(-50%, -50%);
 }
 
 .show-catalog-art[data-game="bunker"] {

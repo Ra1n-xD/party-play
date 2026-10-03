@@ -34,18 +34,40 @@ export function UpdatesScreen() {
             <span className="updates-current">Сейчас v{__APP_VERSION__}</span>
           </header>
           <div className="updates-layout">
-            <nav className="updates-versions" aria-label="Версии обновлений">
-              <span>Главные обновления</span>
-              {releaseHighlights.map((release) => (
-                <a key={release.id} href={`#${release.id}`}>
-                  <strong>{release.version}</strong>
-                  <small>{release.category}</small>
-                </a>
-              ))}
-            </nav>
+            <aside className="updates-navigation">
+              <label className="updates-version-picker">
+                Перейти к версии
+                <select
+                  defaultValue=""
+                  onChange={(event) => {
+                    if (event.target.value) window.location.hash = event.target.value;
+                  }}
+                >
+                  <option value="" disabled>
+                    Выберите обновление
+                  </option>
+                  {releaseHighlights.map((release) => (
+                    <option key={release.id} value={release.id}>
+                      {release.version} · {release.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <nav className="updates-versions" aria-label="Версии обновлений">
+                <span>Главные обновления</span>
+                {releaseHighlights.map((release) => (
+                  <a key={release.id} href={`#${release.id}`}>
+                    <strong>{release.version}</strong>
+                    <small>{release.category}</small>
+                  </a>
+                ))}
+              </nav>
+            </aside>
             <div className="updates-releases">
               <p className="updates-archive-note">
-                Скриншоты показывают интерфейс на момент каждого обновления.
+                История с первой версии. Собрали заметные изменения, пропустили мелкие правки.
+                Сохранившиеся скриншоты показывают интерфейс того времени; восстановленные по
+                исходникам отмечены отдельно.
               </p>
               {releaseHighlights.map((release, index) => (
                 <article className="updates-release" key={release.id} id={release.id}>
@@ -61,31 +83,33 @@ export function UpdatesScreen() {
                       <li key={change}>{change}</li>
                     ))}
                   </ul>
-                  <div className="updates-gallery">
-                    {release.screenshots.map((shot) => (
-                      <figure key={shot.src}>
-                        <button
-                          type="button"
-                          className="updates-screenshot"
-                          aria-label={`Увеличить скриншот: ${shot.caption}`}
-                          onClick={() => setScreenshot(shot)}
-                        >
-                          <img
-                            src={shot.src}
-                            alt={shot.alt}
-                            width={shot.width}
-                            height={shot.height}
-                            loading={index === 0 ? "eager" : "lazy"}
-                            decoding="async"
-                          />
-                          <span>
-                            <FiMaximize2 aria-hidden="true" /> Увеличить
-                          </span>
-                        </button>
-                        <figcaption>{shot.caption}</figcaption>
-                      </figure>
-                    ))}
-                  </div>
+                  {release.screenshots.length > 0 && (
+                    <div className="updates-gallery">
+                      {release.screenshots.map((shot) => (
+                        <figure key={shot.src}>
+                          <button
+                            type="button"
+                            className="updates-screenshot"
+                            aria-label={`Увеличить скриншот: ${shot.caption}`}
+                            onClick={() => setScreenshot(shot)}
+                          >
+                            <img
+                              src={shot.src}
+                              alt={shot.alt}
+                              width={shot.width}
+                              height={shot.height}
+                              loading={index === 0 ? "eager" : "lazy"}
+                              decoding="async"
+                            />
+                            <span>
+                              <FiMaximize2 aria-hidden="true" /> Увеличить
+                            </span>
+                          </button>
+                          <figcaption>{shot.caption}</figcaption>
+                        </figure>
+                      ))}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
