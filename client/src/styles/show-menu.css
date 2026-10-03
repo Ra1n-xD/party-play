@@ -66,6 +66,62 @@
   margin: 0 auto;
 }
 
+.show-menu-ambience {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.show-menu-ambience::before,
+.show-menu-ambience::after {
+  content: "";
+  position: absolute;
+  inset: -8%;
+}
+
+.show-menu-ambience::before {
+  background:
+    radial-gradient(ellipse at 18% 35%, #c596ec1c, transparent 45%),
+    radial-gradient(
+      ellipse at 80% 72%,
+      color-mix(in srgb, var(--show-accent) 7%, transparent),
+      transparent 42%
+    );
+  animation: show-menu-glow-drift 22s ease-in-out infinite alternate;
+}
+
+.show-menu-ambience::after {
+  background:
+    radial-gradient(circle at 12% 22%, #e3aff644 0 1px, transparent 3px),
+    radial-gradient(circle at 34% 62%, #fff8e826 0 1px, transparent 3px),
+    radial-gradient(circle at 58% 12%, #e3aff638 0 1px, transparent 3px),
+    radial-gradient(circle at 73% 82%, #e3aff63d 0 1px, transparent 3px),
+    radial-gradient(circle at 88% 42%, #fff8e82e 0 1px, transparent 3px);
+  animation: show-menu-particles-drift 28s ease-in-out infinite alternate;
+}
+
+@keyframes show-menu-glow-drift {
+  from {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(3%, 2%, 0) scale(1.04);
+  }
+}
+
+@keyframes show-menu-particles-drift {
+  from {
+    transform: translate3d(-10px, 12px, 0);
+    opacity: 0.45;
+  }
+  to {
+    transform: translate3d(12px, -18px, 0);
+    opacity: 0.8;
+  }
+}
+
 .is-main-menu .show-menu-shell,
 .is-game-menu .show-menu-shell {
   display: flex;
@@ -2527,6 +2583,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .show-menu-ambience::before,
+  .show-menu-ambience::after {
+    animation: none;
+  }
+
   .show-menu *,
   .show-menu *::before,
   .show-menu *::after {
