@@ -26,19 +26,6 @@
   text-align: left;
   pointer-events: none;
 }
-.uno3d-notice {
-  position: absolute;
-  left: 22px;
-  top: 297px;
-  max-width: 220px;
-  padding: 10px 12px;
-  background: #1d2928dd;
-  border: 1px solid #c6b58140;
-  color: #ecd8a5;
-  border-radius: 5px;
-  font-size: 0.72rem;
-  pointer-events: none;
-}
 .uno3d-return {
   position: absolute;
   z-index: 5;
@@ -58,13 +45,6 @@
   }
   .uno3d-information strong {
     font-size: 0.68rem;
-  }
-  .uno3d-notice {
-    left: 10px;
-    top: 245px;
-    max-width: 47%;
-    font-size: 0.6rem;
-    padding: 7px;
   }
   .uno3d-discard-label {
     top: 201px;

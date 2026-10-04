@@ -43,6 +43,12 @@ import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
 import { useTableHotkeys } from "../shared/table3d/useTableHotkeys";
 import { useTableActionDock } from "../shared/table3d/useTableActionDock";
+import { useTableCardPointer } from "../shared/table3d/useTableCardPointer";
+import { clockwiseOpponents } from "../shared/cardSeatOrder";
+import { useCardGameAudio } from "../shared/useCardGameAudio";
+import { CardGameSoundButton } from "../shared/CardGameSoundButton";
+import { CardTurnNotice } from "../shared/CardTurnNotice";
+import "../shared/card-game-notices.css";
 import {
   DurakCard,
   DurakCardBack,
@@ -353,6 +359,11 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
     connected && reconnectState === "connected" && viewerSeat?.controllerKind === "human";
   const canDrag = Boolean(privateGame && canUseConnection && !is3D);
   const canAct = Boolean(privateGame && canUseConnection && !paused && !commandPending);
+  const sound = useCardGameAudio(
+    game?.visualEvents ?? [],
+    Boolean(is3D && viewerSeatId && game?.currentActorSeatId === viewerSeatId && canUseConnection),
+    paused || !connected,
+  );
   const playableCardIds = getLegalPlayableIds(legalAction);
   const displayedHand = useMemo(
     () =>
@@ -395,6 +406,30 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
     },
     true,
   );
+  const playSelected = () => {
+    if (!canAct) return;
+    if (legalAction?.type === "defend" && selectedCards[0] && focusedTarget)
+      defendSelected(focusedTarget);
+    else if (selectedCards[0]) activateHandCard(selectedCards[0]);
+  };
+  useTableCardPointer({
+    enabled: is3D && !managementOpen,
+    cursorVisible,
+    step: (direction) => {
+      const index = Math.max(
+        0,
+        displayedHand.findIndex((card) => card.id === focusedCard?.id),
+      );
+      if (displayedHand.length)
+        setFocusedCardId(
+          displayedHand[(index + direction + displayedHand.length) % displayedHand.length].id,
+        );
+    },
+    select: () => {
+      if (focusedCard) selectHandCard(focusedCard);
+    },
+    play: playSelected,
+  });
   useDurakKeyboard({
     enabled: is3D && !managementOpen,
     canAct,
@@ -405,11 +440,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
     focusedTargetId: focusedTarget,
     focusTarget: setFocusedTargetId,
     selectCard: (card) => selectHandCard(card),
-    play: () => {
-      if (legalAction?.type === "defend" && selectedCards[0] && focusedTarget)
-        defendSelected(focusedTarget);
-      else if (selectedCards[0]) activateHandCard(selectedCards[0]);
-    },
+    play: playSelected,
     secondary: () => {
       if (canAct && secondaryAction) sendGameCommand("durak", { type: secondaryAction });
     },
@@ -669,9 +700,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
   const viewerPlayer = viewerSeatId
     ? (orderedPlayers.find((player) => player.seatId === viewerSeatId) ?? null)
     : null;
-  const opponentPlayers = viewerPlayer
-    ? orderedPlayers.filter((player) => player.seatId !== viewerPlayer.seatId)
-    : orderedPlayers;
+  const opponentPlayers = clockwiseOpponents(orderedPlayers, viewerSeatId);
   const turnTimeoutMs =
     snapshot.settings.turnTimeoutSeconds == null
       ? null
@@ -829,6 +858,14 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
         className="card-game-arena durak-arena"
         style={{ "--opponent-count": Math.max(1, opponentPlayers.length) } as CSSProperties}
       >
+        <CardTurnNotice
+          visible={is3D && sound.turnNotice && !paused}
+          label={
+            game.currentActorSeatId === viewerSeatId && legalAction?.type === "defend"
+              ? "Вы защищаетесь"
+              : "Ваш ход"
+          }
+        />
         {is3D ? (
           <Suspense
             fallback={
@@ -1178,6 +1215,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                 onToggle={() => setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit"))}
               />
             )}
+            <CardGameSoundButton enabled={sound.enabled} onToggle={sound.toggle} />
             <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
             {isHost && (
               <button

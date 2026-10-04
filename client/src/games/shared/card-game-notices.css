@@ -1,0 +1,136 @@
+.card-game-turn-notice {
+  position: absolute;
+  z-index: 48;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 12px 24px;
+  border: 1px solid #9affc3;
+  border-radius: 12px;
+  background: #153c2bef;
+  box-shadow: 0 8px 30px #0008;
+  color: #ccffdf;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-align: center;
+  pointer-events: none;
+}
+.uno-notices {
+  position: absolute;
+  z-index: 47;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 8px;
+  width: min(440px, calc(100% - 24px));
+  pointer-events: none;
+}
+.card-game-turn-notice + .uno-notices {
+  top: 72px;
+}
+.uno-notice,
+.uno-event-notice {
+  display: grid;
+  gap: 7px;
+  padding: 12px 16px;
+  border: 1px solid #e8d39a;
+  border-radius: 12px;
+  background: #242a29f2;
+  box-shadow: 0 8px 30px #0008;
+  color: #fff6dc;
+  overflow-wrap: anywhere;
+}
+.uno-notice strong {
+  font-size: 1.1rem;
+}
+.uno-notice span {
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.uno-notice.is-required {
+  border: 2px solid #f4dc76;
+  background: #40351bf2;
+}
+.uno-notice-actions {
+  display: flex;
+  gap: 8px;
+}
+.uno-notice .btn {
+  pointer-events: auto;
+  min-height: 36px;
+  padding: 8px 12px;
+  flex: 1;
+}
+.uno-event-notice {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.game-2d .uno-notices {
+  top: calc(var(--card-seat-size) + 62px);
+}
+.card-game-sound svg {
+  width: 16px;
+  height: 16px;
+}
+@media (max-width: 680px), (pointer: coarse) {
+  .card-game-turn-notice {
+    top: 55px;
+    padding: 8px 16px;
+    font-size: 1rem;
+  }
+  .uno-notices {
+    top: 55px;
+    gap: 6px;
+    width: calc(100% - 20px);
+    max-height: 40%;
+    overflow-y: auto;
+    pointer-events: auto;
+  }
+  .card-game-turn-notice + .uno-notices {
+    top: 100px;
+  }
+  .uno-notice,
+  .uno-event-notice {
+    padding: 9px 12px;
+    gap: 5px;
+  }
+  .uno-notice strong {
+    font-size: 0.95rem;
+  }
+  .uno-notice span,
+  .uno-event-notice {
+    font-size: 0.72rem;
+  }
+  .uno-notice .btn {
+    min-height: 34px;
+    font-size: 0.73rem;
+  }
+  .is-3d:has(.uno-notice, .uno-event-notice, .card-game-turn-notice)
+    :is(.table3d-information, .table3d-turn-indicator, .uno3d-discard-label) {
+    visibility: hidden;
+  }
+  .is-3d:has(.uno-notice, .uno-event-notice, .card-game-turn-notice) .table3d-toolbar {
+    top: 8px;
+  }
+  .game-2d .uno-notices {
+    top: calc(var(--card-seat-size) + 53px);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .card-game-turn-notice,
+  .uno-event-notice {
+    animation: card-notice-in 200ms ease-out;
+  }
+  @keyframes card-notice-in {
+    from {
+      opacity: 0;
+      translate: 0 -6px;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+}

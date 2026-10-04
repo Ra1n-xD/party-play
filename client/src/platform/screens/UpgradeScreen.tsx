@@ -10,9 +10,9 @@ import {
 } from "react-icons/fi";
 import {
   CASE_ITEMS,
-  COSMETICS,
   COSMETIC_KIND_NAMES,
   RARITIES,
+  compareCosmetics,
   getCosmetic,
   isCosmeticInUse,
   type Cosmetic,
@@ -37,6 +37,42 @@ import "../../styles/upgrades.css";
 const formatChance = (value: number) =>
   (value / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 });
 const formatValue = (value: number) => value.toLocaleString("ru-RU");
+type ItemFilter = CosmeticKind | "all";
+function TypeFilters({
+  value,
+  onChange,
+  disabled,
+  label,
+}: {
+  value: ItemFilter;
+  onChange: (value: ItemFilter) => void;
+  disabled: boolean;
+  label: string;
+}) {
+  return (
+    <nav className="upgrade-filters" aria-label={label}>
+      {(["all", "avatar", "durak", "uno", "reaction"] as const).map((kind) => (
+        <button
+          type="button"
+          key={kind}
+          aria-pressed={value === kind}
+          onClick={() => onChange(kind)}
+          disabled={disabled}
+        >
+          {kind === "all"
+            ? "Все"
+            : kind === "avatar"
+              ? "Персонажи"
+              : kind === "durak"
+                ? "Дурак"
+                : kind === "uno"
+                  ? "UNO"
+                  : "Эмоции"}
+        </button>
+      ))}
+    </nav>
+  );
+}
 
 function ItemCard({
   item,
@@ -68,6 +104,7 @@ export function UpgradeScreen() {
   const [inputs, setInputs] = useState<UpgradeInput[]>([]);
   const [targetId, setTargetId] = useState<string | null>(null);
   const [filter, setFilter] = useState<CosmeticKind | "all">("all");
+  const [inputFilter, setInputFilter] = useState<ItemFilter>("all");
   const [multiplier, setMultiplier] = useState(2);
   const [attempt, setAttempt] = useState<UpgradeAttempt | null>(null);
   const [phase, setPhase] = useState<"idle" | "request" | "spin" | "result">("idle");
@@ -119,17 +156,18 @@ export function UpgradeScreen() {
   const inactive = phase !== "idle" || !!pendingUpgrade;
   const visibleProfile =
     phase === "request" || phase === "spin" ? (previewProfile ?? profile) : profile;
-  const owned = COSMETICS.filter(
-    (item) =>
-      visibleProfile.inventory[item.id] &&
-      (item.rarity !== "basic" || getUpgradeAvailableCount(visibleProfile, item) > 0),
+  const owned = CASE_ITEMS.filter((item) => visibleProfile.inventory[item.id]).sort(
+    compareCosmetics,
   );
+  const filteredOwned = owned.filter((item) => inputFilter === "all" || item.kind === inputFilter);
   const filtered = CASE_ITEMS.filter((item) => filter === "all" || item.kind === filter);
-  const targets = filtered.filter(
-    (item) =>
-      UPGRADE_VALUES[item.rarity] > inputValue &&
-      UPGRADE_VALUES[item.rarity] >= inputValue * multiplier,
-  );
+  const targets = filtered
+    .filter(
+      (item) =>
+        UPGRADE_VALUES[item.rarity] > inputValue &&
+        UPGRADE_VALUES[item.rarity] >= inputValue * multiplier,
+    )
+    .sort(compareCosmetics);
   const equipped = target && isCosmeticInUse(profile, target);
 
   const add = (item: Cosmetic) => {
@@ -395,19 +433,25 @@ export function UpgradeScreen() {
           <div className="upgrade-catalog-heading">
             <div>
               <span className="profile-eyebrow">ОТДАЁТЕ</span>
-              <h2 id="upgrade-inventory-title">Ваш инвентарь</h2>
+              <h2 id="upgrade-inventory-title">Ваши предметы</h2>
             </div>
             <span>
               {selectedCount} / {MAX_UPGRADE_ITEMS}
             </span>
           </div>
           <p className="upgrade-catalog-note">
-            Базовые дубликаты можно улучшать: одна копия каждого базового предмета всегда остаётся у
-            вас. Используемые скины и последняя копия каждой эмоции тоже защищены.
+            Базовые предметы не участвуют в улучшении. Используемые скины и последняя копия каждой
+            эмоции защищены.
           </p>
-          {owned.length ? (
+          <TypeFilters
+            value={inputFilter}
+            onChange={setInputFilter}
+            disabled={inactive}
+            label="Тип ваших предметов"
+          />
+          {filteredOwned.length ? (
             <div className="upgrade-grid">
-              {owned.map((item) => {
+              {filteredOwned.map((item) => {
                 const selected = shownInputs.find((input) => input.itemId === item.id)?.count ?? 0;
                 const count = available(item);
                 return (
@@ -424,11 +468,9 @@ export function UpgradeScreen() {
                         <span>
                           {count
                             ? `Доступно: ${count}`
-                            : item.rarity === "basic"
-                              ? "Базовая копия защищена"
-                              : item.kind === "reaction"
-                                ? "Последняя копия защищена"
-                                : "Используется"}
+                            : item.kind === "reaction"
+                              ? "Последняя копия защищена"
+                              : "Используется"}
                         </span>
                         <strong>
                           {selected
@@ -444,11 +486,24 @@ export function UpgradeScreen() {
           ) : (
             <div className="upgrade-empty">
               <FiPlus aria-hidden="true" />
-              <h3>Пока нечего улучшать</h3>
-              <p>Откройте кейс, чтобы пополнить коллекцию.</p>
-              <a href="/cases" className="profile-primary">
-                К кейсам <FiArrowUpRight aria-hidden="true" />
-              </a>
+              <h3>{owned.length ? "Нет предметов этого типа" : "Пока нечего улучшать"}</h3>
+              {owned.length ? (
+                <button
+                  type="button"
+                  className="profile-primary"
+                  onClick={() => setInputFilter("all")}
+                  disabled={inactive}
+                >
+                  Показать все предметы
+                </button>
+              ) : (
+                <>
+                  <p>Откройте кейс, чтобы пополнить коллекцию.</p>
+                  <a href="/cases" className="profile-primary">
+                    К кейсам <FiArrowUpRight aria-hidden="true" />
+                  </a>
+                </>
+              )}
             </div>
           )}
         </section>
@@ -460,27 +515,7 @@ export function UpgradeScreen() {
             </div>
             <span>{targets.length} предметов</span>
           </div>
-          <nav className="upgrade-filters" aria-label="Тип цели">
-            {(["all", "avatar", "durak", "uno", "reaction"] as const).map((kind) => (
-              <button
-                type="button"
-                key={kind}
-                aria-pressed={filter === kind}
-                onClick={() => setFilter(kind)}
-                disabled={inactive}
-              >
-                {kind === "all"
-                  ? "Все"
-                  : kind === "avatar"
-                    ? "Персонажи"
-                    : kind === "durak"
-                      ? "Дурак"
-                      : kind === "uno"
-                        ? "UNO"
-                        : "Эмоции"}
-              </button>
-            ))}
-          </nav>
+          <TypeFilters value={filter} onChange={setFilter} disabled={inactive} label="Тип цели" />
           <div className="upgrade-multipliers" aria-label="Минимальная ценность цели">
             <span>От</span>
             {[1, 2, 3, 5, 10].map((value) => (

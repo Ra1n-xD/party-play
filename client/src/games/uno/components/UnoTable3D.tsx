@@ -104,10 +104,10 @@ export default function UnoTable3D(props: Props) {
       shortcuts={
         viewerSeatId
           ? [
-              { label: "Карта", keys: ["A", "D"] },
+              { label: "Карта", keys: ["A", "D", "Колесо"] },
               ...(props.isHost ? [{ label: "Управление", keys: ["H"] }] : []),
-              { label: "Выбрать", keys: ["Пробел"] },
-              { label: "Сыграть / цвет", keys: ["E"] },
+              { label: "Выбрать", keys: ["ЛКМ", "Пробел"] },
+              { label: "Сыграть / цвет", keys: ["ПКМ", "E"] },
               { label: props.secondary, keys: ["F"] },
               { label: "Оспорить +4", keys: ["G"] },
               { label: "Сказать UNO", keys: ["U"] },
@@ -150,17 +150,6 @@ export default function UnoTable3D(props: Props) {
         remainingMs={game.turnRemainingMs}
         revision={props.revision}
       />
-      {(game.pendingWildDrawFour || game.lastChallengeResolution) && (
-        <div className="uno3d-notice" role="status">
-          {game.pendingWildDrawFour
-            ? `Проверка +4 · ${actor?.name ?? "ожидание"} · прежний цвет: ${COLORS[game.pendingWildDrawFour.previousActiveColor]}`
-            : game.lastChallengeResolution?.outcome === "challenge-succeeded"
-              ? "Оспаривание удалось · сыгравший +4 берёт штраф"
-              : game.lastChallengeResolution?.outcome === "challenge-failed"
-                ? "Оспаривание не удалось · штраф +6"
-                : "Штраф +4 принят"}
-        </div>
-      )}
     </RoundTableView>
   );
 }

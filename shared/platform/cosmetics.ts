@@ -130,6 +130,15 @@ export const COSMETIC_KIND_NAMES: Record<CosmeticKind, string> = {
   uno: "Карты UNO",
   reaction: "Эмоции",
 };
+const rarityOrder = Object.keys(RARITIES);
+const kindOrder = Object.keys(COSMETIC_KIND_NAMES);
+export function compareCosmetics(a: Cosmetic, b: Cosmetic): number {
+  return (
+    rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity) ||
+    kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) ||
+    a.name.localeCompare(b.name, "ru")
+  );
+}
 export const GAME_REWARD = 1;
 export const WIN_REWARD = 5;
 export const INITIAL_COINS = 20;

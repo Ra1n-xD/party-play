@@ -1,5 +1,7 @@
 import {
   closeSync,
+  copyFileSync,
+  fchmodSync,
   fsyncSync,
   mkdirSync,
   openSync,
@@ -257,7 +259,8 @@ const hash = /^[0-9a-f]{64}$/;
 function isValidUpgradeAttempt(attempt: UpgradeAttempt): boolean {
   return Boolean(
     attempt &&
-    getUpgradeQuote(attempt.inputs, attempt.targetItemId) &&
+    // Completed attempts keep their original inputs, including legacy basic duplicates.
+    getUpgradeQuote(attempt.inputs, attempt.targetItemId, true) &&
     typeof attempt.requestId === "string" &&
     /^[a-f0-9-]{36}$/.test(attempt.requestId) &&
     Number.isFinite(attempt.createdAt) &&
@@ -304,6 +307,7 @@ try {
       throw new Error("Invalid profile storage");
     const loaded = emptyStore();
     const nicknames = new Set<string>();
+    let normalizedProfiles = 0;
     for (const profile of data.profiles as ProfileSnapshot[]) {
       if (
         !profile ||
@@ -340,6 +344,10 @@ try {
         throw new Error("Invalid daily reward");
       for (const id of BASIC_ITEMS)
         if (!profile.inventory[id]) throw new Error("Missing basic item");
+      if (BASIC_ITEMS.some((id) => profile.inventory[id] !== 1)) {
+        for (const id of BASIC_ITEMS) profile.inventory[id] = 1;
+        normalizedProfiles++;
+      }
       for (const kind of ["avatar", "durak", "uno"] as const)
         if (!profile.inventory[`${kind}:${profile.equipped[kind]}`])
           throw new Error("Invalid equipped item");
@@ -416,6 +424,23 @@ try {
     if (data.rewardedMatches.some((id: unknown) => typeof id !== "string"))
       throw new Error("Invalid reward history");
     loaded.rewardedMatches = new Set(data.rewardedMatches);
+    if (normalizedProfiles) {
+      // Retain the pre-migration store beyond the rolling .bak overwritten by normal writes.
+      // Only migrate after the complete file has passed validation and before serving accounts.
+      const backupPath = `${storagePath}.before-basic-singletons-${Date.now()}.bak`;
+      copyFileSync(storagePath, backupPath);
+      const backupFd = openSync(backupPath, "r+");
+      try {
+        fchmodSync(backupFd, 0o600);
+        fsyncSync(backupFd);
+      } finally {
+        closeSync(backupFd);
+      }
+      writeAtomic(storagePath, serialize(loaded));
+      console.info(
+        `Normalized basic items to one copy for ${normalizedProfiles} profiles; backup saved.`,
+      );
+    }
     profileStore = loaded;
     savedCurrentFormat = true;
   }

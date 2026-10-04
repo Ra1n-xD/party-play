@@ -269,11 +269,15 @@ export default function DurakTable3D({
                 <span>
                   <kbd>A</kbd>
                   <kbd>D</kbd>
+                  <kbd>Колесо</kbd>
                 </span>
               </li>
               <li>
                 <span>Выбрать</span>
-                <kbd>Пробел</kbd>
+                <span>
+                  <kbd>ЛКМ</kbd>
+                  <kbd>Пробел</kbd>
+                </span>
               </li>
               <li className={targetIds.length ? "is-available" : ""}>
                 <span>Цель защиты</span>
@@ -284,7 +288,10 @@ export default function DurakTable3D({
               </li>
               <li>
                 <span>Сыграть</span>
-                <kbd>E</kbd>
+                <span>
+                  <kbd>ПКМ</kbd>
+                  <kbd>E</kbd>
+                </span>
               </li>
               <li>
                 <span>{secondaryLabel}</span>

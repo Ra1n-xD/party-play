@@ -69,7 +69,11 @@ export interface UnoPendingWildDrawFour {
 export interface UnoWindow {
   id: number;
   subjectSeatId: SeatId;
+  protectedRemainingMs: number;
+  canBeCaught: boolean;
 }
+
+export const UNO_DECLARATION_GRACE_MS = 5_000;
 
 export interface UnoChallengeResolution {
   id: number;
@@ -101,6 +105,7 @@ export interface UnoPublicState {
   players: UnoPlayerPublicState[];
   pendingWildDrawFour: UnoPendingWildDrawFour | null;
   unoWindow: UnoWindow | null;
+  unoWindows: UnoWindow[];
   lastChallengeResolution: UnoChallengeResolution | null;
   turnRemainingMs: number | null;
   paused: boolean;

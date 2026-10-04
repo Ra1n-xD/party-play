@@ -1,6 +1,6 @@
 import {
-  COSMETICS,
-  COSMETIC_KIND_NAMES,
+  CASE_ITEMS,
+  compareCosmetics,
   RARITIES,
   type CosmeticKind,
   type Rarity,
@@ -10,7 +10,7 @@ export const CASES = [
   {
     id: "partyplay",
     name: "Кейс PartyPlay",
-    description: "Все предметы игры",
+    description: "Все предметы из кейсов",
     kind: null,
     cost: 1,
   },
@@ -49,24 +49,20 @@ export interface CaseRequest {
   caseId: CaseId;
 }
 export const CASE_RARITY_WEIGHTS: Record<Rarity, number> = {
-  basic: 45,
-  common: 30,
+  basic: 0,
+  common: 75,
   rare: 15,
   epic: 8,
   legendary: 2,
 };
 const rarityOrder = Object.keys(RARITIES);
-const kindOrder = Object.keys(COSMETIC_KIND_NAMES);
 export function getCase(id: unknown) {
   return CASES.find((entry) => entry.id === id);
 }
 export function getCaseItems(id: CaseId) {
   const definition = getCase(id)!;
-  return COSMETICS.filter((item) => !definition.kind || item.kind === definition.kind).sort(
-    (a, b) =>
-      rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity) ||
-      kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) ||
-      a.name.localeCompare(b.name, "ru"),
+  return CASE_ITEMS.filter((item) => !definition.kind || item.kind === definition.kind).sort(
+    compareCosmetics,
   );
 }
 export function getCaseRarities(id: CaseId) {
