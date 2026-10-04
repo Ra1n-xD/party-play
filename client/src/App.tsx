@@ -13,6 +13,7 @@ import { LeaderboardScreen } from "./platform/screens/LeaderboardScreen";
 import { UpdatesScreen } from "./platform/screens/UpdatesScreen";
 import { ProfileHeader } from "./platform/components/ProfileHeader";
 import "./styles/profiles.css";
+import { AppUpdateNotice } from "./platform/components/AppUpdateNotice";
 
 function ProfileApp() {
   const { profile, loading } = useProfile();
@@ -177,6 +178,7 @@ export default function App() {
         </ProfileProvider>
       </PlatformProvider>
       <div className="app-version">v{__APP_VERSION__}</div>
+      <AppUpdateNotice />
     </>
   );
 }

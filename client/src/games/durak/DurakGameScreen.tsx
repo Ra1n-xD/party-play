@@ -29,6 +29,7 @@ import {
 } from "../../platform/components/ReconnectHostControls";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
+import { CardDockUtilities } from "../shared/CardDockUtilities";
 import { GameDockTools } from "../../screens/game/GameDockTools";
 import { CardDragLayer } from "../shared/CardDragLayer";
 import { getCardSkin } from "../../../../shared/platform/cosmetics";
@@ -805,6 +806,25 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
         {!is3D && <GameViewToggle onOpen3D={() => setIs3D(true)} />}
       </GameRoomHeader>
 
+      {!is3D && (
+        <div className="card-game-turn-status" role="status">
+          <strong>
+            {paused
+              ? "Пауза"
+              : legalAction?.type === "defend"
+                ? "Защита"
+                : legalAction?.type === "attack"
+                  ? "Ваш ход"
+                  : legalAction?.type === "throw-in"
+                    ? "Подкидывание"
+                    : actorName
+                      ? `Ход: ${actorName}`
+                      : "Следующий ход"}
+          </strong>
+          <CardTurnClock remainingMs={game.turnRemainingMs} paused={paused} />
+        </div>
+      )}
+
       <div
         className="card-game-arena durak-arena"
         style={{ "--opponent-count": Math.max(1, opponentPlayers.length) } as CSSProperties}
@@ -1150,32 +1170,37 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
       </div>
 
       <aside className="durak-command-dock" aria-label="Игровые действия">
-        {!is3D && (
-          <div className="card-game-turn-status" role="status">
-            <strong>
-              {paused
-                ? "Пауза"
-                : legalAction?.type === "defend"
-                  ? "Защита"
-                  : legalAction?.type === "attack"
-                    ? "Ваш ход"
-                    : legalAction?.type === "throw-in"
-                      ? "Подкидывание"
-                      : actorName
-                        ? `Ход: ${actorName}`
-                        : "Следующий ход"}
-            </strong>
-            <CardTurnClock remainingMs={game.turnRemainingMs} paused={paused} />
-          </div>
-        )}
         <div className="durak-command-actions">
-          {privateGame && (
-            <HandSortButton
-              mode={handSortMode}
-              onToggle={() => setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit"))}
-            />
-          )}
-          <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
+          <CardDockUtilities attention={recoveryAttentionCount}>
+            {privateGame && (
+              <HandSortButton
+                mode={handSortMode}
+                onToggle={() => setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit"))}
+              />
+            )}
+            <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
+            {isHost && (
+              <button
+                type="button"
+                className="btn btn-secondary durak-manage-button"
+                onClick={openManagement}
+                disabled={!canManage}
+                aria-label={
+                  recoveryAttentionCount > 0
+                    ? `Управление комнатой, требует внимания: ${recoveryAttentionCount}`
+                    : "Управление комнатой"
+                }
+                title="Управление комнатой"
+              >
+                <FiSettings aria-hidden="true" />
+                {recoveryAttentionCount > 0 && (
+                  <span className="card-manage-badge" aria-hidden="true">
+                    {recoveryAttentionCount}
+                  </span>
+                )}
+              </button>
+            )}
+          </CardDockUtilities>
           {privateGame && (
             <div className="card-actions-stable" role="group" aria-label="Действия с картами">
               <div className="card-action-slot">
@@ -1220,27 +1245,6 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                 )}
               </div>
             </div>
-          )}
-          {isHost && (
-            <button
-              type="button"
-              className="btn btn-secondary durak-manage-button"
-              onClick={openManagement}
-              disabled={!canManage}
-              aria-label={
-                recoveryAttentionCount > 0
-                  ? `Управление комнатой, требует внимания: ${recoveryAttentionCount}`
-                  : "Управление комнатой"
-              }
-              title="Управление комнатой"
-            >
-              <FiSettings aria-hidden="true" />
-              {recoveryAttentionCount > 0 && (
-                <span className="card-manage-badge" aria-hidden="true">
-                  {recoveryAttentionCount}
-                </span>
-              )}
-            </button>
           )}
         </div>
       </aside>

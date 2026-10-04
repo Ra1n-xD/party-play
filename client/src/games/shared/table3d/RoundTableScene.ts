@@ -116,6 +116,7 @@ export class RoundTableScene {
   private readonly labelSizes = new WeakMap<Element, PersonLabel>();
   private readonly controls: TableLookControls;
   private readonly ownHand: FirstPersonHand;
+  private viewerId: string | null = null;
   private readonly remoteLooks = new Map<string, AvatarLook & { receivedAt: number }>();
   private readonly resizeObserver: ResizeObserver;
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -638,6 +639,7 @@ export class RoundTableScene {
 
   update(state: RoundTableState) {
     const ownIndex = state.people.findIndex((person) => person.id === state.viewerId);
+    this.viewerId = ownIndex >= 0 && !state.people[ownIndex].eliminated ? state.viewerId : null;
     const ownAvatar = getAvatar(state.people[ownIndex]?.avatarId);
     this.ownHand.update(
       ownIndex >= 0
@@ -645,6 +647,7 @@ export class RoundTableScene {
         : [],
       ownAvatar.skin,
       ownAvatar.outfit,
+      this.viewerId,
     );
     this.labelHost.style.setProperty(
       "--table3d-dossier-width",
@@ -794,7 +797,9 @@ export class RoundTableScene {
     this.seenReactions.add(event.eventId);
     if (this.seenReactions.size > 64)
       this.seenReactions.delete(this.seenReactions.values().next().value!);
-    this.avatars.get(event.senderSeatId)?.react(event.reactionId, performance.now());
+    const time = performance.now();
+    this.avatars.get(event.senderSeatId)?.react(event.reactionId, time);
+    if (event.senderSeatId === this.viewerId) this.ownHand.react(event.reactionId, time);
   }
 
   setPaused(paused: boolean) {
@@ -1015,7 +1020,7 @@ export class RoundTableScene {
         !this.paused &&
         !isTableInputBlocked(null),
     );
-    this.ownHand.render(this.renderer, smoothing);
+    this.ownHand.render(this.renderer, smoothing, time, this.paused, this.reducedMotion.matches);
     this.sampleFrames++;
     this.sampleWorkMs += performance.now() - frameStartedAt;
     const sampleDuration = time - this.sampleStartedAt;

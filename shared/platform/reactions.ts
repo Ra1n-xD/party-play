@@ -8,6 +8,7 @@ export const ROOM_REACTIONS = [
   { id: "lucky", label: "Повезло", rarity: "rare", durationMs: 3000 },
   { id: "fire", label: "Огонь", rarity: "epic", durationMs: 3000 },
   { id: "laugh", label: "АХАХАХАХХА", rarity: "legendary", durationMs: 3200 },
+  { id: "mog", label: "могну", rarity: "legendary", durationMs: 3000 },
 ] as const;
 export type RoomReactionId = (typeof ROOM_REACTIONS)[number]["id"];
 export const ROOM_REACTION_IDS = ROOM_REACTIONS.map((reaction) => reaction.id);

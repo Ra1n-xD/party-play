@@ -733,7 +733,8 @@
   touch-action: manipulation;
 }
 .table3d-hand-inputs[inert] .table3d-hand-card,
-.table3d-hand-inputs[inert] .table3d-hand-step {
+.table3d-hand-inputs[inert] .table3d-hand-step,
+.table3d-hand-inputs[inert] .table3d-hand-choose {
   pointer-events: none;
 }
 .table3d-hand-card[aria-disabled="true"] {
@@ -1077,4 +1078,55 @@
 .table3d-person-label:not(.is-active) .table3d-person-turn {
   background: #f2d59b;
   color: #382711;
+}
+
+.table3d-hand-choose {
+  display: none;
+}
+@media (max-width: 680px), (pointer: coarse) {
+  .screen.command-game-screen.card-game-screen.is-3d :is(.durak-command-dock, .uno-command-dock) {
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  }
+  .table3d-hand-choose {
+    position: absolute;
+    bottom: 8px;
+    left: 60px;
+    right: 60px;
+    display: block;
+    height: 44px;
+    padding: 5px 8px;
+    border: 1px solid #c9b57f88;
+    border-radius: 10px;
+    background: #10271df2;
+    color: #fff2d3;
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.3;
+    z-index: 500;
+    pointer-events: auto;
+    touch-action: manipulation;
+  }
+  .table3d-hand-choose[aria-pressed="true"] {
+    background: #655022;
+    border-color: #ffe094;
+  }
+  .table3d-hand-choose:disabled {
+    color: #d1d3ce;
+    background: #17231ee8;
+  }
+  .table3d-hand-step {
+    bottom: 8px;
+    width: 44px;
+    height: 44px;
+    touch-action: manipulation;
+  }
+  .table3d-hand-caption {
+    bottom: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }

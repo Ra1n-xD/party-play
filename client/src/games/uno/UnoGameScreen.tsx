@@ -15,6 +15,7 @@ import {
 } from "../../platform/components/ReconnectHostControls";
 import { usePlatform } from "../../platform/context/PlatformContext";
 import { GameRoomHeader } from "../../screens/game/GameRoomHeader";
+import { CardDockUtilities } from "../shared/CardDockUtilities";
 import { GameDockTools } from "../../screens/game/GameDockTools";
 import { CardDragLayer } from "../shared/CardDragLayer";
 import { getCardSkin } from "../../../../shared/platform/cosmetics";
@@ -505,6 +506,21 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
         {!is3D && <GameViewToggle onOpen3D={() => setIs3D(true)} />}
       </GameRoomHeader>
 
+      {!is3D && (
+        <div className="card-game-turn-status" role="status">
+          <strong>
+            {paused
+              ? "Пауза"
+              : ownWdfResponse
+                ? "Решение по +4"
+                : game.currentActorSeatId === viewerSeatId
+                  ? "Ваш ход"
+                  : `Ход: ${actorName}`}
+          </strong>
+          <CardTurnClock remainingMs={game.turnRemainingMs} paused={paused} />
+        </div>
+      )}
+
       <div
         className="card-game-arena uno-arena"
         style={{ "--opponent-count": Math.max(1, opponentPlayers.length) } as CSSProperties}
@@ -750,28 +766,37 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
       </div>
 
       <aside className="uno-command-dock" aria-label="Игровые действия">
-        {!is3D && (
-          <div className="card-game-turn-status" role="status">
-            <strong>
-              {paused
-                ? "Пауза"
-                : ownWdfResponse
-                  ? "Решение по +4"
-                  : game.currentActorSeatId === viewerSeatId
-                    ? "Ваш ход"
-                    : `Ход: ${actorName}`}
-            </strong>
-            <CardTurnClock remainingMs={game.turnRemainingMs} paused={paused} />
-          </div>
-        )}
         <div className="uno-command-actions">
-          {privateGame && (
-            <HandSortButton
-              mode={handSortMode}
-              onToggle={() => setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit"))}
-            />
-          )}
-          <GameDockTools gameId="uno" gameTitle="UNO" />
+          <CardDockUtilities attention={recoveryAttentionCount}>
+            {privateGame && (
+              <HandSortButton
+                mode={handSortMode}
+                onToggle={() => setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit"))}
+              />
+            )}
+            <GameDockTools gameId="uno" gameTitle="UNO" />
+            {isHost && (
+              <button
+                type="button"
+                className="btn btn-secondary uno-manage-button"
+                onClick={openManagement}
+                disabled={!canManage}
+                aria-label={
+                  recoveryAttentionCount > 0
+                    ? `Управление комнатой, требует внимания: ${recoveryAttentionCount}`
+                    : "Управление комнатой"
+                }
+                title="Управление комнатой"
+              >
+                <FiSettings aria-hidden="true" />
+                {recoveryAttentionCount > 0 && (
+                  <span className="card-manage-badge" aria-hidden="true">
+                    {recoveryAttentionCount}
+                  </span>
+                )}
+              </button>
+            )}
+          </CardDockUtilities>
           {privateGame && (
             <div
               className="card-actions-stable is-uno"
@@ -798,7 +823,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                       else if (selectedCard) playCard(selectedCard);
                     }}
                   >
-                    {legalActions?.canChooseInitialColor ? "Выбрать цвет" : "Сыграть"}
+                    {legalActions?.canChooseInitialColor ? "Цвет" : "Сыграть"}
                     {is3D && <kbd>E</kbd>}
                   </button>
                 ) : null}
@@ -818,18 +843,20 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                     type="button"
                     className="btn btn-secondary"
                     disabled={!canAct}
+                    aria-label="Завершить ход"
                     onClick={() => sendGameCommand("uno", { type: "end-turn" })}
                   >
-                    Завершить ход {is3D && <kbd>F</kbd>}
+                    Готово {is3D && <kbd>F</kbd>}
                   </button>
                 ) : legalActions?.canDraw ? (
                   <button
                     type="button"
                     className="btn btn-secondary"
                     disabled={!canAct}
+                    aria-label="Взять карту"
                     onClick={() => sendGameCommand("uno", { type: "draw-card" })}
                   >
-                    Взять карту {is3D && <kbd>F</kbd>}
+                    Взять {is3D && <kbd>F</kbd>}
                   </button>
                 ) : null}
               </div>
@@ -880,27 +907,6 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                 )}
               </div>
             </div>
-          )}
-          {isHost && (
-            <button
-              type="button"
-              className="btn btn-secondary uno-manage-button"
-              onClick={openManagement}
-              disabled={!canManage}
-              aria-label={
-                recoveryAttentionCount > 0
-                  ? `Управление комнатой, требует внимания: ${recoveryAttentionCount}`
-                  : "Управление комнатой"
-              }
-              title="Управление комнатой"
-            >
-              <FiSettings aria-hidden="true" />
-              {recoveryAttentionCount > 0 && (
-                <span className="card-manage-badge" aria-hidden="true">
-                  {recoveryAttentionCount}
-                </span>
-              )}
-            </button>
           )}
         </div>
       </aside>

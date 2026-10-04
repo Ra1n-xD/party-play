@@ -11,7 +11,13 @@ export function CosmeticPreview({ item }: { item: Cosmetic }) {
     return (
       <div className={`cosmetic-reaction${item.rarity === "legendary" ? " is-legendary" : ""}`}>
         <ReactionIcon id={item.reactionId} />
-        <span>{item.reactionId === "laugh" ? "Смех стоя · со звуком" : "Эмоция за столом"}</span>
+        <span>
+          {item.reactionId === "laugh"
+            ? "Смех стоя · со звуком"
+            : item.reactionId === "mog"
+              ? "Жест вдоль челюсти"
+              : "Эмоция за столом"}
+        </span>
       </div>
     );
   if (item.avatarId)

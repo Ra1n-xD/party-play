@@ -113,6 +113,9 @@ body .command-game-screen .room-reaction-message-copy span {
   .reaction-icon-laugh.is-animated .reaction-art {
     animation: reaction-laugh 0.22s ease-in-out 10 alternate;
   }
+  .reaction-icon-mog.is-animated .reaction-art {
+    animation: reaction-mog 2.4s ease-in-out both;
+  }
   .reaction-icon-good-move.is-animated .reaction-art {
     animation: reaction-approve 1.3s ease-in-out both;
   }
@@ -137,6 +140,16 @@ body .command-game-screen .room-reaction-message-copy span {
   }
   .reaction-icon.is-animated .reaction-spark {
     animation: reaction-spark 0.55s ease-in-out 4;
+  }
+}
+@keyframes reaction-mog {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25%,
+  75% {
+    transform: translateY(-2px) rotate(-8deg);
   }
 }
 @keyframes reaction-laugh {

@@ -1,7 +1,10 @@
 import type { CardSkinId } from "../../../../../shared/platform/cosmetics";
 import * as THREE from "three";
 import { CARD_WIDTH, CARD_HEIGHT, CARD_THICKNESS, type CardMesh } from "./CardGeometry";
-import { HAND_CARD_EDGE_Y, makeAvatarHand, limbBetween, roundedPart } from "./AvatarParts";
+import { HAND_CARD_EDGE_Y, limbBetween, roundedPart } from "./AvatarParts";
+import { makeArticulatedHand } from "./AvatarHand";
+import { FirstPersonReactions, type FirstPersonGrip } from "./FirstPersonReactions";
+import type { RoomReactionId } from "../../../../../shared/platform/reactions";
 
 export interface CardFace {
   skinId?: CardSkinId;
@@ -33,17 +36,23 @@ export class FirstPersonHand {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(48, 1, 0.05, 10);
   private readonly grip = new THREE.Group();
-  private readonly grips: { root: THREE.Group; side: number }[] = [];
+  private readonly grips: FirstPersonGrip[] = [];
+  private readonly reactions = new FirstPersonReactions();
+  private ownerId: string | null = null;
   private gripScale = 1;
   private readonly cards = new Map<string, HeldCard>();
   private readonly inputs = document.createElement("div");
   private readonly caption = document.createElement("div");
   private readonly previous = document.createElement("button");
   private readonly next = document.createElement("button");
+  private readonly choose = document.createElement("button");
   private readonly projectedPoint = new THREE.Vector3();
   private readonly touchControls = window.matchMedia("(pointer: coarse), (max-width: 680px)");
   private readonly gripPoint = new THREE.Vector3();
   private readonly gripOffset = new THREE.Vector3();
+  private readonly elbow = new THREE.Vector3();
+  private readonly armDirection = new THREE.Vector3();
+  private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly corners = [
     new THREE.Vector3(-CARD_WIDTH / 2, CARD_THICKNESS / 2, -CARD_HEIGHT / 2),
     new THREE.Vector3(CARD_WIDTH / 2, CARD_THICKNESS / 2, -CARD_HEIGHT / 2),
@@ -83,7 +92,13 @@ export class FirstPersonHand {
     this.next.setAttribute("aria-label", "Следующая карта");
     this.previous.onclick = () => this.step(-1);
     this.next.onclick = () => this.step(1);
-    this.inputs.append(this.previous, this.caption, this.next);
+    this.choose.type = "button";
+    this.choose.className = "table3d-hand-choose";
+    this.choose.onclick = () => {
+      const card = this.hand.find((item) => item.focused) ?? this.hand[0];
+      if (this.enabled && card?.selectable) this.onSelect(card.id);
+    };
+    this.inputs.append(this.previous, this.caption, this.choose, this.next);
     host.append(this.inputs);
   }
 
@@ -108,29 +123,38 @@ export class FirstPersonHand {
     for (const side of [-1, 1]) {
       const anchor = new THREE.Group();
       this.grip.add(anchor);
-      this.grips.push({ root: anchor, side });
-      const hand = makeAvatarHand(skin, -side, true);
-      anchor.add(hand);
-      const wrist = new THREE.Vector3(0, -0.155, -0.045);
-      limbBetween(
-        anchor,
-        new THREE.Vector3(side * 0.15, -0.45, 0.22),
-        wrist,
+      const hand = makeArticulatedHand(skin, -side, true);
+      const sleeve = limbBetween(
+        this.grip,
+        new THREE.Vector3(),
+        new THREE.Vector3(0, 1, 0),
         0.078,
         sleeveMaterial,
         0.051,
       );
+      this.grips.push({
+        root: anchor,
+        side,
+        hand,
+        sleeve,
+        restPosition: new THREE.Vector3(),
+        restRotation: new THREE.Quaternion(),
+      });
+      anchor.add(hand.root);
+      const wrist = new THREE.Vector3(0, -0.155, -0.045);
       const cuff = roundedPart([0.1, 0.058, 0.082], cuffMaterial, 0.015);
       cuff.position.copy(wrist);
       anchor.add(cuff);
     }
   }
 
-  update(hand: TableHandCard[], skin: number, shirt: number) {
+  update(hand: TableHandCard[], skin: number, shirt: number, ownerId: string | null) {
+    if (this.ownerId !== ownerId) this.reactions.reset();
+    this.ownerId = ownerId;
     this.hand = hand;
     this.inputs.hidden = hand.length === 0;
     this.grip.visible = hand.length > 0;
-    if (hand.length) this.makeGrip(skin, shirt);
+    if (ownerId) this.makeGrip(skin, shirt);
     const ids = new Set(hand.map((card) => card.id));
     this.cards.forEach((entry, id) => {
       if (ids.has(id)) return;
@@ -156,6 +180,11 @@ export class FirstPersonHand {
         button.className = "table3d-hand-card";
         button.oncontextmenu = (event) => event.preventDefault();
         button.dataset.tableHandCard = card.id;
+        button.onpointerdown = (event) => {
+          // Native focus raises a card before touchend and can move its hit area away
+          // from the finger. Select on click, keeping the card still for the whole tap.
+          if (event.pointerType !== "mouse" || this.touchControls.matches) event.preventDefault();
+        };
         button.onpointermove = (event) => {
           if (
             this.enabled &&
@@ -217,7 +246,8 @@ export class FirstPersonHand {
     );
     const spacing = Math.min(0.105 * scale, availableSpan / Math.max(count - 1, 1));
     const angleStep = Math.min(0.085, 0.52 / Math.max(count - 1, 1));
-    const centerY = -halfHeight + 0.105 * scale;
+    const navigationInset = this.touchControls.matches ? 58 : 0;
+    const centerY = -halfHeight + 0.105 * scale + (2 * halfHeight * navigationInset) / this.height;
     this.gripScale = scale;
     this.hand.forEach((card, index) => {
       const entry = this.cards.get(card.id)!;
@@ -246,18 +276,35 @@ export class FirstPersonHand {
     this.caption.textContent = focused
       ? `${focus + 1} / ${this.hand.length} · ${focused.label}${this.hand.some((card) => card.selected) ? ` · выбрано: ${this.hand.filter((card) => card.selected).length}` : ""}`
       : "";
+    this.choose.textContent = focused
+      ? `${focus + 1}/${count} · ${focused.label} · ${focused.selected ? "Убрать" : focused.selectable ? "Выбрать" : "Недоступна"}`
+      : "";
+    this.choose.disabled = !focused?.selectable;
+    this.choose.setAttribute(
+      "aria-label",
+      focused ? `${focused.selected ? "Убрать" : "Выбрать"}: ${focused.label}` : "Выбрать карту",
+    );
+    this.choose.setAttribute("aria-pressed", String(Boolean(focused?.selected)));
     this.previous.hidden = this.next.hidden = this.hand.length < 2;
   }
 
   setInteractive(enabled: boolean) {
     if (this.enabled === enabled) return;
     this.enabled = enabled;
-    this.inputs.style.pointerEvents = enabled ? "" : "none";
     this.inputs.inert = !enabled;
   }
 
-  render(renderer: THREE.WebGLRenderer, smoothing: number) {
-    if (!this.hand.length) return;
+  react(id: RoomReactionId, time: number) {
+    if (this.ownerId) this.reactions.react(id, time);
+  }
+
+  render(
+    renderer: THREE.WebGLRenderer,
+    smoothing: number,
+    time: number,
+    paused: boolean,
+    reducedMotion: boolean,
+  ) {
     let moved = this.hitAreasDirty;
     this.cards.forEach((entry) => {
       if (!entry.pivot.visible) return;
@@ -279,9 +326,19 @@ export class FirstPersonHand {
       const visible = this.hand
         .map((card) => this.cards.get(card.id)!)
         .filter((entry) => entry.pivot.visible);
-      for (const { root, side } of this.grips) {
+      for (const { root, side, restPosition, restRotation } of this.grips) {
         const card = side < 0 ? visible[0] : visible[visible.length - 1];
-        if (!card) continue;
+        if (!card) {
+          const halfHeight = 1.52 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+          restPosition.set(
+            side * 0.25 * this.gripScale,
+            -halfHeight - 0.22 * this.gripScale,
+            -1.52,
+          );
+          restRotation.identity();
+          root.scale.setScalar(this.gripScale);
+          continue;
+        }
         // Grip the outer corner: lifting an edge card must not push the thumb into its neighbour.
         root.quaternion.copy(card.pivot.quaternion);
         root.scale.setScalar(this.gripScale);
@@ -295,6 +352,8 @@ export class FirstPersonHand {
           .set(0, HAND_CARD_EDGE_Y * this.gripScale, 0)
           .applyQuaternion(root.quaternion);
         root.position.sub(this.gripOffset);
+        restPosition.copy(root.position);
+        restRotation.copy(root.quaternion);
       }
       this.grip.updateMatrixWorld(true);
       this.camera.updateMatrixWorld(true);
@@ -316,6 +375,31 @@ export class FirstPersonHand {
         entry.button.style.clipPath = `polygon(${points.map((point) => `${point.x - left}px ${point.y - top}px`).join(",")})`;
       });
       this.hitAreasDirty = false;
+    }
+    const reacting = this.reactions.frame(
+      time,
+      paused,
+      reducedMotion || this.overview || !this.ownerId,
+      this.grips,
+      this.gripScale,
+    );
+    this.grip.visible = this.hand.length > 0 || reacting;
+    if (!this.hand.length && !reacting) return;
+    // Keep the forearms attached below the frame as wrists turn and lift. A
+    // sleeve parented to the rotating palm otherwise becomes a floating stump.
+    this.grip.updateMatrixWorld(true);
+    const halfHeight = 1.52 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    for (const { hand, sleeve, side } of this.grips) {
+      hand.root.localToWorld(this.gripPoint.set(0, -0.14, -0.045));
+      this.elbow.set(side * 0.3 * this.gripScale, -halfHeight - 0.25 * this.gripScale, -1.3);
+      this.armDirection.copy(this.gripPoint).sub(this.elbow);
+      sleeve.position.copy(this.elbow).lerp(this.gripPoint, 0.5);
+      sleeve.scale.set(
+        this.gripScale,
+        this.armDirection.length() + 0.025 * this.gripScale,
+        this.gripScale,
+      );
+      sleeve.quaternion.setFromUnitVectors(this.up, this.armDirection.normalize());
     }
     renderer.autoClear = false;
     renderer.clearDepth();

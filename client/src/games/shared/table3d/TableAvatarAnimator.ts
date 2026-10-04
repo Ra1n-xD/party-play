@@ -200,6 +200,29 @@ export class TableAvatarAnimator {
     const anticipation = pulse(t, 0, 0.48) * release;
     this.body.rotation.x += anticipation * 0.014;
     switch (this.reaction.id) {
+      case "mog": {
+        const jaw = ease((t - 0.9) / 0.65);
+        this.rightArm.gesture(
+          0.015 + jaw * 0.23,
+          2.13 - jaw * 0.06,
+          0.35 - jaw * 0.06,
+          0,
+          -0.3,
+          -jaw * 0.85,
+          gesture,
+          RELIEF_ARM,
+        );
+        this.rightArm.poseFingers(POINT, 0.06, 0.65, fingers);
+        this.head.rotation.x -= 0.17 * jaw * gesture;
+        this.head.rotation.y += 0.22 * jaw * gesture;
+        this.head.rotation.z -= 0.035 * gesture;
+        this.body.rotation.x -= 0.025 * gesture;
+        face.smile = 0.12 * expression;
+        face.squint = 0.64 * expression;
+        face.brow = -0.32 * expression;
+        face.blink *= 1 - expression;
+        break;
+      }
       case "laugh": {
         const standing = ease((t - 0.12) / 0.5) * ease((seconds - t) / 0.65) * release;
         const hands = ease((t - 0.1) / 0.4) * ease((seconds - t) / 0.55) * release;
