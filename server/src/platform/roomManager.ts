@@ -94,6 +94,7 @@ export interface Spectator {
   sessionToken: string;
   name: string;
   connected: boolean;
+  profileKey: string | null;
 }
 
 export interface Room<G extends GameId = GameId> {
@@ -293,14 +294,39 @@ export function createRoom<G extends GameId = "bunker">(
   return { room, player };
 }
 
+export const ACCOUNT_ALREADY_IN_ROOM =
+  "Этот аккаунт уже находится в комнате. Вернитесь к открытой вкладке или переподключитесь к своему месту";
+
+export function hasAccountInRoom(
+  room: Room,
+  profileKey: string | null,
+  exceptId?: string,
+): boolean {
+  if (!profileKey) return false;
+  return (
+    [...room.players.values()].some(
+      (player) =>
+        player.id !== exceptId &&
+        player.profileKey === profileKey &&
+        !player.kicked &&
+        !player.voluntarilyLeft,
+    ) ||
+    [...room.spectators.values()].some(
+      (spectator) => spectator.id !== exceptId && spectator.profileKey === profileKey,
+    )
+  );
+}
+
 export function joinRoom(
   roomCode: string,
   socketId: string,
   playerName: string,
   maxSeats?: number,
+  profileKey: string | null = null,
 ): { room: Room; player: Player } | { error: string } {
   const room = rooms.get(roomCode);
   if (!room) return { error: "Комната не найдена" };
+  if (hasAccountInRoom(room, profileKey)) return { error: ACCOUNT_ALREADY_IN_ROOM };
   if (room.lifecycle !== "lobby") return { error: "Игра уже началась" };
   if (room.players.size >= (maxSeats ?? room.seatLimit)) return { error: "Комната заполнена" };
 
@@ -312,7 +338,7 @@ export function joinRoom(
     sessionToken,
     name: playerName,
     avatarId: DEFAULT_AVATAR_ID,
-    profileKey: null,
+    profileKey,
     cardSkins: { durak: "classic", uno: "classic" },
     ready: false,
     connected: true,
@@ -484,9 +510,11 @@ export function joinRoomAsSpectator(
   roomCode: string,
   socketId: string,
   spectatorName: string,
+  profileKey: string | null = null,
 ): { room: Room; spectator: Spectator } | { error: string } {
   const room = rooms.get(roomCode);
   if (!room) return { error: "Комната не найдена" };
+  if (hasAccountInRoom(room, profileKey)) return { error: ACCOUNT_ALREADY_IN_ROOM };
   if (room.spectators.size >= CONFIG.MAX_SPECTATORS_PER_ROOM)
     return { error: "Слишком много зрителей" };
 
@@ -497,6 +525,7 @@ export function joinRoomAsSpectator(
     sessionToken: generateSessionToken(),
     name: spectatorName,
     connected: true,
+    profileKey,
   };
 
   room.spectators.set(spectatorId, spectator);

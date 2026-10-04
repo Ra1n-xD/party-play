@@ -19,6 +19,7 @@ import type {
   UpgradeAttempt,
   UpgradeInput,
   UpgradeRequest,
+  UpgradeReply,
 } from "../../../../shared/platform/upgrades";
 import { getUpgradeQuote } from "../../../../shared/platform/upgrades";
 
@@ -393,33 +394,28 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     return new Promise((resolve) =>
       socket
         .timeout(8000)
-        .emit(
-          "profile:upgrade",
-          request,
-          (
-            timeout: Error | null,
-            result: ProfileReply<{ profile: ProfileSnapshot; attempt: UpgradeAttempt }>,
-          ) => {
-            if (socket.id !== connectionId) {
-              resolve(null);
-              return;
-            }
-            requestBusy.current = false;
-            setBusy(false);
-            if (timeout) {
-              setError("Ответ потерялся. Восстановите результат: повторного списания не будет");
-              resolve(null);
-            } else if (!result.ok) {
-              rememberUpgrade(null);
-              setError(result.error);
-              resolve(null);
-            } else {
-              rememberUpgrade(null);
-              accept(result.value.profile);
-              resolve(result.value.attempt);
-            }
-          },
-        ),
+        .emit("profile:upgrade", request, (timeout: Error | null, result: UpgradeReply) => {
+          if (socket.id !== connectionId) {
+            resolve(null);
+            return;
+          }
+          requestBusy.current = false;
+          setBusy(false);
+          if (timeout) {
+            setError("Ответ потерялся. Восстановите результат: повторного списания не будет");
+            resolve(null);
+          } else if (!result.ok) {
+            // A temporary failure says nothing about whether an earlier request committed.
+            // Keep its ID until the server returns a receipt or a definitive rejection.
+            if (result.retryable === false) rememberUpgrade(null);
+            setError(result.error);
+            resolve(null);
+          } else {
+            rememberUpgrade(null);
+            accept(result.value.profile);
+            resolve(result.value.attempt);
+          }
+        }),
     );
   };
   return (

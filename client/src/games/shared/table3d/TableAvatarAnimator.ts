@@ -206,35 +206,19 @@ export class TableAvatarAnimator {
         let chuckle = 0;
         for (const beat of LAUGH_BEATS_SECONDS) chuckle += pulse(t, beat, 0.18);
         chuckle *= release;
-        this.legs?.pose(standing);
-        this.body.position.y += (AVATAR_STAND_RISE + chuckle * 0.018) * standing;
+        const jump = (pulse(t, 0.7, 0.46) + pulse(t, 1.34, 0.46) + pulse(t, 1.98, 0.46)) * standing;
+        const crouch = (pulse(t, 0.58, 0.2) + pulse(t, 1.22, 0.2) + pulse(t, 1.86, 0.2)) * standing;
+        this.legs?.pose(standing * (1 - crouch * 0.08));
+        this.body.position.y += AVATAR_STAND_RISE * standing + jump * 0.16 - crouch * 0.035;
         this.body.position.z += AVATAR_STAND_FORWARD * standing;
         this.body.rotation.x += pulse(t, 0.04, 0.5) * 0.11 + (0.025 + chuckle * 0.065) * standing;
         this.body.rotation.z += Math.sin(t * 7) * 0.026 * standing;
         this.head.rotation.x -= (0.18 - chuckle * 0.1) * standing;
         this.head.rotation.z += Math.sin(t * 5.5) * 0.07 * standing;
-        this.leftArm.gesture(
-          -0.16,
-          1.46 + chuckle * 0.045,
-          0.32,
-          -0.65,
-          0.3,
-          0.45,
-          hands,
-          RELIEF_ARM,
-        );
-        this.rightArm.gesture(
-          0.5,
-          1.73 + chuckle * 0.08,
-          0.38,
-          0.3,
-          -0.25,
-          -0.3,
-          hands,
-          RELIEF_ARM,
-        );
-        this.leftArm.poseFingers(CUPPED, 0.12, 0.35, hands);
-        this.rightArm.poseFingers(RELAXED, 0.18, 0.3, hands);
+        this.leftArm.gesture(-0.48, 2.54 + chuckle * 0.06, 0.23, 0, 0.18, -0.22, hands, RELIEF_ARM);
+        this.rightArm.gesture(0.48, 2.54 + chuckle * 0.06, 0.23, 0, -0.18, 0.22, hands, RELIEF_ARM);
+        this.leftArm.poseFingers(FIST, 0.025, 0.85, hands);
+        this.rightArm.poseFingers(FIST, 0.025, 0.85, hands);
         face.smile = 0.08 + 0.9 * expression;
         face.open = (0.2 + chuckle * 0.74) * standing;
         face.squint = (0.62 + chuckle * 0.22) * expression;

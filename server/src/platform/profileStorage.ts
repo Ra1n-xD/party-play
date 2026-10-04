@@ -10,6 +10,7 @@ import {
 } from "fs";
 import { copyFile, open, rename, unlink } from "node:fs/promises";
 import { basename, dirname, resolve } from "path";
+import { isDeepStrictEqual } from "node:util";
 import {
   BASIC_ITEMS,
   getCosmetic,
@@ -17,7 +18,7 @@ import {
   normalizeNickname,
   type ProfileSnapshot,
 } from "../../../shared/platform/cosmetics.js";
-import { getUpgradeQuote } from "../../../shared/platform/upgrades.js";
+import { getUpgradeQuote, type UpgradeAttempt } from "../../../shared/platform/upgrades.js";
 import { getCase } from "../../../shared/platform/cases.js";
 
 export interface StoredAccount {
@@ -36,6 +37,7 @@ interface ProfileStore {
   accounts: Map<string, StoredAccount>;
   sessions: Map<string, StoredSession>;
   rewardedMatches: Set<string>;
+  upgradeReceipts: Map<string, { profileId: string; attempt: UpgradeAttempt }>;
 }
 function emptyStore(): ProfileStore {
   return {
@@ -43,6 +45,7 @@ function emptyStore(): ProfileStore {
     accounts: new Map(),
     sessions: new Map(),
     rewardedMatches: new Set(),
+    upgradeReceipts: new Map(),
   };
 }
 export let profileStore = emptyStore();
@@ -94,6 +97,7 @@ function serialize(store: ProfileStore): string {
     accounts: [...store.accounts.values()],
     sessions: [...store.sessions.values()],
     rewardedMatches: [...store.rewardedMatches],
+    upgradeReceipts: [...store.upgradeReceipts.values()],
   });
 }
 function writeAtomic(path: string, value: string): void {
@@ -123,6 +127,7 @@ function* serializeChunks(store: ProfileStore): Generator<string> {
     ["accounts", store.accounts.values()],
     ["sessions", store.sessions.values()],
     ["rewardedMatches", store.rewardedMatches],
+    ["upgradeReceipts", store.upgradeReceipts.values()],
   ];
   for (const [name, values] of sections) {
     yield `,"${name}":[`;
@@ -210,6 +215,7 @@ export async function profileTransaction(
       accounts: new Map(profileStore.accounts),
       sessions: new Map(profileStore.sessions),
       rewardedMatches: new Set(profileStore.rewardedMatches),
+      upgradeReceipts: new Map(profileStore.upgradeReceipts),
     };
     for (const id of new Set(profileIds)) {
       const profile = draft.profiles.get(id);
@@ -247,6 +253,28 @@ export async function closeProfileStorage(): Promise<void> {
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const hash = /^[0-9a-f]{64}$/;
+
+function isValidUpgradeAttempt(attempt: UpgradeAttempt): boolean {
+  return Boolean(
+    attempt &&
+    getUpgradeQuote(attempt.inputs, attempt.targetItemId) &&
+    typeof attempt.requestId === "string" &&
+    /^[a-f0-9-]{36}$/.test(attempt.requestId) &&
+    Number.isFinite(attempt.createdAt) &&
+    Number.isInteger(attempt.roll) &&
+    attempt.roll >= 0 &&
+    attempt.roll < 10_000 &&
+    Number.isInteger(attempt.chanceBasisPoints) &&
+    attempt.chanceBasisPoints >= 1 &&
+    attempt.chanceBasisPoints <= 9000 &&
+    attempt.success === attempt.roll < attempt.chanceBasisPoints,
+  );
+}
+
+export function upgradeReceiptKey(profileId: string, requestId: string): string {
+  return `${profileId}:${requestId}`;
+}
+
 try {
   const data = JSON.parse(readFileSync(storagePath, "utf8"));
   const legacyStore =
@@ -328,21 +356,7 @@ try {
       profile.recentUpgrades ??= [];
       if (
         !Array.isArray(profile.recentUpgrades) ||
-        profile.recentUpgrades.some((attempt) => {
-          const quote = getUpgradeQuote(attempt.inputs, attempt.targetItemId);
-          return (
-            !quote ||
-            typeof attempt.requestId !== "string" ||
-            !Number.isFinite(attempt.createdAt) ||
-            !Number.isInteger(attempt.roll) ||
-            attempt.roll < 0 ||
-            attempt.roll >= 10_000 ||
-            !Number.isInteger(attempt.chanceBasisPoints) ||
-            attempt.chanceBasisPoints < 1 ||
-            attempt.chanceBasisPoints > 9000 ||
-            attempt.success !== attempt.roll < attempt.chanceBasisPoints
-          );
-        })
+        profile.recentUpgrades.some((attempt) => !isValidUpgradeAttempt(attempt))
       )
         throw new Error("Invalid upgrade history");
       const key = nicknameKey(profile.nickname);
@@ -350,6 +364,29 @@ try {
         throw new Error("Duplicate profile");
       nicknames.add(key);
       loaded.profiles.set(profile.id, profile);
+    }
+    if (data.upgradeReceipts !== undefined && !Array.isArray(data.upgradeReceipts))
+      throw new Error("Invalid upgrade receipts");
+    for (const receipt of data.upgradeReceipts ?? []) {
+      if (
+        !receipt ||
+        !loaded.profiles.has(receipt.profileId) ||
+        !isValidUpgradeAttempt(receipt.attempt)
+      )
+        throw new Error("Invalid upgrade receipt");
+      const key = upgradeReceiptKey(receipt.profileId, receipt.attempt.requestId);
+      if (loaded.upgradeReceipts.has(key)) throw new Error("Duplicate upgrade receipt");
+      loaded.upgradeReceipts.set(key, receipt);
+    }
+    // Migrate existing receipts without touching balances, inventory or historical values.
+    for (const profile of loaded.profiles.values()) {
+      for (const attempt of profile.recentUpgrades ?? []) {
+        const key = upgradeReceiptKey(profile.id, attempt.requestId);
+        const receipt = loaded.upgradeReceipts.get(key);
+        if (receipt && !isDeepStrictEqual(receipt.attempt, attempt))
+          throw new Error("Conflicting upgrade receipt");
+        loaded.upgradeReceipts.set(key, receipt ?? { profileId: profile.id, attempt });
+      }
     }
     for (const account of data.accounts as StoredAccount[]) {
       if (

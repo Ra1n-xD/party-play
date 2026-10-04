@@ -292,19 +292,41 @@ export function makeAvatarHead(avatarId: AvatarId) {
   }
   faces.set(head, makeAvatarFace(id, head, skinMesh));
   if (id === "astronaut") {
-    mesh(
+    // Shell and visor share one spherical boundary; the old half-sphere left gaps at the rim.
+    const radius = 0.335;
+    const opening = 1.12;
+    const rimRadius = radius * Math.sin(opening);
+    const rimDepth = radius * Math.cos(opening) - 0.014;
+    const shell = mesh(
       head,
-      new THREE.SphereGeometry(0.313, 32, 24, Math.PI, Math.PI),
+      new THREE.SphereGeometry(radius, 48, 32, 0, Math.PI * 2, opening, Math.PI - opening).rotateX(
+        Math.PI / 2,
+      ),
       0xece6d9,
       [0, 0.018, -0.014],
-    ).scale.y = 1.1;
-    const rim = mesh(
-      head,
-      new THREE.TorusGeometry(0.277, 0.024, 10, 48),
-      0xd6c9af,
-      [0, 0.019, 0.048],
     );
-    rim.scale.y = 1.09;
+    shell.scale.y = 1.1;
+    const visor = new THREE.Mesh(
+      new THREE.SphereGeometry(radius, 48, 20, 0, Math.PI * 2, 0, opening).rotateX(Math.PI / 2),
+      new THREE.MeshStandardMaterial({
+        color: 0xc6e4ef,
+        transparent: true,
+        opacity: 0.16,
+        roughness: 0.12,
+        metalness: 0.2,
+        depthWrite: false,
+      }),
+    );
+    visor.name = "helmet-visor";
+    visor.position.copy(shell.position);
+    visor.scale.copy(shell.scale);
+    head.add(visor);
+    const rim = mesh(head, new THREE.TorusGeometry(rimRadius, 0.024, 12, 48), 0xd6c9af, [
+      0,
+      0.018,
+      rimDepth,
+    ]);
+    rim.scale.y = 1.1;
     for (const side of [-1, 1]) {
       box(head, [0.07, 0.15, 0.143], accent, [side * 0.3, 0.023, -0.03]);
       box(head, [0.02, 0.073, 0.073], 0x516d85, [side * 0.337, 0.022, -0.014]);
@@ -375,6 +397,19 @@ export function makeSeatedAvatar(avatarId: AvatarId, holdingCards: boolean) {
   const legs = makeAvatarLegs(trousers, space ? 0xb8bebb : 0x342e31, space ? 0x8b9695 : 0x55484b);
   model.add(legs.root);
   model.add(tailoredTorso(jacket));
+  if (space) {
+    const collar = mesh(
+      model,
+      new THREE.TorusGeometry(0.13, 0.045, 12, 40),
+      0xb8bebb,
+      [0, 1.9, 0.02],
+    );
+    collar.rotation.x = Math.PI / 2;
+    collar.scale.z = 0.85;
+    // Closed shoulder seals overlap both the suit and the rotating sleeve roots.
+    for (const side of [-1, 1])
+      oval(model, [0.13, 0.13, 0.12], avatar.outfit, [side * 0.3, 1.8, 0.045]);
+  }
   if (mechanical || space) {
     box(model, [0.269, 0.299, 0.033], mechanical ? 0x273f50 : 0x516d85, [0, 1.566, 0.221]);
     for (const side of [-1, 1])

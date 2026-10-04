@@ -20,7 +20,7 @@ import type { ProjectStatsSnapshot } from "./projectStats.js";
 import type { CaseOpening, ProfileReply, ProfileSnapshot } from "./cosmetics.js";
 import type { CaseId } from "./cases.js";
 import type { DailyReward, DailyRewardStatus } from "./dailyRewards.js";
-import type { UpgradeAttempt, UpgradeRequest } from "./upgrades.js";
+import type { UpgradeReply, UpgradeRequest } from "./upgrades.js";
 import type { CosmeticDrop } from "./dropFeed.js";
 import type { LeaderboardQuery, LeaderboardSnapshot } from "./leaderboard.js";
 import type { ProfileCredentials, ProfileSession } from "./auth.js";
@@ -93,10 +93,7 @@ export interface ClientEvents {
     data: { requestId: string; caseId?: CaseId },
     reply: (result: ProfileReply<{ profile: ProfileSnapshot; opening: CaseOpening }>) => void,
   ) => void;
-  "profile:upgrade": (
-    data: UpgradeRequest,
-    reply: (result: ProfileReply<{ profile: ProfileSnapshot; attempt: UpgradeAttempt }>) => void,
-  ) => void;
+  "profile:upgrade": (data: UpgradeRequest, reply: (result: UpgradeReply) => void) => void;
   "room:create": (data: {
     gameId?: GameId;
     playerName: string;

@@ -28,6 +28,7 @@ import {
   profileStore,
   profileStorageHealthy,
   profileTransaction as transaction,
+  upgradeReceiptKey,
 } from "./profileStorage.js";
 import { assertProfileSession, profileRoom, registerProfileAuthHandlers } from "./profileAuth.js";
 import { guardProfileRequest } from "./profileRateLimit.js";
@@ -37,6 +38,7 @@ import { registerLeaderboardHandlers } from "./leaderboard.js";
 import { getServerGameModule } from "./gameRegistry.js";
 
 type IOSocket = Socket<ClientEvents, ServerEvents>;
+class UpgradeRejectedError extends Error {}
 const DROP_FEED_ROOM = "__cosmetic_drops";
 function makeDrop(
   profile: ProfileSnapshot,
@@ -313,17 +315,24 @@ export function registerProfileHandlers(
       const profile = key ? profileStore.profiles.get(key) : undefined;
       if (!key || !profile) throw new Error("Сначала войдите в аккаунт");
       if (typeof data?.requestId !== "string" || !/^[a-f0-9-]{36}$/.test(data.requestId))
-        throw new Error("Некорректный запрос улучшения");
+        throw new UpgradeRejectedError("Некорректный запрос улучшения");
+      assertProfileSession(socket, key);
+      const receiptKey = upgradeReceiptKey(key, data.requestId);
+      const receipt = profileStore.upgradeReceipts.get(receiptKey);
+      // Recovery is read-only: it also works if a later write has made storage unavailable.
+      if (receipt) {
+        reply({ ok: true, value: { profile, attempt: receipt.attempt } });
+        return;
+      }
       const quote = getUpgradeQuote(data.inputs, data.targetItemId);
-      if (!quote) throw new Error("Выберите от 1 до 5 предметов и более ценную цель");
+      if (!quote)
+        throw new UpgradeRejectedError("Выберите от 1 до 5 предметов и более ценную цель");
       let attempt!: UpgradeAttempt;
       let created = false;
       await transaction([key], (draft) => {
         assertProfileSession(socket, key);
         const current = draft.profiles.get(key)!;
-        const existing = current.recentUpgrades?.find(
-          (entry) => entry.requestId === data.requestId,
-        );
+        const existing = draft.upgradeReceipts.get(receiptKey)?.attempt;
         if (existing) {
           attempt = existing;
           return false;
@@ -331,7 +340,7 @@ export function registerProfileHandlers(
         for (const input of data.inputs) {
           const item = getCosmetic(input.itemId)!;
           if (getUpgradeAvailableCount(current, item) < input.count)
-            throw new Error(
+            throw new UpgradeRejectedError(
               "Предметов недостаточно. Последняя базовая копия, используемый экземпляр и последняя копия эмоции защищены",
             );
         }
@@ -351,10 +360,12 @@ export function registerProfileHandlers(
         }
         if (attempt.success) {
           const count = (current.inventory[attempt.targetItemId] ?? 0) + 1;
-          if (!Number.isSafeInteger(count)) throw new Error("Inventory limit exceeded");
+          if (!Number.isSafeInteger(count))
+            throw new UpgradeRejectedError("Inventory limit exceeded");
           current.inventory[attempt.targetItemId] = count;
         }
         current.recentUpgrades = [attempt, ...(current.recentUpgrades ?? [])].slice(0, 100);
+        draft.upgradeReceipts.set(receiptKey, { profileId: key, attempt });
         created = true;
       });
       if (created) publishProfile(key, io);
@@ -371,7 +382,11 @@ export function registerProfileHandlers(
         );
       reply({ ok: true, value: { profile: profileStore.profiles.get(key)!, attempt } });
     } catch (error) {
-      reply({ ok: false, error: (error as Error).message });
+      reply({
+        ok: false,
+        error: (error as Error).message,
+        retryable: !(error instanceof UpgradeRejectedError),
+      });
     }
   });
 }

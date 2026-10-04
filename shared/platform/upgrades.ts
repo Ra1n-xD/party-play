@@ -36,6 +36,10 @@ export interface UpgradeAttempt extends UpgradeRequest, UpgradeQuote {
   createdAt: number;
 }
 
+export type UpgradeReply =
+  | { ok: true; value: { profile: ProfileSnapshot; attempt: UpgradeAttempt } }
+  | { ok: false; error: string; retryable?: boolean };
+
 /** Keep starter access, equipped cosmetics and unlocked reactions available. */
 export function getUpgradeAvailableCount(profile: ProfileSnapshot, item: Cosmetic): number {
   const protectedCopy = item.rarity === "basic" || isCosmeticInUse(profile, item) ? 1 : 0;
