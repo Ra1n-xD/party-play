@@ -778,94 +778,107 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
               role="group"
               aria-label="Действия с картами"
             >
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={
-                  !canAct ||
-                  Boolean(ownWdfResponse) ||
-                  (!legalActions?.canChooseInitialColor && !selectedCard)
-                }
-                onClick={() => {
-                  if (legalActions?.canChooseInitialColor) setColorChoice({ mode: "initial" });
-                  else if (selectedCard) playCard(selectedCard);
-                }}
-              >
-                {legalActions?.canChooseInitialColor ? "Выбрать цвет" : "Сыграть"}
-                {is3D && <kbd>E</kbd>}
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={!canAct || !legalActions?.canDraw}
-                onClick={() => sendGameCommand("uno", { type: "draw-card" })}
-              >
-                Взять карту
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={!canAct || !legalActions?.canEndTurn}
-                onClick={() => sendGameCommand("uno", { type: "end-turn" })}
-              >
-                Завершить ход
-              </button>
-              <button
-                type="button"
-                className={`btn btn-secondary uno-declare-intent ${declareWithPlay ? "is-active" : ""}`}
-                aria-pressed={canOfferAtomicUnoIntent ? declareWithPlay : undefined}
-                title={
-                  canOfferAtomicUnoIntent
-                    ? "Объявить UNO вместе с выбранной картой"
-                    : "Объявить UNO"
-                }
-                disabled={
-                  !canAct || !(canOfferAtomicUnoIntent || canPreDeclareUno || canPostDeclareUno)
-                }
-                onClick={() => {
-                  if (canOfferAtomicUnoIntent) setDeclareWithPlay((value) => !value);
-                  else
-                    sendGameCommand("uno", {
-                      type: "declare-uno",
-                      ...(legalActions?.declareUnoWindowId != null
-                        ? { windowId: legalActions.declareUnoWindowId }
-                        : {}),
-                    });
-                }}
-              >
-                {declareWithPlay ? "✓ UNO!" : "UNO!"}
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                disabled={!canAct || !legalActions?.catchUno}
-                title={unoSubject ? `Поймать: ${unoSubject.name}` : "Поймать игрока без UNO"}
-                onClick={() =>
-                  legalActions?.catchUno &&
-                  sendGameCommand("uno", {
-                    type: "catch-uno",
-                    windowId: legalActions.catchUno.windowId,
-                  })
-                }
-              >
-                Поймать
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={!canAct || !legalActions?.canAcceptWildDrawFour}
-                onClick={() => respondToWildDrawFour("accept")}
-              >
-                Принять +4
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={!canAct || !legalActions?.canChallengeWildDrawFour}
-                onClick={() => respondToWildDrawFour("challenge")}
-              >
-                Оспорить
-              </button>
+              <div className="card-action-slot">
+                {legalActions?.canChallengeWildDrawFour ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={!canAct}
+                    onClick={() => respondToWildDrawFour("challenge")}
+                  >
+                    Оспорить {is3D && <kbd>G</kbd>}
+                  </button>
+                ) : !ownWdfResponse && (legalActions?.canChooseInitialColor || selectedCard) ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={!canAct}
+                    onClick={() => {
+                      if (legalActions?.canChooseInitialColor) setColorChoice({ mode: "initial" });
+                      else if (selectedCard) playCard(selectedCard);
+                    }}
+                  >
+                    {legalActions?.canChooseInitialColor ? "Выбрать цвет" : "Сыграть"}
+                    {is3D && <kbd>E</kbd>}
+                  </button>
+                ) : null}
+              </div>
+              <div className="card-action-slot">
+                {legalActions?.canAcceptWildDrawFour ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={!canAct}
+                    onClick={() => respondToWildDrawFour("accept")}
+                  >
+                    Принять +4 {is3D && <kbd>F</kbd>}
+                  </button>
+                ) : legalActions?.canEndTurn ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={!canAct}
+                    onClick={() => sendGameCommand("uno", { type: "end-turn" })}
+                  >
+                    Завершить ход {is3D && <kbd>F</kbd>}
+                  </button>
+                ) : legalActions?.canDraw ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={!canAct}
+                    onClick={() => sendGameCommand("uno", { type: "draw-card" })}
+                  >
+                    Взять карту {is3D && <kbd>F</kbd>}
+                  </button>
+                ) : null}
+              </div>
+              <div className="card-action-slot">
+                {(canOfferAtomicUnoIntent || canPreDeclareUno || canPostDeclareUno) && (
+                  <button
+                    type="button"
+                    className={`btn btn-secondary uno-declare-intent ${declareWithPlay ? "is-active" : ""}`}
+                    aria-pressed={canOfferAtomicUnoIntent ? declareWithPlay : undefined}
+                    title={
+                      canOfferAtomicUnoIntent
+                        ? "Объявить UNO вместе с выбранной картой"
+                        : "Объявить UNO"
+                    }
+                    disabled={!canAct}
+                    onClick={() => {
+                      if (canOfferAtomicUnoIntent) setDeclareWithPlay((value) => !value);
+                      else
+                        sendGameCommand("uno", {
+                          type: "declare-uno",
+                          ...(legalActions?.declareUnoWindowId != null
+                            ? { windowId: legalActions.declareUnoWindowId }
+                            : {}),
+                        });
+                    }}
+                  >
+                    {declareWithPlay ? "✓ UNO!" : "UNO!"} {is3D && <kbd>U</kbd>}
+                  </button>
+                )}
+              </div>
+              <div className="card-action-slot">
+                {legalActions?.catchUno && (
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    disabled={!canAct}
+                    title={unoSubject ? `Поймать: ${unoSubject.name}` : "Поймать игрока без UNO"}
+                    onClick={() =>
+                      legalActions?.catchUno &&
+                      sendGameCommand("uno", {
+                        type: "catch-uno",
+                        windowId: legalActions.catchUno.windowId,
+                      })
+                    }
+                  >
+                    Поймать {is3D && <kbd>X</kbd>}
+                  </button>
+                )}
+              </div>
             </div>
           )}
           {isHost && (

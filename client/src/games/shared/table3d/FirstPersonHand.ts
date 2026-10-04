@@ -41,6 +41,7 @@ export class FirstPersonHand {
   private readonly previous = document.createElement("button");
   private readonly next = document.createElement("button");
   private readonly projectedPoint = new THREE.Vector3();
+  private readonly touchControls = window.matchMedia("(pointer: coarse), (max-width: 680px)");
   private readonly gripPoint = new THREE.Vector3();
   private readonly gripOffset = new THREE.Vector3();
   private readonly corners = [
@@ -158,6 +159,7 @@ export class FirstPersonHand {
         button.onpointermove = (event) => {
           if (
             this.enabled &&
+            !this.touchControls.matches &&
             event.pointerType !== "touch" &&
             (event.movementX !== 0 || event.movementY !== 0)
           )

@@ -7,11 +7,11 @@ import {
 } from "./cosmetics.js";
 
 export const UPGRADE_VALUES: Record<Rarity, number> = {
-  basic: 0.1,
-  common: 1,
-  rare: 3,
-  epic: 9,
-  legendary: 27,
+  basic: 1,
+  common: 10,
+  rare: 30,
+  epic: 90,
+  legendary: 270,
 };
 export const MAX_UPGRADE_ITEMS = 5;
 export const MAX_UPGRADE_CHANCE = 9000;
@@ -43,11 +43,10 @@ export function getUpgradeAvailableCount(profile: ProfileSnapshot, item: Cosmeti
 }
 
 export function getUpgradeInputValue(inputs: readonly UpgradeInput[]): number {
-  const units = inputs.reduce((sum, input) => {
+  return inputs.reduce((sum, input) => {
     const item = getCosmetic(input.itemId);
-    return sum + (item ? Math.round(UPGRADE_VALUES[item.rarity] * 10) * input.count : 0);
+    return sum + (item ? UPGRADE_VALUES[item.rarity] * input.count : 0);
   }, 0);
-  return units / 10;
 }
 
 export function getUpgradeQuote(inputs: UpgradeInput[], targetItemId: string): UpgradeQuote | null {
@@ -76,8 +75,7 @@ export function getUpgradeQuote(inputs: UpgradeInput[], targetItemId: string): U
     targetValue,
     chanceBasisPoints: Math.min(
       MAX_UPGRADE_CHANCE,
-      // Count tenths as integers so three basic copies produce exactly 0.3 units.
-      Math.floor((Math.round(inputValue * 10) * 10_000) / (targetValue * 10)),
+      Math.floor((inputValue * 10_000) / targetValue),
     ),
   };
 }

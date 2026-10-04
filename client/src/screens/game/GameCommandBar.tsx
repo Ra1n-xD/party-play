@@ -65,6 +65,8 @@ export function GameCommandBar({
             type="button"
             className="btn btn-reveal-action gs-command-button"
             onClick={onRevealAction}
+            aria-label="Раскрыть особое условие"
+            title="Раскрыть особое условие"
           >
             <FiZap aria-hidden="true" />
             <span>Раскрыть особое условие</span>

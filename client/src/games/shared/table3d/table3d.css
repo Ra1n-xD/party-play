@@ -264,9 +264,9 @@
 }
 @media (max-width: 600px) {
   .durak-table3d .table3d-information {
-    top: 88px;
-    right: 10px;
-    left: auto;
+    top: 135px;
+    right: auto;
+    left: 10px;
     gap: 10px;
     padding: 7px 10px;
   }
@@ -1015,7 +1015,7 @@
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 680px) {
   .table3d-overview-touch {
     display: inline-block;
   }
@@ -1026,6 +1026,54 @@
   }
 }
 
+@media (min-width: 560px) and (max-height: 500px) {
+  .screen.command-game-screen.is-3d :is(.uno-command-actions, .durak-command-actions) {
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+  .screen.command-game-screen.is-3d .card-actions-stable,
+  .screen.command-game-screen.is-3d .card-actions-stable.is-uno {
+    order: 0;
+    flex: 1 1 0;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+  }
+  .table3d-toolbar {
+    top: 6px;
+    left: 10px;
+    gap: 5px;
+  }
+  .table3d-title,
+  .table3d-beta {
+    display: none;
+  }
+  .table3d-turn-indicator {
+    top: 6px;
+    right: 10px;
+    left: 200px;
+    width: auto;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .table3d-turn-copy strong {
+    font-size: 0.9rem;
+  }
+  .table3d-information,
+  .durak-table3d .table3d-information {
+    top: 68px;
+    right: auto;
+    left: 10px;
+    padding: 6px 8px;
+  }
+  .table3d-roster {
+    top: 122px;
+    left: 10px;
+  }
+  .table3d-hand-step {
+    bottom: 80px;
+  }
+}
 .table3d-person-label:not(.is-active) .table3d-person-turn {
   background: #f2d59b;
   color: #382711;
