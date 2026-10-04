@@ -179,13 +179,13 @@ export class TableLookControls {
       this.setCursor(true);
       return;
     }
+    if (this.coarse.matches) {
+      this.setCursor(true);
+      return;
+    }
     this.setCursor(false);
     if (!capture) {
       this.requestPending = false;
-      this.canvas.focus({ preventScroll: true });
-      return;
-    }
-    if (this.coarse.matches) {
       this.canvas.focus({ preventScroll: true });
       return;
     }
@@ -252,7 +252,7 @@ export class TableLookControls {
       this.resume(false);
       return;
     }
-    this.setCursor(!this.gameplayActive);
+    this.setCursor(this.coarse.matches || !this.gameplayActive);
     if (
       !this.coarse.matches &&
       this.cursorVisible &&

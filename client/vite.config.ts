@@ -6,7 +6,21 @@ import { resolve } from "path";
 const rootPkg = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf-8"));
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: "partyplay-build-version",
+      generateBundle(_options, bundle) {
+        const entry = Object.values(bundle).find((file) => file.type === "chunk" && file.isEntry);
+        if (entry)
+          this.emitFile({
+            type: "asset",
+            fileName: "version.json",
+            source: JSON.stringify({ version: rootPkg.version, entry: `/${entry.fileName}` }),
+          });
+      },
+    },
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(rootPkg.version),
   },

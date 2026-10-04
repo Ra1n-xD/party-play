@@ -181,6 +181,16 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # HTML и указатель сборки должны проверяться заново после публикации.
+    # expires сохраняет наследование общих заголовков безопасности nginx.
+    location = /index.html {
+        expires -1;
+    }
+    location = /version.json {
+        expires -1;
+        try_files $uri =404;
+    }
+
     # Реальные health/readiness Node.js, без SPA fallback
     location = /healthz {
         proxy_pass http://127.0.0.1:3001/healthz;
@@ -443,3 +453,7 @@ ss -tlnp | grep 3001
 # Ручной деплой если Actions не сработал
 su - partyplay -c "~/party-play/deploy.sh"
 ```
+
+### Обновление открытых вкладок
+
+Сборка клиента публикует `version.json` с версией и хешированным entry-файлом. Клиент проверяет его при возвращении на вкладку и раз в пять минут. Если вкладка использует прошлую сборку, появляется предложение обновить страницу; активная партия автоматически не перезагружается, данные переподключения сохраняются. Проверка использует `cache: no-store`; HTML и `version.json` на nginx должны иметь `expires -1`, как в примере выше.

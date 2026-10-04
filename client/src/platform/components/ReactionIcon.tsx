@@ -17,8 +17,16 @@ export function ReactionIcon({ id, animated = false }: { id: RoomReactionId; ani
       <path d="m10 12 42-3 4 44-43 4Z" fill="#282335" stroke="none" />
       <path
         d="m7 8 43-3 5 44-43 4Z"
-        fill={id === "laugh" ? "#ffc35d" : id === "fire" ? "#ffa74c" : "#e4b5f3"}
+        fill={id === "laugh" || id === "mog" ? "#ffc35d" : id === "fire" ? "#ffa74c" : "#e4b5f3"}
       />
+      {id === "mog" && (
+        <g className="reaction-art">
+          <path d="m20 17 18-2 8 10-3 15-12 9-12-8-3-14Z" fill="#fff8e8" />
+          <path d="m20 25 8-1m6-1 7 1m-18 5 4-1m8-1 4 1m-12 9 9-1m-12 6 7 4 9-7" />
+          <path d="m41 42-7-9c-2-3-5-1-3 2l4 7-3-2c-3-2-5 1-2 3l9 7 7-4" fill="#d8fc61" />
+          <path className="reaction-spark" d="m47 10 1 7m-4-3 7-1" />
+        </g>
+      )}
       {id === "laugh" && (
         <g className="reaction-art">
           <path d="M16 29a16 16 0 0 1 32-2c1 11-6 22-15 22S17 42 16 29Z" fill="#fff8e8" />

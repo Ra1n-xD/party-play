@@ -18,12 +18,18 @@ class ReactionAudio {
   unlock() {
     try {
       this.context ??= new AudioContext();
-      if (this.context.state === "suspended") void this.context.resume().catch(() => {});
+      // iOS can interrupt audio when the tab is backgrounded. Resume on the next
+      // completed gesture as well as pointerdown (older WebKit needs touchend).
+      if (this.context.state !== "running" && this.context.state !== "closed")
+        void this.context.resume().catch(() => {});
       const context = this.context;
       this.buffer ??= fetch(laughUrl)
         .then((response) => (response.ok ? response.arrayBuffer() : Promise.reject()))
         .then((bytes) => context.decodeAudioData(bytes))
-        .catch(() => null);
+        .catch(() => {
+          this.buffer = null;
+          return null;
+        });
     } catch {
       // An unavailable audio device must never block an emotion or the game.
     }
@@ -103,11 +109,15 @@ export function useReactionAudio(events: readonly RoomReactionEvent[], paused = 
       if (document.hidden) audio.current?.stop();
     };
     window.addEventListener("pointerdown", unlock);
+    window.addEventListener("touchend", unlock, { passive: true });
+    window.addEventListener("click", unlock);
     window.addEventListener("keydown", unlock);
     document.addEventListener("visibilitychange", hide);
     if (!enabled) audio.current?.stop();
     return () => {
       window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("touchend", unlock);
+      window.removeEventListener("click", unlock);
       window.removeEventListener("keydown", unlock);
       document.removeEventListener("visibilitychange", hide);
     };

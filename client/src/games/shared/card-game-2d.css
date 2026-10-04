@@ -1,6 +1,6 @@
 .screen.command-game-screen.card-game-screen.game-2d {
   --card2d-hand-width: clamp(76px, 6.2vw, 118px);
-  --card2d-table-width: clamp(64px, 5.3vw, 104px);
+  --card2d-table-width: clamp(88px, 7.5vw, 124px);
   --card2d-portrait-size: clamp(46px, 4.3vw, 76px);
   display: flex;
   flex-direction: column;
@@ -264,14 +264,14 @@
   transform: none;
 }
 .screen.command-game-screen.card-game-screen.game-2d .card-arena-self-seat .card-player-seat {
-  --card2d-portrait-size: 44px;
+  --card2d-portrait-size: 32px;
   display: grid;
   grid-template-columns: var(--card2d-portrait-size) auto auto;
   grid-template-rows: auto auto;
   width: max-content;
   max-width: 100%;
   flex: 0 0 auto;
-  min-height: 44px;
+  min-height: 32px;
   align-items: center;
   padding: 0;
   gap: 0 8px;
@@ -400,11 +400,12 @@
 .screen.command-game-screen.card-game-screen.game-2d :is(.durak-command-dock, .uno-command-dock) {
   position: static;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
   width: 100%;
-  min-height: 62px;
+  min-height: 58px;
   max-height: none;
   padding: 10px clamp(14px, 2vw, 36px) calc(10px + env(safe-area-inset-bottom));
   margin: 0;
@@ -421,9 +422,9 @@
 .screen.command-game-screen.card-game-screen.game-2d
   :is(.durak-command-actions, .uno-command-actions) {
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   overflow: visible;
-  gap: 9px;
+  gap: 10px;
 }
 .screen.command-game-screen.card-game-screen.game-2d
   :is(.durak-command-actions, .uno-command-actions)
@@ -476,8 +477,8 @@
   min-height: 140px;
   align-items: center;
   justify-content: center;
-  padding: 12px;
-  overflow: auto;
+  padding: 10px;
+  overflow: visible;
   border: 0;
   background: transparent;
 }
@@ -485,23 +486,39 @@
   left: auto;
 }
 .screen.command-game-screen.card-game-screen.game-2d .durak-table-grid {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(3, calc(var(--card2d-table-width) * 1.32));
+  grid-auto-rows: calc(var(--card2d-table-width) * 1.68);
   justify-content: center;
   gap: 12px;
-  width: 100%;
+  width: max-content;
   max-width: 100%;
   padding: 0;
+  overflow: visible;
 }
-.screen.command-game-screen.card-game-screen.game-2d .durak-table-pair {
-  flex: 0 0 calc(var(--card2d-table-width) * 1.35);
-  width: calc(var(--card2d-table-width) * 1.35);
-  min-height: calc(var(--card2d-table-width) * 1.65);
+.screen.command-game-screen.card-game-screen.game-2d .durak-table-pair,
+.screen.command-game-screen.card-game-screen.game-2d .durak-pair-cards {
+  position: relative;
+  width: calc(var(--card2d-table-width) * 1.32);
+  height: calc(var(--card2d-table-width) * 1.68);
+  min-height: 0;
 }
 .screen.command-game-screen.card-game-screen.game-2d .durak-pair-cards {
-  width: calc(var(--card2d-table-width) * 1.35);
-  min-height: calc(var(--card2d-table-width) * 1.5);
+  display: block;
+}
+.screen.command-game-screen.card-game-screen.game-2d .durak-table-card-flight-shell {
+  position: absolute;
+  top: 4px;
+  left: 3px;
+}
+.screen.command-game-screen.card-game-screen.game-2d
+  .durak-table-card-flight-shell
+  .durak-pair-card {
+  transform: none;
+}
+.screen.command-game-screen.card-game-screen.game-2d .durak-table-card-flight-shell.is-defense {
+  top: calc(var(--card2d-table-width) * 0.19);
+  left: calc(var(--card2d-table-width) * 0.27);
 }
 .screen.command-game-screen.card-game-screen.game-2d .durak-table .durak-card.is-table {
   width: var(--card2d-table-width);
@@ -698,8 +715,8 @@
   }
   .screen.command-game-screen.card-game-screen.game-2d .durak-trump-label {
     position: absolute;
-    top: 88px;
-    left: 0;
+    top: 18px;
+    left: 108px;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -869,7 +886,7 @@
 @media (min-width: 761px) and (max-height: 850px) {
   .screen.command-game-screen.card-game-screen.game-2d {
     --card2d-hand-width: clamp(72px, 6vw, 108px);
-    --card2d-table-width: clamp(60px, 5vw, 94px);
+    --card2d-table-width: clamp(66px, calc((100dvh - 444px) / 3.36), 104px);
     --card2d-portrait-size: clamp(42px, 4vw, 60px);
   }
   .screen.command-game-screen.card-game-screen.game-2d .card-game-arena {
@@ -970,5 +987,108 @@
   from {
     opacity: 0;
     transform: translateY(calc(var(--fan-rise) + 16px)) rotate(var(--fan-angle));
+  }
+}
+
+/* The table has room for two full rows, including defensive cards and focus rings. */
+.screen.command-game-screen.card-game-screen.game-2d .card-game-turn-status {
+  flex: 0 0 auto;
+  margin: 0;
+  min-height: 26px;
+  padding: 3px 12px;
+  background: #001d2540;
+  font-size: 12px;
+}
+.screen.command-game-screen.card-game-screen.game-2d .card-game-arena {
+  grid-template-rows: auto minmax(min-content, 1fr) auto auto;
+  gap: 6px;
+  padding-block: 8px;
+}
+.screen.command-game-screen.card-game-screen.game-2d .card-arena-opponents {
+  margin-bottom: 14px;
+}
+.screen.command-game-screen.card-game-screen.game-2d.durak-screen
+  .card-arena-opponents
+  .card-player-seat {
+  display: grid;
+  grid-template-columns: var(--card2d-portrait-size) minmax(0, 1fr);
+  min-height: 54px;
+  padding: 5px;
+  gap: 2px 8px;
+}
+.screen.command-game-screen.card-game-screen.game-2d.durak-screen
+  .card-arena-opponents
+  :is(.card-player-seat-name, .card-player-seat-detail) {
+  text-align: left;
+}
+.screen.command-game-screen.card-game-screen.game-2d.durak-screen .card-player-seat-back {
+  display: none;
+}
+.screen.command-game-screen.card-game-screen.game-2d .card-arena-hand {
+  min-height: calc(var(--card2d-hand-width) * 1.424242 + 24px);
+}
+.screen.command-game-screen.card-game-screen.game-2d :is(.durak-hand, .uno-hand) {
+  min-height: calc(var(--card2d-hand-width) * 1.424242 + 24px);
+  padding-block: 16px 8px;
+}
+.screen.command-game-screen.card-game-screen.game-2d :is(.durak-command-dock, .uno-command-dock) {
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+}
+.screen.command-game-screen.card-game-screen.game-2d .durak-table {
+  min-height: 0;
+}
+.screen.command-game-screen.card-game-screen.game-2d .durak-arena-table-zone {
+  min-height: calc(var(--card2d-table-width) * 3.36 + 32px);
+}
+@media (min-width: 761px) and (max-height: 850px) {
+  .screen.command-game-screen.card-game-screen.game-2d {
+    --card2d-portrait-size: 40px;
+    --card2d-hand-width: 76px;
+  }
+}
+@media (max-width: 760px) {
+  .screen.command-game-screen.card-game-screen.game-2d .durak-arena-table-zone {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 64px auto;
+    gap: 6px;
+    min-height: 0;
+    align-content: center;
+  }
+  .screen.command-game-screen.card-game-screen.game-2d .durak-table {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    --card2d-table-width: clamp(58px, 18vw, 88px);
+    padding: 8px 4px;
+  }
+  .screen.command-game-screen.card-game-screen.game-2d .durak-deck-panel {
+    --card2d-table-width: 42px;
+    min-height: 60px;
+    height: 60px;
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    margin-left: 10px;
+  }
+  .screen.command-game-screen.card-game-screen.game-2d .durak-2d-discard {
+    --card2d-table-width: 36px;
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-right: 10px;
+  }
+  .screen.command-game-screen.card-game-screen.game-2d .durak-table-grid {
+    gap: 8px;
+  }
+}
+@media (max-width: 360px) {
+  .screen.command-game-screen.card-game-screen.game-2d {
+    --card2d-hand-width: 74px;
+  }
+  .screen.command-game-screen.card-game-screen.game-2d.durak-screen
+    .card-arena-opponents
+    .card-player-seat {
+    min-height: 40px;
   }
 }
