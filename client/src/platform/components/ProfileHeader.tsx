@@ -1,11 +1,9 @@
-import { useState, type MouseEvent } from "react";
-import { createPortal } from "react-dom";
+import type { MouseEvent } from "react";
 import { FiLogIn, FiLogOut } from "react-icons/fi";
 import { usePlatform } from "../context/PlatformContext";
 import { useProfile } from "../context/ProfileContext";
 import { BrandDice } from "./BrandDice";
-import { CoinAmount } from "./CoinAmount";
-import { DailyBonusModal } from "./DailyBonusModal";
+import { DailyBonusWallet } from "./DailyBonusWallet";
 
 interface ProfileHeaderProps {
   activePage?: "games" | "profile" | "cases" | "upgrade" | "updates" | "leaderboard" | "stats";
@@ -15,7 +13,6 @@ interface ProfileHeaderProps {
 export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderProps) {
   const { profile, connected, busy, logout, error } = useProfile();
   const { roomCode } = usePlatform();
-  const [bonusOpen, setBonusOpen] = useState(false);
   const goHome = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!onHome || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -50,15 +47,7 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
             <a href="/profile" className="show-profile-nickname">
               {profile.nickname}
             </a>
-            <button
-              type="button"
-              className="coin-wallet"
-              aria-label={`Монет на балансе: ${profile.coins}. Ежедневный бонус`}
-              aria-haspopup="dialog"
-              onClick={() => setBonusOpen(true)}
-            >
-              <CoinAmount amount={profile.coins} />
-            </button>
+            <DailyBonusWallet key={profile.id} profile={profile} />
           </div>
           <button
             className="show-logout"
@@ -87,12 +76,6 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
           {error}
         </span>
       )}
-      {profile &&
-        bonusOpen &&
-        createPortal(
-          <DailyBonusModal key={profile.id} onClose={() => setBonusOpen(false)} />,
-          document.body,
-        )}
     </header>
   );
 }
