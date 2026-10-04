@@ -23,53 +23,23 @@
   font-weight: 500;
 }
 .coin-wallet {
-  position: relative;
-  flex-shrink: 0;
-}
-.coin-wallet summary {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   padding: 6px 10px;
   border: 1px solid #ffcf6730;
   border-radius: 24px;
   background: #ffcf670c;
+  font: inherit;
   cursor: pointer;
-  list-style: none;
 }
-.coin-wallet summary::-webkit-details-marker {
-  display: none;
-}
-.coin-wallet summary:hover,
-.coin-wallet[open] summary {
+.coin-wallet:hover {
   background: #ffcf671c;
   border-color: #ffcf6760;
 }
-.coin-wallet summary:focus-visible {
+.coin-wallet:focus-visible {
   outline: 2px solid #ffcf67;
   outline-offset: 3px;
-}
-.coin-wallet-help {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 10px);
-  right: 0;
-  width: min(280px, calc(100vw - 40px));
-  padding: 18px;
-  border: 1px solid #ffcf6740;
-  border-radius: 14px;
-  background: #30233e;
-  box-shadow: 0 12px 32px #0005;
-  color: #fff8e8;
-  font:
-    13px/1.5 "Golos Text",
-    sans-serif;
-}
-.coin-wallet-help > strong {
-  color: #ffcf67;
-}
-.coin-wallet-help p {
-  margin: 8px 0 0;
-  color: #d4c8de;
 }
 
 html:has(.show-menu, .profile-login),
@@ -888,9 +858,6 @@ body:has(.show-menu, .profile-login),
     position: relative;
   }
   .coin-wallet {
-    position: static;
-  }
-  .coin-wallet summary {
     padding: 6px 7px;
   }
   .coin-wallet .coin-amount {
@@ -1100,44 +1067,122 @@ body:has(.show-menu, .profile-login),
 .case-result .collection-equip {
   margin-top: 14px;
 }
-.daily-reward-toast {
-  position: fixed;
-  z-index: 2000;
-  top: calc(18px + env(safe-area-inset-top));
-  left: 50%;
-  display: grid;
-  gap: 5px;
-  width: min(380px, calc(100vw - 28px));
-  padding: 17px 42px 17px 18px;
-  border: 1px solid #ffcf6790;
-  border-radius: 15px;
-  background: #32233ff5;
-  color: #fff3d0;
-  box-shadow: 0 8px 35px #0007;
-  transform: translateX(-50%);
-  font:
-    13px/1.45 "Golos Text",
-    sans-serif;
+.modal.daily-bonus-dialog {
+  width: min(460px, calc(100vw - 28px));
+  padding: clamp(20px, 5vw, 30px);
+  border: 1px solid #ffcf6750;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #372747, #251c32);
+  color: #fff8e8;
+  font-family: "Golos Text", sans-serif;
 }
-.daily-reward-toast > strong {
+.daily-bonus-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.daily-bonus-heading > div > span {
   color: #ffcf67;
-  font-size: 16px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
 }
-.daily-reward-toast > span {
-  color: #d4c8de;
+.daily-bonus-heading h2 {
+  margin: 9px 0 0;
+  color: #fff8e8;
+  font-size: clamp(20px, 5vw, 24px);
 }
-.daily-reward-toast > button {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #eee4f7;
-  font-size: 22px;
+.daily-bonus-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #ffffff25;
+  border-radius: 10px;
+  background: #ffffff08;
+  color: #fff8e8;
   cursor: pointer;
+}
+.daily-bonus-reward {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 24px 16px;
+  border: 1px solid #ffcf6740;
+  border-radius: 16px;
+  background: radial-gradient(ellipse at 50% 20%, #ffcf6717, transparent 80%);
+  text-align: center;
+}
+.daily-bonus-reward > span:first-child {
+  color: #eed8ae;
+  font-size: 13px;
+  font-weight: 700;
+}
+.daily-bonus-reward > .coin-amount {
+  gap: 10px;
+  font-size: 44px;
+  line-height: 1;
+}
+.daily-bonus-reward .coin-icon {
+  width: 52px;
+  height: 52px;
+}
+.daily-bonus-reward .coin-label {
+  align-self: end;
+  margin-bottom: 7px;
+  font-size: 15px;
+}
+.daily-bonus-reward p {
+  max-width: 290px;
+  margin: 0;
+  color: #d4c8de;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.daily-bonus-rules,
+.daily-bonus-help {
+  margin: 18px 0;
+  color: #d4c8de;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.daily-bonus-help {
+  margin-bottom: 0;
+  font-size: 12px;
+}
+.daily-bonus-dialog .daily-bonus-claim {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 20px;
+}
+.daily-bonus-claim:not(:disabled) .coin-amount {
+  color: inherit;
+}
+.daily-bonus-wallet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #ffffff18;
+  font-size: 13px;
+}
+.daily-bonus-success {
+  margin: 16px 0 0;
+  color: #d8fc61;
+  font-size: 14px;
+}
+.daily-bonus-dialog button:focus-visible {
+  outline: 2px solid #ffcf67;
+  outline-offset: 3px;
 }
 @media (max-width: 900px) {
   .case-selector {

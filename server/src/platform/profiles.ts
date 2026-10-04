@@ -10,7 +10,12 @@ import {
   type CaseOpening,
 } from "../../../shared/platform/cosmetics.js";
 import { getCase, getCaseItems, getCaseRarities } from "../../../shared/platform/cases.js";
-import { nextDailyReward, type DailyReward } from "../../../shared/platform/dailyRewards.js";
+import {
+  getDailyRewardStatus,
+  getMoscowDay,
+  nextDailyReward,
+  type DailyReward,
+} from "../../../shared/platform/dailyRewards.js";
 import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
 import { getUpgradeQuote, type UpgradeAttempt } from "../../../shared/platform/upgrades.js";
 import { DROP_FEED_LIMIT, type CosmeticDrop } from "../../../shared/platform/dropFeed.js";
@@ -176,17 +181,32 @@ export function registerProfileHandlers(
     socket.leave(DROP_FEED_ROOM);
   });
   registerProfileAuthHandlers(socket, io, membershipNickname);
-  socket.on("profile:claim-daily", async (reply) => {
+  socket.on("profile:daily-status", (reply) => {
     if (typeof reply !== "function") return;
     try {
       guard();
       const key = socket.data.profileKey as string | undefined;
       if (!key) throw new Error("Сначала войдите в аккаунт");
       assertProfileSession(socket, key);
+      reply({ ok: true, value: getDailyRewardStatus(profileStore.profiles.get(key)!.dailyReward) });
+    } catch (error) {
+      reply({ ok: false, error: (error as Error).message });
+    }
+  });
+  socket.on("profile:claim-daily", async (data, reply) => {
+    // Old clients used to auto-claim without a date. They must never grant a bonus.
+    if (typeof reply !== "function") return;
+    try {
+      guard();
+      const key = socket.data.profileKey as string | undefined;
+      if (!key) throw new Error("Сначала войдите в аккаунт");
+      assertProfileSession(socket, key);
+      if (data?.date !== getMoscowDay()) throw new Error("Начался новый день. Обновите бонус");
       let reward: DailyReward | null = null;
       if (nextDailyReward(profileStore.profiles.get(key)?.dailyReward)) {
         await transaction([key], (draft) => {
           assertProfileSession(socket, key);
+          if (data.date !== getMoscowDay()) throw new Error("Начался новый день. Обновите бонус");
           const profile = draft.profiles.get(key)!;
           reward = nextDailyReward(profile.dailyReward);
           if (!reward) return false;

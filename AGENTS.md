@@ -39,6 +39,15 @@ History predominantly uses Conventional Commits, e.g. `fix(durak): preserve thro
 
 Agents must preserve existing changes, leave edits unstaged, never stage/commit/push/merge/rebase, and suggest an English commit message. Branch or destructive Git operations require explicit requests.
 
+## Player-Facing Release Notes
+
+Important player-visible changes must appear on the site's **«Обновления»** page (`/updates`) before the task is complete, without waiting for a separate request. This includes new features, games, economy or progression changes, substantial visual improvements, and significant gameplay fixes. Minor and major releases always require an entry; small internal maintenance changes do not need their own highlight.
+
+- Update the canonical list in `client/src/platform/releaseHighlights.ts` alongside the implementation and version bump. Add new entries first, with a unique ID, the actual feature version and date, a short Russian title, summary, and concrete changes for players.
+- Keep one entry per logical release. Amend it while the same release is in progress; group related patch versions only with an accurate version range. Preserve earlier history and do not invent dates or include unimplemented plans.
+- For visual changes, reuse or capture a real screenshot when it helps explain the update. Store it in `client/src/assets/updates/`, provide accurate dimensions, caption and alt text, and label demo data or reconstructed historical views. Do not substitute unrelated or generated images for product screenshots.
+- Check `/updates` on desktop and mobile, including the new entry, version navigation, and image enlargement when images were added. In the final response, state that release notes were updated, or briefly explain why the change did not warrant a highlight. Adding an entry does not authorize deployment.
+
 ## Security & Configuration
 
 Keep `.env*`, credentials, and `server/.data/` untracked. Never expose private game state or session tokens in public payloads. Pushes to `main` trigger deployment; deploy only when explicitly requested.

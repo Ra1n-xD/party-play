@@ -25,7 +25,7 @@ import { getUpgradeQuote } from "../../../../shared/platform/upgrades";
 import type { ProfileSession } from "../../../../shared/platform/auth";
 import { PROFILE_SESSION_KEY, readProfileSession, saveProfileSession } from "../profileSession";
 import { getCase, type CaseId, type CaseRequest } from "../../../../shared/platform/cases";
-import { nextMoscowMidnight, type DailyReward } from "../../../../shared/platform/dailyRewards";
+import type { DailyReward, DailyRewardStatus } from "../../../../shared/platform/dailyRewards";
 const OPENING_KEY = "partyplay_pending_case_v2";
 const UPGRADE_KEY = "partyplay_pending_upgrade_v2";
 function readPendingUpgrade(name: string): UpgradeRequest | null {
@@ -78,6 +78,8 @@ interface ProfileContextValue {
   pendingCaseId: CaseId | null;
   pendingUpgrade: UpgradeRequest | null;
   upgrade(inputs: UpgradeInput[], targetItemId: string): Promise<UpgradeAttempt | null>;
+  getDailyReward(): Promise<DailyRewardStatus>;
+  claimDailyReward(date: string): Promise<DailyReward | null>;
   clearError(): void;
 }
 const Context = createContext<ProfileContextValue | null>(null);
@@ -92,7 +94,6 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const accountId = useRef("");
   const pendingOpening = useRef<CaseRequest | null>(null);
   const [pendingCaseId, setPendingCaseId] = useState<CaseId | null>(null);
-  const [dailyNotice, setDailyNotice] = useState<DailyReward | null>(null);
   const pendingUpgradeRef = useRef<UpgradeRequest | null>(null);
   const [pendingUpgrade, setPendingUpgrade] = useState<UpgradeRequest | null>(null);
   const rememberUpgrade = useCallback((request: UpgradeRequest | null) => {
@@ -117,7 +118,6 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     accountId.current = "";
     pendingOpening.current = null;
     setPendingCaseId(null);
-    setDailyNotice(null);
     pendingUpgradeRef.current = null;
     setPendingUpgrade(null);
     setProfile(null);
@@ -239,39 +239,48 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("storage", storage);
     };
   }, [accept, acceptSession, clearProfile]);
-  useEffect(() => {
-    if (!profile?.id || !connected || !ready) return;
-    let active = true;
-    let inFlight = false;
-    const claim = () => {
-      if (!active || document.hidden || inFlight) return;
-      const connectionId = socket.id;
-      inFlight = true;
-      socket.timeout(8000).emit("profile:claim-daily", (timeout, result) => {
-        inFlight = false;
-        if (!active || socket.id !== connectionId || timeout || !result.ok) return;
-        accept(result.value.profile);
-        if (result.value.reward) setDailyNotice(result.value.reward);
+  const getDailyReward = useCallback((): Promise<DailyRewardStatus> => {
+    if (!socket.connected || !ready || !accountId.current)
+      return Promise.reject(new Error("Нет связи. Бонус можно проверить после подключения"));
+    const connectionId = socket.id;
+    const profileId = accountId.current;
+    return new Promise((resolve, reject) => {
+      socket.timeout(8000).emit("profile:daily-status", (timeout, result) => {
+        if (socket.id !== connectionId || accountId.current !== profileId || timeout)
+          return reject(new Error("Не удалось проверить бонус. Попробуйте ещё раз"));
+        if (!result.ok) return reject(new Error(result.error));
+        resolve(result.value);
       });
-    };
-    claim();
-    const timer = window.setInterval(claim, 60_000);
-    const midnight = window.setTimeout(claim, nextMoscowMidnight() - Date.now() + 100);
-    document.addEventListener("visibilitychange", claim);
-    window.addEventListener("focus", claim);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-      window.clearTimeout(midnight);
-      document.removeEventListener("visibilitychange", claim);
-      window.removeEventListener("focus", claim);
-    };
-  }, [profile?.id, connected, ready, accept]);
-  useEffect(() => {
-    if (!dailyNotice) return;
-    const timer = window.setTimeout(() => setDailyNotice(null), 7000);
-    return () => window.clearTimeout(timer);
-  }, [dailyNotice]);
+    });
+  }, [ready]);
+  const claimDailyReward = useCallback(
+    (date: string): Promise<DailyReward | null> => {
+      if (!socket.connected || !ready || !accountId.current || requestBusy.current)
+        return Promise.reject(new Error("Дождитесь подключения и завершения текущей операции"));
+      const connectionId = socket.id;
+      const profileId = accountId.current;
+      requestBusy.current = true;
+      setBusy(true);
+      return new Promise((resolve, reject) => {
+        socket.timeout(8000).emit("profile:claim-daily", { date }, (timeout, result) => {
+          if (socket.id !== connectionId)
+            return reject(new Error("Соединение изменилось. Откройте бонус снова"));
+          requestBusy.current = false;
+          setBusy(false);
+          if (accountId.current !== profileId)
+            return reject(new Error("Аккаунт изменился. Откройте бонус снова"));
+          if (timeout)
+            return reject(
+              new Error("Ответ потерялся. Повторите запрос: второй раз бонус не начислится"),
+            );
+          if (!result.ok) return reject(new Error(result.error));
+          accept(result.value.profile);
+          resolve(result.value.reward);
+        });
+      });
+    },
+    [ready, accept],
+  );
   const performLogout = () => {
     if (!socket.connected || !ready || requestBusy.current) return;
     requestBusy.current = true;
@@ -429,23 +438,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         pendingCaseId,
         pendingUpgrade,
         upgrade,
+        getDailyReward,
+        claimDailyReward,
         clearError: () => setError(null),
       }}
     >
       {children}
-      {dailyNotice && (
-        <div className="daily-reward-toast" role="status">
-          <strong>+{dailyNotice.coins} · Ежедневная награда</strong>
-          <span>День {dailyNotice.streak} подряд. Завтра — ещё больше!</span>
-          <button
-            type="button"
-            aria-label="Закрыть ежедневную награду"
-            onClick={() => setDailyNotice(null)}
-          >
-            ×
-          </button>
-        </div>
-      )}
       {confirmLogout && profile && (
         <AccessibleModal labelledBy="profile-logout-title" onClose={() => setConfirmLogout(false)}>
           <h2 id="profile-logout-title">Выйти из аккаунта?</h2>

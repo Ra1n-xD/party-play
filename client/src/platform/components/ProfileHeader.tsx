@@ -1,10 +1,11 @@
-import type { MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { FiLogIn, FiLogOut } from "react-icons/fi";
 import { usePlatform } from "../context/PlatformContext";
 import { useProfile } from "../context/ProfileContext";
 import { BrandDice } from "./BrandDice";
 import { CoinAmount } from "./CoinAmount";
-import { CASE_COST, GAME_REWARD, WIN_REWARD } from "../../../../shared/platform/cosmetics";
+import { DailyBonusModal } from "./DailyBonusModal";
 
 interface ProfileHeaderProps {
   activePage?: "games" | "profile" | "cases" | "upgrade" | "updates" | "leaderboard" | "stats";
@@ -14,6 +15,7 @@ interface ProfileHeaderProps {
 export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderProps) {
   const { profile, connected, busy, logout, error } = useProfile();
   const { roomCode } = usePlatform();
+  const [bonusOpen, setBonusOpen] = useState(false);
   const goHome = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!onHome || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -48,31 +50,15 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
             <a href="/profile" className="show-profile-nickname">
               {profile.nickname}
             </a>
-            <details className="coin-wallet">
-              <summary aria-label={`Ваш баланс: ${profile.coins} монет. Как получить монеты`}>
-                <CoinAmount amount={profile.coins} />
-              </summary>
-              <div className="coin-wallet-help">
-                <strong>Монеты PartyPlay</strong>
-                <p>
-                  За победу — {WIN_REWARD} монет. Остальным участникам завершённой партии —{" "}
-                  {GAME_REWARD} монета.
-                </p>
-                <p>
-                  Ежедневный вход: день серии = число монет. Новый день — в 00:00 МСК. Пропуск
-                  сбрасывает серию.
-                </p>
-                {profile.dailyReward && (
-                  <p>
-                    Последняя награда: +{profile.dailyReward.coins}, день серии{" "}
-                    {profile.dailyReward.streak}.
-                  </p>
-                )}
-                <p>
-                  Зрители и прерванные партии без награды. Открытие кейса стоит {CASE_COST} монету.
-                </p>
-              </div>
-            </details>
+            <button
+              type="button"
+              className="coin-wallet"
+              aria-label={`Монет на балансе: ${profile.coins}. Ежедневный бонус`}
+              aria-haspopup="dialog"
+              onClick={() => setBonusOpen(true)}
+            >
+              <CoinAmount amount={profile.coins} />
+            </button>
           </div>
           <button
             className="show-logout"
@@ -101,6 +87,12 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
           {error}
         </span>
       )}
+      {profile &&
+        bonusOpen &&
+        createPortal(
+          <DailyBonusModal key={profile.id} onClose={() => setBonusOpen(false)} />,
+          document.body,
+        )}
     </header>
   );
 }

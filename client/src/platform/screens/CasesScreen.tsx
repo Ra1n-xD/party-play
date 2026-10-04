@@ -227,10 +227,13 @@ export function CasesScreen() {
               ) : pendingCaseId ? (
                 "Получить результат"
               ) : profile.coins < definition.cost ? (
-                "Нужна 1 монета"
+                <>
+                  {definition.cost === 1 ? "Нужна" : "Нужно"}{" "}
+                  <CoinAmount amount={definition.cost} />
+                </>
               ) : (
                 <>
-                  Открыть кейс <CoinAmount amount={definition.cost} label="монета" />
+                  Открыть кейс <CoinAmount amount={definition.cost} />
                 </>
               )}
             </button>
