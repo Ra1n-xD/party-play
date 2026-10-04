@@ -41,6 +41,103 @@
   outline: 2px solid #ffcf67;
   outline-offset: 3px;
 }
+.coin-wallet.has-bonus-hint {
+  border-color: #ffcf67;
+  box-shadow: 0 0 0 4px #ffcf672b;
+}
+.daily-bonus-hint {
+  position: fixed;
+  z-index: 90;
+  width: min(304px, calc(100vw - 32px));
+  padding: 21px;
+  border: 1px solid #ffcf6780;
+  border-radius: 16px;
+  background: #30233f;
+  color: #fff8e8;
+  box-shadow: 0 16px 48px #10091d80;
+  font:
+    14px/1.55 "Golos Text",
+    sans-serif;
+}
+.daily-bonus-hint::before {
+  content: "";
+  position: absolute;
+  left: var(--hint-arrow);
+  top: -7px;
+  width: 12px;
+  height: 12px;
+  border-top: 1px solid #ffcf6780;
+  border-left: 1px solid #ffcf6780;
+  background: #30233f;
+  transform: translateX(-50%) rotate(45deg);
+}
+.daily-bonus-hint.is-above::before {
+  top: auto;
+  bottom: -7px;
+  transform: translateX(-50%) rotate(225deg);
+}
+.daily-bonus-hint-eyebrow {
+  color: #ffcf67;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+.daily-bonus-hint h2 {
+  margin: 10px 0;
+  font:
+    700 17px/1.45 "Unbounded",
+    sans-serif;
+}
+.daily-bonus-hint p {
+  margin: 0 0 14px;
+  color: #d4c8de;
+  font-size: 13px;
+}
+.daily-bonus-hint-reward {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.daily-bonus-hint-reward .coin-icon {
+  width: 22px;
+  height: 22px;
+}
+.daily-bonus-hint-open,
+.daily-bonus-hint-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 0;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.daily-bonus-hint-open {
+  background: #d8fc61;
+  color: #242c16;
+  font-weight: 700;
+}
+.daily-bonus-hint-open:hover {
+  background: #e3ff87;
+}
+.daily-bonus-hint-dismiss {
+  margin-top: 5px;
+  background: transparent;
+  color: #d4c8de;
+}
+.daily-bonus-hint-dismiss:hover {
+  background: #ffffff08;
+}
+.daily-bonus-hint button:focus-visible {
+  outline: 2px solid #ffcf67;
+  outline-offset: 3px;
+}
 
 html:has(.show-menu, .profile-login),
 body:has(.show-menu, .profile-login),

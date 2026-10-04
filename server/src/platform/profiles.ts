@@ -17,7 +17,11 @@ import {
   type DailyReward,
 } from "../../../shared/platform/dailyRewards.js";
 import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
-import { getUpgradeQuote, type UpgradeAttempt } from "../../../shared/platform/upgrades.js";
+import {
+  getUpgradeAvailableCount,
+  getUpgradeQuote,
+  type UpgradeAttempt,
+} from "../../../shared/platform/upgrades.js";
 import { DROP_FEED_LIMIT, type CosmeticDrop } from "../../../shared/platform/dropFeed.js";
 import type { IOServer } from "./gameModule.js";
 import {
@@ -326,10 +330,9 @@ export function registerProfileHandlers(
         }
         for (const input of data.inputs) {
           const item = getCosmetic(input.itemId)!;
-          const protectedCopy = isCosmeticInUse(current, item) ? 1 : 0;
-          if ((current.inventory[item.id] ?? 0) - protectedCopy < input.count)
+          if (getUpgradeAvailableCount(current, item) < input.count)
             throw new Error(
-              "Предметов недостаточно. Используемый экземпляр и последняя копия эмоции защищены",
+              "Предметов недостаточно. Последняя базовая копия, используемый экземпляр и последняя копия эмоции защищены",
             );
         }
         const roll = randomInt(10_000);

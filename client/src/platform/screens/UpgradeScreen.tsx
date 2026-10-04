@@ -10,6 +10,7 @@ import {
 } from "react-icons/fi";
 import {
   CASE_ITEMS,
+  COSMETICS,
   COSMETIC_KIND_NAMES,
   RARITIES,
   getCosmetic,
@@ -21,6 +22,8 @@ import {
 import {
   MAX_UPGRADE_ITEMS,
   UPGRADE_VALUES,
+  getUpgradeAvailableCount,
+  getUpgradeInputValue,
   getUpgradeQuote,
   type UpgradeAttempt,
   type UpgradeInput,
@@ -33,6 +36,7 @@ import "../../styles/upgrades.css";
 
 const formatChance = (value: number) =>
   (value / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 });
+const formatValue = (value: number) => value.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
 
 function ItemCard({
   item,
@@ -89,8 +93,7 @@ export function UpgradeScreen() {
   const available = (item: Cosmetic) => {
     if (!profile) return 0;
     const current = phase === "request" || phase === "spin" ? (previewProfile ?? profile) : profile;
-    const protectedCopy = isCosmeticInUse(current, item) ? 1 : 0;
-    return Math.max(0, (current.inventory[item.id] ?? 0) - protectedCopy);
+    return getUpgradeAvailableCount(current, item);
   };
   useEffect(() => {
     if (phase !== "idle" || pendingUpgrade || !profile) return;
@@ -110,20 +113,17 @@ export function UpgradeScreen() {
   const shownTargetId = attempt?.targetItemId ?? pendingUpgrade?.targetItemId ?? targetId;
   const target = getCosmetic(shownTargetId);
   const selectedCount = inputs.reduce((sum, input) => sum + input.count, 0);
-  const inputValue = shownInputs.reduce(
-    (sum, input) => sum + UPGRADE_VALUES[getCosmetic(input.itemId)!.rarity] * input.count,
-    0,
-  );
+  const inputValue = getUpgradeInputValue(shownInputs);
   const quote = target ? getUpgradeQuote(shownInputs, target.id) : null;
   const chance = attempt?.chanceBasisPoints ?? quote?.chanceBasisPoints ?? 0;
   const inactive = phase !== "idle" || !!pendingUpgrade;
   const visibleProfile =
     phase === "request" || phase === "spin" ? (previewProfile ?? profile) : profile;
-  const owned = CASE_ITEMS.filter((item) => visibleProfile.inventory[item.id]);
+  const owned = COSMETICS.filter((item) => visibleProfile.inventory[item.id]);
   const filtered = CASE_ITEMS.filter((item) => filter === "all" || item.kind === filter);
   const targets = filtered.filter(
     (item) =>
-      UPGRADE_VALUES[item.rarity] > Math.max(1, inputValue) &&
+      UPGRADE_VALUES[item.rarity] > inputValue &&
       UPGRADE_VALUES[item.rarity] >= inputValue * multiplier,
   );
   const equipped = target && isCosmeticInUse(profile, target);
@@ -251,7 +251,7 @@ export function UpgradeScreen() {
           <div className="upgrade-value">
             <span>Общая ценность</span>
             <strong>
-              {inputValue} <small>ед.</small>
+              {formatValue(inputValue)} <small>ед.</small>
             </strong>
           </div>
         </div>
@@ -361,7 +361,7 @@ export function UpgradeScreen() {
           <div className="upgrade-value">
             <span>Ценность цели</span>
             <strong>
-              {target ? UPGRADE_VALUES[target.rarity] : "—"} <small>ед.</small>
+              {target ? formatValue(UPGRADE_VALUES[target.rarity]) : "—"} <small>ед.</small>
             </strong>
           </div>
           {phase === "result" && attempt?.success && target && (
@@ -398,7 +398,9 @@ export function UpgradeScreen() {
             </span>
           </div>
           <p className="upgrade-catalog-note">
-            Базовые предметы, используемые скины и последняя копия каждой эмоции защищены.
+            Базовые дубликаты можно улучшать: одна копия каждого базового предмета всегда остаётся у
+            вас. Используемые скины и последняя копия каждой эмоции тоже защищены. Ценность базовой
+            копии — 0,1 ед., обычной — 1 ед.
           </p>
           {owned.length ? (
             <div className="upgrade-grid">
@@ -416,9 +418,19 @@ export function UpgradeScreen() {
                   >
                     <ItemCard item={item}>
                       <div className="upgrade-item-meta">
-                        <span>{count ? `Доступно: ${count}` : "Используется"}</span>
+                        <span>
+                          {count
+                            ? `Доступно: ${count}`
+                            : item.rarity === "basic"
+                              ? "Базовая копия защищена"
+                              : item.kind === "reaction"
+                                ? "Последняя копия защищена"
+                                : "Используется"}
+                        </span>
                         <strong>
-                          {selected ? `Выбрано: ${selected}` : `${UPGRADE_VALUES[item.rarity]} ед.`}
+                          {selected
+                            ? `Выбрано: ${selected}`
+                            : `${formatValue(UPGRADE_VALUES[item.rarity])} ед.`}
                         </strong>
                       </div>
                     </ItemCard>
@@ -497,7 +509,7 @@ export function UpgradeScreen() {
                 >
                   <ItemCard item={item}>
                     <div className="upgrade-item-meta">
-                      <span>{UPGRADE_VALUES[item.rarity]} ед.</span>
+                      <span>{formatValue(UPGRADE_VALUES[item.rarity])} ед.</span>
                       <strong>
                         {inputValue
                           ? `${formatChance(getUpgradeQuote(inputs, item.id)?.chanceBasisPoints ?? 0)}%`
