@@ -112,7 +112,7 @@ export function UpgradeScreen() {
   const shownInputs = attempt?.inputs ?? pendingUpgrade?.inputs ?? inputs;
   const shownTargetId = attempt?.targetItemId ?? pendingUpgrade?.targetItemId ?? targetId;
   const target = getCosmetic(shownTargetId);
-  const selectedCount = inputs.reduce((sum, input) => sum + input.count, 0);
+  const selectedCount = shownInputs.reduce((sum, input) => sum + input.count, 0);
   const inputValue = getUpgradeInputValue(shownInputs);
   const quote = target ? getUpgradeQuote(shownInputs, target.id) : null;
   const chance = attempt?.chanceBasisPoints ?? quote?.chanceBasisPoints ?? 0;
@@ -408,7 +408,7 @@ export function UpgradeScreen() {
           {owned.length ? (
             <div className="upgrade-grid">
               {owned.map((item) => {
-                const selected = inputs.find((input) => input.itemId === item.id)?.count ?? 0;
+                const selected = shownInputs.find((input) => input.itemId === item.id)?.count ?? 0;
                 const count = available(item);
                 return (
                   <button
@@ -515,7 +515,7 @@ export function UpgradeScreen() {
                       <span>{formatValue(UPGRADE_VALUES[item.rarity])} ед.</span>
                       <strong>
                         {inputValue
-                          ? `${formatChance(getUpgradeQuote(inputs, item.id)?.chanceBasisPoints ?? 0)}%`
+                          ? `${formatChance(getUpgradeQuote(shownInputs, item.id)?.chanceBasisPoints ?? 0)}%`
                           : "Выбрать"}
                       </strong>
                     </div>

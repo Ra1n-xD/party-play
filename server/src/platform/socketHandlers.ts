@@ -29,6 +29,8 @@ import {
   Room,
   Player,
   Spectator,
+  hasAccountInRoom,
+  ACCOUNT_ALREADY_IN_ROOM,
 } from "./roomManager.js";
 import { DEPLOYMENT_STOP_MESSAGE, isDeploymentDraining } from "./deploymentState.js";
 import { bunkerModule, executeBunkerCommand } from "../games/bunker/module.js";
@@ -583,6 +585,10 @@ function resolveSeatClaimCommand(
     removeClaimsForSocket(claim.socketId, io, "Заявитель больше недоступен", true);
     return { success: false, code: "CONFLICT", error: "Заявитель больше недоступен" };
   }
+  if (hasAccountInRoom(room, claimantSocket.data.profileKey ?? null, player.id)) {
+    removeClaimsForSocket(claim.socketId, io, ACCOUNT_ALREADY_IN_ROOM, true);
+    return { success: false, code: "CONFLICT", error: ACCOUNT_ALREADY_IN_ROOM };
+  }
 
   const bindResult = bindPlayerSocket(player, claimantSocket.id, (previousSocketId) => {
     const previousInfo = socketRoomMap.get(previousSocketId);
@@ -825,15 +831,22 @@ export function registerHandlers(io: IOServer): void {
           socket.id,
           sanitizePlayerName(data.playerName),
           module.maxSeats,
+          socket.data.profileKey ?? null,
         );
         if ("error" in result) {
           emitPublicRoomError(
             socket,
             gameId,
-            result.error === "Комната заполнена" ? "ROOM_FULL" : "ROOM_CLOSED",
+            result.error === ACCOUNT_ALREADY_IN_ROOM
+              ? "ALREADY_IN_ROOM"
+              : result.error === "Комната заполнена"
+                ? "ROOM_FULL"
+                : "ROOM_CLOSED",
             result.error === "Комната заполнена"
               ? "Последнее место уже занято"
-              : "Комната больше недоступна",
+              : result.error === ACCOUNT_ALREADY_IN_ROOM
+                ? result.error
+                : "Комната больше недоступна",
           );
           return;
         }
@@ -927,15 +940,22 @@ export function registerHandlers(io: IOServer): void {
           room.code,
           socket.id,
           sanitizePlayerName(data.spectatorName),
+          socket.data.profileKey ?? null,
         );
         if ("error" in result) {
           emitPublicRoomError(
             socket,
             gameId,
-            result.error === "Слишком много зрителей" ? "SPECTATOR_LIMIT" : "ROOM_CLOSED",
+            result.error === ACCOUNT_ALREADY_IN_ROOM
+              ? "ALREADY_IN_ROOM"
+              : result.error === "Слишком много зрителей"
+                ? "SPECTATOR_LIMIT"
+                : "ROOM_CLOSED",
             result.error === "Слишком много зрителей"
               ? "В комнате достигнут лимит зрителей"
-              : "Комната больше недоступна",
+              : result.error === ACCOUNT_ALREADY_IN_ROOM
+                ? result.error
+                : "Комната больше недоступна",
           );
           return;
         }
@@ -1048,6 +1068,7 @@ export function registerHandlers(io: IOServer): void {
         socket.id,
         sanitizePlayerName(playerName),
         module?.maxSeats,
+        socket.data.profileKey ?? null,
       );
       if ("error" in result) {
         socket.emit("room:error", { message: result.error });
@@ -1100,6 +1121,23 @@ export function registerHandlers(io: IOServer): void {
         emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
+      if (hasAccountInRoom(room, socket.data.profileKey ?? null, player.id)) {
+        emitReconnectError(socket, "SEAT_ALREADY_CONNECTED", ACCOUNT_ALREADY_IN_ROOM, false);
+        return;
+      }
+      if (
+        socket.data.profileKey &&
+        ((player.profileKey && player.profileKey !== socket.data.profileKey) ||
+          !profileNicknameMatches(socket, player.owner.name))
+      ) {
+        emitReconnectError(
+          socket,
+          "INVALID_SESSION",
+          "Это место принадлежит другому аккаунту",
+          true,
+        );
+        return;
+      }
 
       const existingSocketInfo = getCurrentSocketMembership(socket);
       if (
@@ -1140,6 +1178,7 @@ export function registerHandlers(io: IOServer): void {
 
       clearRejoinFailures(socket);
       touchRoom(room.code);
+      player.profileKey ??= socket.data.profileKey ?? null;
       removeClaimsForSocket(socket.id, io, "Владелец места вернулся", true);
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
@@ -1223,6 +1262,10 @@ export function registerHandlers(io: IOServer): void {
         });
         return;
       }
+      if (hasAccountInRoom(room, socket.data.profileKey ?? null, playerId)) {
+        socket.emit("room:error", { message: ACCOUNT_ALREADY_IN_ROOM });
+        return;
+      }
 
       touchRoom(room.code);
       expireSeatClaims(room, io);
@@ -1279,6 +1322,7 @@ export function registerHandlers(io: IOServer): void {
         normalizedRoomCode,
         socket.id,
         sanitizePlayerName(spectatorName),
+        socket.data.profileKey ?? null,
       );
       if ("error" in result) {
         socket.emit("room:error", { message: result.error });
@@ -1326,6 +1370,23 @@ export function registerHandlers(io: IOServer): void {
         emitReconnectError(socket, "INVALID_SESSION", "Не удалось переподключиться", true);
         return;
       }
+      if (hasAccountInRoom(room, socket.data.profileKey ?? null, spectator.id)) {
+        emitReconnectError(socket, "SEAT_ALREADY_CONNECTED", ACCOUNT_ALREADY_IN_ROOM, false);
+        return;
+      }
+      if (
+        socket.data.profileKey &&
+        ((spectator.profileKey && spectator.profileKey !== socket.data.profileKey) ||
+          !profileNicknameMatches(socket, spectator.name))
+      ) {
+        emitReconnectError(
+          socket,
+          "INVALID_SESSION",
+          "Это место принадлежит другому аккаунту",
+          true,
+        );
+        return;
+      }
 
       if (
         rejectExistingSocketMembership(socket, {
@@ -1359,6 +1420,7 @@ export function registerHandlers(io: IOServer): void {
       removeClaimsForSocket(socket.id, io, "Заявитель присоединился к другой комнате", true);
       const newToken = generateSessionToken();
       spectator.sessionToken = newToken;
+      spectator.profileKey ??= socket.data.profileKey ?? null;
 
       socket.join(room.code);
       socketRoomMap.set(socket.id, {
