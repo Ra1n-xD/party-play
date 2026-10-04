@@ -1178,67 +1178,47 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
           <GameDockTools gameId="durak" gameTitle="Подкидной дурак" />
           {privateGame && (
             <div className="card-actions-stable" role="group" aria-label="Действия с картами">
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={
-                  !canAct ||
-                  selectedCards.length === 0 ||
-                  !(
-                    legalAction?.type === "attack" ||
+              <div className="card-action-slot">
+                {selectedCards.length > 0 &&
+                  (legalAction?.type === "attack" ||
                     legalAction?.type === "throw-in" ||
-                    (legalAction?.type === "defend" && focusedTarget)
-                  )
-                }
-                onClick={() => {
-                  if (legalAction?.type === "defend" && focusedTarget)
-                    defendSelected(focusedTarget);
-                  else if (selectedCards[0]) activateHandCard(selectedCards[0]);
-                }}
-                title={
-                  legalAction?.type === "defend"
-                    ? "Побить выбранной картой"
-                    : "Сыграть выбранные карты"
-                }
-              >
-                Сыграть {is3D && <kbd>E</kbd>}
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                disabled={!canAct || legalAction?.type !== "defend"}
-                onClick={() => sendGameCommand("durak", { type: "take" })}
-              >
-                Взять
-              </button>
-              <button
-                type="button"
-                className="btn durak-finish-action"
-                disabled={
-                  !canAct ||
-                  !(
-                    legalAction?.type === "pass" ||
-                    (legalAction?.type === "throw-in" && legalAction.canPass)
-                  )
-                }
-                onClick={() => sendGameCommand("durak", { type: "pass" })}
-              >
-                Пас
-              </button>
-              <button
-                type="button"
-                className="btn durak-finish-action"
-                disabled={
-                  !canAct ||
-                  !(
-                    legalAction?.type === "beat" ||
-                    (legalAction?.type === "throw-in" && legalAction.canBeat)
-                  )
-                }
-                onClick={() => sendGameCommand("durak", { type: "beat" })}
-              >
-                Бито
-              </button>
+                    (legalAction?.type === "defend" && focusedTarget)) && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={!canAct}
+                      onClick={() => {
+                        if (legalAction?.type === "defend" && focusedTarget)
+                          defendSelected(focusedTarget);
+                        else if (selectedCards[0]) activateHandCard(selectedCards[0]);
+                      }}
+                      title={
+                        legalAction?.type === "defend"
+                          ? "Побить выбранной картой"
+                          : "Сыграть выбранные карты"
+                      }
+                    >
+                      {legalAction?.type === "defend" ? "Побить" : "Сыграть"} {is3D && <kbd>E</kbd>}
+                    </button>
+                  )}
+              </div>
+              <div className="card-action-slot">
+                {secondaryAction && (
+                  <button
+                    type="button"
+                    className={`btn ${secondaryAction === "take" ? "btn-danger" : "durak-finish-action"}`}
+                    disabled={!canAct}
+                    onClick={() => sendGameCommand("durak", { type: secondaryAction })}
+                  >
+                    {secondaryAction === "take"
+                      ? "Взять"
+                      : secondaryAction === "beat"
+                        ? "Бито"
+                        : "Пас"}
+                    {is3D && <kbd>F</kbd>}
+                  </button>
+                )}
+              </div>
             </div>
           )}
           {isHost && (

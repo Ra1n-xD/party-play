@@ -1011,7 +1011,9 @@ export class RoundTableScene {
     });
     this.renderer.render(this.scene, this.camera);
     this.ownHand.setInteractive(
-      this.controls.isCursorVisible && !this.paused && !isTableInputBlocked(null),
+      (this.controls.canUseTouchControls || this.controls.isCursorVisible) &&
+        !this.paused &&
+        !isTableInputBlocked(null),
     );
     this.ownHand.render(this.renderer, smoothing);
     this.sampleFrames++;

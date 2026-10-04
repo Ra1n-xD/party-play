@@ -1903,15 +1903,23 @@
 }
 .card-game-screen .card-actions-stable {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  flex: 1 1 380px;
-  max-width: 560px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 0 0 360px;
+  width: 360px;
+  max-width: 100%;
   gap: 6px;
 }
 .card-game-screen .card-actions-stable.is-uno {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  flex-basis: 650px;
-  max-width: 840px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex-basis: 460px;
+  width: 460px;
+}
+.card-game-screen .card-action-slot {
+  min-width: 0;
+  min-height: 44px;
+}
+.card-game-screen .card-action-slot > .btn {
+  height: 100%;
 }
 .screen.command-game-screen.card-game-screen .card-actions-stable .btn {
   display: flex;
@@ -1937,8 +1945,8 @@
   .card-game-screen .card-actions-stable,
   .card-game-screen .card-actions-stable.is-uno {
     order: 10;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
     flex: 1 0 100%;
+    width: 100%;
     max-width: none;
   }
   .screen.command-game-screen.card-game-screen .card-actions-stable .btn {

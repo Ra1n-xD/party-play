@@ -111,7 +111,7 @@ body .command-game-screen .room-reaction-message-copy span {
 }
 @media (prefers-reduced-motion: no-preference) {
   .reaction-icon-laugh.is-animated .reaction-art {
-    animation: reaction-laugh 0.3s ease-in-out 12 alternate;
+    animation: reaction-laugh 0.22s ease-in-out 10 alternate;
   }
   .reaction-icon-good-move.is-animated .reaction-art {
     animation: reaction-approve 1.3s ease-in-out both;

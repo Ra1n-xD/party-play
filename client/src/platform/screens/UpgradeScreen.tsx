@@ -36,7 +36,7 @@ import "../../styles/upgrades.css";
 
 const formatChance = (value: number) =>
   (value / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 });
-const formatValue = (value: number) => value.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
+const formatValue = (value: number) => value.toLocaleString("ru-RU");
 
 function ItemCard({
   item,
@@ -119,7 +119,11 @@ export function UpgradeScreen() {
   const inactive = phase !== "idle" || !!pendingUpgrade;
   const visibleProfile =
     phase === "request" || phase === "spin" ? (previewProfile ?? profile) : profile;
-  const owned = COSMETICS.filter((item) => visibleProfile.inventory[item.id]);
+  const owned = COSMETICS.filter(
+    (item) =>
+      visibleProfile.inventory[item.id] &&
+      (item.rarity !== "basic" || getUpgradeAvailableCount(visibleProfile, item) > 0),
+  );
   const filtered = CASE_ITEMS.filter((item) => filter === "all" || item.kind === filter);
   const targets = filtered.filter(
     (item) =>
@@ -399,8 +403,7 @@ export function UpgradeScreen() {
           </div>
           <p className="upgrade-catalog-note">
             Базовые дубликаты можно улучшать: одна копия каждого базового предмета всегда остаётся у
-            вас. Используемые скины и последняя копия каждой эмоции тоже защищены. Ценность базовой
-            копии — 0,1 ед., обычной — 1 ед.
+            вас. Используемые скины и последняя копия каждой эмоции тоже защищены.
           </p>
           {owned.length ? (
             <div className="upgrade-grid">

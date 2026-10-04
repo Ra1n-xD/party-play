@@ -7,12 +7,13 @@ export const ROOM_REACTIONS = [
   { id: "nice", label: "Красиво", rarity: "common", durationMs: 3000 },
   { id: "lucky", label: "Повезло", rarity: "rare", durationMs: 3000 },
   { id: "fire", label: "Огонь", rarity: "epic", durationMs: 3000 },
-  { id: "laugh", label: "АХАХАХАХХА", rarity: "legendary", durationMs: 5400 },
+  { id: "laugh", label: "АХАХАХАХХА", rarity: "legendary", durationMs: 3200 },
 ] as const;
 export type RoomReactionId = (typeof ROOM_REACTIONS)[number]["id"];
 export const ROOM_REACTION_IDS = ROOM_REACTIONS.map((reaction) => reaction.id);
 export const DEFAULT_ROOM_REACTION: RoomReactionId = "good-move";
-export const LAUGH_BEATS_SECONDS = [1.15, 1.42, 1.68, 1.97, 2.33, 2.62, 2.92, 3.27, 3.63] as const;
+export const LAUGH_AUDIO_START_SECONDS = 0.55;
+export const LAUGH_BEATS_SECONDS = [0.72, 0.88, 1.12, 1.32, 1.7, 2.14, 2.36] as const;
 
 export function ownsRoomReaction(
   id: RoomReactionId,

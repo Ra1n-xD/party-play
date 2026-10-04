@@ -19,7 +19,7 @@ export function isTableInputBlocked(target: EventTarget | null): boolean {
 export class TableLookControls {
   readonly target: AvatarLook = { yaw: 0, pitch: TABLE_DEFAULT_PITCH };
   private readonly abort = new AbortController();
-  private readonly coarse = window.matchMedia("(pointer: coarse)");
+  private readonly coarse = window.matchMedia("(pointer: coarse), (max-width: 680px)");
   private cursorVisible = true;
   private touch: { id: number; x: number; y: number } | null = null;
   private readonly modalObserver: MutationObserver;
@@ -46,7 +46,7 @@ export class TableLookControls {
       (event) => {
         // High polling-rate mice can send thousands of events per second. Dialog state is
         // refreshed on DOM/focus changes instead of searching the entire page for each event.
-        if (!this.gameplayActive || this.inputBlocked) return;
+        if (this.coarse.matches || !this.gameplayActive || this.inputBlocked) return;
         // Esc can temporarily prevent a new Pointer Lock request. Keep the cursor hidden
         // and allow camera motion until the next click/key can capture it again.
         this.move(event.movementX, event.movementY);
@@ -163,6 +163,10 @@ export class TableLookControls {
 
   get isCursorVisible() {
     return this.cursorVisible;
+  }
+
+  get canUseTouchControls() {
+    return this.coarse.matches;
   }
 
   /** Call synchronously from a trusted click/key, after removing the menu. */

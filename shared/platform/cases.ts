@@ -49,11 +49,11 @@ export interface CaseRequest {
   caseId: CaseId;
 }
 export const CASE_RARITY_WEIGHTS: Record<Rarity, number> = {
-  basic: 20,
-  common: 45,
-  rare: 22,
-  epic: 10,
-  legendary: 3,
+  basic: 45,
+  common: 30,
+  rare: 15,
+  epic: 8,
+  legendary: 2,
 };
 const rarityOrder = Object.keys(RARITIES);
 const kindOrder = Object.keys(COSMETIC_KIND_NAMES);

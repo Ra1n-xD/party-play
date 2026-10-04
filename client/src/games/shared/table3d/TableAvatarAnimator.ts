@@ -168,7 +168,7 @@ export class TableAvatarAnimator {
       this.head.rotation.z = Math.sin(this.idleTime * 0.0008 + this.idlePhase) * 0.008;
       this.rightArm.poseFingers(RELAXED, 0.08, 0.25, 0.1 + (breath + 1) * 0.035);
     }
-    const releaseDuration = this.reaction?.id === "laugh" ? 700 : 180;
+    const releaseDuration = this.reaction?.id === "laugh" ? 450 : 180;
     const duration = this.reaction ? getRoomReactionDuration(this.reaction.id) : 3000;
     if (
       this.queuedReaction &&
@@ -201,21 +201,31 @@ export class TableAvatarAnimator {
     this.body.rotation.x += anticipation * 0.014;
     switch (this.reaction.id) {
       case "laugh": {
-        const standing = ease((t - 0.28) / 0.95) * ease((seconds - t) / 1.15) * release;
-        const hands = ease((t - 0.2) / 0.7) * ease((seconds - t) / 0.85) * release;
+        const standing = ease((t - 0.12) / 0.5) * ease((seconds - t) / 0.65) * release;
+        const hands = ease((t - 0.1) / 0.4) * ease((seconds - t) / 0.55) * release;
         let chuckle = 0;
-        for (const beat of LAUGH_BEATS_SECONDS) chuckle += pulse(t, beat, 0.24);
+        for (const beat of LAUGH_BEATS_SECONDS) chuckle += pulse(t, beat, 0.18);
         chuckle *= release;
         this.legs?.pose(standing);
-        this.body.position.y += AVATAR_STAND_RISE * standing;
+        this.body.position.y += (AVATAR_STAND_RISE + chuckle * 0.018) * standing;
         this.body.position.z += AVATAR_STAND_FORWARD * standing;
-        this.body.rotation.x += pulse(t, 0.1, 0.8) * 0.09 + (0.012 + chuckle * 0.018) * standing;
-        this.head.rotation.x -= (0.14 - chuckle * 0.06) * standing;
-        this.head.rotation.z += Math.sin(t * 2.5) * 0.045 * standing;
-        this.leftArm.gesture(-0.16, 1.46, 0.32, -0.65, 0.3, 0.45, hands, RELIEF_ARM);
+        this.body.rotation.x += pulse(t, 0.04, 0.5) * 0.11 + (0.025 + chuckle * 0.065) * standing;
+        this.body.rotation.z += Math.sin(t * 7) * 0.026 * standing;
+        this.head.rotation.x -= (0.18 - chuckle * 0.1) * standing;
+        this.head.rotation.z += Math.sin(t * 5.5) * 0.07 * standing;
+        this.leftArm.gesture(
+          -0.16,
+          1.46 + chuckle * 0.045,
+          0.32,
+          -0.65,
+          0.3,
+          0.45,
+          hands,
+          RELIEF_ARM,
+        );
         this.rightArm.gesture(
           0.5,
-          1.73 + chuckle * 0.025,
+          1.73 + chuckle * 0.08,
           0.38,
           0.3,
           -0.25,
@@ -226,7 +236,7 @@ export class TableAvatarAnimator {
         this.leftArm.poseFingers(CUPPED, 0.12, 0.35, hands);
         this.rightArm.poseFingers(RELAXED, 0.18, 0.3, hands);
         face.smile = 0.08 + 0.9 * expression;
-        face.open = (0.25 + chuckle * 0.62) * standing;
+        face.open = (0.2 + chuckle * 0.74) * standing;
         face.squint = (0.62 + chuckle * 0.22) * expression;
         face.brow = 0.18 * expression;
         this.cards.visible = hands < 0.025 && standing < 0.025;
