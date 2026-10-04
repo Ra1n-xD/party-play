@@ -22,17 +22,19 @@ import {
   applyUnoTurnTimeout,
   createUnoGameState,
   excludeUnoSeat,
+  expireUnoGracePeriods,
   freezeUnoTurn,
   resumeUnoTurn,
 } from "./engine.js";
 import { buildUnoPrivateState, buildUnoPublicState } from "./projections.js";
-import { asUnoRoom, type UnoGameState, type UnoRoom } from "./runtime.js";
+import { asUnoRoom, remainingUnoGraceMs, type UnoGameState, type UnoRoom } from "./runtime.js";
 
 interface PendingUnoActions {
   state: UnoGameState;
   turnTimer: ReturnType<typeof setTimeout> | null;
   botTimer: ReturnType<typeof setTimeout> | null;
   unoReactionTimer: ReturnType<typeof setTimeout> | null;
+  unoGraceTimer: ReturnType<typeof setTimeout> | null;
 }
 
 interface UnoReplayMetadata {
@@ -66,12 +68,13 @@ function clearUnoActions(roomCode: string): void {
   if (pending?.turnTimer) clearTimeout(pending.turnTimer);
   if (pending?.botTimer) clearTimeout(pending.botTimer);
   if (pending?.unoReactionTimer) clearTimeout(pending.unoReactionTimer);
+  if (pending?.unoGraceTimer) clearTimeout(pending.unoGraceTimer);
   pendingActions.delete(roomCode);
 }
 
 function rememberTimer(
   room: UnoRoom,
-  kind: "turnTimer" | "botTimer" | "unoReactionTimer",
+  kind: "turnTimer" | "botTimer" | "unoReactionTimer" | "unoGraceTimer",
   timer: ReturnType<typeof setTimeout>,
 ): void {
   const pending = pendingActions.get(room.code) ?? {
@@ -79,6 +82,7 @@ function rememberTimer(
     turnTimer: null,
     botTimer: null,
     unoReactionTimer: null,
+    unoGraceTimer: null,
   };
   pending[kind] = timer;
   pendingActions.set(room.code, pending);
@@ -199,7 +203,38 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer, retry = false): void {
     rememberTimer(room, "botTimer", botTimer);
   }
 
-  const unoWindow = state.unoWindow;
+  const graceDeadlines = state.unoWindows.flatMap((window) =>
+    !window.catchReady && window.clock.kind === "running" ? [window.clock.deadlineAt] : [],
+  );
+  if (graceDeadlines.length) {
+    const deadline = Math.min(...graceDeadlines);
+    const timer = setTimeout(
+      () => {
+        void executeInRoom(room.code, () => {
+          if (getRoom(room.code) !== room || room.gameState !== state || isPaused(room)) return;
+          if (Date.now() < deadline) return scheduleUnoActions(room, io, true);
+          commitUnoState(room, expireUnoGracePeriods(state, Date.now()), io);
+        }).catch(() => {});
+      },
+      Math.max(0, deadline - Date.now()),
+    );
+    timer.unref();
+    rememberTimer(room, "unoGraceTimer", timer);
+  }
+
+  const unoWindow = state.unoWindows.find(
+    (window) =>
+      remainingUnoGraceMs(window, Date.now()) === 0 &&
+      state.activeSeatIds.some((seatId) => {
+        const player = room.players.get(seatId);
+        return (
+          player &&
+          player.id !== window.subjectSeatId &&
+          player.controller.kind === "bot" &&
+          !player.kicked
+        );
+      }),
+  );
   if (!unoWindow) return;
   const catchingBot = state.activeSeatIds
     .map((seatId) => room.players.get(seatId))
@@ -222,7 +257,7 @@ function scheduleUnoActions(room: UnoRoom, io: IOServer, retry = false): void {
         if (
           !currentState ||
           currentState.gameInstanceId !== expectedGameInstanceId ||
-          currentState.unoWindow?.id !== expectedWindowId ||
+          !currentState.unoWindows.some((window) => window.id === expectedWindowId) ||
           currentBot !== catchingBot ||
           currentBot.controller.kind !== "bot" ||
           currentBot.controller.epoch !== expectedBotEpoch

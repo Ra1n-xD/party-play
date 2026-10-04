@@ -32,6 +32,15 @@ export interface UnoUnoWindowInternal {
   id: number;
   subjectSeatId: SeatId;
   openedByTurnId: number;
+  clock: Exclude<UnoTurnClock, { kind: "unlimited" }>;
+  catchReady: boolean;
+}
+
+export function remainingUnoGraceMs(window: UnoUnoWindowInternal, nowMs: number): number {
+  if (window.catchReady) return 0;
+  return window.clock.kind === "frozen"
+    ? window.clock.remainingMs
+    : Math.max(0, window.clock.deadlineAt - nowMs);
 }
 
 export interface UnoGameState {
@@ -53,7 +62,7 @@ export interface UnoGameState {
   nextTurnId: number;
   pendingWildDrawFour: UnoPendingWildDrawFourInternal | null;
   nextWildDrawFourId: number;
-  unoWindow: UnoUnoWindowInternal | null;
+  unoWindows: UnoUnoWindowInternal[];
   nextUnoWindowId: number;
   preDeclaredUno: { seatId: SeatId; turnId: number } | null;
   lastChallengeResolution: UnoChallengeResolution | null;

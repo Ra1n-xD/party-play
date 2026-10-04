@@ -290,7 +290,7 @@
   line-height: 1.5;
 }
 .show-menu.is-main-menu .show-entry-form {
-  margin-top: calc(20 * var(--show-unit));
+  margin-top: calc(12 * var(--show-unit));
   gap: calc(12 * var(--show-unit));
 }
 .show-menu.is-main-menu .show-field {
@@ -462,11 +462,11 @@
     margin-top: calc(12 * var(--show-unit));
   }
   .show-menu.is-main-menu .show-entry-form {
-    margin-top: calc(28 * var(--show-unit));
+    margin-top: calc(16 * var(--show-unit));
     gap: calc(16 * var(--show-unit));
   }
   .show-menu.is-main-menu .show-entry-form:has(input[autocomplete="nickname"]:not([readonly])) {
-    margin-top: calc(20 * var(--show-unit));
+    margin-top: calc(16 * var(--show-unit));
     gap: calc(12 * var(--show-unit));
   }
   .show-menu.is-main-menu .show-field {

@@ -1,3 +1,5 @@
+import { UNO_DECLARATION_GRACE_MS } from "../../../../shared/games/uno/types.js";
+import { remainingUnoGraceMs } from "./runtime.js";
 import type {
   CardVisualAnchor,
   SeatId,
@@ -77,7 +79,7 @@ function cloneState(state: UnoGameState): UnoGameState {
     removedFaceDown: [...state.removedFaceDown],
     turn: state.turn ? { ...state.turn, clock: { ...state.turn.clock } } : null,
     pendingWildDrawFour: state.pendingWildDrawFour ? { ...state.pendingWildDrawFour } : null,
-    unoWindow: state.unoWindow ? { ...state.unoWindow } : null,
+    unoWindows: state.unoWindows.map((window) => ({ ...window, clock: { ...window.clock } })),
     preDeclaredUno: state.preDeclaredUno ? { ...state.preDeclaredUno } : null,
     lastChallengeResolution: state.lastChallengeResolution
       ? { ...state.lastChallengeResolution }
@@ -141,16 +143,18 @@ function finishGame(state: UnoGameState, result: UnoResult): void {
   state.result = result;
   state.turn = null;
   state.pendingWildDrawFour = null;
-  state.unoWindow = null;
+  state.unoWindows = [];
   state.preDeclaredUno = null;
 }
 
-function closeUnoWindow(state: UnoGameState): void {
-  state.unoWindow = null;
+function closeUnoWindow(state: UnoGameState, id: number): void {
+  state.unoWindows = state.unoWindows.filter((window) => window.id !== id);
 }
 
-function closeUnoForGameplayAction(state: UnoGameState): void {
-  closeUnoWindow(state);
+function closeUnoForGameplayAction(state: UnoGameState, actorSeatId: SeatId): void {
+  // An accepted action by the next player ends grace, but keeps the catch opportunity.
+  for (const window of state.unoWindows)
+    if (window.subjectSeatId !== actorSeatId) window.catchReady = true;
   state.preDeclaredUno = null;
   state.lastChallengeResolution = null;
 }
@@ -182,6 +186,8 @@ function drawCards(state: UnoGameState, seatId: SeatId, count: number): UnoCard[
     state.hands[seatId].push(card);
     drawn.push(card);
   }
+  if (state.hands[seatId].length !== 1)
+    state.unoWindows = state.unoWindows.filter((window) => window.subjectSeatId !== seatId);
   appendTransfer(state, { kind: "deck" }, { kind: "player", seatId }, drawn.length);
   return drawn;
 }
@@ -198,6 +204,8 @@ function openUnoWindowIfNeeded(
   seatId: SeatId,
   turnId: number,
   declaredAtomically: boolean,
+  nowMs: number,
+  paused: boolean,
 ): void {
   const preDeclared = state.preDeclaredUno;
   state.preDeclaredUno = null;
@@ -208,11 +216,15 @@ function openUnoWindowIfNeeded(
   ) {
     return;
   }
-  state.unoWindow = {
+  state.unoWindows.push({
     id: state.nextUnoWindowId++,
     subjectSeatId: seatId,
     openedByTurnId: turnId,
-  };
+    clock: paused
+      ? { kind: "frozen", remainingMs: UNO_DECLARATION_GRACE_MS }
+      : { kind: "running", deadlineAt: nowMs + UNO_DECLARATION_GRACE_MS },
+    catchReady: false,
+  });
 }
 
 function advanceAfterRegularPlay(
@@ -285,9 +297,10 @@ function applyPlayedCard(
   }
 
   const next = cloneState(state);
-  // A card play is the next accepted gameplay action, so an older catch window
-  // cannot survive it. Keep a same-turn pre-declaration for the atomic play.
-  next.unoWindow = null;
+  // Keep older opponents catchable; a same-turn pre-declaration belongs to this play.
+  for (const window of next.unoWindows)
+    if (window.subjectSeatId !== actorSeatId) window.catchReady = true;
+  next.unoWindows = next.unoWindows.filter((window) => window.subjectSeatId !== actorSeatId);
   next.lastChallengeResolution = null;
   const played = removeFromHand(next, actorSeatId, cardId);
   if (!played) return failure("Карты нет в руке");
@@ -314,12 +327,12 @@ function applyPlayedCard(
       wasLegalAtPlay,
     };
     next.pendingWildDrawFour = pending;
-    openUnoWindowIfNeeded(next, actorSeatId, turn.id, declareUno);
+    openUnoWindowIfNeeded(next, actorSeatId, turn.id, declareUno, nowMs, paused);
     setTurn(next, targetSeatId, "wild-draw-four-response", nowMs, paused);
     return success(next);
   }
 
-  openUnoWindowIfNeeded(next, actorSeatId, turn.id, declareUno);
+  openUnoWindowIfNeeded(next, actorSeatId, turn.id, declareUno, nowMs, paused);
   advanceAfterRegularPlay(next, actorSeatId, played, nowMs, paused);
   if (next.hands[actorSeatId].length === 0) {
     finishGame(next, { type: "winner", winnerSeatId: actorSeatId });
@@ -348,7 +361,7 @@ function resolveWildDrawFour(
   }
   const next = cloneState(state);
   const current = next.pendingWildDrawFour!;
-  closeUnoForGameplayAction(next);
+  closeUnoForGameplayAction(next, actorSeatId);
   appendAction(
     next,
     actorSeatId,
@@ -442,7 +455,7 @@ export function createUnoGameState(input: CreateUnoGameInput): UnoGameState {
     nextTurnId: 1,
     pendingWildDrawFour: null,
     nextWildDrawFourId: 1,
-    unoWindow: null,
+    unoWindows: [],
     nextUnoWindowId: 1,
     preDeclaredUno: null,
     lastChallengeResolution: null,
@@ -528,10 +541,11 @@ export function applyUnoCommand(
 
   if (command.type === "declare-uno") {
     const next = cloneState(state as UnoGameState);
-    if (next.unoWindow?.subjectSeatId === actorSeatId) {
-      if (command.windowId !== undefined && command.windowId !== next.unoWindow.id)
+    const ownWindow = next.unoWindows.find((window) => window.subjectSeatId === actorSeatId);
+    if (ownWindow) {
+      if (command.windowId !== undefined && command.windowId !== ownWindow.id)
         return failure("Окно UNO устарело");
-      closeUnoWindow(next);
+      closeUnoWindow(next, ownWindow.id);
       appendAction(next, actorSeatId, "declare-uno");
       return success(next);
     }
@@ -555,7 +569,7 @@ export function applyUnoCommand(
 
   if (command.type === "catch-uno") {
     const next = cloneState(state as UnoGameState);
-    const window = next.unoWindow;
+    const window = next.unoWindows.find((window) => window.id === command.windowId);
     if (!window || window.id !== command.windowId || window.subjectSeatId === actorSeatId) {
       return failure("Нельзя поймать UNO");
     }
@@ -563,8 +577,10 @@ export function applyUnoCommand(
       return failure("Игрок больше не участвует");
     if (next.hands[window.subjectSeatId].length !== 1)
       return failure("Игрок уже не обязан объявлять UNO");
+    if (remainingUnoGraceMs(window, nowMs) > 0)
+      return failure("Дайте игроку 5 секунд, чтобы сказать UNO");
     drawCards(next, window.subjectSeatId, 2);
-    closeUnoWindow(next);
+    closeUnoWindow(next, window.id);
     appendAction(next, actorSeatId, "catch-uno");
     return success(next);
   }
@@ -594,7 +610,7 @@ export function applyUnoCommand(
         return failure("Нужно сыграть подходящую карту");
       }
       const next = cloneState(state as UnoGameState);
-      closeUnoForGameplayAction(next);
+      closeUnoForGameplayAction(next, actorSeatId);
       appendAction(next, actorSeatId, "draw-card");
       const [drawn] = drawCards(next, actorSeatId, 1);
       if (!drawn) {
@@ -610,7 +626,7 @@ export function applyUnoCommand(
       if (state.turn.kind !== "after-draw")
         return failure("Завершить ход можно только после добора");
       const next = cloneState(state as UnoGameState);
-      closeUnoForGameplayAction(next);
+      closeUnoForGameplayAction(next, actorSeatId);
       appendAction(next, actorSeatId, "end-turn");
       const following = nextSeat(next, actorSeatId);
       if (!following) return failure("Недостаточно игроков");
@@ -671,7 +687,7 @@ export function applyUnoTurnTimeout(
     return applyUnoCommand(state, actor, { type: "end-turn" }, nowMs, false, true);
   }
   const next = cloneState(state as UnoGameState);
-  closeUnoForGameplayAction(next);
+  closeUnoForGameplayAction(next, actor);
   appendAction(next, actor, "draw-card");
   drawCards(next, actor, 1);
   const following = nextSeat(next, actor);
@@ -688,6 +704,9 @@ export function freezeUnoTurn(state: Readonly<UnoGameState>, nowMs: number): Uno
       remainingMs: Math.max(0, next.turn.clock.deadlineAt - nowMs),
     };
   }
+  for (const window of next.unoWindows)
+    if (window.clock.kind === "running")
+      window.clock = { kind: "frozen", remainingMs: Math.max(0, window.clock.deadlineAt - nowMs) };
   assertUnoState(next);
   return next;
 }
@@ -697,6 +716,17 @@ export function resumeUnoTurn(state: Readonly<UnoGameState>, nowMs: number): Uno
   if (next.turn?.clock.kind === "frozen") {
     next.turn.clock = { kind: "running", deadlineAt: nowMs + next.turn.clock.remainingMs };
   }
+  for (const window of next.unoWindows)
+    if (window.clock.kind === "frozen")
+      window.clock = { kind: "running", deadlineAt: nowMs + window.clock.remainingMs };
+  assertUnoState(next);
+  return next;
+}
+
+export function expireUnoGracePeriods(state: UnoGameState, nowMs: number): UnoGameState {
+  const next = cloneState(state);
+  for (const window of next.unoWindows)
+    if (remainingUnoGraceMs(window, nowMs) === 0) window.catchReady = true;
   assertUnoState(next);
   return next;
 }
@@ -716,7 +746,7 @@ export function excludeUnoSeat(
   next.hands[seatId] = [];
   next.statusBySeatId[seatId] = "excluded";
   next.activeSeatIds = next.activeSeatIds.filter((activeSeatId) => activeSeatId !== seatId);
-  if (next.unoWindow?.subjectSeatId === seatId) next.unoWindow = null;
+  next.unoWindows = next.unoWindows.filter((window) => window.subjectSeatId !== seatId);
   if (next.preDeclaredUno?.seatId === seatId) next.preDeclaredUno = null;
   const wasPendingParticipant =
     pendingBeforeExclusion?.sourceSeatId === seatId ||
@@ -761,6 +791,16 @@ export function assertUnoState(state: UnoGameState): void {
   ) {
     throw new Error("UNO active seat order is inconsistent");
   }
+  if (
+    new Set(state.unoWindows.map((window) => window.subjectSeatId)).size !==
+      state.unoWindows.length ||
+    state.unoWindows.some(
+      (window) =>
+        state.statusBySeatId[window.subjectSeatId] !== "active" ||
+        state.hands[window.subjectSeatId]?.length !== 1,
+    )
+  )
+    throw new Error("UNO declaration windows are inconsistent");
   const cards = [...state.drawPile, ...state.discardPile, ...state.removedFaceDown];
   for (const seatId of state.seatOrder) cards.push(...(state.hands[seatId] ?? []));
   const canonical = new Set(createUnoDeck().map((card) => card.id));

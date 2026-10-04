@@ -7,7 +7,7 @@ import type {
   UnoSeatStatus,
 } from "../../../../shared/types.js";
 import { canPlayUnoCard, sortUnoHand } from "./cards.js";
-import type { UnoGameState, UnoRoom } from "./runtime.js";
+import { remainingUnoGraceMs, type UnoGameState, type UnoRoom } from "./runtime.js";
 
 function isPaused(room: UnoRoom): boolean {
   return room.pauseReasons.admin || room.pauseReasons.disconnectedSeatIds.size > 0;
@@ -51,6 +51,7 @@ function lobbyPublicState(room: UnoRoom): UnoPublicState {
       })),
     pendingWildDrawFour: null,
     unoWindow: null,
+    unoWindows: [],
     lastChallengeResolution: null,
     turnRemainingMs: null,
     paused: false,
@@ -62,6 +63,12 @@ function lobbyPublicState(room: UnoRoom): UnoPublicState {
 export function buildUnoPublicState(room: UnoRoom, nowMs = Date.now()): UnoPublicState {
   const state = room.gameState;
   if (!state) return lobbyPublicState(room);
+  const unoWindows = state.unoWindows.map((window) => ({
+    id: window.id,
+    subjectSeatId: window.subjectSeatId,
+    protectedRemainingMs: remainingUnoGraceMs(window, nowMs),
+    canBeCaught: remainingUnoGraceMs(window, nowMs) === 0,
+  }));
   return {
     gameId: "uno",
     revision: room.revision,
@@ -105,9 +112,8 @@ export function buildUnoPublicState(room: UnoRoom, nowMs = Date.now()): UnoPubli
           previousActiveColor: state.pendingWildDrawFour.previousActiveColor,
         }
       : null,
-    unoWindow: state.unoWindow
-      ? { id: state.unoWindow.id, subjectSeatId: state.unoWindow.subjectSeatId }
-      : null,
+    unoWindow: unoWindows[0] ?? null,
+    unoWindows,
     lastChallengeResolution: state.lastChallengeResolution
       ? { ...state.lastChallengeResolution }
       : null,
@@ -135,7 +141,11 @@ function emptyLegalActions(): UnoLegalActions {
   };
 }
 
-export function getUnoLegalActions(room: UnoRoom, seatId: SeatId): UnoLegalActions {
+export function getUnoLegalActions(
+  room: UnoRoom,
+  seatId: SeatId,
+  nowMs = Date.now(),
+): UnoLegalActions {
   const state = room.gameState;
   const player = room.players.get(seatId);
   const legal = emptyLegalActions();
@@ -151,13 +161,16 @@ export function getUnoLegalActions(room: UnoRoom, seatId: SeatId): UnoLegalActio
     return legal;
   }
 
-  const window = state.unoWindow;
-  if (window?.subjectSeatId === seatId) {
+  const ownWindow = state.unoWindows.find((window) => window.subjectSeatId === seatId);
+  if (ownWindow) {
     legal.canDeclareUno = true;
-    legal.declareUnoWindowId = window.id;
-  } else if (window && window.subjectSeatId !== seatId) {
-    legal.catchUno = { windowId: window.id, targetSeatId: window.subjectSeatId };
+    legal.declareUnoWindowId = ownWindow.id;
   }
+  const catchWindow = state.unoWindows.find(
+    (window) => window.subjectSeatId !== seatId && remainingUnoGraceMs(window, nowMs) === 0,
+  );
+  if (catchWindow)
+    legal.catchUno = { windowId: catchWindow.id, targetSeatId: catchWindow.subjectSeatId };
 
   if (state.turn.actorSeatId !== seatId) return legal;
   const hand = state.hands[seatId];

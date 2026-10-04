@@ -341,7 +341,7 @@ export function registerProfileHandlers(
           const item = getCosmetic(input.itemId)!;
           if (getUpgradeAvailableCount(current, item) < input.count)
             throw new UpgradeRejectedError(
-              "Предметов недостаточно. Последняя базовая копия, используемый экземпляр и последняя копия эмоции защищены",
+              "Предметов недостаточно. Используемый экземпляр и последняя копия эмоции защищены",
             );
         }
         const roll = randomInt(10_000);

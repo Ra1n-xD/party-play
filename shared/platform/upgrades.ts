@@ -7,6 +7,7 @@ import {
 } from "./cosmetics.js";
 
 export const UPGRADE_VALUES: Record<Rarity, number> = {
+  // Kept for completed attempts made before basic items became singletons.
   basic: 1,
   common: 10,
   rare: 30,
@@ -42,7 +43,8 @@ export type UpgradeReply =
 
 /** Keep starter access, equipped cosmetics and unlocked reactions available. */
 export function getUpgradeAvailableCount(profile: ProfileSnapshot, item: Cosmetic): number {
-  const protectedCopy = item.rarity === "basic" || isCosmeticInUse(profile, item) ? 1 : 0;
+  if (item.rarity === "basic") return 0;
+  const protectedCopy = isCosmeticInUse(profile, item) ? 1 : 0;
   return Math.max(0, (profile.inventory[item.id] ?? 0) - protectedCopy);
 }
 
@@ -53,7 +55,12 @@ export function getUpgradeInputValue(inputs: readonly UpgradeInput[]): number {
   }, 0);
 }
 
-export function getUpgradeQuote(inputs: UpgradeInput[], targetItemId: string): UpgradeQuote | null {
+/** Legacy inputs are accepted only when reading completed historical attempts. */
+export function getUpgradeQuote(
+  inputs: UpgradeInput[],
+  targetItemId: string,
+  allowLegacyBasicInputs = false,
+): UpgradeQuote | null {
   const target = getCosmetic(targetItemId);
   if (!target || target.rarity === "basic" || !Array.isArray(inputs) || !inputs.length) return null;
   const seen = new Set<string>();
@@ -62,6 +69,7 @@ export function getUpgradeQuote(inputs: UpgradeInput[], targetItemId: string): U
     const item = getCosmetic(input?.itemId);
     if (
       !item ||
+      (item.rarity === "basic" && !allowLegacyBasicInputs) ||
       seen.has(item.id) ||
       !Number.isSafeInteger(input.count) ||
       input.count < 1 ||

@@ -29,9 +29,16 @@ import { usePlayerActionIndicators } from "../shared/usePlayerActionIndicators";
 import { useTableCardFlight } from "../shared/useTableCardFlight";
 import { UnoCard, UnoCardBack, getUnoCardMark, getUnoCardName } from "./components/UnoCard";
 import { UnoColorDialog } from "./components/UnoColorDialog";
+import { UnoNotices } from "./UnoNotices";
 
 import { useTableHotkeys } from "../shared/table3d/useTableHotkeys";
 import { useTableActionDock } from "../shared/table3d/useTableActionDock";
+import { useTableCardPointer } from "../shared/table3d/useTableCardPointer";
+import { clockwiseOpponents } from "../shared/cardSeatOrder";
+import { useCardGameAudio } from "../shared/useCardGameAudio";
+import { CardGameSoundButton } from "../shared/CardGameSoundButton";
+import { CardTurnNotice } from "../shared/CardTurnNotice";
+import "../shared/card-game-notices.css";
 const UnoTable3D = lazy(() => import("./components/UnoTable3D"));
 
 interface UnoGameScreenProps {
@@ -137,6 +144,11 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   const canUseConnection =
     connected && reconnectState === "connected" && viewerSeat?.controllerKind === "human";
   const canAct = Boolean(privateGame && canUseConnection && !paused && !commandPending);
+  const sound = useCardGameAudio(
+    game?.visualEvents ?? [],
+    Boolean(is3D && viewerSeatId && game?.currentActorSeatId === viewerSeatId && canUseConnection),
+    paused || !connected,
+  );
   const displayedHand = useMemo(
     () =>
       privateGame
@@ -320,6 +332,29 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     if (!canAct || (!playableCardIds.has(id) && !bluffableWildDrawFourIds.has(id))) return;
     setSelectedCardId((current) => (current === id ? null : id));
   };
+  const playSelected = () => {
+    if (!canAct) return;
+    if (legalActions?.canChooseInitialColor) setColorChoice({ mode: "initial" });
+    else if (selectedCard) playCard(selectedCard);
+  };
+  useTableCardPointer({
+    enabled: is3D && !managementOpen && !colorChoice,
+    cursorVisible,
+    step: (direction) => {
+      const index = Math.max(
+        0,
+        displayedHand.findIndex((card) => card.id === focusedCard?.id),
+      );
+      if (displayedHand.length)
+        setFocusedCardId(
+          displayedHand[(index + direction + displayedHand.length) % displayedHand.length].id,
+        );
+    },
+    select: () => {
+      if (focusedCard) selectCard(focusedCard.id);
+    },
+    play: playSelected,
+  });
   useTableHotkeys(
     is3D && (managementOpen || Boolean(colorChoice)),
     (code) => {
@@ -360,8 +395,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     if (code === "Space") {
       if (focusedCard) selectCard(focusedCard.id);
     } else if (code === "KeyE" || code === "Enter") {
-      if (legalActions?.canChooseInitialColor) setColorChoice({ mode: "initial" });
-      else if (selectedCard) playCard(selectedCard);
+      playSelected();
     } else if (code === "KeyF") {
       if (legalActions?.canAcceptWildDrawFour) respondToWildDrawFour("accept");
       else if (legalActions?.canEndTurn) sendGameCommand("uno", { type: "end-turn" });
@@ -392,25 +426,20 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
   }
 
   const playersById = new Map(game.players.map((player) => [player.seatId, player]));
-  const orderedPlayers = [
-    ...game.activeOrder
-      .map((seatId) => playersById.get(seatId))
-      .filter((player): player is UnoPlayerPublicState => player !== undefined),
-    ...game.players.filter((player) => !game.activeOrder.includes(player.seatId)),
-  ];
+  const orderedPlayers = game.players;
   const viewerPlayer = viewerSeatId
     ? (orderedPlayers.find((player) => player.seatId === viewerSeatId) ?? null)
     : null;
-  const opponentPlayers = viewerPlayer
-    ? orderedPlayers.filter((player) => player.seatId !== viewerPlayer.seatId)
-    : orderedPlayers;
+  const opponentPlayers = clockwiseOpponents(orderedPlayers, viewerSeatId);
   const turnTimeoutMs =
     snapshot.settings.turnTimeoutSeconds == null
       ? null
       : snapshot.settings.turnTimeoutSeconds * 1000;
   const handFanAngleStep = Math.min(4, 32 / Math.max(displayedHand.length - 1, 1));
   const pendingWildDrawFour = game.pendingWildDrawFour;
-  const unoSubject = game.unoWindow ? playersById.get(game.unoWindow.subjectSeatId) : null;
+  const unoSubject = legalActions?.catchUno
+    ? playersById.get(legalActions.catchUno.targetSeatId)
+    : null;
   const recoverySeats: RecoverySeat[] = snapshot.seats
     .filter((seat) => !seat.closed)
     .map((seat) => ({
@@ -525,6 +554,31 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
         className="card-game-arena uno-arena"
         style={{ "--opponent-count": Math.max(1, opponentPlayers.length) } as CSSProperties}
       >
+        <CardTurnNotice visible={is3D && sound.turnNotice && !paused} />
+        <UnoNotices
+          game={game}
+          viewerSeatId={viewerSeatId}
+          canAct={canAct}
+          catchWindowId={legalActions?.catchUno?.windowId ?? null}
+          revision={snapshot.revision}
+          onDeclare={() => {
+            if (canAct && legalActions?.canDeclareUno)
+              sendGameCommand("uno", {
+                type: "declare-uno",
+                ...(legalActions.declareUnoWindowId != null
+                  ? { windowId: legalActions.declareUnoWindowId }
+                  : {}),
+              });
+          }}
+          onCatch={() => {
+            if (canAct && legalActions?.catchUno)
+              sendGameCommand("uno", {
+                type: "catch-uno",
+                windowId: legalActions.catchUno.windowId,
+              });
+          }}
+          onRespond={respondToWildDrawFour}
+        />
         {is3D ? (
           <Suspense fallback={<div className="table3d-loading">Готовим 3D-стол…</div>}>
             <UnoTable3D
@@ -774,6 +828,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                 onToggle={() => setHandSortMode((mode) => (mode === "suit" ? "rank" : "suit"))}
               />
             )}
+            <CardGameSoundButton enabled={sound.enabled} onToggle={sound.toggle} />
             <GameDockTools gameId="uno" gameTitle="UNO" />
             {isHost && (
               <button

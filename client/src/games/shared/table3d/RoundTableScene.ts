@@ -678,7 +678,11 @@ export class RoundTableScene {
           viewerIndex < 0
             ? index + 0.5
             : (index - viewerIndex + state.people.length) % state.people.length;
-        const angle = (relative / state.people.length) * Math.PI * 2;
+        const angle =
+          (relative / state.people.length) *
+          Math.PI *
+          2 *
+          (this.options.variant === "bunker" ? 1 : -1);
         if (person.id === state.viewerId) {
           this.seatPositions.set(person.id, new THREE.Vector3(0, 2, this.seatRadius));
           return;
