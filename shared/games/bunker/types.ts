@@ -99,6 +99,7 @@ export interface BunkerPublicState {
   players: BunkerPlayerInfo[];
   currentTurnPlayerId: SeatId | null;
   votesCount: number;
+  votingOpen: boolean;
   totalVotesExpected: number;
   voteResults: Record<SeatId, number> | null;
   eliminatedPlayerId: SeatId | null;

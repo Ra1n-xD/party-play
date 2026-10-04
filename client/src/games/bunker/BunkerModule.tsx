@@ -1,5 +1,4 @@
 import { useLayoutEffect, useState } from "react";
-import { FiX } from "react-icons/fi";
 import type { AttributeType } from "../../../../shared/games/bunker/types";
 import { BunkerAttributeIcon } from "./BunkerAttributeIcon";
 import { GameScreen } from "../../screens/GameScreen";
@@ -74,7 +73,7 @@ function OverlayRenderer({ item }: { item: OverlayItem }) {
 function BunkerView() {
   const [is3D, setIs3D] = useState(true);
   const { snapshot } = usePlatform();
-  const { gameState, currentOverlay, dismissOverlays } = useBunkerGame();
+  const { gameState, currentOverlay } = useBunkerGame();
   const isVoteScreen =
     gameState?.phase === "ROUND_VOTE" || gameState?.phase === "ROUND_VOTE_TIEBREAK";
 
@@ -133,7 +132,8 @@ function BunkerView() {
         ) : (
           <AccessibleModal
             labelledBy="bunker-event-title"
-            onClose={dismissOverlays}
+            onClose={() => undefined}
+            dismissible={false}
             overlayClassName="bunker-event-overlay"
             panelClassName="bunker-event-panel"
           >
@@ -141,20 +141,9 @@ function BunkerView() {
               Игровое событие
             </h2>
             <OverlayRenderer item={currentOverlay} />
-            {is3D ? (
-              <button
-                type="button"
-                className="bunker3d-modal-close"
-                aria-label="Закрыть игровое событие"
-                onClick={dismissOverlays}
-              >
-                <FiX aria-hidden="true" />
-              </button>
-            ) : (
-              <button type="button" className="btn btn-secondary" onClick={dismissOverlays}>
-                Продолжить игру
-              </button>
-            )}
+            <p className="bunker-event-wait" role="status">
+              Продолжим автоматически после показа события
+            </p>
           </AccessibleModal>
         ))}
     </>

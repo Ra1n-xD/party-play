@@ -11,6 +11,8 @@ export interface BunkerGameState {
   bunkerCapacity: number;
   turnOrder: string[];
   currentTurnIndex: number;
+  revealPending: boolean;
+  tiebreakVotingOpen: boolean;
   votes: Map<string, string>;
   eliminationOrder: string[];
   votingSchedule: number[];

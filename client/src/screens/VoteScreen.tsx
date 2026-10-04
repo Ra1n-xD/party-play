@@ -205,7 +205,7 @@ export function VoteScreen({
   const voted = myHasVoted;
   const voteUnavailable =
     !connected || reconnectState !== "connected" || gameState.paused || adminPauseActiveRef.current;
-  const voteLocked = voteUnavailable || voteSubmitting;
+  const voteLocked = voteUnavailable || voteSubmitting || !gameState.votingOpen;
   const canRevealAction = myCharacter?.actionCard && !me?.actionCardRevealed;
 
   const handleVote = (targetId: string) => {
@@ -225,13 +225,15 @@ export function VoteScreen({
       <div className="vote-command-status" role="status" aria-live="polite">
         <small>{isTiebreak ? "Переголосование" : "Голосование"}</small>
         <strong>
-          {selectedTarget
-            ? `Выбран: ${gameState.players.find((player) => player.id === selectedTarget)?.name ?? "игрок"}`
-            : voted
-              ? "Ваш голос принят"
-              : canVote
-                ? "Выберите кандидата"
-                : "Вы наблюдаете за голосованием"}
+          {!gameState.votingOpen
+            ? "Кандидаты защищают своё место"
+            : selectedTarget
+              ? `Выбран: ${gameState.players.find((player) => player.id === selectedTarget)?.name ?? "игрок"}`
+              : voted
+                ? "Ваш голос принят"
+                : canVote
+                  ? "Выберите кандидата"
+                  : "Вы наблюдаете за голосованием"}
         </strong>
       </div>
       <div className="vote-command-actions">
@@ -332,7 +334,13 @@ export function VoteScreen({
             buildGameScreenViewModel({ gameState, playerId, isSpectator, myCharacter })
               .revealedIndices
           }
-          phaseLabel={isTiebreak ? "Переголосование" : "Кого оставить за бортом?"}
+          phaseLabel={
+            !gameState.votingOpen
+              ? "Защита кандидатов"
+              : isTiebreak
+                ? "Переголосование"
+                : "Кого оставить за бортом?"
+          }
           phaseDescription={
             !canVote
               ? "Вы наблюдаете за голосованием"
@@ -342,11 +350,13 @@ export function VoteScreen({
                   ? "Голос отправляется…"
                   : voteUnavailable
                     ? "Голосование приостановлено"
-                    : isTiebreak
-                      ? "Ничья · выберите одного из кандидатов"
-                      : isLastEliminated && !me?.alive
-                        ? "Вы голосуете как последний изгнанный"
-                        : "Выберите кандидата и подтвердите голос"
+                    : !gameState.votingOpen
+                      ? "Голосование откроется после защиты кандидатов"
+                      : isTiebreak
+                        ? "Ничья · выберите одного из кандидатов"
+                        : isLastEliminated && !me?.alive
+                          ? "Вы голосуете как последний изгнанный"
+                          : "Выберите кандидата и подтвердите голос"
           }
           voting={{
             candidateIds: candidates.map((player) => player.id),

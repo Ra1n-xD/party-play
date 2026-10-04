@@ -11,6 +11,123 @@
   top: 54px;
   bottom: 0;
 }
+.bunker3d-hand {
+  position: absolute;
+  z-index: 12;
+  right: 14px;
+  bottom: calc(var(--table3d-dock-height, 80px) + 12px);
+  left: 14px;
+  max-width: 1050px;
+  margin-inline: auto;
+  padding: 9px;
+  border: 1px solid #bba47775;
+  border-radius: 12px;
+  background: #14251eef;
+  color: #fff0ce;
+}
+.bunker3d-hand-heading {
+  margin-bottom: 6px;
+  font-size: 0.67rem;
+  font-weight: 750;
+}
+.is-3d .bunker3d-hand,
+.is-3d .bunker3d-hand * {
+  cursor: auto !important;
+}
+.is-3d .bunker3d-hand button {
+  cursor: pointer !important;
+}
+.bunker3d-hand-heading span {
+  color: #b8bcad;
+  font-weight: 400;
+}
+.bunker3d-hand-cards {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.bunker3d-own-card {
+  display: flex;
+  min-width: 0;
+  min-height: 102px;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid #c4bba6;
+  border-radius: 7px;
+  background: #efe4cc;
+  color: #172c3d;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.bunker3d-own-card small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #52615f;
+  font-size: 0.6rem;
+}
+.bunker3d-own-card strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 0.76rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.bunker3d-own-card > span {
+  margin-top: auto;
+  color: #65706e;
+  font-size: 0.58rem;
+}
+.bunker3d-own-card.is-revealed {
+  background: #dce6d5;
+  border-color: #81a482;
+}
+.bunker3d-own-card.can-reveal {
+  border-color: #f6ad5e;
+  box-shadow: inset 0 0 0 1px #d97632;
+}
+.bunker3d-own-card:focus-visible {
+  outline: 3px solid #f6ad5e;
+  outline-offset: -3px;
+}
+.bunker3d-screen:has(.bunker3d-hand) .bunker3d-tools {
+  bottom: calc(var(--table3d-dock-height, 80px) + 162px);
+}
+.bunker3d-screen:has(.bunker3d-hand) .bunker3d-table-caption {
+  bottom: calc(var(--table3d-dock-height, 80px) + 205px);
+}
+.bunker-event-wait {
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+}
+@media (max-width: 680px), (pointer: coarse) {
+  .bunker3d-hand {
+    right: 8px;
+    bottom: calc(var(--table3d-dock-height, 80px) + 8px);
+    left: 8px;
+    padding: 7px;
+  }
+  .bunker3d-hand-cards {
+    grid-template-columns: repeat(7, minmax(100px, 1fr));
+  }
+  .bunker3d-own-card {
+    min-height: 94px;
+    padding: 8px;
+  }
+  .bunker3d-screen:has(.bunker3d-hand) .bunker3d-tools {
+    bottom: 144px;
+  }
+  .bunker3d-screen:has(.bunker3d-hand) .bunker3d-table-caption {
+    bottom: 187px;
+  }
+}
 .bunker3d-screen .gs-command-status {
   max-width: 300px;
 }

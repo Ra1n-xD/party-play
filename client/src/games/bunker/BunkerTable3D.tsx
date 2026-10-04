@@ -10,11 +10,13 @@ import { ScenarioSummary } from "../../screens/game/ScenarioSummary";
 import { buildGameScreenViewModel } from "../../screens/game/gameScreenViewModel";
 import { TableTurnIndicator } from "../shared/table3d/TableTurnIndicator";
 import { BUNKER_ATTRIBUTE_ICONS, BunkerAttributeIcon } from "./BunkerAttributeIcon";
+import { BunkerPrivateCards } from "./BunkerPrivateCards";
 
 interface Props {
   onCursorChange: (visible: boolean) => void;
   onClassic: () => void;
   onReveal?: () => void;
+  onRevealAttribute?: (index: number) => void;
   onSpecial?: () => void;
   onManage?: () => void;
   onSkip?: () => void;
@@ -219,9 +221,11 @@ export default function BunkerTable3D(props: Props) {
         <TableTurnIndicator
           label={
             voting
-              ? game.phase === "ROUND_VOTE_TIEBREAK"
-                ? "Переголосование"
-                : "Голосование"
+              ? !game.votingOpen
+                ? "Защита кандидатов"
+                : game.phase === "ROUND_VOTE_TIEBREAK"
+                  ? "Переголосование"
+                  : "Голосование"
               : view.isMyTurn
                 ? "Ваш ход"
                 : view.currentTurnPlayer
@@ -230,9 +234,11 @@ export default function BunkerTable3D(props: Props) {
           }
           detail={
             voting
-              ? myHasVoted
-                ? "Ваш голос принят"
-                : `${game.votesCount} / ${game.totalVotesExpected} голосов`
+              ? !game.votingOpen
+                ? "Голосование откроется после защиты"
+                : myHasVoted
+                  ? "Ваш голос принят"
+                  : `${game.votesCount} / ${game.totalVotesExpected} голосов`
               : view.isMyTurn && view.canReveal
                 ? game.roundNumber === 1
                   ? "Раскройте профессию"
@@ -267,6 +273,18 @@ export default function BunkerTable3D(props: Props) {
           )}
         </nav>
       </RoundTableView>
+      {!isSpectator && myCharacter && (
+        <BunkerPrivateCards
+          character={myCharacter}
+          revealedIndices={view.revealedIndices}
+          actionRevealed={Boolean(view.me?.actionCardRevealed)}
+          roundNumber={game.roundNumber}
+          canReveal={Boolean(props.onRevealAttribute && view.canReveal)}
+          canRevealAction={Boolean(props.onSpecial && view.canRevealAction)}
+          onReveal={props.onRevealAttribute}
+          onSpecial={props.onSpecial}
+        />
+      )}
       {scenario && (
         <AccessibleModal
           labelledBy="bunker3d-scenario-title"

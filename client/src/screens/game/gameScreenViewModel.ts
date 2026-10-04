@@ -108,7 +108,11 @@ export function buildGameScreenViewModel({
   } else if (gameState.phase === "BUNKER_EXPLORE") {
     phaseDescription = "Открыта новая карта бункера";
   } else if (gameState.phase === "ROUND_DISCUSSION") {
-    phaseDescription = "Обсудите, кого оставить за пределами бункера";
+    phaseDescription =
+      gameState.votingSchedule[gameState.roundNumber - 1] > 0 ||
+      gameState.roundNumber === gameState.totalRounds
+        ? "Обсудите, кого оставить за пределами бункера"
+        : "Обсудите раскрытые карты перед следующим раундом";
   } else if (gameState.phase === "ROUND_RESULT") {
     phaseDescription = "Подведены итоги голосования";
   } else if (gameState.phase === "ROUND_REVEAL") {
@@ -122,7 +126,9 @@ export function buildGameScreenViewModel({
     } else {
       phaseDescription = currentTurnPlayer
         ? `Сейчас ходит ${currentTurnPlayer.name}`
-        : "Ожидаем следующего игрока";
+        : gameState.phaseEndTime
+          ? "Изучаем раскрытую характеристику"
+          : "Ожидаем следующего игрока";
     }
   }
 
