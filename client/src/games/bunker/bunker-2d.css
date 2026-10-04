@@ -702,6 +702,11 @@ button.b2-dossier-field:focus-visible,
   }
 }
 @media (max-width: 900px) {
+  .bunker-2d .gs-room-header {
+    /* A filtered header traps the fixed bottom toolbar inside its own bounds. */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
   .screen.command-game-screen.bunker-2d {
     min-height: 100dvh;
     height: auto;

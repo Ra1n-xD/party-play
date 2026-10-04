@@ -14,6 +14,7 @@ interface AccessibleModalProps {
   labelledBy: string;
   onClose: () => void;
   onEscape?: () => void;
+  dismissible?: boolean;
   children: ReactNode;
   overlayClassName?: string;
   panelClassName?: string;
@@ -66,6 +67,7 @@ export function AccessibleModal({
   labelledBy,
   onClose,
   onEscape,
+  dismissible = true,
   children,
   overlayClassName = "",
   panelClassName = "",
@@ -74,11 +76,13 @@ export function AccessibleModal({
   const panelRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
   const onEscapeRef = useRef(onEscape);
+  const dismissibleRef = useRef(dismissible);
 
   useEffect(() => {
     onCloseRef.current = onClose;
     onEscapeRef.current = onEscape;
-  }, [onClose, onEscape]);
+    dismissibleRef.current = dismissible;
+  }, [onClose, onEscape, dismissible]);
 
   useEffect(() => {
     const overlay = overlayRef.current;
@@ -102,7 +106,7 @@ export function AccessibleModal({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (!event.repeat) (onEscapeRef.current ?? onCloseRef.current)();
+        if (!event.repeat && dismissibleRef.current) (onEscapeRef.current ?? onCloseRef.current)();
         return;
       }
 
@@ -153,7 +157,7 @@ export function AccessibleModal({
       ref={overlayRef}
       className={`modal-overlay ${overlayClassName}`.trim()}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onCloseRef.current();
+        if (dismissibleRef.current && event.target === event.currentTarget) onCloseRef.current();
       }}
     >
       <section

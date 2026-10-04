@@ -84,7 +84,6 @@ interface BunkerGameContextValue {
   transferHost: (targetPlayerId: string) => void;
   clearHostChangeNotice: () => void;
   currentOverlay: OverlayItem | null;
-  dismissOverlays: () => void;
   pendingAdminOpen: boolean;
   consumePendingAdminOpen: () => void;
 }
@@ -189,14 +188,8 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
   );
 
   const enqueueOverlay = useCallback((item: OverlayItem) => {
-    setOverlayQueue((current) => [...current.slice(-7), item]);
+    setOverlayQueue((current) => [...current, item]);
   }, []);
-
-  const dismissOverlays = useCallback(() => {
-    if (currentOverlay?.kind === "actionCard") setPendingAdminOpen(true);
-    setCurrentOverlay(null);
-    setOverlayQueue([]);
-  }, [currentOverlay]);
 
   useEffect(() => {
     if (currentOverlay || overlayQueue.length === 0) return;
@@ -240,14 +233,12 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
     const nextPhase = gameState.phase;
     if (previousPhase === nextPhase) return;
     previousPhaseRef.current = nextPhase;
-    // Old reveal animations must not obscure a new ballot or the final result.
-    setOverlayQueue((current) =>
-      nextPhase === "GAME_OVER" ? [] : current.filter((item) => item.kind === "actionCard"),
-    );
-    setCurrentOverlay((current) =>
-      nextPhase !== "GAME_OVER" && current?.kind === "actionCard" ? current : null,
-    );
-    if (nextPhase === "GAME_OVER") setPendingAdminOpen(false);
+    // A phase transition must not discard the last player's reveal or queued events.
+    if (nextPhase === "GAME_OVER") {
+      setOverlayQueue([]);
+      setCurrentOverlay(null);
+      setPendingAdminOpen(false);
+    }
 
     if (nextPhase === "CATASTROPHE_REVEAL" && gameState.catastrophe) {
       enqueueOverlay({
@@ -459,7 +450,6 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
         },
         clearHostChangeNotice: platform.clearHostChangeNotice,
         currentOverlay,
-        dismissOverlays,
         pendingAdminOpen,
         consumePendingAdminOpen,
       }}

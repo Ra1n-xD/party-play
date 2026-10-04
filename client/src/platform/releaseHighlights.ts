@@ -1,3 +1,4 @@
+import bunkerCards from "../assets/updates/bunker-cards-6.7.0.png";
 import cardControls from "../assets/updates/card-controls-6.6.0.png";
 import upgradeFilters from "../assets/updates/upgrade-filters-6.5.0.png";
 import firstPersonEmotions from "../assets/updates/first-person-emotions-6.4.0.png";
@@ -39,6 +40,28 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-7",
+    version: "6.7.0",
+    date: "2026-10-04",
+    category: "БУНКЕР",
+    title: "Каждая карта получает своё время.",
+    summary: "Раскрытие без спешки, правильный финал и личные карты под рукой в 3D.",
+    changes: [
+      "Последняя раскрытая карта больше не исчезает при смене этапа. После каждого круга есть обсуждение, а игровые события показываются полностью без пропуска.",
+      "Партия продолжается до нужного числа мест в бункере. Пустое голосование не пропускает исключение, а при ничьей люди и боты сначала ждут окончания защиты кандидатов.",
+      "В 3D ваши характеристики и особое условие видны внизу: нажмите карту для подробностей или раскрытия. Меню эмоций в 2D открывается там, где для него есть место.",
+    ],
+    screenshots: [
+      {
+        src: bunkerCards,
+        caption: "6.7.0 · Личные карты внизу 3D-стола — тестовая партия на 16 мест с ботами",
+        alt: "В 3D Бункера внизу видны шесть личных характеристик и особое условие. Карты можно открыть нажатием. Тестовый стол на шестнадцать мест с ботами.",
+        width: 1280,
+        height: 720,
+      },
+    ],
+  },
   {
     id: "release-6-6",
     version: "6.6.0",

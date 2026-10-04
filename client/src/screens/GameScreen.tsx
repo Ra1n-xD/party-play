@@ -233,6 +233,7 @@ export function GameScreen({
           <BunkerTable3D
             onCursorChange={setCursorVisible}
             onClassic={onToggle3D}
+            onRevealAttribute={canUseRoomActions && view.canReveal ? handleReveal : undefined}
             onReveal={
               canUseRoomActions && view.canReveal
                 ? () => (gameState.roundNumber === 1 ? revealAttribute(0) : openAttributePicker())

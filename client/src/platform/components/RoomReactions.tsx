@@ -95,21 +95,24 @@ export function RoomReactions() {
     }
     const maxLeft = Math.max(POPOVER_MARGIN, viewportWidth - popoverWidth - POPOVER_MARGIN);
     const left = Math.min(Math.max(POPOVER_MARGIN, triggerRect.right - popoverWidth), maxLeft);
-    const openAbove =
-      Boolean(trigger.closest(".game-dock-tools")) ||
-      triggerRect.bottom + POPOVER_GAP + POPOVER_HEIGHT > viewportHeight - POPOVER_MARGIN;
+    const spaceAbove = Math.max(0, triggerRect.top - POPOVER_GAP - POPOVER_MARGIN);
+    const spaceBelow = Math.max(
+      0,
+      viewportHeight - triggerRect.bottom - POPOVER_GAP - POPOVER_MARGIN,
+    );
+    const openAbove = spaceAbove >= POPOVER_HEIGHT || spaceAbove > spaceBelow;
 
     setPopoverPosition(
       openAbove
         ? {
             bottom: Math.max(POPOVER_MARGIN, viewportHeight - triggerRect.top + POPOVER_GAP),
             left,
-            maxHeight: triggerRect.top - POPOVER_GAP - POPOVER_MARGIN,
+            maxHeight: spaceAbove,
           }
         : {
             left,
             top: triggerRect.bottom + POPOVER_GAP,
-            maxHeight: viewportHeight - triggerRect.bottom - POPOVER_GAP - POPOVER_MARGIN,
+            maxHeight: spaceBelow,
           },
     );
   }, []);

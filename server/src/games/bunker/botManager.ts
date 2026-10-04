@@ -49,10 +49,12 @@ export function scheduleBotActions(room: Room, io: IOServer): void {
 
   switch (phase) {
     case "ROUND_REVEAL":
+      if (room.gameState.revealPending) break;
       scheduleBotReveal(room, io);
       break;
     case "ROUND_VOTE":
     case "ROUND_VOTE_TIEBREAK":
+      if (phase === "ROUND_VOTE_TIEBREAK" && !room.gameState.tiebreakVotingOpen) break;
       scheduleBotVotes(room, io);
       break;
   }
