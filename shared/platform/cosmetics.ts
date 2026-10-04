@@ -130,7 +130,6 @@ export const COSMETIC_KIND_NAMES: Record<CosmeticKind, string> = {
   uno: "Карты UNO",
   reaction: "Эмоции",
 };
-export const CASE_COST = 1;
 export const GAME_REWARD = 1;
 export const WIN_REWARD = 5;
 export const INITIAL_COINS = 20;

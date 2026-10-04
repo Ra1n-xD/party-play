@@ -1,4 +1,10 @@
-import { COSMETICS, RARITIES, type CosmeticKind, type Rarity } from "./cosmetics.js";
+import {
+  COSMETICS,
+  COSMETIC_KIND_NAMES,
+  RARITIES,
+  type CosmeticKind,
+  type Rarity,
+} from "./cosmetics.js";
 
 export const CASES = [
   {
@@ -13,22 +19,22 @@ export const CASES = [
     name: "Кейс персонажа",
     description: "Только персонажи",
     kind: "avatar",
-    cost: 1,
+    cost: 5,
   },
   {
     id: "durak",
     name: "Кейс карт Дурака",
     description: "Рубашки для Дурака",
     kind: "durak",
-    cost: 1,
+    cost: 5,
   },
-  { id: "uno", name: "Кейс карт UNO", description: "Рубашки для UNO", kind: "uno", cost: 1 },
+  { id: "uno", name: "Кейс карт UNO", description: "Рубашки для UNO", kind: "uno", cost: 5 },
   {
     id: "reaction",
     name: "Кейс эмоций",
     description: "Жесты и реакции",
     kind: "reaction",
-    cost: 1,
+    cost: 5,
   },
 ] as const satisfies readonly {
   id: string;
@@ -50,6 +56,7 @@ export const CASE_RARITY_WEIGHTS: Record<Rarity, number> = {
   legendary: 3,
 };
 const rarityOrder = Object.keys(RARITIES);
+const kindOrder = Object.keys(COSMETIC_KIND_NAMES);
 export function getCase(id: unknown) {
   return CASES.find((entry) => entry.id === id);
 }
@@ -58,6 +65,7 @@ export function getCaseItems(id: CaseId) {
   return COSMETICS.filter((item) => !definition.kind || item.kind === definition.kind).sort(
     (a, b) =>
       rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity) ||
+      kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) ||
       a.name.localeCompare(b.name, "ru"),
   );
 }

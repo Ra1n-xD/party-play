@@ -5,6 +5,11 @@ export interface DailyReward {
   streak: number;
   coins: number;
 }
+export interface DailyRewardStatus {
+  available: DailyReward | null;
+  lastClaim: DailyReward | null;
+  nextClaimAt: number;
+}
 /** Calendar days in Moscow, independent of the server or browser timezone. */
 export function getMoscowDay(now = Date.now()) {
   return new Date(now + MOSCOW_OFFSET_MS).toISOString().slice(0, 10);
@@ -20,4 +25,14 @@ export function nextDailyReward(
   if (previous && previous.date >= date) return null;
   const streak = previous?.date === getMoscowDay(now - DAY_MS) ? previous.streak + 1 : 1;
   return { date, streak, coins: streak };
+}
+export function getDailyRewardStatus(
+  previous: DailyReward | null | undefined,
+  now = Date.now(),
+): DailyRewardStatus {
+  return {
+    available: nextDailyReward(previous, now),
+    lastClaim: previous ?? null,
+    nextClaimAt: nextMoscowMidnight(now),
+  };
 }
