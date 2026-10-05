@@ -850,7 +850,11 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
                       ? `Ход: ${actorName}`
                       : "Следующий ход"}
           </strong>
-          <CardTurnClock remainingMs={game.turnRemainingMs} paused={paused} />
+          <CardTurnClock
+            remainingMs={game.turnRemainingMs}
+            paused={paused}
+            revision={snapshot.revision}
+          />
         </div>
       )}
 

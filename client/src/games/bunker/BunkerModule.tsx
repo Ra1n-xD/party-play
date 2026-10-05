@@ -70,6 +70,55 @@ function OverlayRenderer({ item }: { item: OverlayItem }) {
   );
 }
 
+function VoteEventNotice({
+  item,
+  paused,
+  votingOpen,
+}: {
+  item: OverlayItem;
+  paused: boolean;
+  votingOpen: boolean;
+}) {
+  const title =
+    item.kind === "announcement"
+      ? item.title
+      : item.kind === "attribute"
+        ? item.attribute.value
+        : item.actionCard.title;
+  const subtitle =
+    item.kind === "announcement"
+      ? item.subtitle
+      : `${item.playerName} ${item.kind === "attribute" ? ATTRIBUTE_LABELS[item.attribute.type] : "раскрывает особое условие"}`;
+  const description =
+    item.kind === "announcement"
+      ? item.description
+      : item.kind === "attribute"
+        ? item.attribute.detail
+        : item.actionCard.description;
+
+  return (
+    <aside className="bunker-vote-event-notice" aria-label="Игровое событие" data-table-input-block>
+      <div role="status" aria-live="polite" aria-atomic="true">
+        {subtitle && <span>{subtitle}</span>}
+        <strong>{title}</strong>
+      </div>
+      {description && (
+        <details key={`${title}:${description}`}>
+          <summary>{item.kind === "actionCard" ? "Прочитать условие" : "Подробнее"}</summary>
+          <p>{description}</p>
+        </details>
+      )}
+      <small>
+        {paused
+          ? "Голосование на паузе"
+          : votingOpen
+            ? "Голосование продолжается"
+            : "Кандидаты защищают своё место"}
+      </small>
+    </aside>
+  );
+}
+
 function BunkerView() {
   const [is3D, setIs3D] = useState(true);
   const { snapshot } = usePlatform();
@@ -107,7 +156,21 @@ function BunkerView() {
       break;
     case "ROUND_VOTE":
     case "ROUND_VOTE_TIEBREAK":
-      screen = <VoteScreen is3D={is3D} onToggle3D={() => setIs3D((value) => !value)} />;
+      screen = (
+        <VoteScreen
+          is3D={is3D}
+          onToggle3D={() => setIs3D((value) => !value)}
+          eventNotice={
+            currentOverlay ? (
+              <VoteEventNotice
+                item={currentOverlay}
+                paused={gameState.paused}
+                votingOpen={gameState.votingOpen}
+              />
+            ) : undefined
+          }
+        />
+      );
       break;
     case "GAME_OVER":
       screen = <ResultsScreen />;
@@ -124,6 +187,7 @@ function BunkerView() {
     <>
       {screen}
       {currentOverlay &&
+        !isVoteScreen &&
         (is3D && currentOverlay.kind === "announcement" && currentOverlay.eliminatedPlayerId ? (
           <div className="table3d-elimination-notice" role="status">
             <strong>{currentOverlay.subtitle}</strong>

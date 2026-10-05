@@ -546,7 +546,11 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
                   ? "Ваш ход"
                   : `Ход: ${actorName}`}
           </strong>
-          <CardTurnClock remainingMs={game.turnRemainingMs} paused={paused} />
+          <CardTurnClock
+            remainingMs={game.turnRemainingMs}
+            paused={paused}
+            revision={snapshot.revision}
+          />
         </div>
       )}
 
