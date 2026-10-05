@@ -117,6 +117,10 @@
   transform: translate(-50%, -50%);
 }
 
+.show-catalog-art .show-art-permit {
+  right: calc(24 * var(--show-unit));
+}
+
 .show-catalog-art[data-game="bunker"] {
   background: repeating-linear-gradient(0deg, transparent 0 25px, #33291915 26px 28px), #eb8557;
 }
