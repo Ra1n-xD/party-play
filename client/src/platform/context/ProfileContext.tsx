@@ -1,3 +1,4 @@
+import { brandStorage } from "../brandStorage";
 import {
   createContext,
   useCallback,
@@ -27,12 +28,12 @@ import type { ProfileSession } from "../../../../shared/platform/auth";
 import { PROFILE_SESSION_KEY, readProfileSession, saveProfileSession } from "../profileSession";
 import { getCase, type CaseId, type CaseRequest } from "../../../../shared/platform/cases";
 import type { DailyReward, DailyRewardStatus } from "../../../../shared/platform/dailyRewards";
-const OPENING_KEY = "partyplay_pending_case_v2";
-const UPGRADE_KEY = "partyplay_pending_upgrade_v2";
+const OPENING_KEY = "partyside_pending_case_v2";
+const UPGRADE_KEY = "partyside_pending_upgrade_v2";
 function readPendingUpgrade(name: string): UpgradeRequest | null {
   try {
     const saved = JSON.parse(
-      localStorage.getItem(`${UPGRADE_KEY}:${name.toLocaleLowerCase("ru-RU")}`) ?? "null",
+      brandStorage.getItem(`${UPGRADE_KEY}:${name.toLocaleLowerCase("ru-RU")}`) ?? "null",
     );
     const request = saved?.request;
     return saved?.accountId === name &&
@@ -47,7 +48,7 @@ function readPendingUpgrade(name: string): UpgradeRequest | null {
 }
 function pendingCase(name: string): CaseRequest | null {
   try {
-    const saved = JSON.parse(localStorage.getItem(OPENING_KEY) ?? "null");
+    const saved = JSON.parse(brandStorage.getItem(OPENING_KEY) ?? "null");
     return saved?.accountId === name &&
       typeof saved.requestId === "string" &&
       getCase(saved.caseId ?? "partyplay")
@@ -59,8 +60,8 @@ function pendingCase(name: string): CaseRequest | null {
 }
 function savePendingCase(name: string, request: CaseRequest | null) {
   try {
-    if (request) localStorage.setItem(OPENING_KEY, JSON.stringify({ accountId: name, ...request }));
-    else localStorage.removeItem(OPENING_KEY);
+    if (request) brandStorage.setItem(OPENING_KEY, JSON.stringify({ accountId: name, ...request }));
+    else brandStorage.removeItem(OPENING_KEY);
   } catch {
     /* The in-memory key still prevents retry charges. */
   }
@@ -103,8 +104,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     try {
       const key = `${UPGRADE_KEY}:${accountId.current}`;
       if (request)
-        localStorage.setItem(key, JSON.stringify({ accountId: accountId.current, request }));
-      else localStorage.removeItem(key);
+        brandStorage.setItem(key, JSON.stringify({ accountId: accountId.current, request }));
+      else brandStorage.removeItem(key);
     } catch {
       /* Keep the same request in memory if browser storage is unavailable. */
     }
@@ -221,7 +222,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setError(null);
     };
     const storage = (event: StorageEvent) => {
-      if (event.key !== PROFILE_SESSION_KEY && event.key !== null) return;
+      if (
+        event.key !== PROFILE_SESSION_KEY &&
+        event.key !== "partyplay_profile_session_v2" &&
+        event.key !== null
+      )
+        return;
       readProfileSession();
       socket.disconnect();
       socket.connect();

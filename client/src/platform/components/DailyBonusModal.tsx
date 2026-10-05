@@ -92,7 +92,7 @@ export function DailyBonusModal({ onClose }: { onClose(): void }) {
     >
       <header className="daily-bonus-heading">
         <div>
-          <span>МОНЕТЫ PARTYPLAY</span>
+          <span>МОНЕТЫ PARTYSIDE</span>
           <h2 id="daily-bonus-title">Ежедневный бонус</h2>
         </div>
         <button

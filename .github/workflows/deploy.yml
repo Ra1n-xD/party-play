@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: partyplay-production
+  group: partyside-production
   cancel-in-progress: false
 
 permissions:
@@ -18,17 +18,28 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
+        env:
+          PARTYSIDE_PROJECT_DIR: ${{ vars.VPS_PROJECT_DIR }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           fingerprint: ${{ secrets.VPS_HOST_FINGERPRINT }}
           command_timeout: 30m
+          envs: PARTYSIDE_PROJECT_DIR
           script: |
             set -eu
-            cd ~/party-play
+            if [ -z "${PARTYSIDE_PROJECT_DIR:-}" ]; then
+              if [ -d "$HOME/party-side/.git" ]; then
+                PARTYSIDE_PROJECT_DIR="$HOME/party-side"
+              else
+                PARTYSIDE_PROJECT_DIR="$HOME/party-play"
+              fi
+            fi
+            export PARTYSIDE_PROJECT_DIR
+            cd "$PARTYSIDE_PROJECT_DIR"
             git fetch --quiet origin main
             deploy_script=$(mktemp)
             trap 'rm -f "$deploy_script"' EXIT
             git show "${{ github.sha }}:deploy.sh" > "$deploy_script"
-            PARTYPLAY_TARGET_COMMIT="${{ github.sha }}" bash "$deploy_script"
+            PARTYSIDE_TARGET_COMMIT="${{ github.sha }}" bash "$deploy_script"

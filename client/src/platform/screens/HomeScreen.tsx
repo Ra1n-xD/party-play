@@ -18,6 +18,7 @@ import { useProfile } from "../context/ProfileContext";
 import { clientGameRegistry, type RegisteredClientGameId } from "../gameRegistry";
 import { gameMenuPresentation } from "../gameMenuPresentation";
 import { ReconnectScreen } from "./ReconnectScreen";
+import { HomeAbout } from "../seo/PublicPage";
 import "../../styles/show-menu.css";
 import "../../styles/game-catalog.css";
 
@@ -75,7 +76,12 @@ export function HomeScreen() {
     setPublicRoomName(profile?.nickname ?? "");
   }, [profile?.nickname]);
   const [joinCode, setJoinCode] = useState("");
-  const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(null);
+  const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(() => {
+    const requested = new URLSearchParams(window.location.search).get("game");
+    return requested && Object.hasOwn(clientGameRegistry, requested)
+      ? (requested as RegisteredClientGameId)
+      : null;
+  });
   const [entryMode, setEntryMode] = useState<RoomEntryMode>("join");
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [rulesGameId, setRulesGameId] = useState<RegisteredClientGameId | null>(null);
@@ -131,12 +137,14 @@ export function HomeScreen() {
   const openGame = (gameId: RegisteredClientGameId) => {
     clearError();
     setSelectedGameId(gameId);
+    history.replaceState(null, "", `/?game=${gameId}`);
     setEntryMode("join");
     setCreateVisibility("private");
   };
   const backToCatalog = () => {
     clearError();
     setSelectedGameId(null);
+    history.replaceState(null, "", "/");
   };
   const openRulesModal = (gameId: RegisteredClientGameId) => {
     setRecoveryOpen(false);
@@ -234,7 +242,7 @@ export function HomeScreen() {
     </button>
   );
 
-  return (
+  const screen = (
     <main
       className={`show-menu${selectedGame ? " is-game-menu" : " is-main-menu"}`}
       data-game={selectedGame?.id}
@@ -481,5 +489,11 @@ export function HomeScreen() {
         </AccessibleModal>
       )}
     </main>
+  );
+  return (
+    <>
+      {screen}
+      {!selectedGame && <HomeAbout />}
+    </>
   );
 }

@@ -14,6 +14,9 @@ import { UpdatesScreen } from "./platform/screens/UpdatesScreen";
 import { ProfileHeader } from "./platform/components/ProfileHeader";
 import "./styles/profiles.css";
 import { AppUpdateNotice } from "./platform/components/AppUpdateNotice";
+import { PageMetadata } from "./platform/seo/PageMetadata";
+import { PublicPage } from "./platform/seo/PublicPage";
+import { publicGames } from "./platform/seo/siteMetadata";
 
 function ProfileApp() {
   const { profile, loading } = useProfile();
@@ -46,6 +49,7 @@ function ProfileApp() {
           "/updates",
           "/leaderboard",
           "/stats",
+          ...publicGames.map((game) => `/games/${game.id}`),
         ].includes(link.getAttribute("href") ?? "")
       )
         return;
@@ -70,11 +74,37 @@ function ProfileApp() {
     previousProfile.current = profile;
   }, [profile, path]);
   const profilePage = path === "/profile" || path === "/cases" || path === "/upgrade";
+  const gamePage = publicGames.some((game) => `/games/${game.id}` === path);
+  const knownPage =
+    gamePage ||
+    [
+      "/",
+      "/login",
+      "/profile",
+      "/cases",
+      "/upgrade",
+      "/leaderboard",
+      "/stats",
+      "/updates",
+    ].includes(path);
+  const metadata = <PageMetadata path={path} />;
   if (loading && (path === "/login" || profilePage))
-    return <RoomLoading message="Проверяем вход…" />;
-  if (!profile && (path === "/login" || profilePage)) return <LoginScreen />;
+    return (
+      <>
+        {metadata}
+        <RoomLoading message="Проверяем вход…" />
+      </>
+    );
+  if (!profile && (path === "/login" || profilePage))
+    return (
+      <>
+        {metadata}
+        <LoginScreen />
+      </>
+    );
   return (
     <>
+      {metadata}
       {profilePage && (
         <div className="show-menu platform-header">
           <div className="show-menu-shell">
@@ -86,7 +116,14 @@ function ProfileApp() {
           </div>
         </div>
       )}
-      {path === "/profile" ? (
+      {!knownPage ? (
+        <main className="screen">
+          <h1>Страница не найдена</h1>
+          <a href="/">К играм PartySide</a>
+        </main>
+      ) : gamePage ? (
+        <PublicPage path={path} />
+      ) : path === "/profile" ? (
         <ProfileScreen />
       ) : path === "/cases" ? (
         <CasesScreen />

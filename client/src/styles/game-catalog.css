@@ -201,6 +201,17 @@
 .show-catalog-actions button:hover {
   color: var(--show-accent);
 }
+.show-catalog-actions a {
+  display: inline-flex;
+  align-items: center;
+  padding: calc(4 * var(--show-unit));
+  color: var(--show-muted);
+  font-size: calc(11 * var(--show-unit));
+  white-space: nowrap;
+}
+.show-catalog-actions a:hover {
+  color: var(--show-accent);
+}
 .show-catalog-actions button span {
   color: #e3aff6;
   font-weight: 700;

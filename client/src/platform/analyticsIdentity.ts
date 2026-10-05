@@ -1,4 +1,5 @@
-const ANALYTICS_ID_STORAGE_KEY = "partyplay.analyticsId";
+import { brandStorage } from "./brandStorage";
+const ANALYTICS_ID_STORAGE_KEY = "partyside.analyticsId";
 const ANALYTICS_ID_PATTERN = /^a_[a-f0-9]{32}$/;
 
 function createAnalyticsId(): string {
@@ -9,10 +10,10 @@ function createAnalyticsId(): string {
 
 export function getOrCreateAnalyticsId(): string {
   try {
-    const stored = window.localStorage.getItem(ANALYTICS_ID_STORAGE_KEY);
+    const stored = brandStorage.getItem(ANALYTICS_ID_STORAGE_KEY);
     if (stored && ANALYTICS_ID_PATTERN.test(stored)) return stored;
     const created = createAnalyticsId();
-    window.localStorage.setItem(ANALYTICS_ID_STORAGE_KEY, created);
+    brandStorage.setItem(ANALYTICS_ID_STORAGE_KEY, created);
     return created;
   } catch {
     return createAnalyticsId();

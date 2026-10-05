@@ -105,7 +105,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
             <FiArrowLeft aria-hidden="true" />
             Ко всем играм
           </button>
-          <span className="show-lobby-brand">PARTYPLAY</span>
+          <span className="show-lobby-brand">PARTYSIDE</span>
           {!connected && (
             <span className="show-server-status" role="status">
               Восстанавливаем связь

@@ -3,7 +3,7 @@
 window.addEventListener("vite:preloadError", (event) => {
   if (!navigator.onLine) return;
   try {
-    const key = "partyplay:asset-reload-version";
+    const key = "partyside:asset-reload-version";
     if (sessionStorage.getItem(key) === __APP_VERSION__) return;
     sessionStorage.setItem(key, __APP_VERSION__);
   } catch {

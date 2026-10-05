@@ -1,6 +1,6 @@
 import type { RoomReactionId } from "../../../../shared/platform/reactions";
 
-/** Original PartyPlay stickers; identical artwork on every OS and in every game. */
+/** Original PartySide stickers; identical artwork on every OS and in every game. */
 export function ReactionIcon({ id, animated = false }: { id: RoomReactionId; animated?: boolean }) {
   return (
     <svg

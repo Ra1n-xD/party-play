@@ -59,7 +59,7 @@ export function StatsScreen() {
           <section className="platform-stats-hero" aria-labelledby="project-stats-title">
             <div>
               <p>Статистика проекта</p>
-              <h1 id="project-stats-title">PartyPlay в цифрах</h1>
+              <h1 id="project-stats-title">PartySide в цифрах</h1>
             </div>
             <span
               className={`platform-stats-connection${connected ? " is-online" : " is-offline"}`}

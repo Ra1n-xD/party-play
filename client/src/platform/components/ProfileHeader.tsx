@@ -20,9 +20,9 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
   };
   return (
     <header className="show-menu-header show-profile-header">
-      <a className="show-brand" href="/" onClick={goHome} aria-label="PartyPlay — на главную">
+      <a className="show-brand" href="/" onClick={goHome} aria-label="PartySide — на главную">
         <BrandDice className="show-brand-dice" />
-        partyplay
+        partyside
       </a>
       <nav className="show-profile-navigation" aria-label="Профиль и коллекция">
         <a href="/" onClick={goHome} aria-current={activePage === "games" ? "page" : undefined}>

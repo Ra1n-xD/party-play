@@ -285,7 +285,7 @@ export function drawCardBack(
     ctx.fillText(skin.id === "classic" ? "♠" : skin.mark, 128, skin.id === "classic" ? 201 : 204);
     if (skin.id !== "classic") {
       ctx.font = "bold 20px sans-serif";
-      ctx.fillText(game === "uno" ? "UNO" : "PARTYPLAY", 128, 266);
+      ctx.fillText(game === "uno" ? "UNO" : "PARTYSIDE", 128, 266);
     }
   }
   ctx.restore();

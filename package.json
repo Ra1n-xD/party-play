@@ -1,6 +1,6 @@
 {
-  "name": "party-play",
-  "version": "6.7.0",
+  "name": "party-side",
+  "version": "6.8.0",
   "private": true,
   "workspaces": [
     "shared",

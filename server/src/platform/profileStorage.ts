@@ -54,6 +54,7 @@ export let profileStore = emptyStore();
 export let profileStorageHealthy = true;
 export let profileStoreRevision = 0;
 const storagePath =
+  process.env.PARTYSIDE_PROFILES_FILE?.trim() ||
   process.env.PARTYPLAY_PROFILES_FILE?.trim() ||
   resolve(
     process.cwd(),
