@@ -324,12 +324,6 @@ body:has(.show-menu, .profile-login),
   font-size: 20px;
   cursor: pointer;
 }
-.profile-password-hint {
-  color: #ffcf67;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.5;
-}
 .profile-auth-tabs button:focus-visible,
 .profile-password-toggle:focus-visible {
   outline: 2px solid #d8fc61;
@@ -1209,9 +1203,6 @@ body:has(.show-menu, .profile-login),
     min-height: 56px;
     font-size: 17px;
   }
-  .profile-password-hint {
-    font-size: 14px;
-  }
   .profile-login .profile-welcome {
     font-size: 14px;
   }
@@ -1245,9 +1236,6 @@ body:has(.show-menu, .profile-login),
     min-height: 48px;
     padding-top: 12px;
     padding-bottom: 12px;
-  }
-  .profile-password-hint {
-    font-size: 12px;
   }
 }
 
