@@ -136,6 +136,7 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
   const [overlayQueue, setOverlayQueue] = useState<OverlayItem[]>([]);
   const [currentOverlay, setCurrentOverlay] = useState<OverlayItem | null>(null);
   const [pendingAdminOpen, setPendingAdminOpen] = useState(false);
+  const overlayShownDuringVotingRef = useRef<OverlayItem | null>(null);
   const previousPhaseRef = useRef<BunkerGamePhase | null>(null);
   const processedEventSequenceRef = useRef(0);
   const previousPlayersRef = useRef<ClientGameState["players"]>([]);
@@ -174,6 +175,15 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
     };
   }, [bunkerSnapshot]);
 
+  const latestPhaseRef = useRef(gameState?.phase);
+  latestPhaseRef.current = gameState?.phase;
+  if (
+    currentOverlay &&
+    (gameState?.phase === "ROUND_VOTE" || gameState?.phase === "ROUND_VOTE_TIEBREAK")
+  ) {
+    overlayShownDuringVotingRef.current = currentOverlay;
+  }
+
   const privateState =
     bunkerSnapshot?.viewer.role === "player" ? bunkerSnapshot.viewer.privateGame : null;
   const myCharacter = privateState?.character ?? null;
@@ -201,7 +211,16 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentOverlay) return;
     const timer = window.setTimeout(() => {
-      if (currentOverlay.kind === "actionCard") setPendingAdminOpen(true);
+      const phase = latestPhaseRef.current;
+      if (
+        currentOverlay.kind === "actionCard" &&
+        overlayShownDuringVotingRef.current !== currentOverlay &&
+        phase !== "ROUND_VOTE" &&
+        phase !== "ROUND_VOTE_TIEBREAK" &&
+        phase !== "GAME_OVER"
+      ) {
+        setPendingAdminOpen(true);
+      }
       setCurrentOverlay(null);
     }, currentOverlay.duration);
     return () => window.clearTimeout(timer);
@@ -343,6 +362,14 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
 
   const consumePendingAdminOpen = useCallback(() => setPendingAdminOpen(false), []);
 
+  const adminPause = useCallback(() => {
+    platform.setAdminPause(true);
+  }, [platform.setAdminPause]);
+
+  const adminUnpause = useCallback(() => {
+    platform.setAdminPause(false);
+  }, [platform.setAdminPause]);
+
   return (
     <BunkerGameContext.Provider
       value={{
@@ -418,12 +445,8 @@ export function BunkerGameProvider({ children }: { children: ReactNode }) {
         adminForceRevealType: (attributeType) => {
           platform.sendGameCommand("bunker", { type: "force-reveal-type", attributeType });
         },
-        adminPause: () => {
-          platform.setAdminPause(true);
-        },
-        adminUnpause: () => {
-          platform.setAdminPause(false);
-        },
+        adminPause,
+        adminUnpause,
         adminSkipDiscussion: () => {
           platform.sendGameCommand("bunker", { type: "skip-discussion" });
         },

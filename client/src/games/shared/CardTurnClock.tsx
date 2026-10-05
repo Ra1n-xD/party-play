@@ -4,9 +4,11 @@ import { FiClock } from "react-icons/fi";
 export function CardTurnClock({
   remainingMs,
   paused,
+  revision,
 }: {
   remainingMs: number | null;
   paused: boolean;
+  revision: number;
 }) {
   const [seconds, setSeconds] = useState<number | null>(null);
   useEffect(() => {
@@ -20,7 +22,7 @@ export function CardTurnClock({
     if (paused) return;
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
-  }, [remainingMs, paused]);
+  }, [remainingMs, paused, revision]);
   return (
     <span className="card-2d-clock">
       <FiClock aria-hidden="true" />

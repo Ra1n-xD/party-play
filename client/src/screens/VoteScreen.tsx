@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { FiSettings } from "react-icons/fi";
 import { VoteProgressBar } from "../components/VoteProgressBar";
 import { useGame } from "../context/GameContext";
@@ -18,9 +18,11 @@ const BunkerTable3D = lazy(() => import("../games/bunker/BunkerTable3D"));
 export function VoteScreen({
   is3D = false,
   onToggle3D = () => {},
+  eventNotice,
 }: {
   is3D?: boolean;
   onToggle3D?: () => void;
+  eventNotice?: ReactNode;
 }) {
   const [cursorVisible, setCursorVisible] = useState(false);
   const {
@@ -169,6 +171,7 @@ export function VoteScreen({
         >
           {!is3D && <GameViewToggle onOpen3D={onToggle3D} />}
         </GameRoomHeader>
+        {eventNotice}
         {is3D ? (
           <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>
             <BunkerTable3D onCursorChange={setCursorVisible} onClassic={onToggle3D} />
@@ -293,6 +296,7 @@ export function VoteScreen({
       >
         {!is3D && <GameViewToggle onOpen3D={onToggle3D} />}
       </GameRoomHeader>
+      {eventNotice}
 
       {is3D ? (
         <Suspense fallback={<div className="table3d-loading">Готовим комнату…</div>}>

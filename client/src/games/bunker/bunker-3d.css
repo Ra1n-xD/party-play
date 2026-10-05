@@ -107,6 +107,79 @@
   text-align: center;
   font-size: 0.75rem;
 }
+.bunker-vote-event-notice {
+  z-index: 75;
+  flex-shrink: 0;
+  width: min(640px, calc(100% - 24px));
+  margin: 12px auto;
+  padding: 12px 14px;
+  border: 1px solid #c4bba6;
+  border-left: 4px solid #b96a35;
+  border-radius: 10px;
+  background: #efe4cc;
+  color: #172c3d;
+  overflow-wrap: anywhere;
+}
+.bunker-vote-event-notice [role="status"] {
+  display: grid;
+  gap: 3px;
+}
+.bunker-vote-event-notice span {
+  color: #65706e;
+  font-size: 0.72rem;
+}
+.bunker-vote-event-notice strong {
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+.bunker-vote-event-notice details {
+  margin-top: 6px;
+}
+.bunker-vote-event-notice summary {
+  width: fit-content;
+  min-height: 32px;
+  padding-block: 6px;
+  color: #995022;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.bunker-vote-event-notice summary:focus-visible {
+  outline: 2px solid #995022;
+  outline-offset: 2px;
+}
+.bunker-vote-event-notice p {
+  max-height: 110px;
+  margin: 2px 0 8px;
+  overflow-y: auto;
+  color: #52615f;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.bunker-vote-event-notice small {
+  display: block;
+  margin-top: 4px;
+  color: #65706e;
+  font-size: 0.65rem;
+}
+.bunker3d-screen > .bunker-vote-event-notice {
+  position: absolute;
+  top: 64px;
+  right: 14px;
+  width: min(340px, calc(100% - 28px));
+  margin: 0;
+  pointer-events: none;
+}
+.bunker3d-screen > .bunker-vote-event-notice details {
+  pointer-events: auto;
+}
+@media (max-width: 680px) {
+  .bunker3d-screen > .bunker-vote-event-notice {
+    top: 144px;
+    right: 10px;
+    width: calc(100% - 20px);
+    padding: 9px 11px;
+  }
+}
 @media (max-width: 680px), (pointer: coarse) {
   .bunker3d-hand {
     right: 8px;
