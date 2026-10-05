@@ -99,8 +99,7 @@ function ItemCard({
 
 export function UpgradeScreen() {
   const sound = useCollectionAudio();
-  const { profile, busy, connected, error, clearError, upgrade, pendingUpgrade, equip } =
-    useProfile();
+  const { profile, busy, connected, clearError, upgrade, pendingUpgrade, equip } = useProfile();
   const [inputs, setInputs] = useState<UpgradeInput[]>([]);
   const [targetId, setTargetId] = useState<string | null>(null);
   const [filter, setFilter] = useState<CosmeticKind | "all">("all");
@@ -422,12 +421,6 @@ export function UpgradeScreen() {
           )}
         </div>
       </section>
-      {error && (
-        <p className="profile-error" role="alert">
-          {error}
-        </p>
-      )}
-
       <div className="upgrade-catalogs">
         <section aria-labelledby="upgrade-inventory-title">
           <div className="upgrade-catalog-heading">

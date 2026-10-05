@@ -158,7 +158,7 @@ export function DailyBonusWallet({ profile }: { profile: ProfileSnapshot }) {
         aria-haspopup="dialog"
         onClick={openBonus}
       >
-        <CoinAmount amount={profile.coins} />
+        <CoinAmount amount={profile.coins} label="" />
       </button>
       {showHint &&
         createPortal(

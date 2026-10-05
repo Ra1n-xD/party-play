@@ -13,6 +13,7 @@ import { useProfile } from "../context/ProfileContext";
 import { useCollectionAudio } from "../useCollectionAudio";
 import { CoinAmount } from "../components/CoinAmount";
 import { DropFeed } from "../components/DropFeed";
+import { CaseIcon } from "../components/CaseIcon";
 import {
   CASES,
   getCase,
@@ -22,8 +23,21 @@ import {
 } from "../../../../shared/platform/cases";
 
 const WINNER_INDEX = 38;
+const CASE_PRESENTATION = {
+  partyplay: { color: "#d8fc61" },
+  avatar: { color: "#d9b3e8" },
+  durak: { color: "#f2be9f" },
+  uno: { color: "#bcd780" },
+  reaction: { color: "#ffcf67" },
+};
 function randomItem(items: Cosmetic[]) {
   return items[Math.floor(Math.random() * items.length)];
+}
+function visibleCardCount(viewport: HTMLDivElement, track: HTMLDivElement) {
+  const card = track.firstElementChild as HTMLElement | null;
+  if (!card) return 8;
+  const gap = Number.parseFloat(getComputedStyle(track).gap) || 0;
+  return Math.ceil(viewport.clientWidth / (card.offsetWidth + gap)) + 1;
 }
 function ReelItem({ item }: { item: Cosmetic }) {
   return (
@@ -39,7 +53,7 @@ function ReelItem({ item }: { item: Cosmetic }) {
 }
 export function CasesScreen() {
   const sound = useCollectionAudio();
-  const { profile, openCase, pendingCaseId, equip, busy, connected, error } = useProfile();
+  const { profile, openCase, pendingCaseId, equip, busy, connected } = useProfile();
   const [caseId, setCaseId] = useState<CaseId>(pendingCaseId ?? "partyplay");
   const definition = getCase(caseId)!;
   const caseItems = getCaseItems(caseId);
@@ -57,6 +71,7 @@ export function CasesScreen() {
   const frame = useRef<number>();
   const mounted = useRef(true);
   const openingLock = useRef(false);
+  const reelSize = useRef({ width: 0, cardWidth: 0 });
   useEffect(() => {
     if (pendingCaseId) setCaseId(pendingCaseId);
   }, [pendingCaseId]);
@@ -67,8 +82,46 @@ export function CasesScreen() {
     setPhase("idle");
     setAnimated(false);
     setOffset(0);
-    setReel(Array.from({ length: 8 }, () => randomItem(getCaseItems(id))));
+    const count =
+      viewport.current && track.current ? visibleCardCount(viewport.current, track.current) : 8;
+    setReel(Array.from({ length: count }, () => randomItem(getCaseItems(id))));
   };
+  useEffect(() => {
+    const reelWindow = viewport.current;
+    const reelTrack = track.current;
+    if (!reelWindow || !reelTrack) return;
+    const fitReel = () => {
+      const card = reelTrack.firstElementChild as HTMLElement | null;
+      if (!card) return;
+      const width = reelWindow.clientWidth;
+      const cardWidth = card.offsetWidth;
+      const resized = width !== reelSize.current.width || cardWidth !== reelSize.current.cardWidth;
+      reelSize.current = { width, cardWidth };
+      const visibleCount = visibleCardCount(reelWindow, reelTrack);
+      // Keep enough cards beyond the winner to fill even a wide reel window.
+      const count =
+        phase === "spin" || phase === "result" ? WINNER_INDEX + visibleCount + 1 : visibleCount;
+      setReel((items) =>
+        items.length >= count
+          ? items
+          : [
+              ...items,
+              ...Array.from({ length: count - items.length }, () =>
+                randomItem(getCaseItems(caseId)),
+              ),
+            ],
+      );
+      if (phase === "result" || (phase === "spin" && resized)) {
+        const winnerCard = reelTrack.children[WINNER_INDEX] as HTMLElement | undefined;
+        if (winnerCard) setOffset(width / 2 - winnerCard.offsetLeft - winnerCard.offsetWidth / 2);
+      }
+    };
+    fitReel();
+    const observer = new ResizeObserver(fitReel);
+    observer.observe(reelWindow);
+    observer.observe(reelTrack.firstElementChild!);
+    return () => observer.disconnect();
+  }, [caseId, phase, profile?.id]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -114,7 +167,11 @@ export function CasesScreen() {
     const winner = getCosmetic(result.itemId)!;
     const resultCaseId = result.caseId ?? "partyplay";
     setCaseId(resultCaseId);
-    const items = Array.from({ length: 46 }, () => randomItem(getCaseItems(resultCaseId)));
+    const visibleCount =
+      viewport.current && track.current ? visibleCardCount(viewport.current, track.current) : 8;
+    const items = Array.from({ length: WINNER_INDEX + visibleCount + 1 }, () =>
+      randomItem(getCaseItems(resultCaseId)),
+    );
     items[WINNER_INDEX] = winner;
     setReel(items);
     setOpening(result);
@@ -141,20 +198,29 @@ export function CasesScreen() {
     <main className="cases-page">
       <DropFeed holdUpdates={phase === "request" || phase === "spin"} />
       <div className="case-selector" role="group" aria-label="Выберите кейс">
-        {CASES.map((entry) => (
-          <button
-            type="button"
-            key={entry.id}
-            aria-pressed={caseId === entry.id}
-            className={`case-choice${caseId === entry.id ? " is-active" : ""}`}
-            disabled={busy || phase === "request" || phase === "spin" || Boolean(pendingCaseId)}
-            onClick={() => chooseCase(entry.id)}
-          >
-            <strong>{entry.name}</strong>
-            <span>{entry.description}</span>
-            <CoinAmount amount={entry.cost} />
-          </button>
-        ))}
+        {CASES.map((entry) => {
+          const { color } = CASE_PRESENTATION[entry.id];
+          return (
+            <button
+              type="button"
+              key={entry.id}
+              aria-pressed={caseId === entry.id}
+              aria-label={`${entry.name}. ${entry.description}. ${entry.cost} ${entry.cost === 1 ? "монета" : "монет"}`}
+              title={entry.description}
+              className={`case-choice${caseId === entry.id ? " is-active" : ""}`}
+              style={{ "--case-icon-color": color } as CSSProperties}
+              disabled={busy || phase === "request" || phase === "spin" || Boolean(pendingCaseId)}
+              onClick={() => chooseCase(entry.id)}
+            >
+              <span className="case-choice-icon" aria-hidden="true">
+                <CaseIcon caseId={entry.id} />
+              </span>
+              <strong>{entry.name}</strong>
+              <CoinAmount amount={entry.cost} label="" />
+              <span className="case-choice-description">{entry.description}</span>
+            </button>
+          );
+        })}
       </div>
       <h1 className="case-title">{definition.name}</h1>
       <section className={`case-stage phase-${phase}`} aria-label="Открытие кейса">
@@ -269,11 +335,6 @@ export function CasesScreen() {
                   : "Использовать"}
             </button>
           </div>
-        )}
-        {error && (
-          <p className="profile-error" role="alert">
-            {error}
-          </p>
         )}
       </section>
       <div className="case-info">

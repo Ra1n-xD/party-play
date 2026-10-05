@@ -312,8 +312,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   };
   const logout = () => {
     if (!socket.connected || !ready || requestBusy.current) return;
-    if (roomCode) setConfirmLogout(true);
-    else performLogout();
+    setConfirmLogout(true);
   };
   const equip = (itemId: string) => {
     if (!socket.connected || requestBusy.current) return;
@@ -447,11 +446,16 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     >
       {children}
       {confirmLogout && profile && (
-        <AccessibleModal labelledBy="profile-logout-title" onClose={() => setConfirmLogout(false)}>
+        <AccessibleModal
+          labelledBy="profile-logout-title"
+          onClose={() => setConfirmLogout(false)}
+          panelClassName="profile-logout-dialog"
+        >
           <h2 id="profile-logout-title">Выйти из аккаунта?</h2>
           <p className="profile-logout-note">
-            Вы также покинете текущую комнату. Если в ней больше нет людей, она закроется. Коллекция
-            сохранится в вашем аккаунте.
+            {roomCode &&
+              "Вы также покинете текущую комнату. Если в ней больше нет людей, она закроется. "}
+            Ваши монеты и коллекция сохранятся. Чтобы вернуться в аккаунт, понадобится пароль.
           </p>
           <div className="modal-actions">
             <button className="btn btn-secondary" onClick={() => setConfirmLogout(false)}>

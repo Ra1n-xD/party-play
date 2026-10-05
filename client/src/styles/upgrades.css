@@ -2,7 +2,7 @@
   --upgrade-accent: #d8fc61;
   --upgrade-muted: #bcb0cc;
   min-height: calc(100dvh - 76px);
-  padding: 44px max(24px, calc((100vw - 1200px) / 2)) 72px;
+  padding: 44px max(var(--platform-gutter), calc((100% - var(--platform-content-max)) / 2)) 72px;
   background: radial-gradient(ellipse at 50% 12%, #66449b30, transparent 700px), #221930;
   color: #fff8e8;
   font-family: "Golos Text", sans-serif;
@@ -538,7 +538,7 @@
 }
 @media (max-width: 760px) {
   .upgrade-page {
-    padding: 30px 20px 50px;
+    padding-block: 30px 50px;
   }
   .upgrade-stage {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -587,9 +587,6 @@
   }
 }
 @media (max-width: 420px) {
-  .upgrade-page {
-    padding-inline: 16px;
-  }
   .upgrade-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

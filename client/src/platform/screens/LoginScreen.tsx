@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { FiEye, FiEyeOff } from "react-icons/fi";
+import { FiAlertTriangle, FiEye, FiEyeOff } from "react-icons/fi";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "../../../../shared/platform/auth";
 import { INITIAL_COINS } from "../../../../shared/platform/cosmetics";
 import { useProfile } from "../context/ProfileContext";
@@ -129,8 +129,8 @@ export function LoginScreen() {
             {registering && (
               <>
                 <small id="profile-password-hint" className="profile-password-hint">
-                  От {PASSWORD_MIN_LENGTH} до {PASSWORD_MAX_LENGTH} символов. Можно использовать
-                  длинную фразу с пробелами.
+                  Запомните или сохраните пароль: если вы его забудете, восстановить доступ к
+                  аккаунту не получится.
                 </small>
                 <label htmlFor="profile-password-confirm">Повторите пароль</label>
                 <input
@@ -178,11 +178,13 @@ export function LoginScreen() {
               <CoinAmount amount={INITIAL_COINS} label="монет при регистрации" />
             </span>
           </div>
-          <small>Сохраните пароль: восстановление через почту пока недоступно.</small>
-          <small className="profile-reset-note">
-            Аккаунты прошлых версий сброшены. Чтобы снова сохранять прогресс, зарегистрируйтесь
-            заново.
-          </small>
+          <div className="profile-password-warning">
+            <FiAlertTriangle aria-hidden="true" />
+            <div>
+              <strong>Сохраните пароль</strong>
+              <span>Восстановление через почту пока недоступно.</span>
+            </div>
+          </div>
         </aside>
       </section>
     </main>

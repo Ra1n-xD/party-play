@@ -88,7 +88,7 @@ function ProfileApp() {
       "/updates",
     ].includes(path);
   const metadata = <PageMetadata path={path} />;
-  if (loading && (path === "/login" || profilePage))
+  if (!profile && loading && (path === "/login" || profilePage))
     return (
       <>
         {metadata}
