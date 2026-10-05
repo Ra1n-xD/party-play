@@ -11,7 +11,7 @@ import { CosmeticPreview } from "../components/CosmeticPreview";
 import { CoinAmount } from "../components/CoinAmount";
 
 export function ProfileScreen() {
-  const { profile, equip, logout, busy, connected, error } = useProfile();
+  const { profile, equip, logout, busy, connected } = useProfile();
   const [tab, setTab] = useState<CosmeticKind>("avatar");
   if (!profile) return null;
   const owned = COSMETICS.filter((item) => profile.inventory[item.id]).length;
@@ -19,7 +19,6 @@ export function ProfileScreen() {
     <main className="collection-page">
       <div className="collection-heading">
         <div>
-          <span className="profile-eyebrow">КОЛЛЕКЦИЯ</span>
           <h1>Ваш стиль игры</h1>
           <p>Персонажи, карты и эмоции для вашего вечера за столом.</p>
         </div>
@@ -48,11 +47,6 @@ export function ProfileScreen() {
           </button>
         ))}
       </nav>
-      {error && (
-        <p className="profile-error" role="alert">
-          {error}
-        </p>
-      )}
       <div className="collection-grid">
         {COSMETICS.filter((item) => item.kind === tab).map((item) => {
           const count = profile.inventory[item.id] ?? 0;

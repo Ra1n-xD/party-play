@@ -116,7 +116,6 @@ export function LeaderboardScreen() {
         <main className="leaderboard-content">
           <header className="leaderboard-heading">
             <div>
-              <span className="leaderboard-eyebrow">PARTYSIDE / ИГРОКИ</span>
               <h1>
                 <FiAward aria-hidden="true" /> Рейтинг
               </h1>

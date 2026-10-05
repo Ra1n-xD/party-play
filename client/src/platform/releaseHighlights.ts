@@ -1,4 +1,5 @@
 import partySideMenu from "../assets/updates/partyside-6.8.0.jpg";
+import arcadeHeader from "../assets/updates/arcade-header-6.8.14.png";
 import bunkerCards from "../assets/updates/bunker-cards-6.7.0.png";
 import cardControls from "../assets/updates/card-controls-6.6.0.png";
 import upgradeFilters from "../assets/updates/upgrade-filters-6.5.0.png";
@@ -43,20 +44,28 @@ interface ReleaseHighlight {
 export const releaseHighlights: ReleaseHighlight[] = [
   {
     id: "release-6-8",
-    version: "6.8.0",
+    version: "6.8.0–6.8.14",
     date: "2026-10-05",
     category: "PARTYSIDE",
     title: "Теперь мы — PartySide.",
-    summary: "Новое название для игр со своей компанией.",
+    summary: "Новое название и аркадное меню для игр со своей компанией.",
     changes: [
       "PartySide встречает вас в каталоге, комнатах, за 3D-столом и в коллекции. Ваши аккаунты, монеты и предметы сохраняются.",
       "У Бункера, Дурака и UNO появились страницы с описанием, основными правилами и переходом к игре — ими удобно делиться с друзьями.",
+      "Аркадные кнопки в шапке объединяют игры, коллекцию, кейсы, улучшение и рейтинг. Активная вкладка выделена ярким цветом, а на телефоне меню остаётся компактным.",
     ],
     screenshots: [
       {
         src: partySideMenu,
         caption: "6.8.0 · Главное меню PartySide — локальная сборка",
         alt: "Главная PartySide с новым названием, каталогом Бункера, Дурака и UNO, ссылками на описание игр и формой входа по коду комнаты. Локальная сборка.",
+        width: 1280,
+        height: 720,
+      },
+      {
+        src: arcadeHeader,
+        caption: "6.8.14 · Аркадное меню в шапке — локальная сборка, тестовый аккаунт",
+        alt: "Главная PartySide с аркадными кнопками Игры, Коллекция, Кейсы, Улучшить и Рейтинг в шапке. Показан тестовый аккаунт в локальной сборке.",
         width: 1280,
         height: 720,
       },

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { FiArrowRight, FiBookOpen, FiChevronLeft, FiChevronRight, FiUsers } from "react-icons/fi";
+import { LuDoorOpen } from "react-icons/lu";
 import type { PublicRoomCountsByGame } from "../../../../shared/platform/publicRooms";
 import type { ClientGameModule, RegisteredClientGameId } from "../gameRegistry";
 import { GameMenuArtwork } from "./GameMenuArtwork";
@@ -96,8 +97,11 @@ export function GameCatalog({ games, counts, onPlay, onRooms }: GameCatalogProps
                   </div>
                   <span className="show-catalog-heading">
                     <strong>{game.metadata.title}</strong>
-                    <small>
-                      {game.metadata.minPlayers}–{game.metadata.maxPlayers} игроков
+                    <small
+                      aria-label={`${game.metadata.minPlayers}–${game.metadata.maxPlayers} игроков`}
+                    >
+                      <FiUsers aria-hidden="true" />
+                      {game.metadata.minPlayers}–{game.metadata.maxPlayers}
                     </small>
                   </span>
                   <span className="show-catalog-play-label">
@@ -112,12 +116,11 @@ export function GameCatalog({ games, counts, onPlay, onRooms }: GameCatalogProps
                     aria-haspopup="dialog"
                     aria-label={`Открытые комнаты — ${game.metadata.title}${roomCount === undefined ? "" : `: ${roomCount}`}`}
                   >
-                    <FiUsers aria-hidden="true" />
-                    Комнаты
+                    <LuDoorOpen aria-hidden="true" />
+                    <span className="show-catalog-rooms-label">Комнаты</span>
                     {roomCount !== undefined && (
                       <span className="show-catalog-room-count">{roomCount}</span>
                     )}
-                    <FiChevronRight className="show-catalog-rooms-arrow" aria-hidden="true" />
                   </button>
                   <a
                     className="show-catalog-rules"

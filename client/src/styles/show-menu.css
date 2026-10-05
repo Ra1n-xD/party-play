@@ -38,8 +38,14 @@
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+:root {
+  --platform-unit: clamp(1px, min(calc(100vw / 1440), calc(100svh / 900)), 2.4px);
+  --platform-content-max: calc(1280 * var(--platform-unit));
+  --platform-gutter: calc(26 * var(--platform-unit));
+}
+
 .show-menu {
-  --show-unit: clamp(1px, min(calc(100vw / 1440), calc(100svh / 900)), 2.4px);
+  --show-unit: var(--platform-unit);
   --show-base: #221930;
   --show-ink: #fff8e8;
   --show-muted: #cfc5da;
@@ -52,7 +58,7 @@
   --bg-secondary: color-mix(in srgb, var(--show-base) 92%, white);
   --bg-card: color-mix(in srgb, var(--show-base) 90%, white);
   min-height: 100svh;
-  padding: calc(16 * var(--show-unit)) calc(26 * var(--show-unit)) calc(20 * var(--show-unit));
+  padding: calc(16 * var(--show-unit)) var(--platform-gutter) calc(20 * var(--show-unit));
   background: radial-gradient(ellipse at 60% 5%, #66449b55, transparent 68%), var(--show-base);
   color: var(--show-ink);
   font-family: "Golos Text", sans-serif;
@@ -62,7 +68,7 @@
 
 .show-menu-shell {
   width: 100%;
-  max-width: calc(1280 * var(--show-unit));
+  max-width: var(--platform-content-max);
   margin: 0 auto;
 }
 
@@ -186,26 +192,96 @@
 }
 
 .show-profile-header {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: calc(16 * var(--show-unit));
+}
+
+.show-profile-account {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: calc(12 * var(--show-unit));
+  min-width: 0;
+  max-width: 100%;
 }
 
 .show-profile-navigation {
   display: flex;
   align-items: center;
-  gap: calc(22 * var(--show-unit));
-  margin-left: calc(12 * var(--show-unit));
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  gap: calc(8 * var(--show-unit));
 }
 
 .show-profile-navigation a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: calc(7 * var(--show-unit));
+  min-height: calc(38 * var(--show-unit));
+  padding: calc(8 * var(--show-unit)) calc(10 * var(--show-unit));
+  border: calc(2 * var(--show-unit)) solid #170e20;
+  border-radius: calc(9 * var(--show-unit));
+  background: #45324f;
+  box-shadow: 0 calc(4 * var(--show-unit)) 0 #140c1d;
   color: var(--show-muted);
-  font-size: calc(14 * var(--show-unit));
+  font-size: calc(12 * var(--show-unit));
+  font-weight: 650;
+  line-height: 1.25;
   text-decoration: none;
-  padding: calc(7 * var(--show-unit)) 0;
+  white-space: nowrap;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.show-profile-navigation svg {
+  flex-shrink: 0;
+  width: calc(16 * var(--show-unit));
+  height: calc(16 * var(--show-unit));
+}
+
+.show-profile-navigation a:hover {
+  background: #664573;
+  color: var(--show-ink);
+  transform: translateY(calc(-2 * var(--show-unit)));
 }
 
 .show-profile-navigation a[aria-current] {
-  color: var(--show-accent);
-  box-shadow: 0 calc(2 * var(--show-unit)) var(--show-accent);
+  background: var(--show-accent);
+  color: #292030;
+  font-weight: 800;
+  transform: rotate(-2deg) translateY(calc(-1 * var(--show-unit)));
+  box-shadow: calc(2 * var(--show-unit)) calc(5 * var(--show-unit)) 0 #140c1d;
+}
+
+.show-profile-header .show-brand {
+  gap: calc(9 * var(--show-unit));
+  font-size: calc(24 * var(--show-unit));
+}
+
+.show-profile-header .show-brand-dice {
+  width: calc(40 * var(--show-unit));
+  height: calc(40 * var(--show-unit));
+}
+
+.show-profile-header .show-login {
+  flex-shrink: 0;
+  border: calc(2 * var(--show-unit)) solid #170e20;
+  background: #e3aff6;
+  box-shadow: calc(2 * var(--show-unit)) calc(3 * var(--show-unit)) 0 #140c1d;
+  color: #2a2033;
+  transform: rotate(1.5deg);
+}
+
+.show-profile-header .show-login:hover {
+  background: #efc9fc;
+  border-color: #170e20;
+  color: #2a2033;
 }
 
 .show-profile-balance {
@@ -228,23 +304,21 @@
   text-decoration: none;
 }
 
-.show-profile-connection {
-  width: 100%;
-  text-align: right;
-  font-size: calc(12 * var(--show-unit));
-  color: var(--show-muted);
-}
-
 .show-logout {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  flex-shrink: 0;
+  width: 34px;
   min-height: 40px;
-  padding: 8px 10px;
+  padding: 8px;
   border: 1px solid #fff8e830;
   border-radius: 8px;
   background: transparent;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .show-menu .show-logout,
@@ -262,7 +336,9 @@
 }
 
 .show-logout:hover:not(:disabled) {
-  background: #ffffff10;
+  border-color: #f26e82;
+  background: #f26e8226;
+  color: #ff8193;
 }
 
 .show-game-navigation {
@@ -1439,11 +1515,36 @@
   }
 }
 
-@media (max-width: 1050px) {
+@media (max-width: 1200px) {
+  .show-profile-header {
+    gap: 10px;
+  }
+
+  .show-profile-header .show-brand {
+    font-size: 20px;
+  }
+
+  .show-profile-header .show-brand-dice {
+    width: 34px;
+    height: 34px;
+  }
+
+  .show-profile-navigation a {
+    padding-inline: 8px;
+    gap: 5px;
+    font-size: 12px;
+  }
+
+  .show-profile-nickname {
+    max-width: 72px;
+  }
+
   .show-profile-balance {
     gap: 8px;
   }
+}
 
+@media (max-width: 1050px) {
   .show-main-layout {
     grid-template-columns: calc(152 * var(--show-unit)) minmax(0, 1fr) calc(250 * var(--show-unit));
     gap: calc(20 * var(--show-unit));
@@ -1488,9 +1589,28 @@
   }
 }
 
+@media (max-width: 950px) {
+  .show-profile-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .show-profile-navigation {
+    grid-area: 2 / 1 / auto / -1;
+    justify-self: center;
+  }
+
+  .show-profile-account {
+    grid-area: 1 / 2;
+  }
+}
+
 @media (max-width: 820px) {
+  :root {
+    --platform-gutter: calc(24 * var(--platform-unit));
+  }
+
   .show-menu {
-    padding: calc(22 * var(--show-unit)) calc(24 * var(--show-unit)) calc(28 * var(--show-unit));
+    padding: calc(22 * var(--show-unit)) var(--platform-gutter) calc(28 * var(--show-unit));
   }
 
   .is-main-menu .show-menu-shell,
@@ -1566,8 +1686,12 @@
 }
 
 @media (max-width: 600px) {
+  :root {
+    --platform-gutter: calc(20 * var(--platform-unit));
+  }
+
   .show-menu {
-    padding: calc(18 * var(--show-unit)) calc(20 * var(--show-unit)) calc(28 * var(--show-unit));
+    padding: calc(18 * var(--show-unit)) var(--platform-gutter) calc(28 * var(--show-unit));
   }
 
   .is-main-menu .show-menu-shell,
@@ -1597,9 +1721,12 @@
   }
 
   .show-profile-header {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) 36px;
+    grid-template-columns: auto minmax(0, 1fr);
     column-gap: 8px;
+  }
+
+  .show-profile-account {
+    gap: 8px;
   }
 
   .show-profile-header .show-brand {
@@ -1608,29 +1735,33 @@
 
   .show-profile-navigation {
     grid-area: 2 / 1 / auto / -1;
-    gap: clamp(8px, 2.5vw, 16px);
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .show-profile-navigation a {
+    flex-direction: column;
+    min-width: 0;
+    min-height: 56px;
+    padding: 8px 3px;
+    gap: 5px;
+    font-size: clamp(9px, 2.5vw, 10px);
+    font-weight: 600;
+    letter-spacing: -0.15px;
+    white-space: nowrap;
+    text-align: center;
   }
 
   .show-profile-balance {
-    grid-area: 1 / 2;
     justify-content: flex-end;
     margin-left: 0;
   }
 
-  .show-profile-connection {
-    grid-column: 1 / -1;
-  }
-
   .show-logout {
-    grid-area: 1 / 3;
-    width: 36px;
+    width: 32px;
     padding: 8px;
     flex-shrink: 0;
-  }
-
-  .show-logout span {
-    display: none;
   }
 
   .show-logout svg {
@@ -1639,7 +1770,7 @@
   }
 
   .show-profile-nickname {
-    max-width: 96px;
+    max-width: 72px;
     font-size: 12px;
   }
 
@@ -1817,9 +1948,23 @@
   }
 }
 
+@media (max-width: 370px) {
+  .show-profile-navigation a {
+    min-height: 44px;
+  }
+
+  .show-profile-navigation a span {
+    display: none;
+  }
+}
+
 @media (max-width: 360px) {
+  :root {
+    --platform-gutter: calc(16 * var(--platform-unit));
+  }
+
   .show-menu {
-    padding-inline: calc(16 * var(--show-unit));
+    padding-inline: var(--platform-gutter);
   }
 
   .show-headline h1 {
