@@ -166,7 +166,7 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
       overlayClassName="table3d-menu-overlay"
       panelClassName="table3d-menu-panel party-dialog"
     >
-      <span className="table3d-menu-eyebrow">PARTYPLAY · {game.metadata.title}</span>
+      <span className="table3d-menu-eyebrow">PARTYSIDE · {game.metadata.title}</span>
       <h2 id="table-session-title">
         {page === "leave"
           ? "Выйти из комнаты?"

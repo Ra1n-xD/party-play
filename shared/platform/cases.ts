@@ -9,7 +9,7 @@ import {
 export const CASES = [
   {
     id: "partyplay",
-    name: "Кейс PartyPlay",
+    name: "Кейс PartySide",
     description: "Все предметы из кейсов",
     kind: null,
     cost: 1,

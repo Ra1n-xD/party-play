@@ -1,13 +1,16 @@
+import { readBrandStorage } from "../brandStorage";
 import type { GameId } from "../../../../shared/platform/gameContract";
 import type { RoomLifecycle } from "../../../../shared/platform/room";
 
-const SESSION_KEY = "partyplay_reconnect_v1";
+const SESSION_KEY = "partyside_reconnect_v1";
+const LEGACY_BRAND_SESSION_KEY = "partyplay_reconnect_v1";
 const LEGACY_ROOM_KEY = "bunker_room";
 const LEGACY_PARTICIPANT_KEY = "bunker_player";
 const LEGACY_TOKEN_KEY = "bunker_token";
 const LEGACY_SPECTATOR_KEY = "bunker_spectator";
 
 const LEGACY_KEYS = [
+  LEGACY_BRAND_SESSION_KEY,
   LEGACY_ROOM_KEY,
   LEGACY_PARTICIPANT_KEY,
   LEGACY_TOKEN_KEY,
@@ -104,7 +107,7 @@ export function readReconnectSession(
   if (!storage) return null;
 
   try {
-    const stored = storage.getItem(SESSION_KEY);
+    const stored = readBrandStorage(storage, SESSION_KEY);
     if (stored) {
       const normalized = normalizeSession(JSON.parse(stored));
       if (normalized) return normalized;

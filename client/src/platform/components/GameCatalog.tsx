@@ -123,6 +123,9 @@ export function GameCatalog({ games, counts, onPlay, onRooms, onRules }: GameCat
                   >
                     <FiBookOpen aria-hidden="true" /> Правила
                   </button>
+                  <a href={`/games/${game.id}`} aria-label={`Об игре ${game.metadata.title}`}>
+                    Об игре
+                  </a>
                 </div>
               </li>
             );

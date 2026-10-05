@@ -38,7 +38,7 @@ export function LoginScreen() {
   return (
     <main className="profile-login">
       <a href="/" className="profile-logo">
-        partyplay<span> / CLUB</span>
+        partyside<span> / CLUB</span>
       </a>
       <section>
         <header className="profile-auth-intro">

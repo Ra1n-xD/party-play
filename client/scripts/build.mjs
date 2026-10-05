@@ -13,7 +13,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { build } from "vite";
 
 const require = createRequire(import.meta.url);
 const clientDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,9 +23,10 @@ const outputDirectory = resolve(clientDirectory, "dist");
 const viteExecutable = resolve(dirname(require.resolve("vite/package.json")), "bin/vite.js");
 
 mkdirSync(cacheDirectory, { recursive: true });
-const stagingDirectory = mkdtempSync(join(cacheDirectory, "party-play-client-dist-"));
+const stagingDirectory = mkdtempSync(join(cacheDirectory, "party-side-client-dist-"));
 const previousDirectory = `${stagingDirectory}-previous`;
 const assetManifest = ".release-assets.json";
+const prerenderDirectory = join(stagingDirectory, ".prerender");
 
 try {
   execFileSync(
@@ -38,6 +40,43 @@ try {
     [viteExecutable, "build", "--outDir", stagingDirectory, "--emptyOutDir"],
     { cwd: clientDirectory, stdio: "inherit" },
   );
+
+  // Public routes ship real HTML, metadata and links before JavaScript starts.
+  await build({
+    root: clientDirectory,
+    configFile: resolve(clientDirectory, "vite.config.ts"),
+    build: {
+      ssr: resolve(clientDirectory, "src/platform/seo/prerender.tsx"),
+      copyPublicDir: false,
+      outDir: prerenderDirectory,
+      emptyOutDir: true,
+      rollupOptions: { output: { entryFileNames: "prerender.mjs" } },
+    },
+  });
+  const { renderPage, publicPages, utilityPages, SITE_URL } = await import(
+    pathToFileURL(join(prerenderDirectory, "prerender.mjs")).href
+  );
+  const template = readFileSync(join(stagingDirectory, "index.html"), "utf8");
+  const paths = [
+    ...publicPages.map((page) => page.path),
+    ...utilityPages.map(([path]) => path),
+    "/404",
+  ];
+  for (const path of paths) {
+    const filename = path === "/" ? "index.html" : `${path.slice(1)}.html`;
+    const destination = join(stagingDirectory, filename);
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, renderPage(path, template));
+  }
+  writeFileSync(
+    join(stagingDirectory, "sitemap.xml"),
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${publicPages.map((page) => `  <url><loc>${SITE_URL}${page.path}</loc></url>`).join("\n")}\n</urlset>\n`,
+  );
+  writeFileSync(
+    join(stagingDirectory, "robots.txt"),
+    `User-agent: *\nAllow: /\nDisallow: /socket.io/\nDisallow: /deployz\nDisallow: /healthz\nDisallow: /readyz\nDisallow: /version.json\nSitemap: ${SITE_URL}/sitemap.xml\n`,
+  );
+  rmSync(prerenderDirectory, { recursive: true, force: true });
 
   const newAssets = join(stagingDirectory, "assets");
   const currentAssets = readdirSync(newAssets, { withFileTypes: true })

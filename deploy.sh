@@ -1,10 +1,13 @@
 #!/bin/bash
 set -Eeuo pipefail
 
-deploy_lock="${PARTYPLAY_DEPLOY_LOCK:-/tmp/partyplay-deploy.lock}"
-health_url="${PARTYPLAY_HEALTH_URL:-http://127.0.0.1:3001/readyz}"
-deploy_url="${PARTYPLAY_DEPLOY_URL:-http://127.0.0.1:3001/deployz}"
-target_commit="${PARTYPLAY_TARGET_COMMIT:-}"
+# Keep the default lock shared with older workflows during the rename.
+deploy_lock="${PARTYSIDE_DEPLOY_LOCK:-${PARTYPLAY_DEPLOY_LOCK:-/tmp/partyplay-deploy.lock}}"
+health_url="${PARTYSIDE_HEALTH_URL:-${PARTYPLAY_HEALTH_URL:-http://127.0.0.1:3001/readyz}}"
+deploy_url="${PARTYSIDE_DEPLOY_URL:-${PARTYPLAY_DEPLOY_URL:-http://127.0.0.1:3001/deployz}}"
+target_commit="${PARTYSIDE_TARGET_COMMIT:-${PARTYPLAY_TARGET_COMMIT:-}}"
+configured_project_dir="${PARTYSIDE_PROJECT_DIR:-${PARTYPLAY_PROJECT_DIR:-}}"
+service_name="${PARTYSIDE_SERVICE:-${PARTYPLAY_SERVICE:-}}"
 previous_commit=""
 project_dir=""
 backup_dir=""
@@ -18,14 +21,32 @@ legacy_deploy_endpoint=false
 
 exec 9>"$deploy_lock"
 if ! flock -w 600 9; then
-  echo "ERROR: another PartyPlay deployment is still running" >&2
+  echo "ERROR: another PartySide deployment is still running" >&2
   exit 1
 fi
 
-cd ~/party-play
+if [ -z "$configured_project_dir" ]; then
+  if [ -d "$HOME/party-side/.git" ]; then
+    configured_project_dir="$HOME/party-side"
+  else
+    configured_project_dir="$HOME/party-play"
+  fi
+fi
+cd -- "$configured_project_dir"
+if [ -z "$service_name" ]; then
+  if [ "$(systemctl show partyside --property=LoadState --value)" = "loaded" ]; then
+    service_name=partyside
+  else
+    service_name=partyplay
+  fi
+fi
+if [[ ! "$service_name" =~ ^[a-zA-Z0-9_.@-]+$ ]]; then
+  echo "ERROR: invalid service name" >&2
+  exit 1
+fi
 project_dir=$(pwd -P)
 if [ -z "$project_dir" ] || [ "$project_dir" = "/" ]; then
-  echo "ERROR: unsafe PartyPlay project directory" >&2
+  echo "ERROR: unsafe PartySide project directory" >&2
   exit 1
 fi
 
@@ -50,7 +71,7 @@ enter_deployment_drain() {
       "$deploy_url/drain"
   ); then
     rm -f "$response_file"
-    echo "ERROR: cannot reach PartyPlay deployment gate" >&2
+    echo "ERROR: cannot reach PartySide deployment gate" >&2
     return 1
   fi
 
@@ -67,9 +88,9 @@ enter_deployment_drain() {
       return 1
       ;;
     404)
-      if [ "${PARTYPLAY_ALLOW_LEGACY_DEPLOY:-0}" != "1" ]; then
+      if [ "${PARTYSIDE_ALLOW_LEGACY_DEPLOY:-${PARTYPLAY_ALLOW_LEGACY_DEPLOY:-0}}" != "1" ]; then
         echo "ERROR: installed server does not expose the deployment gate" >&2
-        echo "ERROR: the first bootstrap requires explicit PARTYPLAY_ALLOW_LEGACY_DEPLOY=1" >&2
+        echo "ERROR: the first bootstrap requires explicit PARTYSIDE_ALLOW_LEGACY_DEPLOY=1" >&2
         rm -f "$response_file"
         return 1
       fi
@@ -249,7 +270,7 @@ handle_exit() {
 
   if [ "$service_restart_attempted" = true ]; then
     if [ "$restore_status" -eq 0 ]; then
-      if sudo systemctl restart partyplay && systemctl is-active --quiet partyplay; then
+      if sudo systemctl restart "$service_name" && systemctl is-active --quiet "$service_name"; then
         deployment_draining=false
       else
         restore_status=1
@@ -270,7 +291,7 @@ handle_exit() {
     cleanup_rollback_snapshot
     echo "Previous release restored successfully." >&2
   else
-    echo "CRITICAL: automatic rollback failed; inspect partyplay.service and $backup_dir." >&2
+    echo "CRITICAL: automatic rollback failed; inspect $service_name.service and $backup_dir." >&2
   fi
   exit "$failure_status"
 }
@@ -325,11 +346,11 @@ verify_deployment_drain
 
 echo "Build successful. Restarting service..."
 service_restart_attempted=true
-sudo systemctl restart partyplay
-systemctl is-active --quiet partyplay
+sudo systemctl restart "$service_name"
+systemctl is-active --quiet "$service_name"
 
 if ! wait_for_readiness; then
-  echo "ERROR: PartyPlay readiness check failed: $health_url" >&2
+  echo "ERROR: PartySide readiness check failed: $health_url" >&2
   false
 fi
 
@@ -341,4 +362,4 @@ deployment_draining=false
 cleanup_rollback_snapshot
 
 echo "Deploy complete."
-systemctl status partyplay --no-pager || true
+systemctl status "$service_name" --no-pager || true

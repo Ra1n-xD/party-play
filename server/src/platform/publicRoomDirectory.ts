@@ -15,7 +15,7 @@ import { getAllRooms, type Room } from "./roomManager.js";
 
 type IOSocket = Socket<ClientEvents, ServerEvents>;
 
-const DIRECTORY_SOCKET_ROOM_PREFIX = "__partyplay_public_directory__:";
+const DIRECTORY_SOCKET_ROOM_PREFIX = "__partyside_public_directory__:";
 const roomDirectorySignatures = new WeakMap<Room, string>();
 const broadcastStates = new WeakMap<IOServer, { scheduled: boolean; gameIds: Set<GameId> }>();
 

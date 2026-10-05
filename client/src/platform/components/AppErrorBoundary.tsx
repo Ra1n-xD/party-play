@@ -16,7 +16,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("PartyPlay render error", error, info.componentStack);
+    console.error("PartySide render error", error, info.componentStack);
   }
 
   render() {

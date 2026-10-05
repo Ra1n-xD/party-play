@@ -1,0 +1,17 @@
+{
+  "name": "PartySide — игры для своей компании",
+  "short_name": "PartySide",
+  "lang": "ru",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#221930",
+  "theme_color": "#221930",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

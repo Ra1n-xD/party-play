@@ -1,6 +1,7 @@
+import { brandStorage } from "./brandStorage";
 import { useEffect, useRef, useState } from "react";
 
-const SOUND_KEY = "partyplay_case_sound_v1";
+const SOUND_KEY = "partyside_case_sound_v1";
 
 class CollectionAudio {
   private context: AudioContext | null = null;
@@ -106,7 +107,7 @@ class CollectionAudio {
 export function useCollectionAudio() {
   const [enabled, setEnabled] = useState(() => {
     try {
-      return localStorage.getItem(SOUND_KEY) !== "off";
+      return brandStorage.getItem(SOUND_KEY) !== "off";
     } catch {
       return true;
     }
@@ -122,7 +123,7 @@ export function useCollectionAudio() {
       setEnabled(next);
       if (!next) audio.current?.stop();
       try {
-        localStorage.setItem(SOUND_KEY, next ? "on" : "off");
+        brandStorage.setItem(SOUND_KEY, next ? "on" : "off");
       } catch {
         /* The current tab still remembers the setting. */
       }

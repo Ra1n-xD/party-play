@@ -27,9 +27,9 @@ export function UpdatesScreen() {
           </a>
           <header className="updates-heading">
             <div>
-              <span className="updates-eyebrow">PARTYPLAY / ЧТО НОВОГО</span>
+              <span className="updates-eyebrow">PARTYSIDE / ЧТО НОВОГО</span>
               <h1>Обновления</h1>
-              <p>Как меняется PartyPlay: главное о новых возможностях и интерфейсе.</p>
+              <p>Как меняется PartySide: главное о новых возможностях и интерфейсе.</p>
             </div>
             <span className="updates-current">Сейчас v{__APP_VERSION__}</span>
           </header>
@@ -67,7 +67,8 @@ export function UpdatesScreen() {
               <p className="updates-archive-note">
                 История с первой версии. Собрали заметные изменения, пропустили мелкие правки.
                 Сохранившиеся скриншоты показывают интерфейс того времени; восстановленные по
-                исходникам отмечены отдельно.
+                исходникам отмечены отдельно. Название PartyPlay на архивных скриншотах и в ранних
+                записях относится к проекту до переименования в PartySide.
               </p>
               {releaseHighlights.map((release, index) => (
                 <article className="updates-release" key={release.id} id={release.id}>

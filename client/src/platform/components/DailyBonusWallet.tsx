@@ -1,3 +1,4 @@
+import { brandStorage } from "../brandStorage";
 import {
   useCallback,
   useEffect,
@@ -16,13 +17,13 @@ import { useProfile } from "../context/ProfileContext";
 import { CoinAmount } from "./CoinAmount";
 import { DailyBonusModal } from "./DailyBonusModal";
 
-const HINT_KEY = "partyplay_daily_bonus_hint_v1:";
+const HINT_KEY = "partyside_daily_bonus_hint_v1:";
 const dismissedInSession = new Set<string>();
 
 function wasDismissed(profileId: string): boolean {
   if (dismissedInSession.has(profileId)) return true;
   try {
-    return localStorage.getItem(`${HINT_KEY}${profileId}`) === "1";
+    return brandStorage.getItem(`${HINT_KEY}${profileId}`) === "1";
   } catch {
     return false;
   }
@@ -51,7 +52,7 @@ export function DailyBonusWallet({ profile }: { profile: ProfileSnapshot }) {
     dismissedInSession.add(profile.id);
     setDismissed(true);
     try {
-      localStorage.setItem(`${HINT_KEY}${profile.id}`, "1");
+      brandStorage.setItem(`${HINT_KEY}${profile.id}`, "1");
     } catch {
       // Keep the choice for this app session when browser storage is unavailable.
     }
@@ -174,7 +175,7 @@ export function DailyBonusWallet({ profile }: { profile: ProfileSnapshot }) {
               } as CSSProperties
             }
           >
-            <span className="daily-bonus-hint-eyebrow">НОВОЕ В PARTYPLAY</span>
+            <span className="daily-bonus-hint-eyebrow">НОВОЕ В PARTYSIDE</span>
             <h2 id={`${hintId}-title`}>Здесь ваши ежедневные монеты</h2>
             <p id={`${hintId}-description`}>
               Нажмите на монеты, чтобы открыть ежедневный бонус. Забирайте награду каждый день.

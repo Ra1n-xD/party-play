@@ -48,7 +48,7 @@ interface StoredProjectStats {
   byGame: Record<GameId, StoredTotals>;
 }
 
-const STATS_SOCKET_ROOM = "__partyplay_project_stats__";
+const STATS_SOCKET_ROOM = "__partyside_project_stats__";
 const ANALYTICS_ID_PATTERN = /^a_[a-f0-9]{32}$/;
 const ANALYTICS_HASH_PATTERN = /^[a-f0-9]{64}$/;
 const GAME_IDS = Object.keys(serverGameRegistry) as GameId[];
@@ -57,8 +57,10 @@ const defaultStatsStoragePath =
   basename(process.cwd()) === "server"
     ? resolve(process.cwd(), ".data/project-stats.json")
     : resolve(process.cwd(), "server/.data/project-stats.json");
-const statsStoragePath = process.env.PARTYPLAY_STATS_FILE?.trim()
-  ? resolve(process.env.PARTYPLAY_STATS_FILE.trim())
+const configuredStatsPath =
+  process.env.PARTYSIDE_STATS_FILE?.trim() || process.env.PARTYPLAY_STATS_FILE?.trim();
+const statsStoragePath = configuredStatsPath
+  ? resolve(configuredStatsPath)
   : defaultStatsStoragePath;
 const observedRoomLifecycles = new WeakMap<Room, RoomLifecycle>();
 const observedRoomSignatures = new WeakMap<Room, string>();

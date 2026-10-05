@@ -56,7 +56,7 @@ export function GameRoomHeader({
         {children && (
           <span className="game-2d-wordmark">
             <BrandDice />
-            partyplay
+            partyside
           </span>
         )}
         <div className="gs-room-brand">

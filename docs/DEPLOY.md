@@ -1,466 +1,168 @@
-# Деплой PartyPlay на VPS
+# Деплой PartySide на VPS
 
-## 1. Купить VPS
+Для **существующего** сервера используйте [переход на partyside.fun](PARTYSIDE-MIGRATION.md):
+там приведены резервное копирование, CORS, HTTPS, nginx и редирект старого домена.
+Не создавайте заново пользователя или хранилище действующего приложения.
 
-Любой провайдер (Timeweb, Aeza, Selectel, Hetzner). Минимум: **1 vCPU, 1 GB RAM, Ubuntu 22.04/24.04**.
+## Новая установка
 
-Получишь IP (например `185.100.50.25`) и root-пароль.
+Ниже — Ubuntu/Debian, Node.js 22 LTS, npm, nginx, git. Node должен поддерживать
+`--env-file`. Приложение слушает только loopback; публичные 80/443 обслуживает nginx.
+Требуется домен `partyside.fun` с DNS на этот VPS. Проверьте ресурсы сервера под
+свою фактическую нагрузку.
 
----
-
-## 2. Подключиться к серверу
-
-```bash
-ssh root@185.100.50.25
-```
-
----
-
-## 3. Настроить сервер
+От root:
 
 ```bash
-# Обновить систему
-apt update && apt upgrade -y
-
-# Установить Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install -y nodejs
-
-# Установить nginx и git
+apt update
 apt install -y nginx git
-
-# Проверить
-node -v   # v20.x
-npm -v    # 10.x
+node -v
+npm -v
+useradd -m -s /bin/bash partyside
 ```
 
----
+Установите Node.js из доверенного источника, если `node -v` не показывает
+поддерживаемую LTS-версию. Пользователь `partyside` должен иметь SSH-доступ к
+GitHub. Публичный ключ добавляется в Deploy keys репозитория; приватный остаётся
+на VPS.
 
-## 4. Создать пользователя для приложения
-
-```bash
-useradd -m -s /bin/bash partyplay
-```
-
----
-
-## 5. Настроить SSH-ключ для GitHub (нужно для git clone и автодеплоя)
+От `partyside`:
 
 ```bash
-# Создать ключ от имени partyplay
-su - partyplay
-ssh-keygen -t ed25519 -C "partyplay@vps" -f ~/.ssh/id_ed25519 -N ""
-
-# Показать публичный ключ — скопируй его
+ssh-keygen -t ed25519 -C "partyside@vps" -f ~/.ssh/id_ed25519 -N ""
 cat ~/.ssh/id_ed25519.pub
-exit
+# После добавления публичного ключа в GitHub:
+git clone git@github.com:Ra1n-xD/party-play.git ~/party-side
+cd ~/party-side
+npm ci --include=dev
+npm run build
 ```
 
-Добавь этот публичный ключ в GitHub:
+Имя существующего репозитория GitHub не изменяется локальным переименованием.
+Папка новой установки называется `party-side`. Не заменяйте уже существующий
+SSH-ключ приведённой командой.
 
-- **Вариант A** (только чтение одного репо): GitHub → Репозиторий → Settings → Deploy keys → Add deploy key
-- **Вариант B** (все репо аккаунта): GitHub → Settings → SSH and GPG keys → New SSH key
-
----
-
-## 6. Загрузить проект
+Создайте файл `/home/partyside/party-side/.env` от root:
 
 ```bash
-su - partyplay
-git clone git@github.com:ТВОЙ_ЮЗЕРНЕЙМ/party-play.git ~/party-play
-cd ~/party-play
-npm install
-exit
-```
-
----
-
-## 7. Собрать проект
-
-```bash
-su - partyplay -c "cd ~/party-play && npm run build"
-```
-
-Эта команда последовательно соберёт server и client.
-
----
-
-## 8. Создать .env
-
-```bash
-cat > /home/partyplay/party-play/.env << 'EOF'
+install -o partyside -g partyside -m 600 /dev/null /home/partyside/party-side/.env
+cat > /home/partyside/party-side/.env <<'ENV'
 PORT=3001
-NODE_ENV=production
 HOST=127.0.0.1
-CORS_ORIGINS=http://185.100.50.25
-EOF
-
-chown partyplay:partyplay /home/partyplay/party-play/.env
+NODE_ENV=production
+CORS_ORIGINS=https://partyside.fun
+ENV
 ```
 
-Замени `185.100.50.25` на свой реальный IP.
+Хранилища по умолчанию — `server/.data/profiles.json` и
+`server/.data/project-stats.json`. `PARTYSIDE_PROFILES_FILE` и
+`PARTYSIDE_STATS_FILE` задают внешние пути. Не размещайте их в `client/dist`.
+Старые `PARTYPLAY_*` имена этих двух настроек остаются совместимыми.
 
----
-
-## 9. Проверить что запускается
-
-```bash
-su - partyplay
-cd ~/party-play
-node --env-file=.env server/dist/server/src/index.js
-```
-
-Должно вывести `PartyPlay server running on http://127.0.0.1:3001`. Останови через `Ctrl+C`:
+От root создайте сервис:
 
 ```bash
-exit
-```
-
----
-
-## 10. Создать systemd-сервис (автозапуск)
-
-```bash
-cat > /etc/systemd/system/partyplay.service << 'EOF'
+cat > /etc/systemd/system/partyside.service <<'UNIT'
 [Unit]
-Description=PartyPlay Server
+Description=PartySide Server
 After=network.target
 
 [Service]
 Type=simple
-User=partyplay
-WorkingDirectory=/home/partyplay/party-play
+User=partyside
+WorkingDirectory=/home/partyside/party-side
 ExecStart=/usr/bin/node --env-file=.env server/dist/server/src/index.js
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-EOF
-```
-
-```bash
+UNIT
 systemctl daemon-reload
-systemctl enable partyplay
-systemctl start partyplay
-systemctl status partyplay   # должен быть active (running)
+systemctl enable --now partyside
+systemctl status partyside --no-pager
+curl --fail --silent --show-error http://127.0.0.1:3001/readyz
 ```
 
----
+Проверьте фактический путь к Node через `command -v node` и используйте его в
+`ExecStart`. Nginx обеспечивает HTTPS/WSS, отдельный сертификат для Node не нужен.
+Для nginx и HTTPS выполните шаги 1, 2, 5 и 7 из
+[инструкции домена](PARTYSIDE-MIGRATION.md). В новой установке старый домен
+и изменение уже правильного CORS пропускаются.
 
-## 11. Разрешить partyplay перезапускать сервис (нужно для автодеплоя)
+## Автодеплой GitHub Actions
+
+Workflow `.github/workflows/deploy.yml` запускается при push в `main`. Он
+получает `deploy.sh` из **точного коммита workflow**, затем запускает его на VPS.
+SSH fingerprint проверяется, параллельные релизы сериализованы; не отключайте
+эти проверки.
+
+В Repository → Settings → Secrets and variables → Actions:
+
+| Secret                 | Значение                                             |
+| ---------------------- | ---------------------------------------------------- |
+| `VPS_HOST`             | IP или hostname VPS                                  |
+| `VPS_USER`             | Пользователь деплоя, для новой установки `partyside` |
+| `VPS_SSH_KEY`          | Приватный ключ отдельного доступа workflow к VPS     |
+| `VPS_HOST_FINGERPRINT` | Проверенный fingerprint SSH host key VPS             |
+
+Для нестандартного пути добавьте Repository variable `VPS_PROJECT_DIR`.
+Без неё workflow ищет `~/party-side`, затем старый `~/party-play`.
+Публичный ключ workflow добавьте в `authorized_keys` пользователя деплоя;
+приватный ключ не размещайте в Git. Пользователь деплоя должен иметь право
+перезапускать **только** сервис приложения:
 
 ```bash
-cat > /etc/sudoers.d/partyplay << 'EOF'
-partyplay ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart partyplay
-EOF
+cat > /etc/sudoers.d/partyside <<'SUDO'
+partyside ALL=(root) NOPASSWD: /usr/bin/systemctl restart partyside
+SUDO
+chmod 440 /etc/sudoers.d/partyside
+visudo -cf /etc/sudoers.d/partyside
 ```
 
----
+Сервис существующей установки может называться `partyplay`: скрипт обнаруживает
+его автоматически, если нет `partyside`. Доступ к перезапуску старого сервиса
+и старый Linux-пользователь сохраняются.
 
-## 12. Настроить nginx
+## Ручной деплой и безопасность партий
+
+От пользователя деплоя:
 
 ```bash
-cat > /etc/nginx/sites-available/partyplay << 'EOF'
-server {
-    listen 80;
-    server_name _;
-
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss:; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header Referrer-Policy "no-referrer" always;
-    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-
-    # Статика клиента
-    root /home/partyplay/party-play/client/dist;
-    index index.html;
-
-    # SPA — все маршруты -> index.html
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # HTML и указатель сборки должны проверяться заново после публикации.
-    # expires сохраняет наследование общих заголовков безопасности nginx.
-    location = /index.html {
-        expires -1;
-    }
-    location = /version.json {
-        expires -1;
-        try_files $uri =404;
-    }
-
-    # Реальные health/readiness Node.js, без SPA fallback
-    location = /healthz {
-        proxy_pass http://127.0.0.1:3001/healthz;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location = /readyz {
-        proxy_pass http://127.0.0.1:3001/readyz;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Socket.IO -> Node.js
-    location /socket.io/ {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        # Replace any client-supplied forwarding chain with nginx's observed peer.
-        proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
+cd ~/party-side
+bash deploy.sh
 ```
 
-```bash
-ln -s /etc/nginx/sites-available/partyplay /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
-nginx -t            # должен быть ok
-systemctl restart nginx
-```
+Для нестандартной установки используйте `PARTYSIDE_PROJECT_DIR` и
+`PARTYSIDE_SERVICE`. Старые `PARTYPLAY_*` переменные скрипта поддерживаются.
+Перед обновлением checkout должен быть чистым, а от предыдущей неудачной
+публикации не должно оставаться `.deploy-backup.*`.
 
----
+`/deployz/drain` доступен только loopback и отказывает с HTTP 409, пока сервер
+удерживает хотя бы одну комнату/зрителя. Закрытие вкладки может сохранить место
+для переподключения: игроки должны выйти через `Esc → Выйти из комнаты`.
+При 409 скрипт не тянет код, не собирает и не перезапускает приложение.
+Повторите workflow после выхода участников; не обходите gate.
 
-## 13. Открыть в браузере
+При разрешённом деплое скрипт сохраняет текущие зависимости и dist, выполняет
+`git pull --ff-only`, `npm ci`, сборку, повторно проверяет gate и перезапускает
+сервис. При ошибке восстанавливается снимок предыдущего релиза. Хранилище игроков
+не заменяется. `/readyz` проверяет готовность и доступность профилей.
+Параметр `PARTYSIDE_ALLOW_LEGACY_DEPLOY=1` допустим только при первом переходе
+с очень старого сервера без `/deployz` после подтверждения отсутствия игроков.
 
-Заходи на `http://185.100.50.25` — должен открыться PartyPlay.
-
----
-
-## 14. Настроить автодеплой (GitHub Actions)
-
-При каждом пуше в `main` сервер автоматически обновляется и пересобирается.
-
-### Шаг 1: Создать SSH-ключ для GitHub Actions
-
-```bash
-# На VPS от root
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f /tmp/deploy_key -N ""
-
-# Добавить публичный ключ в authorized_keys пользователя partyplay
-mkdir -p /home/partyplay/.ssh
-cat /tmp/deploy_key.pub >> /home/partyplay/.ssh/authorized_keys
-chown -R partyplay:partyplay /home/partyplay/.ssh
-chmod 700 /home/partyplay/.ssh
-chmod 600 /home/partyplay/.ssh/authorized_keys
-
-# Скопировать приватный ключ — понадобится для GitHub
-cat /tmp/deploy_key
-
-# Удалить ключ с сервера после копирования
-rm /tmp/deploy_key /tmp/deploy_key.pub
-```
-
-### Шаг 2: Добавить секреты в GitHub
-
-GitHub → Репозиторий → Settings → Secrets and variables → Actions → New repository secret:
-
-| Секрет                 | Значение                                                          |
-| ---------------------- | ----------------------------------------------------------------- |
-| `VPS_HOST`             | IP-адрес сервера (например `185.100.50.25`)                       |
-| `VPS_USER`             | `partyplay`                                                       |
-| `VPS_SSH_KEY`          | Содержимое приватного ключа (весь текст из `cat /tmp/deploy_key`) |
-| `VPS_HOST_FINGERPRINT` | SHA256 fingerprint SSH-хоста из команды ниже                      |
-
-Fingerprint получи непосредственно на VPS и сверь перед добавлением секрета:
+## Проверки и логи
 
 ```bash
-ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $2}'
-```
-
-### Шаг 3: Готово
-
-Workflow-файл `.github/workflows/deploy.yml` уже есть в репозитории. После пуша в `main` GitHub автоматически:
-
-1. Подключится к проверенному VPS по SSH
-2. Закроет создание комнат и завершит существующие комнаты с уведомлением об обновлении
-3. Стянет точный commit, который запустил workflow
-4. Сохранит предыдущие зависимости и собранные артефакты, затем соберёт клиент и сервер
-5. Перезапустит сервис и проверит readiness
-6. При ошибке восстановит готовый предыдущий snapshot без повторной установки из сети
-
-Первый workflow с deployment gate намеренно завершится ошибкой, если установленная версия ещё не
-знает маршрут `/deployz`. Это защита от незаметного рестарта активных комнат. Однократный bootstrap
-выполняется вручную по инструкции ниже.
-
-Статус деплоя смотри в GitHub → вкладка Actions.
-
----
-
-## 15. Ручной деплой (если нужно)
-
-В репозитории есть скрипт `deploy.sh`. Первый rollout версии с `/deployz` выполни только в тихое
-время, когда точно никто не играет. Автоматический workflow не обходит эту проверку. Для явного
-однократного bootstrap:
-
-```bash
-su - partyplay
-cd ~/party-play
-git fetch origin main
-bootstrap_script=$(mktemp)
-git show origin/main:deploy.sh > "$bootstrap_script"
-target_commit=$(git rev-parse origin/main)
-PARTYPLAY_ALLOW_LEGACY_DEPLOY=1 PARTYPLAY_TARGET_COMMIT="$target_commit" bash "$bootstrap_script"
-rm -f "$bootstrap_script"
-```
-
-В дальнейшем:
-
-```bash
-su - partyplay -c "~/party-play/deploy.sh"
-```
-
-Скрипт стянет изменения, пересоберёт проект, проверит сборку и перезапустит сервис. Текущий
-режим `stop-rooms` завершает активные и восстанавливаемые комнаты до сборки: выбирайте
-объявленное время обслуживания. Откат кода не восстанавливает завершённые партии. До изменения
-checkout и зависимостей скрипт сохраняет готовый rollback snapshot. При ошибке или сигналах
-`HUP`/`INT`/`TERM` он восстанавливает предыдущую версию и снимает режим drain.
-
-После изменения nginx проверь не только код ответа, но и JSON:
-
-```bash
-curl --fail --silent --show-error https://partyplay.duckdns.org/healthz
-curl --fail --silent --show-error https://partyplay.duckdns.org/readyz
-```
-
-Ожидаются `{"status":"ok"}` и `{"status":"ready"}`, а не HTML приложения.
-
-Сбой записи профилей возвращает HTTP 503 `storage-unavailable` на `/readyz`.
-Проверьте свободное место и права пользователя сервиса на каталог хранилища.
-После устранения проблемы повторная запись последнего подтверждённого состояния
-выполняется автоматически раз в 10 секунд. Повреждение файла при старте требует
-ручного восстановления при остановленном сервисе; файл автоматически не обнуляется.
-
-С версии 6.5.0 сервер при старте приводит базовые предметы всех существующих профилей
-к одному экземпляру. Миграция выполняется после полной проверки хранилища, сохраняет
-монеты, остальные предметы и историю, а перед записью создаёт отдельный закрытый backup
-`profiles.json.before-basic-singletons-<timestamp>.bak`. Он не заменяется обычным rolling backup.
-Повторный запуск ничего не списывает. Восстановление backup допустимо только при остановленном
-сервисе; старая версия приложения снова разрешит выпадение базовых дубликатов.
-
-Сборка клиента сохраняет файлы `assets/` одной предыдущей версии для открытых вкладок.
-`.release-assets.json` перечисляет только ресурсы текущей сборки, чтобы старые поколения
-не накапливались. Если вкладка пережила несколько обновлений и её модуль уже удалён,
-обработчик `vite:preloadError` перезагружает страницу один раз для этой версии приложения,
-сохраняя комнатный токен и профиль. При недоступной сети циклической перезагрузки нет.
-
----
-
-## 16. Когда купишь домен
-
-```bash
-# 1. Направить DNS A-запись домена на IP сервера
-
-# 2. Обновить nginx
-sed -i 's/server_name _;/server_name yourdomain.com;/' /etc/nginx/sites-available/partyplay
-
-# 3. Установить HTTPS
-apt install -y certbot python3-certbot-nginx
-certbot --nginx -d yourdomain.com
-
-# 4. Обновить CORS
-su - partyplay
-sed -i 's|CORS_ORIGINS=.*|CORS_ORIGINS=https://yourdomain.com|' ~/party-play/.env
-exit
-
-# 5. Перезапустить
-systemctl restart partyplay
-systemctl restart nginx
-```
-
----
-
-## 🚀 Следующие шаги: HTTPS без порта в URL приложения
-
-Сейчас PartyPlay работает на `https://partyplay.duckdns.org:8444`, потому что порт 443 занят VPN (Xray/VLESS Reality). Чтобы убрать порт из URL и получить чистый `https://partyplay.duckdns.org`:
-
-### 1. Перевесить VPN на другой порт
-
-В панели 3x-ui изменить порт Xray с `443` на `8444`. Обновить порт во всех VPN-клиентах.
-
-### 2. Перенести nginx на порт 443
-
-```bash
-# Изменить порт в конфиге nginx
-sed -i 's/listen 8444 ssl/listen 443 ssl/' /etc/nginx/sites-available/partyplay
-
-# Проверить и перезагрузить
-nginx -t
-systemctl reload nginx
-```
-
-### 3. Обновить CORS
-
-```bash
-# Обновить .env
-su - partyplay
-sed -i 's|CORS_ORIGINS=.*|CORS_ORIGINS=https://partyplay.duckdns.org|' ~/party-play/.env
-exit
-
-# Перезапустить приложение
-systemctl restart partyplay
-```
-
-### 4. Открыть порт 443 и закрыть 8444
-
-```bash
-ufw allow 443/tcp
-ufw delete allow 8444/tcp
-```
-
-### 5. Проверить
-
-```bash
-# SSL-сертификат (должен показать Let's Encrypt)
-echo | openssl s_client -connect partyplay.duckdns.org:443 2>/dev/null | openssl x509 -noout -dates -issuer
-
-# В браузере
-# https://partyplay.duckdns.org — должен быть замочек
-```
-
-### Обновление сертификата
-
-Сертификат Let's Encrypt действует 90 дней. Certbot автоматически обновляет его через systemd-таймер. Для обновления ему нужен порт 80 — убедись что nginx слушает порт 80 (для ACME challenge), или используй DNS challenge.
-
-Проверить автообновление:
-
-```bash
-certbot renew --dry-run
-```
-
----
-
-## Если что-то не работает
-
-```bash
-# Логи приложения
-journalctl -u partyplay -f
-
-# Логи nginx
+curl --fail --silent --show-error https://partyside.fun/healthz
+curl --fail --silent --show-error https://partyside.fun/readyz
+journalctl -u partyside -f
 tail -f /var/log/nginx/error.log
-
-# Проверить что порт слушается
-ss -tlnp | grep 3001
-
-# Статус автодеплоя
-# GitHub → Репозиторий → вкладка Actions
-
-# Ручной деплой если Actions не сработал
-su - partyplay -c "~/party-play/deploy.sh"
+nginx -t
 ```
 
-### Обновление открытых вкладок
-
-Сборка клиента публикует `version.json` с версией и хешированным entry-файлом. Клиент проверяет его при возвращении на вкладку и раз в пять минут. Если вкладка использует прошлую сборку, появляется предложение обновить страницу; активная партия автоматически не перезагружается, данные переподключения сохраняются. Проверка использует `cache: no-store`; HTML и `version.json` на nginx должны иметь `expires -1`, как в примере выше.
+Проверяйте интерфейс каждой игры после публикации, вход, комнаты, зрителей,
+переподключение и мобильную верстку. Клиент сохраняет ресурсы одной прошлой
+сборки, включая lazy JS и CSS. `version.json` и HTML должны проверяться заново
+(`expires -1`), а хешированные `/assets/` кешируются надолго. Активная партия
+автоматически не перезагружается при уведомлении о новой версии.

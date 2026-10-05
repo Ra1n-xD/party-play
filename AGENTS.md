@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-PartyPlay is a real-time multiplayer platform using npm workspaces:
+PartySide is a real-time multiplayer platform using npm workspaces:
 
 - `client/src/`: React UI; `platform/` contains shared flows, `games/<gameId>/` contains game interfaces. Assets live in `client/src/assets/`, game-local `assets/`, and `client/public/`.
 - `server/src/`: Express and Socket.IO; `platform/` owns rooms, sessions, and reconnects; `games/<gameId>/` owns rules, bots, and projections.

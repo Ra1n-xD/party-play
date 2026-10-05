@@ -1,3 +1,4 @@
+import { brandStorage } from "./brandStorage";
 import { useEffect, useRef, useState } from "react";
 import {
   LAUGH_AUDIO_START_SECONDS,
@@ -5,7 +6,7 @@ import {
 } from "../../../shared/platform/reactions";
 import laughUrl from "../assets/audio/laugh.wav";
 
-const SOUND_KEY = "partyplay_reaction_sound_v1";
+const SOUND_KEY = "partyside_reaction_sound_v1";
 
 /** A local recording of a natural chuckle, timed to the standing animation. */
 class ReactionAudio {
@@ -92,7 +93,7 @@ class ReactionAudio {
 export function useReactionAudio(events: readonly RoomReactionEvent[], paused = false) {
   const [enabled, setEnabled] = useState(() => {
     try {
-      return localStorage.getItem(SOUND_KEY) !== "off";
+      return brandStorage.getItem(SOUND_KEY) !== "off";
     } catch {
       return true;
     }
@@ -143,7 +144,7 @@ export function useReactionAudio(events: readonly RoomReactionEvent[], paused = 
       }
       setEnabled(next);
       try {
-        localStorage.setItem(SOUND_KEY, next ? "on" : "off");
+        brandStorage.setItem(SOUND_KEY, next ? "on" : "off");
       } catch {
         /* Keep the tab preference. */
       }

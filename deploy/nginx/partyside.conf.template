@@ -1,0 +1,123 @@
+# Replace __CLIENT_DIST__ with the actual absolute client/dist path.
+# Obtain the certificate for both hosts before enabling this file.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name partyside.fun www.partyside.fun;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+        try_files $uri =404;
+    }
+    location / {
+        return 301 https://partyside.fun$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name www.partyside.fun;
+    ssl_certificate /etc/letsencrypt/live/partyside.fun/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/partyside.fun/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    return 301 https://partyside.fun$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name partyside.fun;
+    ssl_certificate /etc/letsencrypt/live/partyside.fun/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/partyside.fun/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss:; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    root __CLIENT_DIST__;
+    index index.html;
+    expires -1;
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json application/xml image/svg+xml;
+
+    # Match the original request only, never an internal 404/index rewrite.
+    if ($request_uri ~ "^/index\.html(?:\?|$)") {
+        return 301 https://partyside.fun/$is_args$args;
+    }
+    if ($request_uri ~ "^/([^?]+)\.html(?:\?|$)") {
+        return 301 https://partyside.fun/$1$is_args$args;
+    }
+    # Do not redirect /socket.io/ or ACME endpoints.
+    rewrite ^(/games/[a-z0-9-]+|/updates|/login|/profile|/cases|/upgrade|/leaderboard|/stats)/$ $1 permanent;
+
+    error_page 404 /404.html;
+    location = /404.html {
+        internal;
+    }
+    location = /games {
+        return 404;
+    }
+    location = /assets {
+        return 404;
+    }
+    location = / {
+        try_files /index.html =404;
+    }
+    location / {
+        # Generated HTML for known routes; missing URLs return a real 404.
+        try_files $uri.html $uri =404;
+    }
+    location /assets/ {
+        expires 1y;
+        try_files $uri =404;
+    }
+    location = /robots.txt {
+        default_type text/plain;
+        try_files $uri =404;
+    }
+    location = /sitemap.xml {
+        default_type application/xml;
+        try_files $uri =404;
+    }
+    location = /version.json {
+        try_files $uri =404;
+    }
+    location ~ /\. {
+        return 404;
+    }
+    location ~ ^/deployz(?:/|$) {
+        return 404;
+    }
+    location = /healthz {
+        proxy_pass http://127.0.0.1:3001/healthz;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location = /readyz {
+        proxy_pass http://127.0.0.1:3001/readyz;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 75s;
+        proxy_buffering off;
+    }
+}

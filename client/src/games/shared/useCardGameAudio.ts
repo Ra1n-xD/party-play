@@ -1,7 +1,8 @@
+import { brandStorage } from "../../platform/brandStorage";
 import { useEffect, useRef, useState } from "react";
 import type { CardTransferVisualEvent, PlayerActionVisualEvent } from "../../../../shared/types";
 
-const SOUND_KEY = "partyplay_card_game_sound_v1";
+const SOUND_KEY = "partyside_card_game_sound_v1";
 type VisualEvent = CardTransferVisualEvent | PlayerActionVisualEvent;
 
 class CardGameAudio {
@@ -90,7 +91,7 @@ export function useCardGameAudio(
 ) {
   const [enabled, setEnabled] = useState(() => {
     try {
-      return localStorage.getItem(SOUND_KEY) !== "off";
+      return brandStorage.getItem(SOUND_KEY) !== "off";
     } catch {
       return true;
     }
@@ -160,7 +161,7 @@ export function useCardGameAudio(
       } else audio.current?.stop();
       setEnabled(next);
       try {
-        localStorage.setItem(SOUND_KEY, next ? "on" : "off");
+        brandStorage.setItem(SOUND_KEY, next ? "on" : "off");
       } catch {
         /* Tab preference. */
       }

@@ -10,7 +10,7 @@ const cacheDirectory = resolve(serverDirectory, "../node_modules/.cache");
 const outputDirectory = resolve(serverDirectory, "dist");
 
 mkdirSync(cacheDirectory, { recursive: true });
-const stagingDirectory = mkdtempSync(join(cacheDirectory, "party-play-server-dist-"));
+const stagingDirectory = mkdtempSync(join(cacheDirectory, "party-side-server-dist-"));
 
 try {
   execFileSync(

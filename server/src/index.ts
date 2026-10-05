@@ -102,7 +102,7 @@ let ready = false;
 let shuttingDown = false;
 
 app.get("/", (_req, res) => {
-  res.json({ status: "ok", message: "PartyPlay Server" });
+  res.json({ status: "ok", message: "PartySide Server" });
 });
 
 app.get("/healthz", (_req, res) => {
@@ -192,7 +192,7 @@ if (isProduction && bindHost !== "127.0.0.1" && bindHost !== "::1") {
 httpServer.listen(CONFIG.PORT, bindHost, () => {
   ready = true;
   const proto = useHttps ? "https" : "http";
-  console.log(`PartyPlay server running on ${proto}://${bindHost}:${CONFIG.PORT}`);
+  console.log(`PartySide server running on ${proto}://${bindHost}:${CONFIG.PORT}`);
   if (!useHttps) {
     console.log(
       "WARNING: Running without HTTPS. Set SSL_CERT and SSL_KEY env vars for production.",
@@ -204,10 +204,10 @@ function shutdown(signal: NodeJS.Signals): void {
   if (shuttingDown) return;
   shuttingDown = true;
   ready = false;
-  console.log(`Received ${signal}, stopping PartyPlay server...`);
+  console.log(`Received ${signal}, stopping PartySide server...`);
 
   const forceExitTimer = setTimeout(() => {
-    console.error("PartyPlay server did not stop within 10 seconds");
+    console.error("PartySide server did not stop within 10 seconds");
     process.exit(1);
   }, 10_000);
   forceExitTimer.unref();
@@ -217,7 +217,7 @@ function shutdown(signal: NodeJS.Signals): void {
     await pendingProfileWrites;
     clearTimeout(forceExitTimer);
     if (error) {
-      console.error("Failed to stop PartyPlay server cleanly", error);
+      console.error("Failed to stop PartySide server cleanly", error);
       process.exit(1);
     }
     process.exit(0);

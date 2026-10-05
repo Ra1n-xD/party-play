@@ -381,7 +381,7 @@ export class RoundTableScene {
     const badge = new THREE.Mesh(
       new THREE.PlaneGeometry(1.05, 0.34),
       new THREE.MeshBasicMaterial({
-        map: this.textTexture("table-mark", "PARTYPLAY", "EST. MMXXIV"),
+        map: this.textTexture("table-mark", "PARTYSIDE", "EST. MMXXIV"),
         transparent: true,
         depthWrite: false,
       }),

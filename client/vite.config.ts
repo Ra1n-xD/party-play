@@ -5,12 +5,13 @@ import { resolve } from "path";
 
 const rootPkg = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf-8"));
 
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   plugins: [
     react(),
     {
-      name: "partyplay-build-version",
+      name: "partyside-build-version",
       generateBundle(_options, bundle) {
+        if (isSsrBuild) return;
         const entry = Object.values(bundle).find((file) => file.type === "chunk" && file.isEntry);
         if (entry)
           this.emitFile({
@@ -34,4 +35,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
