@@ -108,7 +108,6 @@ export function LoginScreen() {
                 autoComplete={registering ? "new-password" : "current-password"}
                 minLength={registering ? PASSWORD_MIN_LENGTH : undefined}
                 maxLength={PASSWORD_MAX_LENGTH}
-                aria-describedby={registering ? "profile-password-hint" : undefined}
                 placeholder={
                   registering ? `Не менее ${PASSWORD_MIN_LENGTH} символов` : "Ваш пароль"
                 }
@@ -128,10 +127,6 @@ export function LoginScreen() {
             </div>
             {registering && (
               <>
-                <small id="profile-password-hint" className="profile-password-hint">
-                  Запомните или сохраните пароль: если вы его забудете, восстановить доступ к
-                  аккаунту не получится.
-                </small>
                 <label htmlFor="profile-password-confirm">Повторите пароль</label>
                 <input
                   id="profile-password-confirm"
