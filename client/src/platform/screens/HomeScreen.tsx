@@ -18,7 +18,7 @@ import { useProfile } from "../context/ProfileContext";
 import { clientGameRegistry, type RegisteredClientGameId } from "../gameRegistry";
 import { gameMenuPresentation } from "../gameMenuPresentation";
 import { ReconnectScreen } from "./ReconnectScreen";
-import { HomeAbout } from "../seo/PublicPage";
+import { HOME_TAGLINE } from "../seo/siteMetadata";
 import "../../styles/show-menu.css";
 import "../../styles/game-catalog.css";
 
@@ -299,9 +299,12 @@ export function HomeScreen() {
         ) : (
           <>
             <section className="show-headline" aria-labelledby="show-menu-title">
-              <h1 id="show-menu-title" ref={titleRef} tabIndex={-1}>
-                ВЕЧЕР НАЧИНАЕТСЯ.
-              </h1>
+              <div className="show-headline-copy">
+                <h1 id="show-menu-title" ref={titleRef} tabIndex={-1}>
+                  ВЕЧЕР НАЧИНАЕТСЯ.
+                </h1>
+                <p className="show-headline-description">{HOME_TAGLINE}</p>
+              </div>
               <div className="show-headline-tools">
                 <span className="show-tag">Ваша компания. Ваше шоу.</span>
                 <a className="show-mobile-join" href="#show-room-entry">
@@ -315,7 +318,6 @@ export function HomeScreen() {
                 counts={connected ? publicRoomCounts?.counts : undefined}
                 onPlay={openGame}
                 onRooms={openPublicRoomsModal}
-                onRules={openRulesModal}
               />
               <aside className="show-catalog-entry" aria-label="Вход в игру и первые шаги">
                 {entryForm}
@@ -490,10 +492,5 @@ export function HomeScreen() {
       )}
     </main>
   );
-  return (
-    <>
-      {screen}
-      {!selectedGame && <HomeAbout />}
-    </>
-  );
+  return screen;
 }

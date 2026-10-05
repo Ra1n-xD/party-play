@@ -369,6 +369,20 @@
   letter-spacing: calc(-1.2 * var(--show-unit));
 }
 
+.show-headline-copy {
+  display: grid;
+  gap: calc(10 * var(--show-unit));
+  min-width: 0;
+}
+
+.show-headline-description {
+  margin: 0;
+  color: var(--show-muted);
+  font-size: calc(14 * var(--show-unit));
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
 .show-tag {
   flex-shrink: 0;
   padding: calc(9 * var(--show-unit)) calc(12 * var(--show-unit));
