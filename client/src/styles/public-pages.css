@@ -26,8 +26,7 @@
   height: 36px;
 }
 
-.public-page a,
-.public-home-info a {
+.public-page a {
   color: #d8fc61;
 }
 
@@ -123,24 +122,6 @@
 
 .public-page-footer {
   padding: 36px 0;
-}
-
-.public-home-info {
-  padding: 24px max(20px, calc((100% - 1100px) / 2));
-  background: #221930;
-  color: #fff8e8;
-  font-family: "Golos Text", sans-serif;
-  line-height: 1.7;
-}
-
-.public-home-info summary {
-  cursor: pointer;
-  font-size: 14px;
-  color: #cfc5da;
-}
-
-.public-home-info .public-overview {
-  padding-top: 24px;
 }
 
 @media (max-width: 480px) {

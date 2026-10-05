@@ -1,5 +1,6 @@
 export const SITE_URL = "https://partyside.fun";
 export const SOCIAL_IMAGE = `${SITE_URL}/social-card.png`;
+export const HOME_TAGLINE = "Онлайн-игры для своей компании — в браузере, без установки.";
 
 export const publicGames = [
   {
@@ -38,9 +39,9 @@ export interface PageMetadata {
 export const publicPages: PageMetadata[] = [
   {
     path: "/",
-    title: "PartySide — игры онлайн с друзьями: Бункер, Дурак и UNO",
+    title: "PartySide — онлайн-игры для компании и друзей",
     description:
-      "Игры для своей компании в браузере: Бункер, Дурак и UNO. Создайте комнату, поделитесь кодом и играйте с друзьями. Боты, зрители и 2D/3D на PartySide.",
+      "Онлайн-игры для компании и друзей в браузере, без установки. Создавайте комнаты, делитесь кодом и играйте вместе с компьютера или телефона на PartySide.",
     indexable: true,
   },
   ...publicGames.map((game) => ({

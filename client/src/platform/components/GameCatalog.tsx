@@ -15,10 +15,9 @@ interface GameCatalogProps {
   counts?: PublicRoomCountsByGame;
   onPlay: (gameId: RegisteredClientGameId) => void;
   onRooms: (gameId: RegisteredClientGameId) => void;
-  onRules: (gameId: RegisteredClientGameId) => void;
 }
 
-export function GameCatalog({ games, counts, onPlay, onRooms, onRules }: GameCatalogProps) {
+export function GameCatalog({ games, counts, onPlay, onRooms }: GameCatalogProps) {
   const gridRef = useRef<HTMLUListElement>(null);
   const [layout, setLayout] = useState({ pageSize: 6, rows: 2 });
   const [page, setPage] = useState(0);
@@ -108,23 +107,24 @@ export function GameCatalog({ games, counts, onPlay, onRooms, onRules }: GameCat
                 <div className="show-catalog-actions">
                   <button
                     type="button"
+                    className="show-catalog-rooms"
                     onClick={() => onRooms(game.id)}
                     aria-haspopup="dialog"
                     aria-label={`Открытые комнаты — ${game.metadata.title}${roomCount === undefined ? "" : `: ${roomCount}`}`}
                   >
-                    <FiUsers aria-hidden="true" /> Комнаты
-                    {roomCount !== undefined && <span>{roomCount}</span>}
+                    <FiUsers aria-hidden="true" />
+                    Комнаты
+                    {roomCount !== undefined && (
+                      <span className="show-catalog-room-count">{roomCount}</span>
+                    )}
+                    <FiChevronRight className="show-catalog-rooms-arrow" aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onRules(game.id)}
-                    aria-haspopup="dialog"
+                  <a
+                    className="show-catalog-rules"
+                    href={`/games/${game.id}`}
                     aria-label={`Правила — ${game.metadata.title}`}
                   >
                     <FiBookOpen aria-hidden="true" /> Правила
-                  </button>
-                  <a href={`/games/${game.id}`} aria-label={`Об игре ${game.metadata.title}`}>
-                    Об игре
                   </a>
                 </div>
               </li>

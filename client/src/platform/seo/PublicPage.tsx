@@ -3,7 +3,7 @@ import { durakRules } from "../../games/durak/rules";
 import { unoRules } from "../../games/uno/rules";
 import { BrandDice } from "../components/BrandDice";
 import { releaseHighlights } from "../releaseHighlights";
-import { publicGames } from "./siteMetadata";
+import { HOME_TAGLINE, publicGames } from "./siteMetadata";
 import "../../styles/public-pages.css";
 
 const rulesByGame = { bunker: bunkerRules, durak: durakRules, uno: unoRules };
@@ -12,9 +12,8 @@ export function SiteOverview() {
   return (
     <div className="public-overview">
       <p>
-        PartySide — игры для своей компании в браузере. Выбирайте Бункер, подкидного Дурака или UNO,
-        создавайте комнату и отправляйте друзьям её код. Устанавливать приложение не нужно:
-        присоединиться можно с компьютера или телефона.
+        {HOME_TAGLINE} Выбирайте игру в каталоге, создавайте комнату и отправляйте друзьям её код.
+        Присоединиться можно с компьютера или телефона.
       </p>
       <div className="public-game-links">
         {publicGames.map((game) => (
@@ -33,7 +32,7 @@ export function SiteOverview() {
       <h2>Своя компания или открытая комната</h2>
       <p>
         Закрытая комната доступна по коду. Открытые комнаты можно найти в каталоге: зайдите на
-        свободное место или присоединитесь зрителем. Во всех трёх играх есть 2D и 3D-вид.
+        свободное место или присоединитесь зрителем.
       </p>
       <h2>Нужна ли регистрация?</h2>
       <p>
@@ -41,17 +40,6 @@ export function SiteOverview() {
         карт и эмоций, получать ежедневные бонусы и участвовать в рейтинге.
       </p>
     </div>
-  );
-}
-
-export function HomeAbout() {
-  return (
-    <section className="public-home-info" aria-label="Об играх PartySide">
-      <details>
-        <summary>PartySide — Бункер, Дурак и UNO онлайн с друзьями</summary>
-        <SiteOverview />
-      </details>
-    </section>
   );
 }
 
