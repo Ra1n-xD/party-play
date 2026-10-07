@@ -17,6 +17,7 @@ Production HTML and the browser must render the same initial `AppRoot` tree. The
 
 - Keep initial rendering deterministic and independent of browser storage, viewport, socket state, current time, or random values. Read client state in effects; use CSS for responsive first paint. Do not hide hydration errors with `suppressHydrationWarning`.
 - Preserve visible public descriptions, canonical game rules, crawlable `<a href>` links, metadata, canonical URLs, JSON-LD, robots and sitemap. Update `siteMetadata.ts` and the canonical game registry/rules when routes or game capabilities change. Private account/room data must never enter prerendered HTML.
+- Public descriptions may be collapsed in native `<details>` for a compact interface, provided players can expand them without JavaScript and the full content remains in the shared initial HTML. Never serve different content to search bots or hide text solely for SEO.
 - Maintain the early startup handling for saved rooms and `/?game=<id>` so the catalog does not flash before the destination. Handle unavailable storage, invalid sessions and cancellation without trapping the player behind a loader.
 - For changes to routes, menus, headers, initial state or public copy, check the production build, its source HTML and cold browser loads on desktop/mobile. Check browser hydration errors, direct links, saved-account/room recovery and SPA navigation. See `docs/ARCHITECTURE.md`, “Публичные страницы и SEO”.
 

@@ -1010,7 +1010,7 @@
   gap: calc(4 * var(--show-unit)) calc(20 * var(--show-unit));
 }
 
-.show-menu-footer a {
+.show-menu-footer nav a {
   display: inline-flex;
   align-items: center;
   gap: calc(7 * var(--show-unit));
@@ -1019,7 +1019,7 @@
   text-decoration: none;
 }
 
-.show-menu-footer a:hover {
+.show-menu-footer nav a:hover {
   color: var(--show-ink);
   text-decoration: underline;
 }

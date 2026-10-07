@@ -3,24 +3,6 @@
   margin: 0 auto;
 }
 
-.show-site-overview {
-  width: 100%;
-  max-width: var(--platform-content-max);
-  margin: 36px auto 0;
-  padding: 32px 0;
-  border-top: 1px solid #695a87;
-  font-size: 16px;
-  line-height: 1.7;
-}
-
-.show-site-overview > h2:first-child {
-  margin-top: 0;
-}
-
-.show-site-overview a {
-  color: #d8fc61;
-}
-
 .public-page-header,
 .public-page-header nav,
 .public-page-footer {
@@ -61,8 +43,7 @@
   overflow-wrap: anywhere;
 }
 
-.public-page h2,
-.public-overview h2 {
+.public-page h2 {
   margin: 32px 0 12px;
   font-size: 23px;
   line-height: 1.4;
@@ -73,8 +54,7 @@
   font-size: 19px;
 }
 
-.public-page p,
-.public-overview p {
+.public-page p {
   margin-bottom: 16px;
 }
 
@@ -128,13 +108,11 @@
   border-bottom: 1px solid #695a87;
 }
 
-.public-page ul,
-.public-overview ol {
+.public-page ul {
   padding-left: 24px;
 }
 
-.public-page li,
-.public-overview li {
+.public-page li {
   margin-bottom: 12px;
 }
 

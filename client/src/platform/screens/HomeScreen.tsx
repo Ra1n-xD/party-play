@@ -19,7 +19,6 @@ import { clientGameRegistry, type RegisteredClientGameId } from "../gameRegistry
 import { gameMenuPresentation } from "../gameMenuPresentation";
 import { ReconnectScreen } from "./ReconnectScreen";
 import { HOME_TAGLINE } from "../seo/siteMetadata";
-import { SiteOverview } from "../seo/SiteOverview";
 import "../../styles/show-menu.css";
 import "../../styles/game-catalog.css";
 
@@ -340,8 +339,6 @@ export function HomeScreen() {
 
         <MenuFooter />
       </div>
-
-      {!selectedGame && <SiteOverview />}
 
       {publicRoomsGame && publicRoomsGameId && (
         <AccessibleModal
