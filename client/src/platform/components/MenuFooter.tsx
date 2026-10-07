@@ -1,5 +1,5 @@
 import { BiDonateHeart } from "react-icons/bi";
-import { FaTelegramPlane, FaTwitch } from "react-icons/fa";
+import { FaTelegramPlane } from "react-icons/fa";
 import { FiAlertCircle, FiClock } from "react-icons/fi";
 import { usePlatform } from "../context/PlatformContext";
 
@@ -19,10 +19,6 @@ export function MenuFooter({ updatesActive = false }: { updatesActive?: boolean 
         <a href="https://t.me/fronted_engineer" target="_blank" rel="noopener noreferrer">
           <FaTelegramPlane aria-hidden="true" />
           Telegram
-        </a>
-        <a href="https://www.twitch.tv/fronted_ra1n" target="_blank" rel="noopener noreferrer">
-          <FaTwitch aria-hidden="true" />
-          Twitch
         </a>
         <a href="https://t.me/Ra1n_xD" target="_blank" rel="noopener noreferrer">
           <FiAlertCircle aria-hidden="true" />
