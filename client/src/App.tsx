@@ -7,6 +7,7 @@ import { StatsScreen } from "./platform/screens/StatsScreen";
 import { ProfileProvider, useProfile } from "./platform/context/ProfileContext";
 import { CollectionScreen } from "./platform/screens/CollectionScreen";
 import { AccountScreen } from "./platform/screens/AccountScreen";
+import { NotFoundScreen } from "./platform/screens/NotFoundScreen";
 import { LoginScreen } from "./platform/screens/LoginScreen";
 import { CasesScreen } from "./platform/screens/CasesScreen";
 import { UpgradeScreen } from "./platform/screens/UpgradeScreen";
@@ -20,10 +21,7 @@ import { PublicPage } from "./platform/seo/PublicPage";
 import { publicGames } from "./platform/seo/siteMetadata";
 
 function readAppPath() {
-  const path = window.location.pathname.replace(/\/$/, "") || "/";
-  if (path !== "/profile") return path;
-  history.replaceState(null, "", `/collection${window.location.search}${window.location.hash}`);
-  return "/collection";
+  return window.location.pathname.replace(/\/$/, "") || "/";
 }
 
 function ProfileApp() {
@@ -53,7 +51,6 @@ function ProfileApp() {
           "/login",
           "/collection",
           "/profile",
-          "/account",
           "/cases",
           "/upgrade",
           "/updates",
@@ -83,7 +80,7 @@ function ProfileApp() {
     }
     previousProfile.current = profile;
   }, [profile, path]);
-  const profilePage = ["/collection", "/account", "/cases", "/upgrade"].includes(path);
+  const profilePage = ["/collection", "/profile", "/cases", "/upgrade"].includes(path);
   const gamePage = publicGames.some((game) => `/games/${game.id}` === path);
   const knownPage =
     gamePage ||
@@ -91,7 +88,7 @@ function ProfileApp() {
       "/",
       "/login",
       "/collection",
-      "/account",
+      "/profile",
       "/cases",
       "/upgrade",
       "/leaderboard",
@@ -121,7 +118,7 @@ function ProfileApp() {
           <div className="show-menu-shell">
             <ProfileHeader
               activePage={
-                path === "/account"
+                path === "/profile"
                   ? "account"
                   : path === "/collection"
                     ? "collection"
@@ -134,15 +131,12 @@ function ProfileApp() {
         </div>
       )}
       {!knownPage ? (
-        <main className="screen">
-          <h1>Страница не найдена</h1>
-          <a href="/">К играм PartySide</a>
-        </main>
+        <NotFoundScreen />
       ) : gamePage ? (
         <PublicPage path={path} />
       ) : path === "/collection" ? (
         <CollectionScreen />
-      ) : path === "/account" ? (
+      ) : path === "/profile" ? (
         <AccountScreen />
       ) : path === "/cases" ? (
         <CasesScreen />

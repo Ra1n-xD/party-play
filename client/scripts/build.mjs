@@ -60,7 +60,6 @@ try {
   const paths = [
     ...publicPages.map((page) => page.path),
     ...utilityPages.map(([path]) => path),
-    "/profile", // Redirect bookmarks made before the collection got its own route.
     "/404",
   ];
   for (const path of paths) {

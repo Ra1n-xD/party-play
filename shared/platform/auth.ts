@@ -44,7 +44,7 @@ export interface ProfileRegistration extends ProfileCredentials {
 export interface ProfileUpdate {
   nickname: string;
   email: string;
-  currentPassword: string;
+  currentPassword?: string;
   newPassword?: string;
 }
 

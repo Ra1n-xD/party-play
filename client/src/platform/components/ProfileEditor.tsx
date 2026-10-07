@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import {
   EMAIL_MAX_LENGTH,
@@ -19,6 +19,17 @@ export function ProfileEditor() {
   const [visible, setVisible] = useState(false);
   const [validation, setValidation] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const previousValues = useRef({
+    nickname: profile?.nickname ?? "",
+    email: account?.email ?? "",
+  });
+  useEffect(() => {
+    const previous = previousValues.current;
+    const next = { nickname: profile?.nickname ?? "", email: account?.email ?? "" };
+    setNickname((value) => (value === previous.nickname ? next.nickname : value));
+    setEmail((value) => (value === previous.email ? next.email : value));
+    previousValues.current = next;
+  }, [profile?.nickname, account?.email]);
   const changed =
     nickname.trim() !== profile?.nickname || email.trim() !== account?.email || !!newPassword;
   const submit = async (event: FormEvent) => {
@@ -37,8 +48,7 @@ export function ProfileEditor() {
     const success = await updateAccount({
       nickname,
       email,
-      currentPassword,
-      ...(newPassword ? { newPassword } : {}),
+      ...(newPassword ? { newPassword, currentPassword } : {}),
     });
     // Passwords are never retained after a request, including a lost response.
     setCurrentPassword("");
@@ -134,32 +144,34 @@ export function ProfileEditor() {
             После смены пароля другие устройства выйдут из аккаунта.
           </p>
         )}
-        <div className="profile-editor-field">
-          <label htmlFor="edit-current-password">Текущий пароль</label>
-          <div className="profile-password-field">
-            <input
-              id="edit-current-password"
-              name="current-password"
-              type={visible ? "text" : "password"}
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              maxLength={PASSWORD_MAX_LENGTH}
-              disabled={busy}
-              required
-            />
-            <button
-              type="button"
-              className="profile-password-toggle"
-              onClick={() => setVisible(!visible)}
-              disabled={busy}
-              aria-label={visible ? "Скрыть пароли" : "Показать пароли"}
-              aria-pressed={visible}
-            >
-              {visible ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
-            </button>
+        {newPassword && (
+          <div className="profile-editor-field">
+            <label htmlFor="edit-current-password">Текущий пароль</label>
+            <div className="profile-password-field">
+              <input
+                id="edit-current-password"
+                name="current-password"
+                type={visible ? "text" : "password"}
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                maxLength={PASSWORD_MAX_LENGTH}
+                disabled={busy}
+                required
+              />
+              <button
+                type="button"
+                className="profile-password-toggle"
+                onClick={() => setVisible(!visible)}
+                disabled={busy}
+                aria-label={visible ? "Скрыть пароли" : "Показать пароли"}
+                aria-pressed={visible}
+              >
+                {visible ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
         {(validation || error) && (
           <p className="profile-error" role="alert">
             {validation || error}
@@ -173,7 +185,13 @@ export function ProfileEditor() {
         <div className="profile-editor-actions">
           <button
             className="profile-primary"
-            disabled={busy || !connected || !changed || !nickname.trim() || !currentPassword}
+            disabled={
+              busy ||
+              !connected ||
+              !changed ||
+              !nickname.trim() ||
+              (!!newPassword && !currentPassword)
+            }
           >
             {busy ? "Сохраняем…" : "Сохранить изменения"}
           </button>

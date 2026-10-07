@@ -42,6 +42,7 @@
   --platform-unit: clamp(1px, min(calc(100vw / 1440), calc(100svh / 900)), 2.4px);
   --platform-content-max: calc(1280 * var(--platform-unit));
   --platform-gutter: calc(26 * var(--platform-unit));
+  --platform-feed-offset: 48px;
 }
 
 .show-menu {
@@ -187,13 +188,17 @@
 }
 
 .show-menu.platform-header {
+  position: relative;
+  z-index: 60;
   min-height: 0;
   padding-bottom: 0;
 }
 
 .show-profile-header {
+  position: relative;
+  z-index: 60;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, auto);
   gap: calc(16 * var(--show-unit));
 }
 
@@ -203,7 +208,7 @@
   justify-self: end;
   gap: calc(12 * var(--show-unit));
   min-width: 0;
-  max-width: 100%;
+  max-width: calc(360 * var(--show-unit));
 }
 
 .show-profile-navigation {
@@ -289,63 +294,139 @@
   align-items: center;
   gap: calc(14 * var(--show-unit));
   min-width: 0;
+  max-width: 100%;
   margin-left: auto;
   color: var(--show-ink);
   font-size: calc(14 * var(--show-unit));
   text-decoration: none;
 }
 
+.show-account-menu {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: calc(280 * var(--show-unit));
+}
+
+.show-account-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--show-ink);
+  text-align: left;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
 .show-profile-nickname {
   display: block;
-  max-width: calc(180 * var(--show-unit));
-  padding: 6px 5px;
-  border-radius: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: inherit;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
   font-family: var(--show-display);
   font-size: calc(12 * var(--show-unit));
   font-weight: 700;
   line-height: 1.5;
-  text-decoration: none;
-  transform: rotate(-3deg);
-  transition:
-    color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
+  transform: rotate(-2deg);
 }
 
-.show-profile-nickname:is(:hover, :focus-visible) {
-  color: var(--show-accent);
+.show-account-trigger > svg {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  transition: transform 160ms ease;
+}
+
+.show-account-trigger:is(:hover, :focus-visible, [aria-expanded="true"]) {
+  border-color: #d8fc6140;
   background: #d8fc6114;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  transform: rotate(-3deg) translateY(-2px);
-}
-
-.show-profile-nickname[aria-current] {
   color: var(--show-accent);
 }
 
-.show-logout {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 34px;
-  min-height: 40px;
-  padding: 8px;
-  border: 1px solid #fff8e830;
-  border-radius: 8px;
-  background: transparent;
-  transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+.show-account-trigger[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
 }
 
-.show-menu .show-logout,
+.show-account-trigger[data-active] {
+  color: var(--show-accent);
+}
+
+.show-account-popover {
+  position: absolute;
+  z-index: 80;
+  top: 100%;
+  right: 0;
+  width: min(280px, calc(100vw - 32px));
+  padding-top: 8px;
+}
+
+.show-account-dropdown {
+  padding: 8px;
+  border: 2px solid #170e20;
+  border-radius: 12px;
+  background: #35283f;
+  box-shadow:
+    0 5px 0 #140c1d,
+    0 12px 24px #10091c40;
+  color: var(--show-ink);
+  font-family: "Golos Text", sans-serif;
+}
+
+.show-account-name {
+  margin: 0 0 4px;
+  padding: 8px 10px 12px;
+  border-bottom: 1px solid #ffffff25;
+  overflow-wrap: anywhere;
+  font-family: var(--show-display);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.show-account-dropdown :is(a, button) {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
+  text-align: left;
+  text-decoration: none;
+}
+
+.show-account-dropdown svg {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.show-account-dropdown :is(a, button):is(:hover, :focus-visible),
+.show-account-dropdown a[aria-current] {
+  background: #d8fc6114;
+  color: var(--show-accent);
+}
+
+.show-account-dropdown .show-account-logout:is(:hover, :focus-visible):not(:disabled) {
+  background: #f26e8226;
+  color: #ff8193;
+}
+
 .show-menu .show-login {
   font-family: "Golos Text", sans-serif;
   font-size: 14px;
@@ -357,12 +438,6 @@
   .show-profile-navigation {
     margin-left: 0;
   }
-}
-
-.show-logout:hover:not(:disabled) {
-  border-color: #f26e82;
-  background: #f26e8226;
-  color: #ff8193;
 }
 
 .show-game-navigation {
@@ -1544,6 +1619,14 @@
     gap: 10px;
   }
 
+  .show-profile-navigation {
+    gap: 5px;
+  }
+
+  .show-profile-account {
+    max-width: 320px;
+  }
+
   .show-profile-header .show-brand {
     font-size: 20px;
   }
@@ -1554,13 +1637,14 @@
   }
 
   .show-profile-navigation a {
-    padding-inline: 8px;
-    gap: 5px;
-    font-size: 12px;
+    padding-inline: 6px;
+    gap: 4px;
+    font-size: 11px;
   }
 
-  .show-profile-nickname {
-    max-width: 72px;
+  .show-profile-navigation svg {
+    width: 14px;
+    height: 14px;
   }
 
   .show-profile-balance {
@@ -1731,7 +1815,11 @@
 
   .show-profile-header .show-brand {
     gap: 8px;
-    font-size: clamp(16px, 4.4vw, 22px);
+    font-size: clamp(16px, 4vw, 22px);
+  }
+
+  .show-brand-name {
+    display: none;
   }
 
   .show-profile-header .show-brand-dice {
@@ -1746,11 +1834,13 @@
 
   .show-profile-header {
     grid-template-columns: auto minmax(0, 1fr);
-    column-gap: 8px;
+    column-gap: 4px;
   }
 
   .show-profile-account {
+    position: relative;
     gap: 8px;
+    max-width: 100%;
   }
 
   .show-profile-header .show-brand {
@@ -1782,20 +1872,22 @@
     margin-left: 0;
   }
 
-  .show-logout {
-    width: 32px;
-    padding: 8px;
-    flex-shrink: 0;
-  }
-
-  .show-logout svg {
-    width: 17px;
-    height: 17px;
-  }
-
   .show-profile-nickname {
-    max-width: 72px;
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .show-profile-header.has-account .show-account-menu {
+    position: static;
+    max-width: 100%;
+  }
+
+  .show-profile-header.has-account .show-account-trigger {
+    justify-content: flex-end;
+    padding-inline: 4px;
+  }
+
+  .show-account-popover {
+    right: 0;
   }
 
   .show-game-navigation {
@@ -1969,6 +2061,12 @@
 
   .show-how-to-panel {
     padding: calc(20 * var(--show-unit));
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --platform-feed-offset: 30px;
   }
 }
 

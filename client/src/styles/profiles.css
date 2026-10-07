@@ -456,7 +456,8 @@ body:has(.show-menu, .profile-login),
 .account-page,
 .cases-page {
   min-height: calc(100svh - 76px);
-  padding: 48px max(var(--platform-gutter), calc((100% - var(--platform-content-max)) / 2)) 90px;
+  padding: var(--platform-feed-offset)
+    max(var(--platform-gutter), calc((100% - var(--platform-content-max)) / 2)) 90px;
   background: radial-gradient(ellipse at 65% 0, #62489544, transparent 700px), #221930;
 }
 .collection-page,
@@ -1057,7 +1058,7 @@ body:has(.show-menu, .profile-login),
   .collection-page,
   .account-page,
   .cases-page {
-    padding-block: 30px 65px;
+    padding-block: var(--platform-feed-offset) 65px;
   }
   .collection-page,
   .account-page {

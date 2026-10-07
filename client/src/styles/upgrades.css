@@ -2,7 +2,8 @@
   --upgrade-accent: #d8fc61;
   --upgrade-muted: #bcb0cc;
   min-height: calc(100dvh - 76px);
-  padding: 44px max(var(--platform-gutter), calc((100% - var(--platform-content-max)) / 2)) 72px;
+  padding: var(--platform-feed-offset)
+    max(var(--platform-gutter), calc((100% - var(--platform-content-max)) / 2)) 72px;
   background: radial-gradient(ellipse at 50% 12%, #66449b30, transparent 700px), #221930;
   color: #fff8e8;
   font-family: "Golos Text", sans-serif;
@@ -538,7 +539,7 @@
 }
 @media (max-width: 760px) {
   .upgrade-page {
-    padding-block: 30px 50px;
+    padding-block: var(--platform-feed-offset) 50px;
   }
   .upgrade-stage {
     grid-template-columns: repeat(2, minmax(0, 1fr));
