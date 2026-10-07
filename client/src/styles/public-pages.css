@@ -3,6 +3,24 @@
   margin: 0 auto;
 }
 
+.show-site-overview {
+  width: 100%;
+  max-width: var(--platform-content-max);
+  margin: 36px auto 0;
+  padding: 32px 0;
+  border-top: 1px solid #695a87;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.show-site-overview > h2:first-child {
+  margin-top: 0;
+}
+
+.show-site-overview a {
+  color: #d8fc61;
+}
+
 .public-page-header,
 .public-page-header nav,
 .public-page-footer {

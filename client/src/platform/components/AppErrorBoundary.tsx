@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { finishStartup } from "../startup";
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -16,6 +17,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    finishStartup();
     console.error("PartySide render error", error, info.componentStack);
   }
 

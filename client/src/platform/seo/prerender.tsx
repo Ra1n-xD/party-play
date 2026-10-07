@@ -1,6 +1,6 @@
-import { renderToStaticMarkup } from "react-dom/server";
-import { PublicPage } from "./PublicPage";
-import { NotFoundScreen } from "../screens/NotFoundScreen";
+import { renderToString } from "react-dom/server";
+import { AppRoot } from "../AppRoot";
+import { RoomLoading } from "../components/RoomLoading";
 import {
   getPageMetadata,
   getStructuredData,
@@ -44,13 +44,13 @@ export function renderPage(path: string, template: string): string {
     <meta name="twitter:description" content="${description}" />
     <meta name="twitter:image" content="${SOCIAL_IMAGE}" />
     <script type="application/ld+json" id="site-structured-data">${structured}</script>`;
-  const content = page.indexable
-    ? renderToStaticMarkup(<PublicPage path={path} />)
-    : path === "/404"
-      ? renderToStaticMarkup(<NotFoundScreen />)
-      : '<main><p>PartySide — игры для своей компании.</p><p><a href="/">К каталогу игр</a></p></main>';
+  const content = renderToString(<AppRoot initialPath={path} />);
+  const startup = renderToString(<RoomLoading message="Загружаем игру…" />);
   return template
     .replace(/<title>.*?<\/title>/s, `<title>${title}</title>`)
     .replace("<!--seo-head-->", head)
-    .replace('<div id="root"></div>', `<div id="root">${content}</div>`);
+    .replace(
+      '<div id="root"></div>',
+      `<div id="app-startup">${startup}</div><div id="root" data-app-path="${escapeHtml(path)}">${content}</div>`,
+    );
 }

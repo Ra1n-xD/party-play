@@ -97,7 +97,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<ProfileSnapshot | null>(null);
   const [account, setAccount] = useState<ProfileAccountDetails | null>(null);
   const [busy, setBusy] = useState(false);
-  const [connected, setConnected] = useState(socket.connected);
+  const [connected, setConnected] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmLogout, setConfirmLogout] = useState(false);

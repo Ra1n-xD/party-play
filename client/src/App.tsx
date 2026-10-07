@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { PlatformOverlays } from "./platform/components/PlatformOverlays";
 import { PlatformProvider, usePlatform } from "./platform/context/PlatformContext";
 import { getLazyGameComponent } from "./platform/gameRegistry";
@@ -19,14 +19,21 @@ import { AppUpdateNotice } from "./platform/components/AppUpdateNotice";
 import { PageMetadata } from "./platform/seo/PageMetadata";
 import { PublicPage } from "./platform/seo/PublicPage";
 import { publicGames } from "./platform/seo/siteMetadata";
+import { RoomLoading } from "./platform/components/RoomLoading";
+import { useBrowserLayoutEffect } from "./platform/useBrowserLayoutEffect";
+import { finishStartup } from "./platform/startup";
 
 function readAppPath() {
   return window.location.pathname.replace(/\/$/, "") || "/";
 }
 
-function ProfileApp() {
+function ProfileApp({ initialPath }: { initialPath: string }) {
   const { profile, loading } = useProfile();
-  const [path, setPath] = useState(readAppPath);
+  const { startupReady } = usePlatform();
+  const [path, setPath] = useState(initialPath);
+  useEffect(() => {
+    if (startupReady) finishStartup();
+  }, [startupReady]);
   useEffect(() => {
     const update = () => {
       setPath(readAppPath());
@@ -156,38 +163,23 @@ function ProfileApp() {
   );
 }
 
-function RoomLoading({
-  message = "Загружаем комнату…",
-  onCancel,
-}: {
-  message?: string;
-  onCancel?: () => void;
-}) {
-  return (
-    <div className="screen platform-room-loading" role="status">
-      <span className="platform-loading-mark" aria-hidden="true">
-        ◆
-      </span>
-      <p>{message}</p>
-      {onCancel && (
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>
-          Вернуться на главную
-        </button>
-      )}
-    </div>
-  );
-}
-
 function RoomAppContent() {
-  const { roomCode, activeGameId, snapshot, sessionPending, cancelPendingMembership, leaveRoom } =
-    usePlatform();
+  const {
+    roomCode,
+    activeGameId,
+    snapshot,
+    sessionPending,
+    reconnectState,
+    cancelPendingMembership,
+    leaveRoom,
+  } = usePlatform();
 
-  useLayoutEffect(() => {
+  useBrowserLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [roomCode, snapshot?.lifecycle]);
 
   if (!roomCode) return <HomeScreen />;
-  if (sessionPending && !snapshot) {
+  if ((sessionPending || reconnectState === "reconnecting") && !snapshot) {
     return <RoomLoading message="Возвращаемся в комнату…" onCancel={cancelPendingMembership} />;
   }
 
@@ -219,12 +211,12 @@ function RoomAppContent() {
   );
 }
 
-export default function App() {
+export default function App({ initialPath }: { initialPath: string }) {
   return (
     <>
       <PlatformProvider>
         <ProfileProvider>
-          <ProfileApp />
+          <ProfileApp initialPath={initialPath} />
         </ProfileProvider>
       </PlatformProvider>
       <div className="app-version">v{__APP_VERSION__}</div>

@@ -22,7 +22,7 @@ function formatDate(value: number): string {
 
 export function StatsScreen() {
   const [stats, setStats] = useState<ProjectStatsSnapshot | null>(null);
-  const [connected, setConnected] = useState(socket.connected);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     const subscribe = () => {

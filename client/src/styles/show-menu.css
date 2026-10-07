@@ -211,6 +211,14 @@
   max-width: min(100%, calc(360 * var(--show-unit)));
 }
 
+.show-account-loading {
+  display: block;
+  width: 96px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fff8e814;
+}
+
 .show-profile-navigation {
   display: flex;
   align-items: center;

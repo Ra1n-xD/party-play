@@ -11,6 +11,15 @@ PartySide is a real-time multiplayer platform using npm workspaces:
 
 Prefer canonical `platform/` and `games/` modules over legacy compatibility entry points. Keep game rules isolated and validate multiplayer state changes on the server. Update all consumers when shared contracts change.
 
+## Initial HTML and SEO
+
+Production HTML and the browser must render the same initial `AppRoot` tree. The build prerenders the actual application screens with `renderToString`; the browser attaches them with `hydrateRoot`. Never introduce a separate static copy of the menu, updates, or another app screen. Changes to shared components must automatically reach both renders.
+
+- Keep initial rendering deterministic and independent of browser storage, viewport, socket state, current time, or random values. Read client state in effects; use CSS for responsive first paint. Do not hide hydration errors with `suppressHydrationWarning`.
+- Preserve visible public descriptions, canonical game rules, crawlable `<a href>` links, metadata, canonical URLs, JSON-LD, robots and sitemap. Update `siteMetadata.ts` and the canonical game registry/rules when routes or game capabilities change. Private account/room data must never enter prerendered HTML.
+- Maintain the early startup handling for saved rooms and `/?game=<id>` so the catalog does not flash before the destination. Handle unavailable storage, invalid sessions and cancellation without trapping the player behind a loader.
+- For changes to routes, menus, headers, initial state or public copy, check the production build, its source HTML and cold browser loads on desktop/mobile. Check browser hydration errors, direct links, saved-account/room recovery and SPA navigation. See `docs/ARCHITECTURE.md`, “Публичные страницы и SEO”.
+
 ## Build, Test, and Development Commands
 
 Run from the repository root:

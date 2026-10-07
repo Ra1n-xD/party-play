@@ -76,6 +76,22 @@ textarea {
   min-height: 100dvh;
 }
 
+#app-startup {
+  display: none;
+}
+
+html[data-app-startup="pending"] #root {
+  visibility: hidden;
+}
+
+html[data-app-startup="pending"] #app-startup {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #221930;
+}
+
 /* ============ SCREEN LAYOUT ============ */
 .screen {
   min-height: 100dvh;
