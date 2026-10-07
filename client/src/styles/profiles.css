@@ -244,6 +244,7 @@ body:has(.show-menu, .profile-login),
 
 .profile-login,
 .collection-page,
+.account-page,
 .cases-page {
   font-family: "Golos Text", sans-serif;
   color: #fff8e8;
@@ -433,8 +434,9 @@ body:has(.show-menu, .profile-login),
   font-size: 15px;
   line-height: 1.3;
 }
-.profile-password-warning span {
+.profile-password-warning p {
   display: block;
+  margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -447,13 +449,19 @@ body:has(.show-menu, .profile-login),
   line-height: 1.5;
 }
 .collection-page,
+.account-page,
 .cases-page {
   min-height: calc(100svh - 76px);
   padding: 48px max(var(--platform-gutter), calc((100% - var(--platform-content-max)) / 2)) 90px;
   background: radial-gradient(ellipse at 65% 0, #62489544, transparent 700px), #221930;
 }
-.collection-page {
+.collection-page,
+.account-page {
   padding-top: 24px;
+}
+.account-content {
+  max-width: 960px;
+  margin: 0 auto;
 }
 .collection-heading {
   display: flex;
@@ -509,14 +517,10 @@ body:has(.show-menu, .profile-login),
   opacity: 0.45;
   cursor: not-allowed;
 }
-.profile-summary-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-left: auto;
-}
-.profile-summary-actions .profile-text-button {
-  margin: 0;
+.profile-optional {
+  font-size: max(11px, 0.8em);
+  font-weight: 400;
+  color: #a89bb7;
 }
 .profile-test-notice {
   padding: 18px 20px;
@@ -558,15 +562,6 @@ body:has(.show-menu, .profile-login),
 }
 .profile-editor h2 {
   margin: 8px 0 0;
-  font-size: 22px;
-}
-.profile-editor > header button {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  padding: 10px;
   font-size: 22px;
 }
 .profile-editor form {
@@ -635,10 +630,6 @@ body:has(.show-menu, .profile-login),
   }
   .profile-editor-actions .profile-primary {
     width: 100%;
-  }
-  .profile-summary-actions {
-    width: 100%;
-    margin-left: 0;
   }
 }
 .collection-tabs {
@@ -1043,6 +1034,7 @@ body:has(.show-menu, .profile-login),
 }
 .profile-login :is(a, button, input):focus-visible,
 .collection-page :is(a, button):focus-visible,
+.account-page :is(a, button):focus-visible,
 .cases-page :is(a, button):focus-visible {
   outline: 3px solid #d8fc61;
   outline-offset: 4px;
@@ -1054,10 +1046,12 @@ body:has(.show-menu, .profile-login),
 }
 @media (max-width: 760px) {
   .collection-page,
+  .account-page,
   .cases-page {
     padding-block: 30px 65px;
   }
-  .collection-page {
+  .collection-page,
+  .account-page {
     padding-top: 16px;
   }
   .collection-heading {

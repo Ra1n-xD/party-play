@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { FiEye, FiEyeOff, FiX } from "react-icons/fi";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import {
   EMAIL_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
@@ -9,7 +9,7 @@ import {
 import { useProfile } from "../context/ProfileContext";
 import { normalizeNickname } from "../../../../shared/platform/cosmetics";
 
-export function ProfileEditor({ onClose }: { onClose(): void }) {
+export function ProfileEditor() {
   const { profile, account, updateAccount, busy, connected, error, clearError } = useProfile();
   const [nickname, setNickname] = useState(profile?.nickname ?? "");
   const [email, setEmail] = useState(account?.email ?? "");
@@ -58,15 +58,6 @@ export function ProfileEditor({ onClose }: { onClose(): void }) {
           <span className="profile-eyebrow">ВАШ АККАУНТ</span>
           <h2 id="profile-editor-title">Редактирование профиля</h2>
         </div>
-        <button
-          type="button"
-          className="profile-text-button"
-          onClick={onClose}
-          disabled={busy}
-          aria-label="Закрыть редактирование профиля"
-        >
-          <FiX aria-hidden="true" />
-        </button>
       </header>
       <p className="profile-field-hint">
         Никнейм можно сменить после выхода из всех комнат. Монеты, коллекция, статистика и участие в
@@ -85,11 +76,12 @@ export function ProfileEditor({ onClose }: { onClose(): void }) {
               maxLength={20}
               disabled={busy}
               required
-              autoFocus
             />
           </div>
           <div className="profile-editor-field">
-            <label htmlFor="edit-email">Электронная почта · необязательно</label>
+            <label htmlFor="edit-email">
+              Электронная почта <span className="profile-optional">(необязательно)</span>
+            </label>
             <input
               id="edit-email"
               name="email"
@@ -185,9 +177,6 @@ export function ProfileEditor({ onClose }: { onClose(): void }) {
             disabled={busy || !connected || !changed || !nickname.trim() || !currentPassword}
           >
             {busy ? "Сохраняем…" : "Сохранить изменения"}
-          </button>
-          <button type="button" className="profile-text-button" onClick={onClose} disabled={busy}>
-            Закрыть
           </button>
         </div>
         {!connected && (

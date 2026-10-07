@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { FiAlertTriangle, FiEye, FiEyeOff } from "react-icons/fi";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -110,7 +110,9 @@ export function LoginScreen() {
             />
             {registering && (
               <>
-                <label htmlFor="profile-email">Электронная почта · необязательно</label>
+                <label htmlFor="profile-email">
+                  Электронная почта <span className="profile-optional">(необязательно)</span>
+                </label>
                 <input
                   id="profile-email"
                   name="email"
@@ -120,13 +122,9 @@ export function LoginScreen() {
                   maxLength={EMAIL_MAX_LENGTH}
                   autoComplete="email"
                   placeholder="you@example.com"
-                  aria-describedby="profile-email-hint"
+                  aria-describedby="profile-account-note"
                   disabled={busy}
                 />
-                <p id="profile-email-hint" className="profile-field-hint">
-                  Пока почта только сохраняется в аккаунте. Вход, подтверждение и восстановление
-                  через неё недоступны.
-                </p>
               </>
             )}
             <label htmlFor="profile-password">Пароль</label>
@@ -200,18 +198,11 @@ export function LoginScreen() {
           </a>
         </div>
         <aside className="profile-auth-notes">
-          <TestAccountNotice />
+          <TestAccountNotice showEmailWarning />
           <div className="profile-welcome">
             <span className="profile-welcome-coins">
               <CoinAmount amount={INITIAL_COINS} label="монет при регистрации" />
             </span>
-          </div>
-          <div className="profile-password-warning">
-            <FiAlertTriangle aria-hidden="true" />
-            <div>
-              <strong>Сохраните пароль</strong>
-              <span>Восстановление через почту пока недоступно.</span>
-            </div>
           </div>
         </aside>
       </section>

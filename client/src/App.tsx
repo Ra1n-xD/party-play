@@ -6,6 +6,7 @@ import { HomeScreen } from "./platform/screens/HomeScreen";
 import { StatsScreen } from "./platform/screens/StatsScreen";
 import { ProfileProvider, useProfile } from "./platform/context/ProfileContext";
 import { ProfileScreen } from "./platform/screens/ProfileScreen";
+import { AccountScreen } from "./platform/screens/AccountScreen";
 import { LoginScreen } from "./platform/screens/LoginScreen";
 import { CasesScreen } from "./platform/screens/CasesScreen";
 import { UpgradeScreen } from "./platform/screens/UpgradeScreen";
@@ -44,6 +45,7 @@ function ProfileApp() {
           "/",
           "/login",
           "/profile",
+          "/account",
           "/cases",
           "/upgrade",
           "/updates",
@@ -73,7 +75,7 @@ function ProfileApp() {
     }
     previousProfile.current = profile;
   }, [profile, path]);
-  const profilePage = path === "/profile" || path === "/cases" || path === "/upgrade";
+  const profilePage = ["/profile", "/account", "/cases", "/upgrade"].includes(path);
   const gamePage = publicGames.some((game) => `/games/${game.id}` === path);
   const knownPage =
     gamePage ||
@@ -81,6 +83,7 @@ function ProfileApp() {
       "/",
       "/login",
       "/profile",
+      "/account",
       "/cases",
       "/upgrade",
       "/leaderboard",
@@ -110,7 +113,13 @@ function ProfileApp() {
           <div className="show-menu-shell">
             <ProfileHeader
               activePage={
-                path === "/profile" ? "profile" : path === "/upgrade" ? "upgrade" : "cases"
+                path === "/account"
+                  ? "account"
+                  : path === "/profile"
+                    ? "profile"
+                    : path === "/upgrade"
+                      ? "upgrade"
+                      : "cases"
               }
             />
           </div>
@@ -125,6 +134,8 @@ function ProfileApp() {
         <PublicPage path={path} />
       ) : path === "/profile" ? (
         <ProfileScreen />
+      ) : path === "/account" ? (
+        <AccountScreen />
       ) : path === "/cases" ? (
         <CasesScreen />
       ) : path === "/upgrade" ? (

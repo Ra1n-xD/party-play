@@ -1,12 +1,25 @@
-export function TestAccountNotice() {
+import { FiAlertTriangle } from "react-icons/fi";
+
+export function TestAccountNotice({ showEmailWarning = false }: { showEmailWarning?: boolean }) {
   return (
-    <div className="profile-test-notice">
-      <strong>Ваш аккаунт останется с вами</strong>
-      <p>
-        Аккаунты, созданные во время тестирования, сохранятся после полноценного релиза PartySide.
-        Участники теста получат бонусы на этих аккаунтах. Подробности о бонусах расскажем ближе к
-        релизу. Почта необязательна и не влияет на участие.
-      </p>
+    <div
+      className={showEmailWarning ? "profile-password-warning" : "profile-test-notice"}
+      id={showEmailWarning ? "profile-account-note" : undefined}
+    >
+      {showEmailWarning && <FiAlertTriangle aria-hidden="true" />}
+      <div>
+        <strong>Ваш аккаунт останется с вами</strong>
+        <p>
+          Аккаунт сохранится после релиза. Участники теста получат бонусы независимо от наличия
+          почты.
+        </p>
+        {showEmailWarning && (
+          <p>
+            Почта пока только сохраняется: вход, подтверждение и восстановление через неё
+            недоступны. Сохраните пароль.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

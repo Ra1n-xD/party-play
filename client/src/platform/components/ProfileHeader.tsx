@@ -8,7 +8,15 @@ import { DailyBonusWallet } from "./DailyBonusWallet";
 import { ProfileNotifications } from "./ProfileNotifications";
 
 interface ProfileHeaderProps {
-  activePage?: "games" | "profile" | "cases" | "upgrade" | "updates" | "leaderboard" | "stats";
+  activePage?:
+    | "games"
+    | "profile"
+    | "account"
+    | "cases"
+    | "upgrade"
+    | "updates"
+    | "leaderboard"
+    | "stats";
   onHome?: () => void;
 }
 
@@ -78,7 +86,12 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
         {profile ? (
           <>
             <div className="show-profile-balance">
-              <a className="show-profile-nickname" href="/profile" title="Открыть профиль">
+              <a
+                className="show-profile-nickname"
+                href="/account"
+                title="Открыть профиль"
+                aria-current={activePage === "account" ? "page" : undefined}
+              >
                 {profile.nickname}
               </a>
               <DailyBonusWallet key={profile.id} profile={profile} />
