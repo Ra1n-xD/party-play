@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import {
   chmodSync,
@@ -56,7 +57,26 @@ try {
   const { renderPage, publicPages, utilityPages, SITE_URL } = await import(
     pathToFileURL(join(prerenderDirectory, "prerender.mjs")).href
   );
-  const template = readFileSync(join(stagingDirectory, "index.html"), "utf8");
+  const startupBundle = await build({
+    configFile: false,
+    build: {
+      write: false,
+      lib: {
+        entry: resolve(clientDirectory, "src/platform/startupHead.ts"),
+        name: "PartySideStartup",
+        formats: ["iife"],
+      },
+    },
+  });
+  const startupOutput = Array.isArray(startupBundle) ? startupBundle[0] : startupBundle;
+  const startupScript = startupOutput.output.find((file) => file.type === "chunk").code;
+  const startupHash = createHash("sha256").update(startupScript).digest("hex").slice(0, 12);
+  const startupFilename = `startup-${startupHash}.js`;
+  writeFileSync(join(stagingDirectory, "assets", startupFilename), startupScript);
+  const template = readFileSync(join(stagingDirectory, "index.html"), "utf8").replace(
+    "<!--app-startup-->",
+    `<script src="/assets/${startupFilename}"></script>`,
+  );
   const paths = [
     ...publicPages.map((page) => page.path),
     ...utilityPages.map(([path]) => path),

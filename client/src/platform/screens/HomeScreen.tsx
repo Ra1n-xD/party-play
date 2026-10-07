@@ -19,6 +19,7 @@ import { clientGameRegistry, type RegisteredClientGameId } from "../gameRegistry
 import { gameMenuPresentation } from "../gameMenuPresentation";
 import { ReconnectScreen } from "./ReconnectScreen";
 import { HOME_TAGLINE } from "../seo/siteMetadata";
+import { SiteOverview } from "../seo/SiteOverview";
 import "../../styles/show-menu.css";
 import "../../styles/game-catalog.css";
 
@@ -76,19 +77,19 @@ export function HomeScreen() {
     setPublicRoomName(profile?.nickname ?? "");
   }, [profile?.nickname]);
   const [joinCode, setJoinCode] = useState("");
-  const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(() => {
+  const [selectedGameId, setSelectedGameId] = useState<RegisteredClientGameId | null>(null);
+  useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("game");
-    return requested && Object.hasOwn(clientGameRegistry, requested)
-      ? (requested as RegisteredClientGameId)
-      : null;
-  });
+    if (requested && Object.hasOwn(clientGameRegistry, requested))
+      setSelectedGameId(requested as RegisteredClientGameId);
+  }, []);
   const [entryMode, setEntryMode] = useState<RoomEntryMode>("join");
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [rulesGameId, setRulesGameId] = useState<RegisteredClientGameId | null>(null);
   const [createVisibility, setCreateVisibility] = useState<RoomVisibility>("private");
   const [publicRoomsGameId, setPublicRoomsGameId] = useState<RegisteredClientGameId | null>(null);
   const [publicRoomName, setPublicRoomName] = useState(profile?.nickname ?? "");
-  const [directoryClock, setDirectoryClock] = useState(() => Date.now());
+  const [directoryClock, setDirectoryClock] = useState(0);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const initialRender = useRef(true);
 
@@ -339,6 +340,8 @@ export function HomeScreen() {
 
         <MenuFooter />
       </div>
+
+      {!selectedGame && <SiteOverview />}
 
       {publicRoomsGame && publicRoomsGameId && (
         <AccessibleModal

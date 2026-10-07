@@ -132,6 +132,7 @@ type QueuedRoomCommand = {
 }[GameId];
 
 interface PlatformContextValue {
+  startupReady: boolean;
   connected: boolean;
   sessionPending: boolean;
   commandPending: boolean;
@@ -230,6 +231,7 @@ const MAX_COMMAND_TRANSPORT_RETRIES = 1;
 const REJOIN_CONFLICT_RETRY_DELAYS_MS = [500, 1_500] as const;
 
 export function PlatformProvider({ children }: { children: ReactNode }) {
+  const [startupReady, setStartupReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [sessionPending, setSessionPending] = useState(false);
   const [commandPending, setCommandPending] = useState(false);
@@ -248,9 +250,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     roomCode: null,
   });
   const [retainedReconnectSession, setRetainedReconnectSession] =
-    useState<RetainedReconnectSessionSummary | null>(() =>
-      summarizeRetainedSession(readReconnectSession()),
-    );
+    useState<RetainedReconnectSessionSummary | null>(null);
   const [pendingSeatClaim, setPendingSeatClaim] = useState<PendingSeatClaimState | null>(null);
   const [hostSeatClaims, setHostSeatClaims] = useState<SeatClaimInfo[]>([]);
   const [hostChangeNotice, setHostChangeNotice] = useState<HostChangeNotice | null>(null);
@@ -1131,6 +1131,19 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     socket.on("admin:seatClaimsUpdated", handleSeatClaimsUpdated);
     socket.on("room:hostChanged", handleHostChanged);
 
+    // Storage is client-only: the initial render must match the public HTML.
+    const initialSession = readReconnectSession();
+    setRetainedReconnectSession(summarizeRetainedSession(initialSession));
+    if (initialSession?.autoRejoin && !reconnectSessionTombstonedRef.current) {
+      setActiveGameId(initialSession.gameId);
+      setRoomCode(initialSession.roomCode);
+      setPlayerId(initialSession.participantId);
+      setIsSpectator(initialSession.role === "spectator");
+      setSessionPending(true);
+      setReconnectState("reconnecting");
+    }
+    setStartupReady(true);
+
     if (socket.connected) {
       handleConnect();
     } else {
@@ -1404,11 +1417,16 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   }, [rejoinRoom, retainedReconnectSession]);
 
   const cancelPendingMembership = useCallback(() => {
-    if (!membershipRequestPendingRef.current && !rejoinRetryTimerRef.current) return;
+    if (
+      !membershipRequestPendingRef.current &&
+      !rejoinRetryTimerRef.current &&
+      !(roomCode && !snapshot)
+    )
+      return;
     returnPendingMembershipToManual();
     socket.disconnect();
     socket.connect();
-  }, [returnPendingMembershipToManual]);
+  }, [returnPendingMembershipToManual, roomCode, snapshot]);
 
   const emitCommonCommand = useCallback(
     (command: CommonPlatformCommand): boolean => {
@@ -1646,6 +1664,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   return (
     <PlatformContext.Provider
       value={{
+        startupReady,
         connected,
         sessionPending,
         commandPending,

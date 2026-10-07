@@ -22,7 +22,7 @@ interface ProfileHeaderProps {
 }
 
 export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderProps) {
-  const { profile, connected, busy, logout } = useProfile();
+  const { profile, loading, connected, busy, logout } = useProfile();
   const { roomCode } = usePlatform();
   const goHome = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!onHome || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -96,6 +96,8 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
             />
             <DailyBonusWallet key={profile.id} profile={profile} />
           </div>
+        ) : loading ? (
+          <span className="show-account-loading" role="status" aria-label="Проверяем вход…" />
         ) : (
           <a className="show-login" href="/login">
             <FiLogIn aria-hidden="true" /> Войти

@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { FiArrowRight, FiBookOpen, FiChevronLeft, FiChevronRight, FiUsers } from "react-icons/fi";
 import { LuDoorOpen } from "react-icons/lu";
 import type { PublicRoomCountsByGame } from "../../../../shared/platform/publicRooms";
 import type { ClientGameModule, RegisteredClientGameId } from "../gameRegistry";
 import { GameMenuArtwork } from "./GameMenuArtwork";
+import { useBrowserLayoutEffect } from "../useBrowserLayoutEffect";
 
 const upcomingGames = [
   { id: "liar-dice", title: "Кости лжеца" },
@@ -23,7 +24,7 @@ export function GameCatalog({ games, counts, onPlay, onRooms }: GameCatalogProps
   const [layout, setLayout] = useState({ pageSize: 6, rows: 2 });
   const [page, setPage] = useState(0);
 
-  useLayoutEffect(() => {
+  useBrowserLayoutEffect(() => {
     const grid = gridRef.current;
     if (!grid) return;
     const desktop = window.matchMedia("(min-width: 901px)");

@@ -486,13 +486,13 @@
 
 @media (min-width: 901px) {
   .show-menu.show-menu.is-main-menu {
-    height: 100svh;
+    height: auto;
     min-height: 0;
   }
   .show-menu.is-main-menu .show-menu-shell {
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr) auto;
-    height: 100%;
+    height: calc(100svh - 36 * var(--show-unit));
     min-height: 0;
   }
   .show-menu.is-main-menu .show-catalog-layout {
