@@ -10,7 +10,7 @@ import { useProfile } from "../context/ProfileContext";
 import { CosmeticPreview } from "../components/CosmeticPreview";
 import { CoinAmount } from "../components/CoinAmount";
 
-export function ProfileScreen() {
+export function CollectionScreen() {
   const { profile, equip, busy, connected } = useProfile();
   const [tab, setTab] = useState<CosmeticKind>("avatar");
   if (!profile) return null;

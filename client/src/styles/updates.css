@@ -180,6 +180,9 @@
   min-width: 0;
   margin: 0;
 }
+.updates-gallery figure.is-portrait {
+  width: min(95%, 180px);
+}
 .updates-screenshot {
   position: relative;
   display: block;
@@ -326,6 +329,9 @@
   }
   .updates-release ul {
     font-size: 15px;
+  }
+  .updates-gallery figure.is-portrait {
+    width: min(95%, 160px);
   }
   .updates-screenshot > span {
     right: 6px;

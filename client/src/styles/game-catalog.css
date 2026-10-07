@@ -308,19 +308,27 @@
 .show-catalog-pagination > div {
   display: flex;
   align-items: center;
-  gap: calc(10 * var(--show-unit));
+  gap: calc(8 * var(--show-unit));
 }
 .show-catalog-pagination [role="status"] {
   white-space: nowrap;
 }
 .show-catalog-pagination button {
+  position: relative;
   display: grid;
   place-items: center;
-  width: calc(34 * var(--show-unit));
-  height: calc(34 * var(--show-unit));
+  width: calc(28 * var(--show-unit));
+  height: calc(28 * var(--show-unit));
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
   border: calc(1 * var(--show-unit)) solid #ffffff30;
   border-radius: calc(7 * var(--show-unit));
   background: #ffffff06;
+}
+.show-catalog-pagination button svg {
+  width: max(14px, calc(14 * var(--show-unit)));
+  height: max(14px, calc(14 * var(--show-unit)));
 }
 .show-catalog-pagination button:disabled {
   opacity: 0.3;
@@ -635,8 +643,13 @@
     padding-bottom: 10px;
   }
   .show-catalog-pagination button {
-    width: 44px;
-    height: 44px;
+    width: 32px;
+    height: 32px;
+  }
+  .show-catalog-pagination button::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
   }
   .show-catalog-layout > .show-catalog-entry {
     width: min(460px, 100%);

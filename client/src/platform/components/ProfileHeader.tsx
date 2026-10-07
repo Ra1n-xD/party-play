@@ -10,7 +10,7 @@ import { ProfileNotifications } from "./ProfileNotifications";
 interface ProfileHeaderProps {
   activePage?:
     | "games"
-    | "profile"
+    | "collection"
     | "account"
     | "cases"
     | "upgrade"
@@ -46,8 +46,8 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
           <span>{roomCode ? "В комнату" : "Игры"}</span>
         </a>
         <a
-          href="/profile"
-          aria-current={activePage === "profile" ? "page" : undefined}
+          href="/collection"
+          aria-current={activePage === "collection" ? "page" : undefined}
           aria-label="Коллекция"
           title="Коллекция"
         >
