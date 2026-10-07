@@ -62,6 +62,7 @@ export const publicPages: PageMetadata[] = [
 export const utilityPages = [
   ["/login", "Вход и регистрация"],
   ["/profile", "Коллекция"],
+  ["/account", "Профиль игрока"],
   ["/cases", "Кейсы"],
   ["/upgrade", "Улучшение предметов"],
   ["/leaderboard", "Рейтинг игроков"],
