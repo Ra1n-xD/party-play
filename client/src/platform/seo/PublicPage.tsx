@@ -54,7 +54,7 @@ export function PublicPage({ path }: { path: string }) {
         <header className="public-page-header">
           <a className="show-brand" href="/" aria-label="PartySide — на главную">
             <BrandDice className="show-brand-dice" />
-            partyside
+            <span className="show-brand-name">partyside</span>
           </a>
           <nav aria-label="Навигация PartySide">
             <a href="/">Игры</a>

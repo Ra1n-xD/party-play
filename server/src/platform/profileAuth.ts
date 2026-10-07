@@ -338,8 +338,6 @@ export function registerProfileAuthHandlers(
         throw new Error("Никнейм должен содержать от 1 до 20 символов без специальных знаков");
       if (email === null || typeof data?.email !== "string")
         throw new Error("Укажите корректную электронную почту или оставьте поле пустым");
-      if (typeof password !== "string" || !password || password.length > PASSWORD_MAX_LENGTH)
-        throw new Error("Введите текущий пароль");
       if (
         newPassword !== undefined &&
         (typeof newPassword !== "string" ||
@@ -350,12 +348,14 @@ export function registerProfileAuthHandlers(
           `Новый пароль должен содержать от ${PASSWORD_MIN_LENGTH} до ${PASSWORD_MAX_LENGTH} символов`,
         );
       const stored = profileStore.accounts.get(id)!;
-      const parts = stored.passwordHash.split("$");
-      const actual = await derivePassword(password, parts[4]);
-      if (!timingSafeEqual(actual, Buffer.from(parts[5], "hex")))
-        throw new Error("Текущий пароль указан неверно");
       let passwordHash = stored.passwordHash;
       if (newPassword !== undefined) {
+        if (typeof password !== "string" || !password || password.length > PASSWORD_MAX_LENGTH)
+          throw new Error("Введите текущий пароль для смены пароля");
+        const parts = stored.passwordHash.split("$");
+        const actual = await derivePassword(password, parts[4]);
+        if (!timingSafeEqual(actual, Buffer.from(parts[5], "hex")))
+          throw new Error("Текущий пароль указан неверно");
         const salt = randomBytes(16).toString("hex");
         passwordHash = `scrypt$32768$8$3$${salt}$${(await derivePassword(newPassword, salt)).toString("hex")}`;
       }
@@ -363,7 +363,7 @@ export function registerProfileAuthHandlers(
         assertProfileSession(socket, id);
         const current = draft.accounts.get(id)!;
         const profile = draft.profiles.get(id)!;
-        if (current.passwordHash !== stored.passwordHash)
+        if (newPassword !== undefined && current.passwordHash !== stored.passwordHash)
           throw new Error("Пароль уже изменился. Введите текущий пароль и повторите действие");
         if (profile.nickname !== nickname) {
           assertNicknameEditable(id);
@@ -381,7 +381,11 @@ export function registerProfileAuthHandlers(
         )
           return false;
         profile.nickname = nickname;
-        draft.accounts.set(id, { ...current, email, passwordHash });
+        draft.accounts.set(id, {
+          ...current,
+          email,
+          passwordHash: newPassword === undefined ? current.passwordHash : passwordHash,
+        });
         if (newPassword !== undefined)
           for (const [hash, session] of draft.sessions)
             if (session.accountId === id && hash !== socket.data.profileSessionHash)

@@ -90,6 +90,12 @@ curl --fail --silent --show-error http://127.0.0.1:3001/readyz
 [инструкции домена](PARTYSIDE-MIGRATION.md). В новой установке старый домен
 и изменение уже правильного CORS пропускаются.
 
+При обновлении с 6.9.x до 6.10.x также примените актуальный
+`deploy/nginx/partyside.conf.template` по шагу настройки nginx в инструкции домена:
+старый редирект `/profile` → `/collection` удалён, профиль доступен по `/profile`.
+Проверьте `nginx -t` перед перезагрузкой конфигурации. Автодеплой приложения
+не обновляет конфигурацию nginx.
+
 ## Автодеплой GitHub Actions
 
 Workflow `.github/workflows/deploy.yml` запускается при push в `main`. Он

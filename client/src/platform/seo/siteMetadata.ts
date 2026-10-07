@@ -62,7 +62,7 @@ export const publicPages: PageMetadata[] = [
 export const utilityPages = [
   ["/login", "Вход и регистрация"],
   ["/collection", "Коллекция"],
-  ["/account", "Профиль игрока"],
+  ["/profile", "Профиль игрока"],
   ["/cases", "Кейсы"],
   ["/upgrade", "Улучшение предметов"],
   ["/leaderboard", "Рейтинг игроков"],
@@ -70,8 +70,7 @@ export const utilityPages = [
 ] as const;
 
 export function getPageMetadata(path: string): PageMetadata {
-  const requested = path.replace(/\/$/, "") || "/";
-  const normalized = requested === "/profile" ? "/collection" : requested;
+  const normalized = path.replace(/\/$/, "") || "/";
   const publicPage = publicPages.find((page) => page.path === normalized);
   if (publicPage) return publicPage;
   const utility = utilityPages.find(([url]) => url === normalized);

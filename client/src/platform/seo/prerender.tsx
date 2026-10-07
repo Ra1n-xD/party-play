@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { PublicPage } from "./PublicPage";
+import { NotFoundScreen } from "../screens/NotFoundScreen";
 import {
   getPageMetadata,
   getStructuredData,
@@ -25,7 +26,6 @@ export function renderPage(path: string, template: string): string {
   const canonical = escapeHtml(`${SITE_URL}${page.path}`);
   const structured = JSON.stringify(getStructuredData(path)).replace(/</g, "\\u003c");
   const head = `
-    ${path === "/profile" ? '<meta http-equiv="refresh" content="0;url=/collection" />' : ""}
     <meta name="description" content="${description}" />
     <meta name="robots" content="${page.indexable ? "index, follow, max-image-preview:large" : "noindex, follow"}" />
     <link rel="canonical" href="${canonical}" />
@@ -47,7 +47,7 @@ export function renderPage(path: string, template: string): string {
   const content = page.indexable
     ? renderToStaticMarkup(<PublicPage path={path} />)
     : path === "/404"
-      ? '<main><h1>Страница не найдена</h1><p><a href="/">К играм PartySide</a></p></main>'
+      ? renderToStaticMarkup(<NotFoundScreen />)
       : '<main><p>PartySide — игры для своей компании.</p><p><a href="/">К каталогу игр</a></p></main>';
   return template
     .replace(/<title>.*?<\/title>/s, `<title>${title}</title>`)

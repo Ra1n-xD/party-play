@@ -1,11 +1,12 @@
 import type { MouseEvent } from "react";
-import { FiLogIn, FiLogOut } from "react-icons/fi";
+import { FiLogIn } from "react-icons/fi";
 import { LuGamepad2, LuLayers, LuPackageOpen, LuSparkles, LuTrophy } from "react-icons/lu";
 import { usePlatform } from "../context/PlatformContext";
 import { useProfile } from "../context/ProfileContext";
 import { BrandDice } from "./BrandDice";
 import { DailyBonusWallet } from "./DailyBonusWallet";
 import { ProfileNotifications } from "./ProfileNotifications";
+import { ProfileAccountMenu } from "./ProfileAccountMenu";
 
 interface ProfileHeaderProps {
   activePage?:
@@ -29,10 +30,10 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
     onHome();
   };
   return (
-    <header className="show-menu-header show-profile-header">
+    <header className={`show-menu-header show-profile-header${profile ? " has-account" : ""}`}>
       <a className="show-brand" href="/" onClick={goHome} aria-label="PartySide — на главную">
         <BrandDice className="show-brand-dice" />
-        partyside
+        <span className="show-brand-name">partyside</span>
       </a>
       <nav className="show-profile-navigation" aria-label="Профиль и коллекция">
         <a
@@ -84,29 +85,17 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
       </nav>
       <div className="show-profile-account">
         {profile ? (
-          <>
-            <div className="show-profile-balance">
-              <a
-                className="show-profile-nickname"
-                href="/account"
-                title="Открыть профиль"
-                aria-current={activePage === "account" ? "page" : undefined}
-              >
-                {profile.nickname}
-              </a>
-              <DailyBonusWallet key={profile.id} profile={profile} />
-            </div>
-            <button
-              className="show-logout"
-              type="button"
-              onClick={logout}
+          <div className="show-profile-balance">
+            <ProfileAccountMenu
+              key={profile.id}
+              nickname={profile.nickname}
+              active={activePage === "account"}
               disabled={busy || !connected}
-              aria-label="Выйти из аккаунта"
-              title={roomCode ? "Выйти из аккаунта и покинуть комнату" : "Выйти из аккаунта"}
-            >
-              <FiLogOut aria-hidden="true" />
-            </button>
-          </>
+              inRoom={!!roomCode}
+              onLogout={logout}
+            />
+            <DailyBonusWallet key={profile.id} profile={profile} />
+          </div>
         ) : (
           <a className="show-login" href="/login">
             <FiLogIn aria-hidden="true" /> Войти
