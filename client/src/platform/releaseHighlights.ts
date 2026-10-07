@@ -21,7 +21,7 @@ import firstCatalog from "../assets/updates/catalog-3.0.0.png";
 import firstShowMenu from "../assets/updates/menu-4.2.0.png";
 import legendaryCards from "../assets/updates/cards-4.5.2.png";
 import accountRegistration from "../assets/updates/auth-5.0.0.png";
-import profileSettings from "../assets/updates/profile-6.9.1.jpg";
+import profileSettings from "../assets/updates/profile-6.9.2.jpg";
 
 export interface ReleaseScreenshot {
   src: string;
@@ -45,7 +45,7 @@ interface ReleaseHighlight {
 export const releaseHighlights: ReleaseHighlight[] = [
   {
     id: "release-6-9",
-    version: "6.9.0–6.9.1",
+    version: "6.9.0–6.9.2",
     date: "2026-10-07",
     category: "АККАУНТ",
     title: "Профиль можно настроить под себя.",
@@ -58,10 +58,10 @@ export const releaseHighlights: ReleaseHighlight[] = [
     screenshots: [
       {
         src: profileSettings,
-        caption: "6.9.1 · Профиль игрока — локальная сборка, тестовый аккаунт",
+        caption: "6.9.2 · Профиль игрока — локальная сборка, тестовый аккаунт",
         alt: "Отдельная страница профиля PartySide с прогрессом игрока, никнеймом, необязательной почтой, полями нового и текущего пароля и пояснением о сохранении тестовых аккаунтов. Локальная сборка, тестовые данные.",
         width: 1280,
-        height: 1100,
+        height: 960,
       },
     ],
   },
