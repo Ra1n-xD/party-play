@@ -91,7 +91,11 @@ import {
   syncLobbyProfileCosmetics,
 } from "./profiles.js";
 import { normalizeNickname } from "../../../shared/platform/cosmetics.js";
-import { profileNicknameMatches, assertProfileSession } from "./profileAuth.js";
+import {
+  profileNicknameMatches,
+  assertProfileSession,
+  isProfileAccountUpdating,
+} from "./profileAuth.js";
 import { profileStore } from "./profileStorage.js";
 import { setRoomPreparingHook, setRoomPublishedHook } from "./statePublisher.js";
 
@@ -677,8 +681,11 @@ export function registerHandlers(io: IOServer): void {
         "publicRooms:join",
         "publicRooms:watch",
       ];
-      if (socket.data.profileAuthBusy && membershipEvents.includes(event)) {
-        socket.emit("room:error", { message: "Дождитесь завершения входа или выхода из аккаунта" });
+      if (
+        (socket.data.profileAuthBusy || isProfileAccountUpdating(socket)) &&
+        membershipEvents.includes(event)
+      ) {
+        socket.emit("room:error", { message: "Дождитесь завершения операции с аккаунтом" });
         return;
       }
       if (isDeploymentDraining() && membershipEvents.includes(event)) {

@@ -22,11 +22,14 @@ import {
 } from "../../../shared/platform/cosmetics.js";
 import { getUpgradeQuote, type UpgradeAttempt } from "../../../shared/platform/upgrades.js";
 import { getCase } from "../../../shared/platform/cases.js";
+import { normalizeEmail } from "../../../shared/platform/auth.js";
 
 export interface StoredAccount {
   id: string;
   passwordHash: string;
   createdAt: number;
+  email?: string;
+  testParticipant?: boolean;
 }
 export interface StoredSession {
   tokenHash: string;
@@ -403,9 +406,14 @@ try {
         !loaded.profiles.has(account.id) ||
         loaded.accounts.has(account.id) ||
         !Number.isFinite(account.createdAt) ||
+        normalizeEmail(account.email) === null ||
+        (account.testParticipant !== undefined && typeof account.testParticipant !== "boolean") ||
         !/^scrypt\$32768\$8\$3\$[0-9a-f]{32}\$[0-9a-f]{128}$/.test(account.passwordHash)
       )
         throw new Error("Invalid account");
+      account.email = normalizeEmail(account.email)!;
+      // Every account from before this feature was created during the test period.
+      account.testParticipant ??= true;
       loaded.accounts.set(account.id, account);
     }
     if (loaded.accounts.size !== loaded.profiles.size) throw new Error("Profile has no account");

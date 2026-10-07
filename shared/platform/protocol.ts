@@ -23,7 +23,13 @@ import type { DailyReward, DailyRewardStatus } from "./dailyRewards.js";
 import type { UpgradeReply, UpgradeRequest } from "./upgrades.js";
 import type { CosmeticDrop } from "./dropFeed.js";
 import type { LeaderboardQuery, LeaderboardSnapshot } from "./leaderboard.js";
-import type { ProfileCredentials, ProfileSession } from "./auth.js";
+import type {
+  ProfileCredentials,
+  ProfileRegistration,
+  ProfileSession,
+  ProfileAccountSnapshot,
+  ProfileUpdate,
+} from "./auth.js";
 import type { AnyRoomCommandEnvelope, AnyRoomSnapshot, RoomCommandResult, SeatId } from "./room.js";
 
 export type HostChangeReason = "disconnect" | "manual" | "recovery";
@@ -75,10 +81,14 @@ export interface ClientEvents {
     reply: (result: ProfileReply<ProfileSession>) => void,
   ) => void;
   "profile:register": (
-    data: ProfileCredentials,
+    data: ProfileRegistration,
     reply: (result: ProfileReply<ProfileSession>) => void,
   ) => void;
-  "profile:session": (reply: (result: ProfileReply<ProfileSnapshot | null>) => void) => void;
+  "profile:session": (reply: (result: ProfileReply<ProfileAccountSnapshot | null>) => void) => void;
+  "profile:update": (
+    data: ProfileUpdate,
+    reply: (result: ProfileReply<ProfileAccountSnapshot>) => void,
+  ) => void;
   "profile:daily-status": (reply: (result: ProfileReply<DailyRewardStatus>) => void) => void;
   "profile:claim-daily": (
     data: { date: string },
@@ -165,6 +175,7 @@ export interface ClientEvents {
 
 // Server -> Client
 export interface ServerEvents {
+  "profile:account-snapshot": (data: ProfileAccountSnapshot) => void;
   "profile:expired": () => void;
   "drops:snapshot": (data: CosmeticDrop[]) => void;
   "profile:snapshot": (data: ProfileSnapshot) => void;

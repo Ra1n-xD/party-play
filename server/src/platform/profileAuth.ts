@@ -4,7 +4,10 @@ import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
 import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  normalizeEmail,
+  type ProfileAccountSnapshot,
   type ProfileCredentials,
+  type ProfileRegistration,
   type ProfileSession,
 } from "../../../shared/platform/auth.js";
 import {
@@ -22,11 +25,37 @@ import {
   type StoredSession,
 } from "./profileStorage.js";
 import type { IOServer } from "./gameModule.js";
+import { getAllRooms } from "./roomManager.js";
 
 type IOSocket = Socket<ClientEvents, ServerEvents>;
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 const limits = new Map<string, { count: number; until: number }>();
 let passwordJobs = 0;
+const updatingAccounts = new Set<string>();
+
+export function isProfileAccountUpdating(socket: IOSocket): boolean {
+  return updatingAccounts.has(socket.data.profileKey);
+}
+
+function accountSnapshot(id: string): ProfileAccountSnapshot {
+  const account = profileStore.accounts.get(id)!;
+  return {
+    profile: profileStore.profiles.get(id)!,
+    account: { email: account.email ?? "", testParticipant: account.testParticipant ?? true },
+  };
+}
+
+function assertNicknameEditable(id: string): void {
+  for (const room of getAllRooms().values()) {
+    if (
+      [...room.players.values()].some(
+        (player) => player.profileKey === id && !player.kicked && !player.voluntarilyLeft,
+      ) ||
+      [...room.spectators.values()].some((spectator) => spectator.profileKey === id)
+    )
+      throw new Error("Для смены никнейма сначала выйдите из всех комнат, включая другие вкладки");
+  }
+}
 
 function consumeLimit(key: string, max: number, window: number): void {
   const now = Date.now();
@@ -135,7 +164,9 @@ export function registerProfileAuthHandlers(
     if (typeof reply !== "function") return;
     try {
       assertProfileStorage();
-      reply({ ok: true, value: profileStore.profiles.get(socket.data.profileKey) ?? null });
+      const id = socket.data.profileKey as string | undefined;
+      if (id) assertProfileSession(socket, id);
+      reply({ ok: true, value: id ? accountSnapshot(id) : null });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });
     }
@@ -143,7 +174,7 @@ export function registerProfileAuthHandlers(
 
   const authenticate = async (
     register: boolean,
-    data: ProfileCredentials,
+    data: ProfileCredentials | ProfileRegistration,
     reply: (result: ProfileReply<ProfileSession>) => void,
   ) => {
     if (typeof reply !== "function") return;
@@ -163,6 +194,9 @@ export function registerProfileAuthHandlers(
       if (socket.data.profileKey) throw new Error("Сначала выйдите из текущего аккаунта");
       const name = normalizeNickname(data?.nickname);
       const password = data?.password;
+      const email = register ? normalizeEmail((data as ProfileRegistration)?.email) : "";
+      if (email === null)
+        throw new Error("Укажите корректную электронную почту или оставьте поле пустым");
       if (!name)
         throw new Error("Никнейм должен содержать от 1 до 20 символов без специальных знаков");
       if (
@@ -211,8 +245,14 @@ export function registerProfileAuthHandlers(
         // Password hashing is asynchronous: recheck uniqueness inside the committed write.
         if (register) {
           if ([...draft.profiles.values()].some((profile) => nicknameKey(profile.nickname) === key))
-            throw new Error("Nickname already registered");
-          draft.accounts.set(id, { id, passwordHash: passwordHash!, createdAt: now });
+            throw new Error("Этот никнейм уже занят. Выберите другой");
+          draft.accounts.set(id, {
+            id,
+            passwordHash: passwordHash!,
+            createdAt: now,
+            email,
+            testParticipant: true,
+          });
           draft.profiles.set(id, {
             id,
             nickname: name,
@@ -224,6 +264,11 @@ export function registerProfileAuthHandlers(
             recentOpenings: [],
             recentUpgrades: [],
           });
+        } else if (
+          draft.accounts.get(id)?.passwordHash !== stored!.passwordHash ||
+          nicknameKey(draft.profiles.get(id)?.nickname ?? "") !== key
+        ) {
+          throw new Error("Данные аккаунта изменились. Повторите вход");
         }
         for (const [sessionHash, session] of draft.sessions)
           if (session.expiresAt <= now) draft.sessions.delete(sessionHash);
@@ -251,7 +296,7 @@ export function registerProfileAuthHandlers(
         if (peer.data.profileKey && !findSession(peer.data.profileSessionHash)) expireSocket(peer);
       reply({
         ok: true,
-        value: { profile: profileStore.profiles.get(id)!, sessionToken, expiresAt },
+        value: { ...accountSnapshot(id), sessionToken, expiresAt },
       });
     } catch (error) {
       if (socket.connected) reply({ ok: false, error: (error as Error).message });
@@ -265,6 +310,97 @@ export function registerProfileAuthHandlers(
   });
   socket.on("profile:login", (data, reply) => {
     void authenticate(false, data, reply);
+  });
+  socket.on("profile:update", async (data, reply) => {
+    if (typeof reply !== "function") return;
+    const id = socket.data.profileKey as string | undefined;
+    if (!id) {
+      reply({ ok: false, error: "Войдите в аккаунт" });
+      return;
+    }
+    if (authenticating || updatingAccounts.has(id)) {
+      reply({ ok: false, error: "Дождитесь завершения предыдущего изменения аккаунта" });
+      return;
+    }
+    authenticating = true;
+    socket.data.profileAuthBusy = true;
+    updatingAccounts.add(id);
+    try {
+      assertProfileStorage();
+      assertProfileSession(socket, id);
+      consumeLimit(`update-ip:${getSocketClientIdentity(socket)}`, 30, 10 * 60_000);
+      consumeLimit(`update-account:${id}`, 10, 10 * 60_000);
+      const nickname = normalizeNickname(data?.nickname);
+      const email = normalizeEmail(data?.email);
+      const password = data?.currentPassword;
+      const newPassword = data?.newPassword;
+      if (!nickname)
+        throw new Error("Никнейм должен содержать от 1 до 20 символов без специальных знаков");
+      if (email === null || typeof data?.email !== "string")
+        throw new Error("Укажите корректную электронную почту или оставьте поле пустым");
+      if (typeof password !== "string" || !password || password.length > PASSWORD_MAX_LENGTH)
+        throw new Error("Введите текущий пароль");
+      if (
+        newPassword !== undefined &&
+        (typeof newPassword !== "string" ||
+          newPassword.length < PASSWORD_MIN_LENGTH ||
+          newPassword.length > PASSWORD_MAX_LENGTH)
+      )
+        throw new Error(
+          `Новый пароль должен содержать от ${PASSWORD_MIN_LENGTH} до ${PASSWORD_MAX_LENGTH} символов`,
+        );
+      const stored = profileStore.accounts.get(id)!;
+      const parts = stored.passwordHash.split("$");
+      const actual = await derivePassword(password, parts[4]);
+      if (!timingSafeEqual(actual, Buffer.from(parts[5], "hex")))
+        throw new Error("Текущий пароль указан неверно");
+      let passwordHash = stored.passwordHash;
+      if (newPassword !== undefined) {
+        const salt = randomBytes(16).toString("hex");
+        passwordHash = `scrypt$32768$8$3$${salt}$${(await derivePassword(newPassword, salt)).toString("hex")}`;
+      }
+      await profileTransaction([id], (draft) => {
+        assertProfileSession(socket, id);
+        const current = draft.accounts.get(id)!;
+        const profile = draft.profiles.get(id)!;
+        if (current.passwordHash !== stored.passwordHash)
+          throw new Error("Пароль уже изменился. Введите текущий пароль и повторите действие");
+        if (profile.nickname !== nickname) {
+          assertNicknameEditable(id);
+          if (
+            [...draft.profiles.values()].some(
+              (other) => other.id !== id && nicknameKey(other.nickname) === nicknameKey(nickname),
+            )
+          )
+            throw new Error("Этот никнейм уже занят. Выберите другой");
+        }
+        if (
+          profile.nickname === nickname &&
+          (current.email ?? "") === email &&
+          newPassword === undefined
+        )
+          return false;
+        profile.nickname = nickname;
+        draft.accounts.set(id, { ...current, email, passwordHash });
+        if (newPassword !== undefined)
+          for (const [hash, session] of draft.sessions)
+            if (session.accountId === id && hash !== socket.data.profileSessionHash)
+              draft.sessions.delete(hash);
+      });
+      // Only the authenticated account room receives contact data.
+      const snapshot = accountSnapshot(id);
+      for (const peer of io.sockets.sockets.values())
+        if (peer.data.profileKey === id && !findSession(peer.data.profileSessionHash))
+          expireSocket(peer);
+      io.to(profileRoom(id)).emit("profile:account-snapshot", snapshot);
+      if (socket.connected) reply({ ok: true, value: snapshot });
+    } catch (error) {
+      if (socket.connected) reply({ ok: false, error: (error as Error).message });
+    } finally {
+      updatingAccounts.delete(id);
+      authenticating = false;
+      socket.data.profileAuthBusy = false;
+    }
   });
   socket.on("profile:logout", async (reply) => {
     if (typeof reply !== "function") return;

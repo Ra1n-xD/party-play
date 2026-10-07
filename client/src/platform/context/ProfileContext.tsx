@@ -24,7 +24,12 @@ import type {
 } from "../../../../shared/platform/upgrades";
 import { getUpgradeQuote } from "../../../../shared/platform/upgrades";
 
-import type { ProfileSession } from "../../../../shared/platform/auth";
+import type {
+  ProfileSession,
+  ProfileAccountDetails,
+  ProfileAccountSnapshot,
+  ProfileUpdate,
+} from "../../../../shared/platform/auth";
 import { PROFILE_SESSION_KEY, readProfileSession, saveProfileSession } from "../profileSession";
 import { getCase, type CaseId, type CaseRequest } from "../../../../shared/platform/cases";
 import type { DailyReward, DailyRewardStatus } from "../../../../shared/platform/dailyRewards";
@@ -68,12 +73,14 @@ function savePendingCase(name: string, request: CaseRequest | null) {
 }
 interface ProfileContextValue {
   profile: ProfileSnapshot | null;
+  account: ProfileAccountDetails | null;
   busy: boolean;
   loading: boolean;
   connected: boolean;
   error: string | null;
   login(name: string, password: string): Promise<boolean>;
-  register(name: string, password: string): Promise<boolean>;
+  register(name: string, password: string, email?: string): Promise<boolean>;
+  updateAccount(data: ProfileUpdate): Promise<boolean>;
   logout(): void;
   equip(itemId: string): void;
   openCase(caseId: CaseId): Promise<CaseOpening | null>;
@@ -88,6 +95,7 @@ const Context = createContext<ProfileContextValue | null>(null);
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { roomCode, leaveRoom } = usePlatform();
   const [profile, setProfile] = useState<ProfileSnapshot | null>(null);
+  const [account, setAccount] = useState<ProfileAccountDetails | null>(null);
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(socket.connected);
   const [ready, setReady] = useState(false);
@@ -123,13 +131,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     pendingUpgradeRef.current = null;
     setPendingUpgrade(null);
     setProfile(null);
+    setAccount(null);
   }, []);
   const acceptSession = useCallback(
-    (next: ProfileSnapshot) => {
-      accept(next);
-      pendingOpening.current = pendingCase(next.id);
+    (next: ProfileAccountSnapshot) => {
+      accept(next.profile);
+      setAccount(next.account);
+      pendingOpening.current = pendingCase(next.profile.id);
       setPendingCaseId(pendingOpening.current?.caseId ?? null);
-      rememberUpgrade(readPendingUpgrade(next.id));
+      rememberUpgrade(readPendingUpgrade(next.profile.id));
     },
     [accept, rememberUpgrade],
   );
@@ -138,6 +148,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       event: "profile:login" | "profile:register",
       name: string,
       password: string,
+      email?: string,
     ): Promise<boolean> => {
       if (!socket.connected || requestBusy.current) return Promise.resolve(false);
       requestBusy.current = true;
@@ -149,7 +160,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           .timeout(15_000)
           .emit(
             event,
-            { nickname: name, password },
+            { nickname: name, password, ...(event === "profile:register" ? { email } : {}) },
             (timeout: Error | null, result: ProfileReply<ProfileSession>) => {
               if (socket.id !== connectionId) {
                 resolve(false);
@@ -168,7 +179,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
                 resolve(false);
               } else {
                 saveProfileSession(result.value.sessionToken);
-                acceptSession(result.value.profile);
+                acceptSession(result.value);
                 resolve(true);
               }
             },
@@ -182,10 +193,49 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     [authenticate],
   );
   const register = useCallback(
-    (name: string, password: string) => authenticate("profile:register", name, password),
+    (name: string, password: string, email?: string) =>
+      authenticate("profile:register", name, password, email),
     [authenticate],
   );
+  const updateAccount = useCallback(
+    (data: ProfileUpdate): Promise<boolean> => {
+      if (!socket.connected || !ready || !accountId.current || requestBusy.current)
+        return Promise.resolve(false);
+      const connectionId = socket.id;
+      const profileId = accountId.current;
+      requestBusy.current = true;
+      setBusy(true);
+      setError(null);
+      return new Promise((resolve) => {
+        socket.timeout(15_000).emit("profile:update", data, (timeout, result) => {
+          if (socket.id !== connectionId) return resolve(false);
+          requestBusy.current = false;
+          setBusy(false);
+          if (accountId.current !== profileId) return resolve(false);
+          if (timeout) {
+            setError(
+              "Ответ потерялся. Обновите страницу, чтобы проверить сохранение. При входе используйте новый пароль, если меняли его",
+            );
+            resolve(false);
+          } else if (!result.ok) {
+            setError(result.error);
+            resolve(false);
+          } else {
+            accept(result.value.profile);
+            setAccount(result.value.account);
+            resolve(true);
+          }
+        });
+      });
+    },
+    [ready, accept],
+  );
   useEffect(() => {
+    const acceptAccount = (next: ProfileAccountSnapshot) => {
+      if (next.profile.id !== accountId.current) return;
+      accept(next.profile);
+      setAccount(next.account);
+    };
     const connect = () => {
       setConnected(true);
       setReady(false);
@@ -194,7 +244,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .timeout(8000)
         .emit(
           "profile:session",
-          (timeout: Error | null, result: ProfileReply<ProfileSnapshot | null>) => {
+          (timeout: Error | null, result: ProfileReply<ProfileAccountSnapshot | null>) => {
             if (socket.id !== connectionId) return;
             setReady(true);
             if (timeout) {
@@ -235,6 +285,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     socket.on("connect", connect);
     socket.on("disconnect", disconnect);
     socket.on("profile:snapshot", accept);
+    socket.on("profile:account-snapshot", acceptAccount);
     socket.on("profile:expired", expired);
     window.addEventListener("storage", storage);
     if (socket.connected) connect();
@@ -242,6 +293,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       socket.off("connect", connect);
       socket.off("disconnect", disconnect);
       socket.off("profile:snapshot", accept);
+      socket.off("profile:account-snapshot", acceptAccount);
       socket.off("profile:expired", expired);
       window.removeEventListener("storage", storage);
     };
@@ -427,12 +479,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     <Context.Provider
       value={{
         profile,
+        account,
         busy,
         loading: !ready,
         connected: connected && ready,
         error,
         login,
         register,
+        updateAccount,
         logout,
         equip,
         openCase,
