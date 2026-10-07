@@ -198,12 +198,12 @@ export function LoginScreen() {
           </a>
         </div>
         <aside className="profile-auth-notes">
-          <TestAccountNotice showEmailWarning />
           <div className="profile-welcome">
             <span className="profile-welcome-coins">
               <CoinAmount amount={INITIAL_COINS} label="монет при регистрации" />
             </span>
           </div>
+          <TestAccountNotice showEmailWarning />
         </aside>
       </section>
     </main>

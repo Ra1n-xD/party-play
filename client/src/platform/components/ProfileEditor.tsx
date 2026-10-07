@@ -54,15 +54,8 @@ export function ProfileEditor() {
   return (
     <section className="profile-editor" aria-labelledby="profile-editor-title">
       <header>
-        <div>
-          <span className="profile-eyebrow">ВАШ АККАУНТ</span>
-          <h2 id="profile-editor-title">Редактирование профиля</h2>
-        </div>
+        <h2 id="profile-editor-title">Редактирование профиля</h2>
       </header>
-      <p className="profile-field-hint">
-        Никнейм можно сменить после выхода из всех комнат. Монеты, коллекция, статистика и участие в
-        тесте сохраняются.
-      </p>
       <form onSubmit={submit} onChange={() => setSaved(false)}>
         <div className="profile-editor-fields">
           <div className="profile-editor-field">
@@ -74,9 +67,13 @@ export function ProfileEditor() {
               value={nickname}
               onChange={(event) => setNickname(event.target.value)}
               maxLength={20}
+              aria-describedby="edit-nickname-hint"
               disabled={busy}
               required
             />
+            <p id="edit-nickname-hint" className="profile-field-hint">
+              Для смены ника выйдите из всех комнат.
+            </p>
           </div>
           <div className="profile-editor-field">
             <label htmlFor="edit-email">
@@ -94,15 +91,16 @@ export function ProfileEditor() {
               aria-describedby="edit-email-hint"
               placeholder="you@example.com"
             />
+            <p id="edit-email-hint" className="profile-field-hint">
+              Вход и восстановление через почту пока недоступны.
+            </p>
           </div>
         </div>
-        <p id="edit-email-hint" className="profile-field-hint">
-          Почта только сохраняется в аккаунте. Подтверждение и восстановление через неё пока
-          недоступны. Поле можно оставить пустым или очистить.
-        </p>
         <div className="profile-editor-fields">
           <div className="profile-editor-field">
-            <label htmlFor="edit-new-password">Новый пароль · если хотите сменить</label>
+            <label htmlFor="edit-new-password">
+              Новый пароль <span className="profile-optional">(необязательно)</span>
+            </label>
             <input
               id="edit-new-password"
               name="new-password"
@@ -131,12 +129,13 @@ export function ProfileEditor() {
             />
           </div>
         </div>
-        <p className="profile-field-hint">
-          Оставьте оба поля пустыми, чтобы сохранить пароль. После смены пароля другие устройства
-          выйдут из аккаунта.
-        </p>
+        {newPassword && (
+          <p className="profile-field-hint">
+            После смены пароля другие устройства выйдут из аккаунта.
+          </p>
+        )}
         <div className="profile-editor-field">
-          <label htmlFor="edit-current-password">Текущий пароль для подтверждения</label>
+          <label htmlFor="edit-current-password">Текущий пароль</label>
           <div className="profile-password-field">
             <input
               id="edit-current-password"
