@@ -23,7 +23,7 @@ export function AccountScreen() {
           <span>
             {profile.completedGames} завершённых партий · {profile.wins} побед
           </span>
-          <a href="/profile" className="profile-text-button">
+          <a href="/collection" className="profile-text-button">
             Коллекция: {owned} / {COSMETICS.length}
           </a>
         </section>

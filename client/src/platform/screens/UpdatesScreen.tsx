@@ -87,7 +87,10 @@ export function UpdatesScreen() {
                   {release.screenshots.length > 0 && (
                     <div className="updates-gallery">
                       {release.screenshots.map((shot) => (
-                        <figure key={shot.src}>
+                        <figure
+                          key={shot.src}
+                          className={shot.height > shot.width ? "is-portrait" : undefined}
+                        >
                           <button
                             type="button"
                             className="updates-screenshot"

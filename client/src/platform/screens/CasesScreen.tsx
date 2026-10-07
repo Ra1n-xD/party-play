@@ -338,7 +338,7 @@ export function CasesScreen() {
         )}
       </section>
       <div className="case-info">
-        <a href="/profile">Открыть коллекцию →</a>
+        <a href="/collection">Открыть коллекцию →</a>
       </div>
       <section className="case-contents">
         <h2>Что внутри</h2>

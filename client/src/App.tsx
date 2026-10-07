@@ -5,7 +5,7 @@ import { getLazyGameComponent } from "./platform/gameRegistry";
 import { HomeScreen } from "./platform/screens/HomeScreen";
 import { StatsScreen } from "./platform/screens/StatsScreen";
 import { ProfileProvider, useProfile } from "./platform/context/ProfileContext";
-import { ProfileScreen } from "./platform/screens/ProfileScreen";
+import { CollectionScreen } from "./platform/screens/CollectionScreen";
 import { AccountScreen } from "./platform/screens/AccountScreen";
 import { LoginScreen } from "./platform/screens/LoginScreen";
 import { CasesScreen } from "./platform/screens/CasesScreen";
@@ -19,12 +19,19 @@ import { PageMetadata } from "./platform/seo/PageMetadata";
 import { PublicPage } from "./platform/seo/PublicPage";
 import { publicGames } from "./platform/seo/siteMetadata";
 
+function readAppPath() {
+  const path = window.location.pathname.replace(/\/$/, "") || "/";
+  if (path !== "/profile") return path;
+  history.replaceState(null, "", `/collection${window.location.search}${window.location.hash}`);
+  return "/collection";
+}
+
 function ProfileApp() {
   const { profile, loading } = useProfile();
-  const [path, setPath] = useState(window.location.pathname.replace(/\/$/, "") || "/");
+  const [path, setPath] = useState(readAppPath);
   useEffect(() => {
     const update = () => {
-      setPath(window.location.pathname.replace(/\/$/, "") || "/");
+      setPath(readAppPath());
       window.scrollTo(0, 0);
     };
     const click = (event: MouseEvent) => {
@@ -44,6 +51,7 @@ function ProfileApp() {
         ![
           "/",
           "/login",
+          "/collection",
           "/profile",
           "/account",
           "/cases",
@@ -75,14 +83,14 @@ function ProfileApp() {
     }
     previousProfile.current = profile;
   }, [profile, path]);
-  const profilePage = ["/profile", "/account", "/cases", "/upgrade"].includes(path);
+  const profilePage = ["/collection", "/account", "/cases", "/upgrade"].includes(path);
   const gamePage = publicGames.some((game) => `/games/${game.id}` === path);
   const knownPage =
     gamePage ||
     [
       "/",
       "/login",
-      "/profile",
+      "/collection",
       "/account",
       "/cases",
       "/upgrade",
@@ -115,8 +123,8 @@ function ProfileApp() {
               activePage={
                 path === "/account"
                   ? "account"
-                  : path === "/profile"
-                    ? "profile"
+                  : path === "/collection"
+                    ? "collection"
                     : path === "/upgrade"
                       ? "upgrade"
                       : "cases"
@@ -132,8 +140,8 @@ function ProfileApp() {
         </main>
       ) : gamePage ? (
         <PublicPage path={path} />
-      ) : path === "/profile" ? (
-        <ProfileScreen />
+      ) : path === "/collection" ? (
+        <CollectionScreen />
       ) : path === "/account" ? (
         <AccountScreen />
       ) : path === "/cases" ? (

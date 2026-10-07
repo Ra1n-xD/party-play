@@ -25,6 +25,7 @@ export function renderPage(path: string, template: string): string {
   const canonical = escapeHtml(`${SITE_URL}${page.path}`);
   const structured = JSON.stringify(getStructuredData(path)).replace(/</g, "\\u003c");
   const head = `
+    ${path === "/profile" ? '<meta http-equiv="refresh" content="0;url=/collection" />' : ""}
     <meta name="description" content="${description}" />
     <meta name="robots" content="${page.indexable ? "index, follow, max-image-preview:large" : "noindex, follow"}" />
     <link rel="canonical" href="${canonical}" />

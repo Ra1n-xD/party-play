@@ -296,12 +296,36 @@
 }
 
 .show-profile-nickname {
+  display: block;
   max-width: calc(180 * var(--show-unit));
+  padding: 6px 5px;
+  border-radius: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: inherit;
+  font-family: var(--show-display);
+  font-size: calc(12 * var(--show-unit));
+  font-weight: 700;
+  line-height: 1.5;
   text-decoration: none;
+  transform: rotate(-3deg);
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.show-profile-nickname:is(:hover, :focus-visible) {
+  color: var(--show-accent);
+  background: #d8fc6114;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  transform: rotate(-3deg) translateY(-2px);
+}
+
+.show-profile-nickname[aria-current] {
+  color: var(--show-accent);
 }
 
 .show-logout {
@@ -1982,6 +2006,113 @@
 
   .show-game-switch button {
     padding: calc(8 * var(--show-unit)) calc(14 * var(--show-unit));
+  }
+}
+
+/* Keep the site's arcade buttons within thumb reach on mobile. */
+@media (max-width: 950px) {
+  :root {
+    --mobile-navigation-space: calc(104px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #root:has(.show-profile-navigation) {
+    padding-bottom: var(--mobile-navigation-space);
+  }
+
+  .show-menu.platform-header {
+    isolation: auto;
+  }
+
+  #root:has(.show-profile-navigation) .app-version {
+    bottom: var(--mobile-navigation-space);
+  }
+
+  .show-profile-navigation {
+    position: fixed;
+    z-index: 40;
+    left: 50%;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    width: min(calc(100% - 24px), 560px);
+    gap: 6px;
+    margin: 0;
+    padding: 8px 8px 12px;
+    border: 2px solid #170e20d9;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #ffffff1a, #ffffff03 48%, #e3aff610), #2e223ceb;
+    box-shadow:
+      inset 0 1px 0 #ffffff59,
+      inset 0 -1px 0 #ffffff14,
+      0 4px 0 #140c1d80,
+      0 10px 28px #10091c33;
+  }
+
+  .show-profile-navigation a {
+    flex-direction: column;
+    min-width: 0;
+    min-height: 52px;
+    padding: 7px 2px;
+    gap: 4px;
+    border-width: 2px;
+    border-radius: 8px;
+    background: linear-gradient(155deg, #ffffff18, #ffffff03 55%), #45324ff5;
+    box-shadow:
+      inset 0 1px 0 #ffffff40,
+      0 4px 0 #140c1da6;
+    color: #fff8e8;
+    font-size: clamp(9px, 2.5vw, 11px);
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    text-align: center;
+  }
+
+  .show-profile-navigation a span {
+    display: block;
+  }
+
+  .show-profile-navigation svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .show-profile-navigation a[aria-current] {
+    background: linear-gradient(150deg, #ffffff70, #ffffff00 65%), #d8fc61;
+    color: #292030;
+    transform: rotate(-2deg) translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 #ffffff99,
+      1px 5px 0 #140c1db3;
+  }
+
+  @media (hover: hover) {
+    .show-profile-navigation a:hover {
+      background: linear-gradient(155deg, #ffffff30, #ffffff08 55%), #775289f5;
+    }
+
+    .show-profile-navigation a[aria-current]:hover {
+      background: linear-gradient(150deg, #ffffff85, #ffffff00 65%), #d8fc61;
+    }
+  }
+
+  .show-profile-navigation a:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 #140c1d;
+  }
+}
+
+@media (max-width: 950px) and (prefers-reduced-transparency: reduce) {
+  .show-profile-navigation {
+    background: #2e223c;
+  }
+
+  .show-profile-navigation a {
+    background: #543964;
+  }
+
+  .show-profile-navigation a[aria-current] {
+    background: #d8fc61;
   }
 }
 

@@ -54,7 +54,8 @@ server {
         return 301 https://partyside.fun/$1$is_args$args;
     }
     # Do not redirect /socket.io/ or ACME endpoints.
-    rewrite ^(/games/[a-z0-9-]+|/updates|/login|/profile|/cases|/upgrade|/leaderboard|/stats)/$ $1 permanent;
+    rewrite ^/profile/?$ /collection permanent;
+    rewrite ^(/games/[a-z0-9-]+|/updates|/login|/collection|/account|/cases|/upgrade|/leaderboard|/stats)/$ $1 permanent;
 
     error_page 404 /404.html;
     location = /404.html {
