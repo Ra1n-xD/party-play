@@ -198,7 +198,7 @@
   position: relative;
   z-index: 60;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, auto);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: calc(16 * var(--show-unit));
 }
 
@@ -208,7 +208,7 @@
   justify-self: end;
   gap: calc(12 * var(--show-unit));
   min-width: 0;
-  max-width: calc(360 * var(--show-unit));
+  max-width: min(100%, calc(360 * var(--show-unit)));
 }
 
 .show-profile-navigation {
@@ -265,6 +265,7 @@
 }
 
 .show-profile-header .show-brand {
+  justify-self: start;
   gap: calc(9 * var(--show-unit));
   font-size: calc(24 * var(--show-unit));
 }
@@ -1624,7 +1625,7 @@
   }
 
   .show-profile-account {
-    max-width: 320px;
+    max-width: min(100%, 320px);
   }
 
   .show-profile-header .show-brand {
