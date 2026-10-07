@@ -78,7 +78,9 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
         {profile ? (
           <>
             <div className="show-profile-balance">
-              <span className="show-profile-nickname">{profile.nickname}</span>
+              <a className="show-profile-nickname" href="/profile" title="Открыть профиль">
+                {profile.nickname}
+              </a>
               <DailyBonusWallet key={profile.id} profile={profile} />
             </div>
             <button

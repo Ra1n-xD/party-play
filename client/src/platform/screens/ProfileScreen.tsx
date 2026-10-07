@@ -9,9 +9,12 @@ import {
 import { useProfile } from "../context/ProfileContext";
 import { CosmeticPreview } from "../components/CosmeticPreview";
 import { CoinAmount } from "../components/CoinAmount";
+import { ProfileEditor } from "../components/ProfileEditor";
+import { TestAccountNotice } from "../components/TestAccountNotice";
 
 export function ProfileScreen() {
-  const { profile, equip, logout, busy, connected } = useProfile();
+  const { profile, account, equip, logout, busy, connected, clearError } = useProfile();
+  const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<CosmeticKind>("avatar");
   if (!profile) return null;
   const owned = COSMETICS.filter((item) => profile.inventory[item.id]).length;
@@ -32,10 +35,33 @@ export function ProfileScreen() {
         <span>
           {profile.completedGames} завершённых партий · {profile.wins} побед
         </span>
-        <button onClick={logout} disabled={busy || !connected} className="profile-text-button">
-          Выйти из аккаунта
-        </button>
+        <div className="profile-summary-actions">
+          <button
+            onClick={() => {
+              clearError();
+              setEditing(!editing);
+            }}
+            disabled={busy || !account}
+            className="profile-text-button"
+            aria-expanded={editing}
+          >
+            {editing ? "Закрыть редактирование" : "Редактировать профиль"}
+          </button>
+          <button onClick={logout} disabled={busy || !connected} className="profile-text-button">
+            Выйти из аккаунта
+          </button>
+        </div>
       </section>
+      {account?.testParticipant && <TestAccountNotice />}
+      {editing && (
+        <ProfileEditor
+          key={profile.id}
+          onClose={() => {
+            clearError();
+            setEditing(false);
+          }}
+        />
+      )}
       <nav className="collection-tabs" aria-label="Тип предметов">
         {Object.entries(COSMETIC_KIND_NAMES).map(([kind, name]) => (
           <button

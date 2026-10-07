@@ -1,14 +1,21 @@
 import { useState, type FormEvent } from "react";
 import { FiAlertTriangle, FiEye, FiEyeOff } from "react-icons/fi";
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "../../../../shared/platform/auth";
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  EMAIL_MAX_LENGTH,
+  normalizeEmail,
+} from "../../../../shared/platform/auth";
 import { INITIAL_COINS } from "../../../../shared/platform/cosmetics";
 import { useProfile } from "../context/ProfileContext";
 import { CoinAmount } from "../components/CoinAmount";
+import { TestAccountNotice } from "../components/TestAccountNotice";
 
 export function LoginScreen() {
   const { login, register, busy, connected, error, clearError } = useProfile();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [visible, setVisible] = useState(false);
@@ -29,7 +36,11 @@ export function LoginScreen() {
       setValidation("Пароли не совпадают");
       return;
     }
-    const success = await (registering ? register : login)(name, password);
+    if (registering && normalizeEmail(email) === null) {
+      setValidation("Укажите корректную электронную почту или оставьте поле пустым");
+      return;
+    }
+    const success = await (registering ? register(name, password, email) : login(name, password));
     if (success) {
       setPassword("");
       setConfirmation("");
@@ -97,6 +108,27 @@ export function LoginScreen() {
               disabled={busy}
               required
             />
+            {registering && (
+              <>
+                <label htmlFor="profile-email">Электронная почта · необязательно</label>
+                <input
+                  id="profile-email"
+                  name="email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  maxLength={EMAIL_MAX_LENGTH}
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  aria-describedby="profile-email-hint"
+                  disabled={busy}
+                />
+                <p id="profile-email-hint" className="profile-field-hint">
+                  Пока почта только сохраняется в аккаунте. Вход, подтверждение и восстановление
+                  через неё недоступны.
+                </p>
+              </>
+            )}
             <label htmlFor="profile-password">Пароль</label>
             <div className="profile-password-field">
               <input
@@ -168,6 +200,7 @@ export function LoginScreen() {
           </a>
         </div>
         <aside className="profile-auth-notes">
+          <TestAccountNotice />
           <div className="profile-welcome">
             <span className="profile-welcome-coins">
               <CoinAmount amount={INITIAL_COINS} label="монет при регистрации" />

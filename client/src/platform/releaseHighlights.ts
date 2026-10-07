@@ -21,6 +21,7 @@ import firstCatalog from "../assets/updates/catalog-3.0.0.png";
 import firstShowMenu from "../assets/updates/menu-4.2.0.png";
 import legendaryCards from "../assets/updates/cards-4.5.2.png";
 import accountRegistration from "../assets/updates/auth-5.0.0.png";
+import profileSettings from "../assets/updates/profile-6.9.0.jpg";
 
 export interface ReleaseScreenshot {
   src: string;
@@ -42,6 +43,28 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-9",
+    version: "6.9.0",
+    date: "2026-10-07",
+    category: "АККАУНТ",
+    title: "Профиль можно настроить под себя.",
+    summary: "Меняйте данные аккаунта и сохраните его для полноценного релиза.",
+    changes: [
+      "В профиле можно сменить никнейм и пароль, сохранив монеты, коллекцию и статистику. Для подтверждения нужен текущий пароль.",
+      "При регистрации можно указать необязательную почту, а позже добавить, изменить или удалить её в профиле. Пока она только сохраняется: подтверждение и восстановление через почту недоступны.",
+      "На экране входа и в профиле теперь есть информация о сохранении тестовых аккаунтов и будущих бонусах участникам тестирования. Почта не влияет на участие.",
+    ],
+    screenshots: [
+      {
+        src: profileSettings,
+        caption: "6.9.0 · Редактирование профиля — локальная сборка, тестовый аккаунт",
+        alt: "Редактор профиля PartySide с никнеймом, необязательной почтой, полями нового и текущего пароля и пояснением о сохранении тестовых аккаунтов. Локальная сборка, тестовые данные.",
+        width: 1280,
+        height: 960,
+      },
+    ],
+  },
   {
     id: "release-6-8",
     version: "6.8.0–6.8.14",
