@@ -1,5 +1,5 @@
 import headerNavigation from "../assets/updates/header-navigation-6.14.0.png";
-import headerMobileNavigation from "../assets/updates/header-navigation-mobile-6.14.0.png";
+import groupedBottomNavigation from "../assets/updates/grouped-bottom-navigation-6.14.1.png";
 import petTable from "../assets/updates/pet-table-6.11.0.jpg";
 import petVarieties from "../assets/updates/pets-6.12.0.jpg";
 import partySideMenu from "../assets/updates/partyside-6.8.0.jpg";
@@ -50,15 +50,16 @@ interface ReleaseHighlight {
 export const releaseHighlights: ReleaseHighlight[] = [
   {
     id: "release-6-13",
-    version: "6.13.0–6.14.0",
+    version: "6.13.0–6.14.1",
     date: "2026-10-08",
     category: "НАВИГАЦИЯ",
     title: "Все разделы под рукой.",
-    summary: "Четыре кнопки в шапке объединяют все игровые разделы на компьютере и телефоне.",
+    summary:
+      "Четыре кнопки объединяют все игровые разделы: в шапке на компьютере, внизу на телефоне.",
     changes: [
       "С 6.14.0 навигация собрана в шапке: «Игры» открывает каталог и дуэли, а «Коллекция» — предметы, кейсы и улучшения. У ссылок есть короткие пояснения, выбранный раздел подсвечен.",
       "Питомец и рейтинг доступны отдельными кнопками. Красная точка у питомца напоминает о ежедневном уходе, баланс и меню аккаунта остаются рядом.",
-      "На телефоне те же четыре кнопки расположены под логотипом и аккаунтом. Выпадающее меню раскрывается на ширину шапки; остальное пространство доступно странице и игровому столу.",
+      "С 6.14.1 на компьютере группы открываются также по наведению. На телефоне те же четыре кнопки закреплены внизу, а меню раскрывается вверх: разделы доступны при прокрутке, баланс и аккаунт остаются в шапке.",
     ],
     screenshots: [
       {
@@ -69,9 +70,9 @@ export const releaseHighlights: ReleaseHighlight[] = [
         height: 720,
       },
       {
-        src: headerMobileNavigation,
-        caption: "6.14.0 · Группа «Коллекция» на телефоне — локальная сборка, QA-профиль",
-        alt: "Мобильная главная PartySide с четырьмя кнопками в шапке и раскрытой группой Коллекция: предметы, кейсы и улучшения. Локальная сборка, тестовые данные.",
+        src: groupedBottomNavigation,
+        caption: "6.14.1 · Группа «Коллекция» в нижнем меню — локальная сборка, QA-профиль",
+        alt: "Мобильная главная PartySide с четырьмя кнопками в нижней панели и раскрытой вверх группой Коллекция: предметы, кейсы и улучшения. Локальная сборка, тестовые данные.",
         width: 390,
         height: 844,
       },

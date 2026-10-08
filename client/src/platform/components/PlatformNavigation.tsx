@@ -98,8 +98,17 @@ export function PlatformNavigation({
   onHome,
 }: PlatformNavigationProps) {
   const navigationRef = useRef<HTMLElement>(null);
+  const hoverOpenedRef = useRef<HTMLDetailsElement | null>(null);
+  const hoverCloseTimerRef = useRef<number | null>(null);
   const navigationId = useId();
+  const cancelHoverClose = () => {
+    if (hoverCloseTimerRef.current === null) return;
+    window.clearTimeout(hoverCloseTimerRef.current);
+    hoverCloseTimerRef.current = null;
+  };
   const closeGroups = (except?: HTMLDetailsElement) => {
+    cancelHoverClose();
+    if (hoverOpenedRef.current !== except) hoverOpenedRef.current = null;
     navigationRef.current?.querySelectorAll("details[open]").forEach((group) => {
       if (group !== except) group.removeAttribute("open");
     });
@@ -123,6 +132,7 @@ export function PlatformNavigation({
     document.addEventListener("pointerdown", closeOutside);
     document.addEventListener("keydown", closeWithEscape);
     return () => {
+      cancelHoverClose();
       document.removeEventListener("pointerdown", closeOutside);
       document.removeEventListener("keydown", closeWithEscape);
     };
@@ -146,6 +156,29 @@ export function PlatformNavigation({
             className="platform-nav-group"
             key={group.id}
             name={navigationId}
+            onPointerEnter={(event) => {
+              if (
+                event.pointerType !== "mouse" ||
+                !window.matchMedia("(hover: hover) and (pointer: fine)").matches
+              )
+                return;
+              const details = event.currentTarget;
+              closeGroups(details);
+              if (!details.open) hoverOpenedRef.current = details;
+              details.open = true;
+            }}
+            onPointerLeave={(event) => {
+              if (event.pointerType !== "mouse") return;
+              const details = event.currentTarget;
+              cancelHoverClose();
+              if (details.contains(document.activeElement)) return;
+              hoverCloseTimerRef.current = window.setTimeout(() => {
+                hoverCloseTimerRef.current = null;
+                if (details.contains(document.activeElement)) return;
+                details.open = false;
+                if (hoverOpenedRef.current === details) hoverOpenedRef.current = null;
+              }, 250);
+            }}
             onBlur={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget))
                 event.currentTarget.open = false;
@@ -156,7 +189,11 @@ export function PlatformNavigation({
               data-active={active || undefined}
               aria-controls={dropdownId}
               onClick={(event) => {
-                closeGroups(event.currentTarget.parentElement as HTMLDetailsElement);
+                const details = event.currentTarget.parentElement as HTMLDetailsElement;
+                closeGroups(details);
+                // The first mouse click keeps a hover-opened group available for selection.
+                if (event.detail > 0 && hoverOpenedRef.current === details) event.preventDefault();
+                hoverOpenedRef.current = null;
               }}
               onKeyDown={(event) => {
                 if (event.key !== "ArrowDown") return;
