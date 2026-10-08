@@ -13,7 +13,6 @@ const pages = {
   "/collection": {
     active: "collection",
     title: "Коллекция",
-    eyebrow: "ВАШ СТИЛЬ ИГРЫ",
     description: "Персонажи, карты и эмоции для вашего вечера за столом.",
     heading: "Соберите свой игровой образ",
     text: "Войдите в аккаунт, чтобы видеть свои предметы, выбирать персонажа, рубашки карт и реакции. Коллекция сохраняется между устройствами.",
@@ -28,7 +27,6 @@ const pages = {
   "/cases": {
     active: "cases",
     title: "Кейсы",
-    eyebrow: "НОВОЕ ДЛЯ КОЛЛЕКЦИИ",
     description: "Находите персонажей, рубашки карт и эмоции.",
     heading: "Ваша следующая находка — здесь",
     text: "Войдите в аккаунт, чтобы открывать кейсы за монеты. Полученные предметы попадают в вашу коллекцию и доступны в играх.",
@@ -43,7 +41,6 @@ const pages = {
   "/upgrade": {
     active: "upgrade",
     title: "Улучшить",
-    eyebrow: "НОВАЯ ЦЕЛЬ ДЛЯ КОЛЛЕКЦИИ",
     description: "Используйте свои предметы, чтобы попробовать получить более ценный.",
     heading: "Дайте предметам новый шанс",
     text: "Войдите в аккаунт, чтобы выбрать предметы из коллекции и желаемую награду. Перед попыткой вы увидите её вероятность; успех не гарантирован.",
@@ -87,7 +84,7 @@ export function GuestAccountScreen({ path }: { path: GuestAccountPath }) {
         <ProfileHeader activePage={page.active} />
         <main className="feature-main guest-account-main">
           <header className="feature-heading">
-            <span className="feature-eyebrow">{page.eyebrow}</span>
+            {"eyebrow" in page && <span className="feature-eyebrow">{page.eyebrow}</span>}
             <h1>{page.title}</h1>
             <p>{page.description}</p>
           </header>

@@ -21,7 +21,7 @@ export function CollectionScreen() {
     <main className="collection-page">
       <div className="collection-heading">
         <div>
-          <h1>Ваш стиль игры</h1>
+          <h1>Коллекция</h1>
           <p>Персонажи, карты и эмоции для вашего вечера за столом.</p>
         </div>
       </div>
