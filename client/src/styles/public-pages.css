@@ -1,6 +1,12 @@
 .public-page-shell {
-  max-width: 960px;
+  max-width: var(--platform-content-max);
   margin: 0 auto;
+}
+
+.public-page main,
+.public-page-footer {
+  max-width: 960px;
+  margin-inline: auto;
 }
 
 .public-page-header,

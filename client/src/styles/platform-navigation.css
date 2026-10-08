@@ -1,6 +1,11 @@
 /* One prerendered navigation tree; CSS adapts the shared header to each screen. */
 :root {
   --platform-header-gap: calc(24 * var(--platform-unit));
+  --platform-header-top: calc(16 * var(--platform-unit));
+  --platform-header-row: calc(46 * var(--platform-unit));
+  --platform-header-rows: 1;
+  --platform-header-row-gap: 0px;
+  --platform-header-bottom: calc(22 * var(--platform-unit));
 }
 
 #root:has(.platform-header-navigation, .profile-login) {
@@ -17,6 +22,10 @@
 }
 
 /* The shared header owns the spacing before each screen's first content block. */
+.show-menu:has(.platform-topbar) {
+  padding-top: var(--platform-header-top);
+}
+
 .show-menu .show-profile-header + .feature-main,
 .show-menu .show-profile-header + .show-game-navigation {
   margin-top: var(--platform-header-gap);
@@ -30,11 +39,22 @@
   padding-top: var(--platform-header-gap);
 }
 
+.guest-account-page .feature-heading > h1 {
+  margin-top: 0;
+}
+
 .show-menu .show-profile-header.platform-topbar {
+  flex-shrink: 0;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: repeat(var(--platform-header-rows), var(--platform-header-row));
+  height: calc(
+    var(--platform-header-row) * var(--platform-header-rows) + var(--platform-header-row-gap) *
+      (var(--platform-header-rows) - 1) + var(--platform-header-bottom) + var(--platform-unit)
+  );
   align-items: center;
   gap: calc(16 * var(--show-unit));
-  padding-bottom: calc(22 * var(--show-unit));
+  row-gap: var(--platform-header-row-gap);
+  padding-bottom: var(--platform-header-bottom);
 }
 
 .platform-topbar .platform-header-brand {
@@ -49,6 +69,20 @@
 .platform-topbar .show-profile-account {
   grid-area: 1 / 3;
   max-width: 100%;
+}
+
+.platform-topbar .show-account-trigger {
+  height: var(--platform-header-row);
+  min-height: 0;
+}
+
+.platform-topbar .show-profile-nickname {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.3;
+  text-wrap: wrap;
 }
 
 .platform-header-navigation {
@@ -278,10 +312,14 @@
 }
 
 @media (max-width: 1050px) {
+  :root {
+    --platform-header-rows: 2;
+    --platform-header-row-gap: 18px;
+    --platform-header-bottom: 20px;
+  }
+
   .show-menu .show-profile-header.platform-topbar {
     grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: 18px;
-    padding-bottom: 20px;
   }
 
   .platform-topbar .show-profile-account {
@@ -298,6 +336,9 @@
 @media (max-width: 950px) {
   :root {
     --platform-header-gap: 20px;
+    --platform-header-top: 16px;
+    --platform-header-rows: 1;
+    --platform-header-row-gap: 0px;
   }
 
   #root:has(.platform-header-navigation) {
@@ -427,6 +468,12 @@
 }
 
 @media (max-width: 600px) {
+  :root {
+    --platform-header-top: 18px;
+    --platform-header-row: 40px;
+    --platform-header-bottom: 10px;
+  }
+
   #root:has(.platform-header-navigation) {
     --mobile-navigation-space: calc(96px + env(safe-area-inset-bottom, 0px));
   }
@@ -437,8 +484,7 @@
 
   .show-menu .show-profile-header.platform-topbar {
     grid-template-columns: auto minmax(0, 1fr);
-    gap: 8px;
-    padding-bottom: 10px;
+    column-gap: 8px;
   }
 
   .platform-topbar .platform-header-brand {
@@ -460,16 +506,7 @@
   }
 
   .platform-topbar .show-account-trigger {
-    min-height: 36px;
     padding-block: 4px;
-  }
-
-  .platform-topbar .show-profile-nickname {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-    text-wrap: wrap;
   }
 
   .platform-header-navigation {
