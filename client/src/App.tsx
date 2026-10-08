@@ -26,7 +26,6 @@ import { useBrowserLayoutEffect } from "./platform/useBrowserLayoutEffect";
 import { finishStartup } from "./platform/startup";
 import { GuestAccountScreen, isGuestAccountPath } from "./platform/screens/GuestAccountScreen";
 import { loginReturnPath } from "./platform/authNavigation";
-import { NavigationProvider } from "./platform/context/NavigationContext";
 import "./styles/platform-navigation.css";
 
 function readAppPath() {
@@ -248,9 +247,7 @@ export default function App({ initialPath }: { initialPath: string }) {
     <>
       <PlatformProvider>
         <ProfileProvider>
-          <NavigationProvider>
-            <ProfileApp initialPath={initialPath} />
-          </NavigationProvider>
+          <ProfileApp initialPath={initialPath} />
         </ProfileProvider>
       </PlatformProvider>
       <div className="app-version">v{__APP_VERSION__}</div>
