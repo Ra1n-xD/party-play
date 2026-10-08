@@ -698,13 +698,6 @@ export class RoundTableScene {
       this.petActor = new PetModel(stage, species);
       this.petActor.root.scale.multiplyScalar(this.options.variant === "bunker" ? 0.65 : 0.5);
       this.companion.add(this.petActor.root);
-      const cushion = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.32, 0.36, 0.12, 24),
-        new THREE.MeshStandardMaterial({ color: "#42675e" }),
-      );
-      cushion.name = "pet-cushion";
-      cushion.position.y = -0.06;
-      this.companion.add(cushion);
     }
     this.scene.add(this.companion);
     this.companion.visible = this.viewerId !== null && stage !== null;
@@ -722,9 +715,12 @@ export class RoundTableScene {
   }
 
   private positionPetInteraction(time: number) {
-    this.petCenter.set(0, this.petStage === 0 ? 0.2 : 0.35, 0);
-    this.companion.localToWorld(this.petCenter);
-    this.petEdge.set(0.34, 0, 0).applyQuaternion(this.camera.quaternion).add(this.petCenter);
+    if (!this.petActor) return;
+    this.petActor.getInteractionCenter(this.petCenter);
+    this.petEdge
+      .set(this.petActor.getInteractionRadius(), 0, 0)
+      .applyQuaternion(this.camera.quaternion)
+      .add(this.petCenter);
     this.petCenter.project(this.camera);
     this.petEdge.project(this.camera);
     const visible =
@@ -992,12 +988,11 @@ export class RoundTableScene {
       2.9 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect;
     const narrowX = Math.min(0.52, Math.max(0.2, halfView - 0.3));
     this.companion.position.set(
-      narrow ? (bunker ? 0.75 : narrowX) : bunker ? 1.6 : 1.05,
-      TABLE_Y + 0.12,
-      this.seatRadius - (bunker ? (narrow ? 4.1 : 3.5) : narrow ? 2.8 : 1.9),
+      narrow ? (bunker ? 0.75 : narrowX) : bunker ? 1.6 : 0.9,
+      TABLE_Y + 0.04,
+      this.seatRadius - (bunker ? (narrow ? 4.1 : 3.5) : narrow ? 2.8 : 2.15),
     );
     this.petActor?.root.scale.setScalar(bunker ? 0.65 : narrow ? 0.42 : 0.5);
-    this.companion.getObjectByName("pet-cushion")?.scale.setScalar(narrow && !bunker ? 0.75 : 1);
   }
 
   private resize() {
