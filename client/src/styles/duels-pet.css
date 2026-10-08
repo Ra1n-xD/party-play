@@ -5,11 +5,11 @@
 }
 @media (max-width: 950px) {
   .show-menu.feature-page {
-    min-height: calc(100svh - var(--mobile-navigation-space));
+    min-height: 100svh;
     padding-block: 16px 20px;
   }
   .feature-page .show-menu-shell {
-    min-height: calc(100svh - var(--mobile-navigation-space) - 36px);
+    min-height: calc(100svh - 36px);
   }
 }
 .feature-main {

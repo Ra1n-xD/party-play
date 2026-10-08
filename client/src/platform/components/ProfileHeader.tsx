@@ -8,7 +8,7 @@ import { ProfileNotifications } from "./ProfileNotifications";
 import { ProfileAccountMenu } from "./ProfileAccountMenu";
 import { usePetCareReminder } from "../usePetCareReminder";
 import { loginHref } from "../authNavigation";
-import { PlatformNavigation, NavigationHeading, type NavigationPage } from "./PlatformNavigation";
+import { PlatformNavigation, type NavigationPage } from "./PlatformNavigation";
 
 interface ProfileHeaderProps {
   activePage?: NavigationPage;
@@ -29,7 +29,7 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
       className={`show-menu-header show-profile-header platform-topbar${profile ? " has-account" : ""}`}
     >
       <a
-        className="show-brand platform-mobile-brand"
+        className="show-brand platform-header-brand"
         href="/"
         onClick={goHome}
         aria-label="PartySide — на главную"
@@ -37,7 +37,6 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
         <BrandDice className="show-brand-dice" />
         <span className="show-brand-name">partyside</span>
       </a>
-      <NavigationHeading page={activePage} />
       <PlatformNavigation
         activePage={activePage}
         inRoom={!!roomCode}
