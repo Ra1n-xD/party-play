@@ -3,6 +3,19 @@
   --platform-header-gap: calc(24 * var(--platform-unit));
 }
 
+#root:has(.platform-header-navigation, .profile-login) {
+  position: relative;
+}
+
+#root:has(.platform-header-navigation, .profile-login) > .app-version {
+  position: absolute;
+  bottom: 2px;
+  padding: 0 6px;
+  background: transparent;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
 /* The shared header owns the spacing before each screen's first content block. */
 .show-menu .show-profile-header + .feature-main,
 .show-menu .show-profile-header + .show-game-navigation {
