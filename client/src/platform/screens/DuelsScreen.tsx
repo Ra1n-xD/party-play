@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  FiAnchor,
+  FiArrowRight,
+  FiCheck,
+  FiChevronDown,
+  FiClock,
+  FiLayers,
+  FiUsers,
+} from "react-icons/fi";
 import { loginHref } from "../authNavigation";
 import {
   DUEL_GAMES,
@@ -20,6 +29,7 @@ import { CoinAmount, coinLabel } from "../components/CoinAmount";
 import { AccessibleModal } from "../components/AccessibleModal";
 import { duelRegistry } from "../duelRegistry";
 import "../../styles/duels-pet.css";
+import "../../styles/feature-showcase.css";
 
 const symbols = ["🍒", "🍋", "🍇", "🍀", "🌙", "⭐", "🔥", "💎", "🎲", "🎵", "🌸", "🦋"];
 const stateLabel = {
@@ -416,17 +426,25 @@ export function DuelsScreen() {
     if (duel) command({ type: "play", id: duel.id, revision: duel.revision, action });
   };
   return (
-    <div className="show-menu feature-page">
+    <div className="show-menu feature-page duels-page">
       <div className="show-menu-shell">
         <ProfileHeader activePage="duels" />
         <main className="feature-main">
           <header className="feature-heading" hidden={!!duel}>
-            <h1>Дуэли</h1>
-            <p>Два игрока. Одна ставка. Весь банк — победителю.</p>
+            <div>
+              <h1>Дуэли</h1>
+              <p>Бросьте вызов другу. Весь банк — победителю.</p>
+            </div>
+            <span className="feature-heading-badge">
+              <FiUsers aria-hidden="true" /> Ставка от 0 монет
+            </span>
           </header>
           {!profile && (
             <div className="feature-panel duel-guest-intro">
-              <p>Играйте за монеты профиля или выбирайте ставку 0 для дружеской партии.</p>
+              <div>
+                <h2>Готовы принять вызов?</h2>
+                <p>Войдите, чтобы сыграть за монеты или устроить дружескую партию со ставкой 0.</p>
+              </div>
               <a className="btn btn-primary" href={loginHref("/duels")}>
                 Войти и сыграть
               </a>
@@ -560,28 +578,43 @@ export function DuelsScreen() {
                     aria-pressed={gameId === g}
                     onClick={() => setGameId(g)}
                   >
+                    <span className="duel-option-tag">
+                      {g === "memory" ? "12 пар" : "10 кораблей"}
+                    </span>
+                    <span className="duel-option-check" aria-hidden="true">
+                      <FiCheck />
+                    </span>
                     <span className="duel-game-art" aria-hidden="true">
                       {g === "memory" ? (
                         <>
-                          <i>✦</i>
-                          <i>✦</i>
+                          <i>★</i>
+                          <i>★</i>
                           <i>?</i>
                         </>
                       ) : (
                         <>
-                          <i>⚓</i>
-                          <i>·</i>
-                          <i>×</i>
+                          <span className="duel-fleet-art">
+                            <FiAnchor />
+                            <span>×</span>
+                            <span>·</span>
+                          </span>
                         </>
                       )}
                     </span>
-                    <strong>{DUEL_NAMES[g]}</strong>
+                    <strong>
+                      {DUEL_NAMES[g]}
+                      <FiArrowRight aria-hidden="true" />
+                    </strong>
                     <small>{duelRegistry[g].subtitle}</small>
                   </button>
                 ))}
               </div>
               {profile && (
                 <section className="feature-panel duel-create">
+                  <h2>
+                    <FiLayers aria-hidden="true" />
+                    {active ? "Ваша дуэль" : "Создать вызов"}
+                  </h2>
                   {active ? (
                     <>
                       <p>У вас уже есть активная дуэль.</p>
@@ -602,12 +635,20 @@ export function DuelsScreen() {
                           onChange={(e) => setStake(e.target.value)}
                         />
                       </label>
-                      <p>
-                        Ваш баланс: <CoinAmount amount={profile.coins} /> · Банк:{" "}
-                        {Number.isSafeInteger(Number(stake)) && Number(stake) >= 0
-                          ? Number(stake) * 2
-                          : "—"}
-                      </p>
+                      <div className="duel-stake-summary">
+                        <span>
+                          На балансе <CoinAmount amount={profile.coins} label="" />
+                        </span>
+                        <span>
+                          Банк победителя{" "}
+                          <strong>
+                            {" "}
+                            {Number.isSafeInteger(Number(stake)) && Number(stake) >= 0
+                              ? Number(stake) * 2
+                              : "—"}
+                          </strong>
+                        </span>
+                      </div>
                       <button
                         className="btn btn-primary"
                         disabled={
@@ -642,11 +683,26 @@ export function DuelsScreen() {
               )}
               {profile && (
                 <section className="feature-panel duel-open">
-                  <h2>Открытые дуэли</h2>
+                  <h2>
+                    <FiUsers aria-hidden="true" />
+                    Открытые дуэли
+                    {data && <span className="duel-open-count">{data.rooms.length}</span>}
+                  </h2>
                   {!data ? (
-                    <p>Загружаем дуэли…</p>
+                    <div className="duel-empty" role="status">
+                      <FiClock aria-hidden="true" />
+                      <strong>Ищем вызовы…</strong>
+                      <p>Здесь появятся дуэли других игроков.</p>
+                    </div>
                   ) : !data.rooms.length ? (
-                    <p>Пока тихо. Создайте первый вызов!</p>
+                    <div className="duel-empty">
+                      <FiUsers aria-hidden="true" />
+                      <strong>Первый вызов за вами</strong>
+                      <p>
+                        Создайте дуэль и отправьте ссылку другу — или дождитесь соперника здесь.
+                      </p>
+                      <span>Дружеская партия? Выбирайте ставку 0.</span>
+                    </div>
                   ) : (
                     <ul className="duel-list">
                       {data.rooms.map((d) => (
@@ -671,52 +727,60 @@ export function DuelsScreen() {
                   )}
                 </section>
               )}
-              {!!data?.mine.length && (
-                <details className="feature-panel duel-history">
-                  <summary>Ваши последние дуэли</summary>
-                  <ul className="duel-list">
-                    {data.mine.map((d) => (
-                      <li key={d.id}>
-                        <span>
-                          {DUEL_NAMES[d.gameId]} · {stateLabel[d.phase]}
-                        </span>
-                        <button className="btn btn-secondary" onClick={() => setId(d.id)}>
-                          Открыть
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
             </div>
           )}
-          <details className="duel-rules feature-panel">
-            <summary>Правила и условия дуэлей</summary>
-            {DUEL_GAMES.map((g) => (
-              <details key={g}>
-                <summary>{DUEL_NAMES[g]} · правила</summary>
-                <p>{duelRegistry[g].text}</p>
+          <div className="duel-info-panels">
+            {!duel && !!data?.mine.length && (
+              <details className="feature-panel duel-history">
+                <summary>Ваши последние дуэли</summary>
+                <ul className="duel-list">
+                  {data.mine.map((d) => (
+                    <li key={d.id}>
+                      <span>
+                        {DUEL_NAMES[d.gameId]} · {stateLabel[d.phase]}
+                      </span>
+                      <button className="btn btn-secondary" onClick={() => setId(d.id)}>
+                        Открыть
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </details>
-            ))}
-            <details>
-              <summary>Ставки, время и переподключение</summary>
-              <p>
-                Ставка — целое число от 0 до {DUEL_MAX_STAKE} монет профиля. Оба игрока вносят
-                одинаковую сумму. Победитель получает весь банк без комиссии; при ничьей ставки
-                возвращаются. Обычные награды за партию в дуэлях не начисляются.
-              </p>
-              <p>
-                На ход — 90 секунд. За сдачу или пропуск времени засчитывается поражение. Закрытие
-                вкладки не останавливает таймер: войдите в тот же аккаунт и откройте «Дуэли», чтобы
-                продолжить. В морском бое на подготовку 3 минуты: если готов только один игрок, он
-                побеждает; если никто — ставки возвращаются.
-              </p>
-              <p>
-                Дуэли проходят между двумя аккаунтами, без ботов. Зрители могут наблюдать за
-                открытыми действиями.
-              </p>
+            )}
+            <details className="duel-rules feature-panel">
+              <summary>
+                <span>
+                  <FiLayers aria-hidden="true" />
+                  Правила и условия дуэлей
+                </span>
+                <FiChevronDown className="pet-guide-chevron" aria-hidden="true" />
+              </summary>
+              {DUEL_GAMES.map((g) => (
+                <details key={g}>
+                  <summary>{DUEL_NAMES[g]} · правила</summary>
+                  <p>{duelRegistry[g].text}</p>
+                </details>
+              ))}
+              <details>
+                <summary>Ставки, время и переподключение</summary>
+                <p>
+                  Ставка — целое число от 0 до {DUEL_MAX_STAKE} монет профиля. Оба игрока вносят
+                  одинаковую сумму. Победитель получает весь банк без комиссии; при ничьей ставки
+                  возвращаются. Обычные награды за партию в дуэлях не начисляются.
+                </p>
+                <p>
+                  На ход — 90 секунд. За сдачу или пропуск времени засчитывается поражение. Закрытие
+                  вкладки не останавливает таймер: войдите в тот же аккаунт и откройте «Дуэли»,
+                  чтобы продолжить. В морском бое на подготовку 3 минуты: если готов только один
+                  игрок, он побеждает; если никто — ставки возвращаются.
+                </p>
+                <p>
+                  Дуэли проходят между двумя аккаунтами, без ботов. Зрители могут наблюдать за
+                  открытыми действиями.
+                </p>
+              </details>
             </details>
-          </details>
+          </div>
         </main>
         {!duel && <MenuFooter />}
       </div>

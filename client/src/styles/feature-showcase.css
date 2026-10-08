@@ -1,0 +1,1072 @@
+/* Pet and duel screens share the matte surfaces and scale of the catalog. */
+.show-menu:is(.pet-page, .duels-page) {
+  --feature-surface: #34283f;
+  --feature-line: #695a8770;
+  --feature-muted: #c5b8d0;
+}
+:is(.pet-page, .duels-page) .feature-main {
+  margin: calc(24 * var(--show-unit)) 0;
+}
+:is(.pet-page, .duels-page) .feature-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: calc(12 * var(--show-unit));
+  margin-bottom: calc(22 * var(--show-unit));
+}
+:is(.pet-page, .duels-page) .feature-heading[hidden] {
+  display: none;
+}
+:is(.pet-page, .duels-page) .feature-heading h1 {
+  margin: 0 0 calc(9 * var(--show-unit));
+  font: 800 calc(32 * var(--show-unit))/1.2 var(--show-display);
+  letter-spacing: -0.05em;
+}
+:is(.pet-page, .duels-page) .feature-heading p {
+  color: var(--feature-muted);
+  font-size: calc(14 * var(--show-unit));
+}
+.feature-heading-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8 * var(--show-unit));
+  padding: calc(10 * var(--show-unit)) calc(14 * var(--show-unit));
+  border: 1px solid var(--feature-line);
+  border-radius: calc(10 * var(--show-unit));
+  background: #45324f;
+  color: #e6c6ef;
+  font-size: calc(12 * var(--show-unit));
+  font-weight: 600;
+}
+.feature-heading-badge svg {
+  width: 16px;
+  height: 16px;
+}
+:is(.pet-page, .duels-page) .feature-panel {
+  border: calc(1 * var(--show-unit)) solid var(--feature-line);
+  border-radius: calc(18 * var(--show-unit));
+  background: var(--feature-surface);
+  padding: calc(20 * var(--show-unit));
+}
+:is(.pet-page, .duels-page) .feature-note {
+  color: var(--feature-muted);
+}
+:is(.pet-page, .duels-page) .feature-panel .btn {
+  border: calc(2 * var(--show-unit)) solid #170e20;
+  border-radius: calc(10 * var(--show-unit));
+  box-shadow: 0 calc(3 * var(--show-unit)) 0 #170e20;
+  font-family: "Golos Text", sans-serif;
+  font-weight: 700;
+  font-size: calc(14 * var(--show-unit));
+  line-height: 1.4;
+  padding: calc(10 * var(--show-unit)) calc(16 * var(--show-unit));
+  min-height: calc(44 * var(--show-unit));
+  text-decoration: none;
+}
+:is(.pet-page, .duels-page) .btn-primary {
+  background: var(--show-accent);
+  color: #292030;
+}
+:is(.pet-page, .duels-page) .btn-secondary {
+  background: #493753;
+  color: #eee1f2;
+}
+:is(.pet-page, .duels-page) .feature-panel .btn:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+}
+:is(.pet-page, .duels-page) .btn:focus-visible,
+.duel-game-option:focus-visible {
+  outline: 2px solid var(--show-accent);
+  outline-offset: 4px;
+}
+:is(.pet-page, .duels-page) .feature-panel input {
+  margin-top: calc(8 * var(--show-unit));
+  padding: calc(10 * var(--show-unit)) calc(12 * var(--show-unit));
+  border: 1px solid #9a85a878;
+  border-radius: calc(9 * var(--show-unit));
+  background: #281e32;
+  color: var(--show-ink);
+  font:
+    600 calc(18 * var(--show-unit))/1.4 "Golos Text",
+    sans-serif;
+}
+:is(.pet-page, .duels-page) .feature-panel input:focus-visible {
+  outline: 2px solid #e3aff6;
+  outline-offset: 2px;
+}
+.pet-page .pet-home {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  padding: 0;
+  margin-bottom: calc(16 * var(--show-unit));
+}
+.pet-page .pet-stage-art {
+  min-height: calc(310 * var(--show-unit));
+  padding: calc(10 * var(--show-unit));
+  background: #d6b8e6;
+  color: #3a2849;
+  border-right: 1px solid #170e2030;
+}
+.pet-page .pet-orbit {
+  width: 62%;
+  max-width: calc(270 * var(--show-unit));
+  border: 1px solid #543c6c25;
+  box-shadow:
+    0 0 0 calc(24 * var(--show-unit)) #fff8e812,
+    0 0 0 calc(48 * var(--show-unit)) #fff8e80a;
+}
+.pet-art-spark {
+  position: absolute;
+  font-size: calc(32 * var(--show-unit));
+  color: #674377;
+}
+.pet-art-spark-one {
+  top: 20%;
+  left: 14%;
+  transform: rotate(-12deg);
+}
+.pet-art-spark-two {
+  right: 14%;
+  bottom: 25%;
+  font-size: calc(42 * var(--show-unit));
+}
+.pet-page .pet-preview {
+  height: calc(240 * var(--show-unit));
+}
+.pet-page .pet-fallback {
+  font-size: calc(90 * var(--show-unit));
+}
+.pet-page .pet-reaction {
+  min-height: calc(25 * var(--show-unit));
+  padding: 0 calc(10 * var(--show-unit));
+  color: #543963;
+  font-size: calc(12 * var(--show-unit));
+  line-height: 1.5;
+}
+.pet-page .pet-reaction.is-active {
+  color: #372244;
+}
+.pet-page .pet-interact:focus-visible {
+  outline-color: #543963;
+}
+.pet-page .pet-stage-name {
+  margin-top: calc(6 * var(--show-unit));
+  padding: calc(6 * var(--show-unit)) calc(12 * var(--show-unit));
+  border: 1px solid #543c6c35;
+  border-radius: 30px;
+  background: #fff8e84a;
+  color: #543963;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: calc(12 * var(--show-unit));
+  font-weight: 600;
+}
+.pet-page .pet-care-panel {
+  padding: calc(24 * var(--show-unit));
+  gap: calc(12 * var(--show-unit));
+}
+.pet-care-status {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: calc(7 * var(--show-unit));
+  color: #dec7eb;
+  font-size: calc(12 * var(--show-unit));
+  font-weight: 600;
+}
+.pet-care-status svg {
+  width: calc(15 * var(--show-unit));
+  height: calc(15 * var(--show-unit));
+}
+.pet-care-status.is-due {
+  color: var(--show-accent);
+}
+.pet-page .pet-care-panel h2 {
+  font-size: calc(22 * var(--show-unit));
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.pet-page .pet-care-panel p {
+  font-size: calc(13 * var(--show-unit));
+  color: var(--feature-muted);
+}
+.pet-page .pet-care-panel small {
+  color: var(--feature-muted);
+  font-size: calc(11 * var(--show-unit));
+}
+.pet-page .pet-growth > span {
+  font-size: calc(12 * var(--show-unit));
+  color: var(--feature-muted);
+}
+.pet-page .pet-growth strong {
+  font-size: calc(22 * var(--show-unit));
+  line-height: 1.2;
+  color: var(--show-ink);
+}
+.pet-page .pet-growth strong small {
+  font-size: calc(13 * var(--show-unit));
+  font-weight: 500;
+}
+.pet-page .pet-growth progress {
+  display: block;
+  height: calc(8 * var(--show-unit));
+  margin-top: calc(8 * var(--show-unit));
+  appearance: none;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #21172d;
+  accent-color: var(--show-accent);
+}
+.pet-page progress::-webkit-progress-bar {
+  background: #21172d;
+  border-radius: 10px;
+}
+.pet-page progress::-webkit-progress-value {
+  background: var(--show-accent);
+  border-radius: 10px;
+}
+.pet-page progress::-moz-progress-bar {
+  background: var(--show-accent);
+  border-radius: 10px;
+}
+.pet-page .pet-care-reward {
+  padding: calc(11 * var(--show-unit)) calc(14 * var(--show-unit));
+  border: 1px solid #d8fc6130;
+  border-radius: calc(10 * var(--show-unit));
+  background: #d8fc6109;
+  font-size: calc(13 * var(--show-unit));
+}
+.pet-care-reward > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--show-unit));
+}
+.pet-care-reward > span:first-child svg {
+  color: #e3aff6;
+  width: calc(16 * var(--show-unit));
+  height: calc(16 * var(--show-unit));
+}
+.pet-page .pet-neglect {
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--show-unit));
+  font-size: calc(11 * var(--show-unit));
+}
+.pet-page .pet-neglect svg {
+  flex-shrink: 0;
+}
+.pet-page .pet-neglect.is-urgent {
+  color: #ffbc89;
+}
+.pet-page .pet-care-panel .btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: calc(7 * var(--show-unit));
+}
+.pet-page .pet-care-panel .btn svg {
+  flex-shrink: 0;
+}
+.pet-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(10 * var(--show-unit));
+}
+.pet-actions > .btn:only-child {
+  grid-column: 1 / -1;
+}
+.pet-page .pet-actions .btn {
+  font-size: calc(12 * var(--show-unit));
+}
+.pet-page .pet-actions small {
+  display: block;
+  font-size: calc(10 * var(--show-unit));
+  font-weight: 400;
+}
+.duel-info-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(16 * var(--show-unit));
+  margin-top: calc(16 * var(--show-unit));
+  align-items: start;
+}
+.duel-info-panels > :only-child {
+  grid-column: 1 / -1;
+}
+.duels-page .duel-info-panels .feature-panel {
+  grid-column: auto;
+  margin-top: 0;
+}
+.pet-page .pet-care-panel .pet-success {
+  color: var(--show-accent);
+}
+.pet-page .pet-milestones {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-left: 0;
+  border-top: 1px solid var(--feature-line);
+  padding: calc(12 * var(--show-unit));
+  gap: calc(10 * var(--show-unit));
+}
+.pet-page .pet-milestones article {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: calc(12 * var(--show-unit));
+  padding: calc(12 * var(--show-unit));
+  border: 1px solid #695a8750;
+  border-radius: calc(10 * var(--show-unit));
+  background: #2b2037;
+}
+.pet-page .pet-milestones article > div {
+  min-width: 0;
+}
+.pet-page .pet-milestones .is-current {
+  border-color: #d8fc6180;
+  background: #d8fc610a;
+}
+.pet-page .pet-milestones .pet-milestone-number {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  float: none;
+  width: calc(34 * var(--show-unit));
+  height: calc(34 * var(--show-unit));
+  border-radius: 50%;
+  background: #493753;
+  color: #c5b8d0;
+  font-size: calc(11 * var(--show-unit));
+  letter-spacing: 0;
+}
+.pet-page .is-current .pet-milestone-number {
+  background: var(--show-accent);
+  color: #292030;
+}
+.pet-page .is-complete .pet-milestone-number {
+  color: var(--show-accent);
+}
+.pet-page .pet-milestones h3 {
+  font-size: calc(14 * var(--show-unit));
+  line-height: 1.25;
+}
+.pet-page .pet-milestones p,
+.pet-page .pet-milestones small {
+  color: var(--feature-muted);
+  font-size: calc(11 * var(--show-unit));
+  line-height: 1.4;
+}
+.pet-page .pet-extra {
+  gap: calc(16 * var(--show-unit));
+}
+.pet-page .pet-extra > .feature-panel {
+  padding: 0;
+}
+.pet-page .pet-extra summary {
+  padding: calc(14 * var(--show-unit)) calc(18 * var(--show-unit));
+  gap: calc(12 * var(--show-unit));
+  min-height: calc(70 * var(--show-unit));
+  color: var(--show-ink);
+}
+.pet-page .pet-extra summary:hover {
+  background: #44324f;
+}
+.pet-page .pet-guide-icon {
+  width: calc(36 * var(--show-unit));
+  height: calc(36 * var(--show-unit));
+  flex-basis: calc(36 * var(--show-unit));
+  background: #493753;
+  border-color: #e3aff630;
+  color: #e3aff6;
+}
+.pet-page .pet-guide-title strong {
+  font-size: calc(14 * var(--show-unit));
+}
+.pet-page .pet-guide-title small {
+  color: var(--feature-muted);
+  font-size: calc(12 * var(--show-unit));
+}
+:is(.pet-page, .duels-page) .pet-guide-chevron {
+  color: var(--feature-muted);
+}
+.pet-page .pet-extra > details[open] {
+  border-color: #ba94c680;
+}
+.pet-page .pet-extra > details[open] > summary {
+  background: #44324f;
+}
+.pet-page .pet-extra > details[open] .pet-guide-chevron {
+  color: #e3aff6;
+}
+.pet-page .pet-guide-content {
+  padding: calc(18 * var(--show-unit));
+  border-color: var(--feature-line);
+}
+.pet-page .pet-guide-content p {
+  color: var(--feature-muted);
+  font-size: calc(13 * var(--show-unit));
+}
+.pet-page .pet-species li {
+  background: #2b2037;
+  border-color: var(--feature-line);
+  padding: calc(10 * var(--show-unit));
+  font-size: calc(13 * var(--show-unit));
+}
+.pet-page .pet-species li b {
+  background: #e3aff614;
+  color: #e3aff6;
+}
+.duels-page .duel-guest-intro {
+  background: #fff8e8;
+  color: #30263b;
+  border: 2px solid #170e20;
+  margin-bottom: calc(18 * var(--show-unit));
+}
+.duels-page .duel-guest-intro > div {
+  flex: 1 1 260px;
+}
+.duels-page .duel-guest-intro h2 {
+  margin: 0 0 calc(6 * var(--show-unit));
+  font-size: calc(18 * var(--show-unit));
+}
+.duels-page .duel-guest-intro p {
+  color: #786b80;
+  font-size: calc(13 * var(--show-unit));
+}
+.duels-page .duel-lobby {
+  gap: calc(18 * var(--show-unit));
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+}
+.duels-page .duel-game-options {
+  gap: calc(16 * var(--show-unit));
+}
+.duels-page .duel-game-option {
+  position: relative;
+  padding: 0;
+  border: 2px solid #695a87;
+  border-radius: calc(16 * var(--show-unit));
+  background: var(--feature-surface);
+  color: var(--show-ink);
+  box-shadow: 0 calc(4 * var(--show-unit)) 0 #170e20;
+  transition:
+    border-color 150ms,
+    transform 150ms;
+}
+.duels-page .duel-game-option[aria-pressed="true"] {
+  border-color: var(--show-accent);
+  box-shadow: 0 calc(4 * var(--show-unit)) 0 #170e20;
+}
+.duel-option-tag {
+  position: absolute;
+  z-index: 1;
+  top: calc(12 * var(--show-unit));
+  left: calc(12 * var(--show-unit));
+  padding: calc(4 * var(--show-unit)) calc(8 * var(--show-unit));
+  background: #fff8e87a;
+  color: #3a2849;
+  border-radius: 5px;
+  font-size: calc(10 * var(--show-unit));
+  font-weight: 700;
+}
+.duel-option-check {
+  position: absolute;
+  z-index: 1;
+  top: calc(10 * var(--show-unit));
+  right: calc(10 * var(--show-unit));
+  display: grid;
+  place-items: center;
+  width: calc(25 * var(--show-unit));
+  height: calc(25 * var(--show-unit));
+  border: 2px solid #3a284935;
+  border-radius: 50%;
+  color: transparent;
+}
+[aria-pressed="true"] .duel-option-check {
+  border-color: #30263b;
+  background: var(--show-accent);
+  color: #30263b;
+}
+.duels-page .duel-game-art {
+  height: calc(116 * var(--show-unit));
+  gap: calc(8 * var(--show-unit));
+  padding-top: calc(16 * var(--show-unit));
+  background: #d6b8e6;
+}
+.duels-page .duel-game-art i {
+  width: calc(43 * var(--show-unit));
+  height: calc(64 * var(--show-unit));
+  border: 2px solid #30263b;
+  border-radius: calc(7 * var(--show-unit));
+  background: #fff8e8;
+  color: #7f528c;
+  font-size: calc(25 * var(--show-unit));
+  box-shadow: calc(3 * var(--show-unit)) calc(4 * var(--show-unit)) 0 #30263b;
+}
+.duels-page .duel-game-art i:nth-child(2) {
+  background: #f1c7a8;
+  color: #b04f57;
+}
+.duels-page .is-battleship .duel-game-art {
+  background: #b7cfda;
+}
+.duel-fleet-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: calc(126 * var(--show-unit));
+  height: calc(82 * var(--show-unit));
+  border: 2px solid #30263b;
+  border-radius: 9px;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 calc(19 * var(--show-unit)),
+      #30263b20 calc(19 * var(--show-unit)) calc(20 * var(--show-unit))
+    ),
+    repeating-linear-gradient(
+      90deg,
+      #d9e8e8 0 calc(19 * var(--show-unit)),
+      #30263b20 calc(19 * var(--show-unit)) calc(20 * var(--show-unit))
+    );
+  box-shadow: 3px 4px 0 #30263b;
+  transform: rotate(-5deg);
+}
+.duel-fleet-art > svg {
+  width: calc(44 * var(--show-unit));
+  height: calc(44 * var(--show-unit));
+  color: #385769;
+}
+.duel-fleet-art > span {
+  position: absolute;
+  top: 4%;
+  right: 10%;
+  font-size: calc(24 * var(--show-unit));
+  color: #bd5c54;
+  font-weight: 800;
+}
+.duel-fleet-art > span:last-child {
+  bottom: 2%;
+  left: 15%;
+  right: auto;
+  top: auto;
+  color: #385769;
+}
+.duels-page .duel-game-option strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: calc(14 * var(--show-unit)) calc(16 * var(--show-unit)) calc(6 * var(--show-unit));
+  font-size: calc(20 * var(--show-unit));
+  line-height: 1.25;
+}
+.duel-game-option strong svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--show-accent);
+}
+.duels-page .duel-game-option small {
+  margin: 0 calc(16 * var(--show-unit)) calc(16 * var(--show-unit));
+  color: var(--feature-muted);
+  font-size: calc(12 * var(--show-unit));
+  line-height: 1.4;
+}
+.duels-page .duel-create {
+  display: grid;
+  grid-template-columns: minmax(0, 0.65fr) minmax(0, 1fr);
+  gap: calc(12 * var(--show-unit)) calc(18 * var(--show-unit));
+  padding: calc(18 * var(--show-unit));
+}
+.duels-page .duel-create h2,
+.duels-page .duel-open h2 {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--show-unit));
+  font-size: calc(16 * var(--show-unit));
+  line-height: 1.4;
+  margin: 0;
+}
+.duels-page .duel-create h2 {
+  grid-column: 1 / -1;
+}
+.duels-page .duel-create h2 svg,
+.duels-page .duel-open h2 svg {
+  color: #e3aff6;
+  flex-shrink: 0;
+  width: calc(18 * var(--show-unit));
+  height: calc(18 * var(--show-unit));
+}
+.duels-page .duel-create label {
+  grid-row: 2 / span 2;
+  align-self: center;
+  font-size: calc(12 * var(--show-unit));
+  color: var(--feature-muted);
+}
+.duel-stake-summary {
+  display: grid;
+  gap: calc(8 * var(--show-unit));
+  font-size: calc(12 * var(--show-unit));
+  color: var(--feature-muted);
+}
+.duel-stake-summary > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.duel-stake-summary strong {
+  color: var(--show-ink);
+  font-size: calc(18 * var(--show-unit));
+}
+.duel-stake-summary .coin-icon {
+  width: calc(22 * var(--show-unit));
+  height: calc(22 * var(--show-unit));
+}
+.duels-page .duel-create .btn {
+  font-size: calc(13 * var(--show-unit));
+}
+.duels-page .duel-create small {
+  grid-column: 1 / -1;
+  font-size: calc(11 * var(--show-unit));
+  line-height: 1.5;
+  color: var(--feature-muted);
+}
+.duels-page .duel-open {
+  max-height: calc(470 * var(--show-unit));
+  display: flex;
+  flex-direction: column;
+}
+.duel-open-count {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  min-width: calc(25 * var(--show-unit));
+  height: calc(25 * var(--show-unit));
+  border-radius: 7px;
+  background: #493753;
+  color: #e3aff6;
+  font-size: calc(12 * var(--show-unit));
+}
+.duel-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: calc(12 * var(--show-unit));
+  padding: calc(30 * var(--show-unit)) calc(12 * var(--show-unit));
+  text-align: center;
+}
+.duel-empty > svg {
+  width: calc(52 * var(--show-unit));
+  height: calc(52 * var(--show-unit));
+  padding: calc(12 * var(--show-unit));
+  box-sizing: content-box;
+  border: 1px dashed #e3aff655;
+  border-radius: 50%;
+  color: #e3aff6;
+}
+.duel-empty strong {
+  margin-top: calc(4 * var(--show-unit));
+  font-size: calc(18 * var(--show-unit));
+}
+.duel-empty p {
+  margin: 0;
+  max-width: 280px;
+  font-size: calc(13 * var(--show-unit));
+  color: var(--feature-muted);
+}
+.duel-empty > span {
+  font-size: calc(11 * var(--show-unit));
+  color: #a896b6;
+}
+.duels-page .duel-list li {
+  gap: calc(12 * var(--show-unit));
+  border-color: var(--feature-line);
+  padding: calc(14 * var(--show-unit)) 0;
+  font-size: calc(13 * var(--show-unit));
+}
+.duels-page .duel-list li div > span:not(.coin-amount) {
+  color: var(--feature-muted);
+  font-size: calc(11 * var(--show-unit));
+  line-height: 1.4;
+}
+.duels-page .duel-list .btn {
+  min-height: 36px;
+  font-size: calc(11 * var(--show-unit));
+  padding: calc(8 * var(--show-unit));
+}
+.duels-page .duel-history {
+  padding: calc(14 * var(--show-unit)) calc(18 * var(--show-unit));
+}
+.duels-page .duel-rules {
+  margin-top: calc(18 * var(--show-unit));
+  padding: calc(14 * var(--show-unit)) calc(18 * var(--show-unit));
+}
+.duels-page .duel-rules > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
+  font-size: calc(14 * var(--show-unit));
+}
+.duels-page .duel-rules > summary::-webkit-details-marker {
+  display: none;
+}
+.duel-rules > summary > span {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--show-unit));
+}
+.duel-rules > summary > span > svg {
+  color: #e3aff6;
+  flex-shrink: 0;
+}
+.duels-page .duel-rules[open] > summary .pet-guide-chevron {
+  transform: rotate(180deg);
+}
+.duels-page .duel-rules details {
+  border-color: var(--feature-line);
+  padding: calc(8 * var(--show-unit)) 0;
+}
+.duels-page .duel-rules details:first-of-type {
+  margin-top: calc(12 * var(--show-unit));
+}
+.duels-page .duel-rules p {
+  color: var(--feature-muted);
+  font-size: calc(13 * var(--show-unit));
+}
+.duels-page .duel-score > div {
+  background: #2b2037;
+  border-color: var(--feature-line);
+}
+.duels-page .duel-score .is-turn {
+  border-color: #d8fc6180;
+  background: #d8fc610c;
+}
+.duels-page .duel-score span,
+.duels-page .duel-turn span {
+  color: var(--feature-muted);
+}
+.duels-page .memory-card {
+  background: repeating-linear-gradient(45deg, #493753 0 7px, #574260 7px 8px);
+  border-color: #9479a3;
+  color: #e3aff6;
+}
+.duels-page .memory-card.is-open {
+  background: #fff8e8;
+  border-color: #fff8e8;
+}
+.duels-page .memory-card.is-matched {
+  background: #d8fc6118;
+  border-color: #d8fc6180;
+}
+.duels-page .sea-cell {
+  background: #2b2037;
+  border-color: #695a87;
+}
+.duels-page .sea-cell.has-ship {
+  background: #876a96;
+}
+.duels-page .sea-cell.is-hit {
+  background: #80562e;
+}
+.duels-page .sea-cell.is-sunk {
+  background: #873d50;
+}
+.duels-page .sea-cell.is-miss {
+  background: #3b2f47;
+}
+.duels-page .sea-tabs button {
+  background: #493753;
+  border-color: #695a87;
+  color: var(--show-ink);
+}
+.duels-page .sea-tabs button[aria-pressed="true"] {
+  background: #d8fc6118;
+  border-color: var(--show-accent);
+}
+.duels-page .duel-wait > span {
+  color: var(--show-accent);
+}
+.duels-page .duel-result {
+  border-color: #d8fc6170;
+  background: #d8fc610b;
+}
+@media (hover: hover) and (pointer: fine) {
+  .duels-page .duel-game-option:hover {
+    transform: translateY(-2px);
+    border-color: #e3aff6;
+  }
+  :is(.pet-page, .duels-page) .feature-panel .btn:not(:disabled):hover {
+    filter: brightness(1.08);
+  }
+}
+@media (max-width: 1100px) {
+  .pet-page .pet-milestones article {
+    gap: 8px;
+    padding: 10px;
+  }
+  .pet-page .pet-milestones .pet-milestone-number {
+    width: 26px;
+    height: 26px;
+  }
+  .duels-page .duel-lobby {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+  .duels-page .duel-game-option strong {
+    font-size: 18px;
+  }
+  .duels-page .duel-list li {
+    flex-wrap: wrap;
+  }
+  .duels-page .duel-list li .btn {
+    width: 100%;
+  }
+}
+@media (max-width: 700px) {
+  .pet-actions,
+  .duel-info-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :is(.pet-page, .duels-page) .feature-main {
+    margin: 18px 0;
+  }
+  :is(.pet-page, .duels-page) .feature-heading {
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  :is(.pet-page, .duels-page) .feature-heading h1 {
+    font-size: 27px;
+    margin-bottom: 6px;
+  }
+  :is(.pet-page, .duels-page) .feature-heading p {
+    font-size: 12px;
+  }
+  .feature-heading-badge {
+    font-size: 11px;
+    padding: 7px 10px;
+  }
+  :is(.pet-page, .duels-page) .feature-panel {
+    padding: 16px;
+    border-radius: 14px;
+  }
+  .pet-page .pet-home {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0;
+  }
+  .pet-page .pet-stage-art {
+    min-height: 185px;
+    border-right: 0;
+  }
+  .pet-page .pet-preview {
+    height: 145px;
+  }
+  .pet-page .pet-orbit {
+    width: 145px;
+  }
+  .pet-page .pet-reaction {
+    font-size: 11px;
+    min-height: 20px;
+  }
+  .pet-page .pet-stage-name {
+    font-size: 11px;
+    margin-top: 3px;
+  }
+  .pet-page .pet-care-panel {
+    gap: 10px;
+    padding: 18px;
+  }
+  .pet-page .pet-care-panel h2 {
+    font-size: 20px;
+  }
+  .pet-page .pet-care-panel p {
+    font-size: 12px;
+  }
+  .pet-page .pet-milestones {
+    gap: 8px;
+    padding: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pet-page .pet-milestones article {
+    gap: 8px;
+    padding: 10px;
+  }
+  .pet-page .pet-milestones h3 {
+    font-size: 12px;
+  }
+  .pet-page .pet-milestones p,
+  .pet-page .pet-milestones small {
+    font-size: 10px;
+  }
+  .pet-page .pet-extra {
+    gap: 10px;
+  }
+  .pet-page .pet-extra summary {
+    padding: 12px 14px;
+    min-height: 66px;
+  }
+  .duels-page .duel-lobby {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .duels-page .duel-game-options {
+    gap: 10px;
+  }
+  .duels-page .duel-game-art {
+    height: 105px;
+  }
+  .duels-page .duel-game-art i {
+    width: 33px;
+    height: 50px;
+    font-size: 22px;
+  }
+  .duels-page .duel-game-option strong {
+    margin: 12px 12px 6px;
+    font-size: 17px;
+  }
+  .duels-page .duel-game-option small {
+    margin: 0 12px 12px;
+    font-size: 11px;
+  }
+  .duels-page .duel-create {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: 16px;
+  }
+  .duels-page .duel-create label {
+    grid-row: auto;
+  }
+  .duels-page .duel-create > .btn {
+    grid-column: 1 / -1;
+  }
+  .duels-page .duel-create > p {
+    grid-column: 1 / -1;
+  }
+  .duels-page .duel-open {
+    grid-column: auto;
+    grid-row: auto;
+    max-height: 380px;
+  }
+  .duel-empty {
+    padding: 22px 8px;
+  }
+  .duel-empty > svg {
+    width: 35px;
+    height: 35px;
+    padding: 12px;
+  }
+  .duel-empty strong {
+    font-size: 16px;
+  }
+  .duels-page .duel-guest-intro {
+    gap: 12px;
+  }
+  .duels-page .duel-guest-intro .btn {
+    width: 100%;
+  }
+  .duels-page .duel-match-heading h1 {
+    font-size: 20px;
+  }
+  .duels-page .duel-match-heading > .btn {
+    font-size: 11px;
+    min-height: 36px;
+    padding: 8px;
+  }
+}
+@media (max-width: 380px) {
+  .duels-page .duel-game-option strong {
+    font-size: 15px;
+  }
+  .duels-page .duel-game-option strong svg {
+    width: 14px;
+    height: 14px;
+  }
+  .duels-page .duel-game-art {
+    height: 100px;
+    gap: 4px;
+  }
+  .duels-page .duel-game-art i {
+    width: 29px;
+    height: 45px;
+  }
+  .duel-fleet-art {
+    width: 98px;
+    height: 68px;
+  }
+  .duel-stake-summary {
+    font-size: 11px;
+  }
+  .pet-page .pet-care-panel {
+    padding: 14px;
+  }
+  .pet-page .pet-milestones article {
+    gap: 6px;
+    padding: 8px;
+  }
+  .pet-page .pet-milestones .pet-milestone-number {
+    width: 23px;
+    height: 23px;
+    font-size: 10px;
+  }
+}
+@media (min-width: 701px) and (max-height: 800px) {
+  :is(.pet-page, .duels-page) .feature-main {
+    margin: 18px 0;
+  }
+  :is(.pet-page, .duels-page) .feature-heading {
+    margin-bottom: 18px;
+  }
+  .pet-page .pet-care-panel {
+    gap: 8px;
+    padding: 18px 22px;
+  }
+  .pet-page .pet-care-panel h2 {
+    font-size: 20px;
+  }
+  .pet-page .pet-stage-art {
+    min-height: 285px;
+  }
+  .pet-page .pet-preview {
+    height: 220px;
+  }
+  .pet-page .pet-milestones {
+    padding: 10px;
+    gap: 8px;
+  }
+  .pet-page .pet-milestones article {
+    padding: 8px 12px;
+  }
+  .pet-page .pet-extra summary {
+    min-height: 62px;
+    padding: 10px 16px;
+  }
+  .duels-page .duel-game-art {
+    height: 92px;
+  }
+  .duels-page .duel-create {
+    grid-template-columns: minmax(0, 0.65fr) minmax(0, 0.85fr) minmax(0, 1fr);
+    gap: 10px 14px;
+    padding: 16px;
+  }
+  .duels-page .duel-create label {
+    grid-row: 2;
+  }
+  .duels-page .duel-create h2,
+  .duels-page .duel-create small {
+    grid-column: 1 / -1;
+  }
+  .duels-page .duel-create > .btn {
+    align-self: center;
+  }
+  .duels-page .duel-create > p {
+    grid-column: 1 / 3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .duels-page .duel-game-option {
+    transition: none;
+  }
+}

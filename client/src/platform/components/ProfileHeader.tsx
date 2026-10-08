@@ -3,7 +3,7 @@ import { FiLogIn } from "react-icons/fi";
 import { usePlatform } from "../context/PlatformContext";
 import { useProfile } from "../context/ProfileContext";
 import { BrandDice } from "./BrandDice";
-import { CoinAmount } from "./CoinAmount";
+import { CoinWallet } from "./CoinWallet";
 import { ProfileNotifications } from "./ProfileNotifications";
 import { ProfileAccountMenu } from "./ProfileAccountMenu";
 import { usePetCareReminder } from "../usePetCareReminder";
@@ -46,13 +46,7 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
       <div className="show-profile-account">
         {profile ? (
           <div className="show-profile-balance">
-            <a
-              href="/pet"
-              className="coin-wallet"
-              aria-label={`Монет на балансе: ${profile.coins}. Уход за питомцем`}
-            >
-              <CoinAmount amount={profile.coins} label="" />
-            </a>
+            <CoinWallet key={profile.id} coins={profile.coins} />
             <ProfileAccountMenu
               key={profile.id}
               nickname={profile.nickname}

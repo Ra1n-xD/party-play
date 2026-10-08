@@ -1,4 +1,6 @@
 import headerNavigation from "../assets/updates/header-navigation-6.14.0.png";
+import petHome from "../assets/updates/pet-home-6.15.0.png";
+import duelLobby from "../assets/updates/duel-lobby-6.15.0.png";
 import groupedBottomNavigation from "../assets/updates/grouped-bottom-navigation-6.14.1.png";
 import petTable from "../assets/updates/pet-table-6.11.0.jpg";
 import petVarieties from "../assets/updates/pets-6.12.0.jpg";
@@ -48,6 +50,35 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-15",
+    version: "6.15.0",
+    date: "2026-10-08",
+    category: "ПИТОМЕЦ И ДУЭЛИ",
+    title: "Забота и вызовы в новом оформлении.",
+    summary: "Обновили страницы питомца и дуэлей и добавили подсказку о монетах прямо у баланса.",
+    changes: [
+      "У питомца — отдельная сцена, блок ежедневного ухода и последовательность стадий с отметкой текущего роста и наградами.",
+      "В дуэлях — наглядные карточки игр, расчёт банка рядом со ставкой и отдельная панель открытых вызовов. Обе страницы используют общую палитру сайта и адаптированы для телефона.",
+      "Наведите курсор на баланс или нажмите на него: краткая справка объяснит, за что начисляются монеты и на что их можно потратить, без перехода на другую страницу.",
+    ],
+    screenshots: [
+      {
+        src: petHome,
+        caption: "6.15.0 · Уход и стадии роста — локальная сборка, QA-профиль",
+        alt: "Обновлённая страница питомца PartySide: дракончик на сиреневой сцене, ежедневный уход и четыре стадии роста. Локальная сборка, тестовые данные.",
+        width: 1280,
+        height: 800,
+      },
+      {
+        src: duelLobby,
+        caption: "6.15.0 · Выбор игры и ставка — локальная сборка, QA-профиль",
+        alt: "Обновлённая страница дуэлей PartySide: карточки Найди пару и Морской бой, создание вызова и список открытых дуэлей. Локальная сборка, тестовые данные.",
+        width: 1280,
+        height: 720,
+      },
+    ],
+  },
   {
     id: "release-6-13",
     version: "6.13.0–6.14.1",
