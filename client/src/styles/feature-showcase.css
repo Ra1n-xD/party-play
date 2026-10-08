@@ -755,6 +755,8 @@
   background: repeating-linear-gradient(45deg, #493753 0 7px, #574260 7px 8px);
   border-color: #9479a3;
   color: #e3aff6;
+  font-size: clamp(23px, 4vw, 38px);
+  line-height: 1;
 }
 .duels-page .memory-card.is-open {
   background: #fff8e8;
@@ -767,6 +769,11 @@
 .duels-page .sea-cell {
   background: #2b2037;
   border-color: #695a87;
+  font: 700 18px/1 system-ui;
+}
+.duels-page :is(.memory-card, .sea-cell):disabled {
+  opacity: 1;
+  cursor: default;
 }
 .duels-page .sea-cell.has-ship {
   background: #876a96;
@@ -828,6 +835,10 @@
   }
 }
 @media (max-width: 700px) {
+  .duels-page .sea-cell {
+    font-size: 16px;
+  }
+
   .pet-actions,
   .duel-info-panels {
     grid-template-columns: minmax(0, 1fr);
@@ -974,6 +985,11 @@
     font-size: 11px;
     min-height: 36px;
     padding: 8px;
+  }
+}
+@media (min-width: 380px) and (max-width: 700px) {
+  .duels-page .memory-card {
+    font-size: 25px;
   }
 }
 @media (max-width: 380px) {

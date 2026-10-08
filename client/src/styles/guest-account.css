@@ -101,9 +101,11 @@
   gap: 10px;
   text-align: center;
 }
-.guest-case-preview article > svg {
+.guest-case-preview article > :is(svg, img) {
+  flex-shrink: 0;
   width: 48px;
   height: 48px;
+  object-fit: contain;
 }
 .guest-case-preview h2 {
   font-size: 13px;
