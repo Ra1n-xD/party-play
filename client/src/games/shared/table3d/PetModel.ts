@@ -15,6 +15,7 @@ const palettes: Record<PetSpecies, PetPalette> = {
   fox: { coat: "#d98558", accent: "#493936", cream: "#fff0d8", blush: "#d89a86" },
   rabbit: { coat: "#eee8dd", accent: "#ae968a", cream: "#fff6eb", blush: "#dea9af" },
   owl: { coat: "#bc9061", accent: "#70513e", cream: "#f6e8c5", blush: "#daa784" },
+  dog: { coat: "#aeb4b5", accent: "#252a30", cream: "#f4eddf", blush: "#ce9a63" },
 };
 
 /** Smooth, tapered anatomy with a continuous surface, including two-tone tail tips. */
@@ -195,7 +196,10 @@ export class PetModel {
     const pink = satin(palette.blush);
     const gold = satin("#dca452");
     const eyeMaterial = satin("#20303d", 0.2);
-    const iris = satin(species === "owl" ? "#a77b43" : "#506b7a", 0.3);
+    const iris = satin(
+      species === "dog" ? "#965e35" : species === "owl" ? "#a77b43" : "#506b7a",
+      0.3,
+    );
     const pupil = satin("#17212c", 0.15);
     const eyeWhite = new THREE.MeshBasicMaterial({ color: "#fff8e8" });
     // Geometry belongs to this rig: page and table instances can be disposed independently.
@@ -322,13 +326,46 @@ export class PetModel {
       this.pose.scale.setScalar(this.bodyScale);
       const isOwl = species === "owl";
       const bodyWidth = isOwl ? 0.33 : species === "rabbit" ? 0.285 : 0.295;
-      ball(this.pose, coat, 0, 0.32, 0, bodyWidth, 0.32, 0.25);
+      const body = ball(this.pose, coat, 0, 0.32, 0, bodyWidth, 0.32, 0.25);
+      if (species === "dog") {
+        // A deterministic mottled coat stays identical through growth and reconnects.
+        body.geometry = new THREE.SphereGeometry(1, 48, 32);
+        const positions = body.geometry.attributes.position;
+        const colors: number[] = [];
+        const lightCoat = new THREE.Color("#e6e4dc");
+        const darkCoat = new THREE.Color("#30383c");
+        for (let i = 0; i < positions.count; i++) {
+          const x = positions.getX(i),
+            y = positions.getY(i),
+            z = positions.getZ(i);
+          const pattern =
+            Math.sin(x * 13 + y * 7 + z * 9) * Math.cos(y * 16 - z * 12) +
+            0.55 * Math.sin(x * 27 - z * 17) * Math.cos(y * 29 + x * 5);
+          const color = lightCoat
+            .clone()
+            .lerp(darkCoat, THREE.MathUtils.smoothstep(pattern, -0.35, 0.6));
+          colors.push(color.r, color.g, color.b);
+        }
+        body.geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+        const merle = satin("#ffffff", 0.88);
+        merle.vertexColors = true;
+        body.material = merle;
+      }
       ball(this.pose, cream, 0, 0.29, 0.225, isOwl ? 0.22 : 0.19, 0.225, 0.044);
       this.head.position.y = 0.68;
       this.pose.add(this.head);
       const headWidth = stage === 1 ? 0.365 : species === "fox" ? 0.345 : 0.35;
       const headDepth = species === "dragon" ? 0.27 : 0.285;
-      ball(this.head, coat, 0, 0.015, 0.025, headWidth, stage === 1 ? 0.31 : 0.285, headDepth);
+      ball(
+        this.head,
+        species === "dog" ? accent : coat,
+        0,
+        0.015,
+        0.025,
+        headWidth,
+        stage === 1 ? 0.31 : 0.285,
+        headDepth,
+      );
       for (const sign of [-1, 1]) {
         const foot = new THREE.Group();
         foot.position.set(sign * 0.17, 0.075, 0.16);
@@ -343,7 +380,7 @@ export class PetModel {
         } else {
           ball(
             foot,
-            species === "fox" ? accent : coat,
+            species === "dog" ? pink : species === "fox" ? accent : coat,
             0,
             0,
             0.012,
@@ -355,7 +392,7 @@ export class PetModel {
             for (const toe of [-1, 1]) {
               curve(
                 foot,
-                species === "fox" ? coat : pink,
+                species === "dog" ? cream : species === "fox" ? coat : pink,
                 [
                   [toe * 0.036, 0.02, 0.14],
                   [toe * 0.039, 0.045, 0.113],
@@ -383,9 +420,33 @@ export class PetModel {
           paw.position.set(sign * 0.265, 0.44, 0.1);
           this.pose.add(paw);
           this.paws.push(paw);
-          ball(paw, coat, 0, -0.09, 0, 0.086, 0.15, 0.1);
-          ball(paw, species === "fox" ? accent : coat, 0, -0.187, 0.032, 0.085, 0.064, 0.088);
-          if (adult && species !== "fox" && species !== "dragon") {
+          ball(paw, species === "dog" ? pink : coat, 0, -0.09, 0, 0.086, 0.15, 0.1);
+          ball(
+            paw,
+            species === "dog" ? pink : species === "fox" ? accent : coat,
+            0,
+            -0.187,
+            0.032,
+            0.085,
+            0.064,
+            0.088,
+          );
+          if (species === "dog") {
+            ball(paw, cream, sign * 0.025, -0.05, 0.069, 0.043, 0.092, 0.035);
+            if (details)
+              for (let spot = 0; spot < 3; spot++)
+                ball(
+                  paw,
+                  accent,
+                  sign * (0.006 + spot * 0.015),
+                  -0.005 - spot * 0.047,
+                  0.097,
+                  0.011,
+                  0.018,
+                  0.006,
+                );
+          }
+          if (adult && species !== "fox" && species !== "dragon" && species !== "dog") {
             ball(paw, pink, 0, -0.188, 0.111, 0.031, 0.025, 0.009);
             for (const toe of [-1, 1])
               ball(paw, pink, toe * 0.033, -0.152, 0.105, 0.013, 0.015, 0.008);
@@ -413,7 +474,40 @@ export class PetModel {
         );
         this.head.add(ear);
         this.ears.push(ear);
-        if (species === "rabbit") {
+        if (species === "dog") {
+          ear.position.set(sign * 0.285, 0.19, 0.095);
+          const flop = new THREE.Group();
+          flop.rotation.z = -sign * (Math.PI - (sign === 1 ? 0.4 : 0.24));
+          ear.add(flop);
+          const height = adult ? 0.37 : details ? 0.33 : 0.28;
+          const volume: EarVolume = {
+            width: 0.13,
+            height,
+            bend: sign * 0.045,
+            depth: 0.07,
+            oval: true,
+          };
+          softEar(flop, accent, volume);
+          earInsert(
+            flop,
+            satin("#4c3f37"),
+            earShape(0.052, height * 0.58, sign * 0.025),
+            volume,
+            0.047,
+          );
+          for (let tuft = 0; tuft < (adult ? 4 : 2); tuft++) {
+            curve(
+              ear,
+              tuft === 1 ? coat : accent,
+              [
+                [sign * 0.055, -0.06 - tuft * 0.04, -0.005],
+                [sign * (0.13 + tuft * 0.012), -0.1 - tuft * 0.047, 0.012],
+                [sign * (0.15 + tuft * 0.008), -0.17 - tuft * 0.046, 0.018],
+              ],
+              [0.028, 0.029, 0.001],
+            );
+          }
+        } else if (species === "rabbit") {
           const height = stage === 1 ? 0.365 : adult ? 0.49 : 0.435;
           const volume: EarVolume = {
             width: 0.085,
@@ -507,15 +601,25 @@ export class PetModel {
             mask.bezierCurveTo(sign * 0.22, -0.085, sign * 0.21, 0.08, sign * 0.15, 0.115);
             mask.bezierCurveTo(sign * 0.105, 0.015, sign * 0.045, -0.04, sign * 0.025, -0.11);
             shapeMesh(this.head, cream, mask, 0, 0, 0.25, 0.028, 0.015);
+          } else if (species === "dog") {
+            ball(this.head, pink, sign * 0.168, -0.041, 0.253, 0.139, 0.15, 0.058);
+            const brow = ball(this.head, pink, sign * 0.135, 0.173, 0.251, 0.073, 0.041, 0.037);
+            brow.rotation.z = sign * -0.24;
           }
           makeEye(
             sign * (species === "dragon" ? 0.147 : 0.137),
             0.055,
-            species === "fox" ? 0.292 : species === "dragon" ? 0.26 : 0.29,
+            species === "dog"
+              ? 0.302
+              : species === "fox"
+                ? 0.292
+                : species === "dragon"
+                  ? 0.26
+                  : 0.29,
             stage === 1 ? 0.061 : 0.052,
             stage === 1 ? 0.081 : 0.069,
           );
-          if (species !== "fox")
+          if (species !== "fox" && species !== "dog")
             ball(this.head, pink, sign * 0.225, -0.055, 0.267, 0.048, 0.024, 0.014);
         }
         if (isOwl || (species === "dragon" && details)) {
@@ -587,7 +691,65 @@ export class PetModel {
           }
         }
       }
-      if (species === "cat" || species === "rabbit") {
+      if (species === "dog") {
+        // Tan eyebrows, a narrow blaze and a cream ruff echo the supplied photographs.
+        curve(
+          this.head,
+          cream,
+          [
+            [-0.009, 0.287, 0.11],
+            [0.002, 0.257, 0.164],
+            [0.006, 0.206, 0.224],
+          ],
+          [0.012, 0.014, 0.002],
+        );
+        ball(this.head, pink, 0, -0.089, 0.285, 0.151, 0.094, 0.138);
+        ball(this.head, cream, 0, -0.151, 0.33, 0.131, 0.055, 0.099);
+        for (const sign of [-1, 1]) {
+          ball(this.head, cream, sign * 0.06, -0.097, 0.37, 0.082, 0.056, 0.078);
+          curve(
+            this.pose,
+            cream,
+            [
+              [sign * 0.205, 0.59, 0.095],
+              [sign * 0.265, 0.49, 0.145],
+              [sign * 0.22, 0.365, 0.2],
+            ],
+            [0.07, 0.083, 0.002],
+          );
+          if (details)
+            curve(
+              this.pose,
+              cream,
+              [
+                [sign * 0.1, 0.59, 0.18],
+                [sign * 0.145, 0.48, 0.23],
+                [sign * 0.11, 0.345, 0.263],
+              ],
+              [0.066, 0.073, 0.002],
+            );
+        }
+        const nose = ball(this.head, accent, 0, -0.063, 0.428, 0.056, 0.041, 0.032);
+        nose.material = satin("#202429", 0.3);
+        ball(this.head, coat, -0.012, -0.048, 0.455, 0.012, 0.007, 0.003);
+        smile(0, -0.143, 0.415, 0.068);
+        const tongue = ball(this.head, satin("#d98791"), 0.014, -0.172, 0.412, 0.028, 0.042, 0.014);
+        tongue.rotation.z = -0.1;
+        if (details) {
+          curve(
+            this.pose,
+            satin("#344443"),
+            [
+              [-0.19, 0.55, 0.181],
+              [0, 0.506, 0.275],
+              [0.19, 0.55, 0.181],
+            ],
+            [0.017, 0.017, 0.017],
+          );
+          const tag = ball(this.pose, satin("#c8d0cc", 0.35), 0, 0.466, 0.279, 0.029, 0.034, 0.009);
+          tag.rotation.z = -0.12;
+        }
+      } else if (species === "cat" || species === "rabbit") {
         for (const sign of [-1, 1])
           ball(this.head, cream, sign * 0.069, -0.105, 0.282, 0.104, 0.075, 0.063);
         const nose = new THREE.Shape();
@@ -704,7 +866,32 @@ export class PetModel {
       }
       this.tail.position.set(0.1, 0.18, -0.2);
       this.pose.add(this.tail);
-      if (species === "rabbit") {
+      if (species === "dog") {
+        curve(
+          this.tail,
+          [coat, cream],
+          [
+            [-0.035, 0, 0],
+            [0.12, 0.005, -0.14],
+            [0.3, 0.085, -0.235],
+            [0.4, 0.21, -0.18],
+            [0.37, 0.3, -0.08],
+          ],
+          [0.063, 0.105, adult ? 0.115 : 0.094, 0.085, 0.001],
+          0.64,
+        );
+        for (let tuft = 0; tuft < (adult ? 4 : 2); tuft++)
+          curve(
+            this.tail,
+            tuft < 2 ? coat : cream,
+            [
+              [0.1 + tuft * 0.061, 0.012 + tuft * 0.036, -0.15 - tuft * 0.018],
+              [0.16 + tuft * 0.063, -0.03 + tuft * 0.038, -0.27],
+              [0.23 + tuft * 0.05, 0.015 + tuft * 0.043, -0.285],
+            ],
+            [0.036, 0.042, 0.001],
+          );
+      } else if (species === "rabbit") {
         ball(this.tail, cream, 0, 0.015, -0.095, 0.13, 0.12, 0.13);
         if (details)
           for (const sign of [-1, 1])
@@ -822,7 +1009,10 @@ export class PetModel {
     this.head.position.set(0, 0.68, 0);
     this.head.scale.setScalar(1);
     this.head.rotation.set(Math.sin(t) * 0.035 * idle, 0, Math.sin(t * 0.8) * 0.045 * idle);
-    this.tail.rotation.y = Math.sin(t * 2.6) * 0.18 * idle;
+    this.tail.rotation.y =
+      Math.sin(t * (this.species === "dog" ? 5.2 : 2.6)) *
+      (this.species === "dog" ? 0.32 : 0.18) *
+      idle;
     this.ears.forEach((ear, i) => {
       ear.rotation.z = (i === 0 ? -1 : 1) * (0.12 + Math.sin(t * 1.6) * 0.035 * idle);
     });
@@ -889,6 +1079,16 @@ export class PetModel {
         case "look":
           this.head.rotation.z += Math.sin(cycle) * 0.4 * envelope;
           this.head.rotation.y = Math.sin(cycle * 1.5) * 0.3 * envelope;
+          break;
+        case "beg":
+          this.pose.scale.y *= 1 + 0.08 * envelope;
+          this.head.rotation.x -= 0.18 * envelope;
+          this.head.rotation.z += Math.sin(cycle) * 0.12 * envelope;
+          this.paws.forEach((paw, i) => {
+            paw.rotation.x = (-1.25 + Math.sin(cycle * 2 + i * 0.6) * 0.12) * envelope;
+            paw.rotation.z = (i ? 0.18 : -0.18) * envelope;
+          });
+          this.tail.rotation.y += Math.sin(cycle * 6) * 0.45 * envelope;
           break;
         case "flutter":
           this.pose.position.y += 0.12 * envelope;

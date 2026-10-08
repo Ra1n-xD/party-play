@@ -2,6 +2,7 @@ import headerNavigation from "../assets/updates/header-navigation-6.14.0.png";
 import petHome from "../assets/updates/pet-home-6.15.0.png";
 import petHabits from "../assets/updates/pet-habits-6.16.0.jpg";
 import petModels from "../assets/updates/pet-models-6.16.2.jpg";
+import dogPet from "../assets/updates/dog-pet-6.17.0.jpg";
 import duelLobby from "../assets/updates/duel-lobby-6.15.0.png";
 import groupedBottomNavigation from "../assets/updates/grouped-bottom-navigation-6.14.1.png";
 import petTable from "../assets/updates/pet-table-6.11.0.jpg";
@@ -52,6 +53,29 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-17",
+    version: "6.17.0",
+    date: "2026-10-08",
+    category: "НОВЫЙ ПИТОМЕЦ",
+    title: "Ещё один друг — с мокрым носом.",
+    summary:
+      "К питомцам присоединилась собака: крапчатая шерсть, рыжие брови, светлая грудка и пушистые висячие уши.",
+    changes: [
+      "Собака может появиться из нового яйца. Теперь видов шесть, и каждый выпадает с одинаковым шансом — 1 из 6. Уже взятые питомцы сохраняют свой вид.",
+      "Малыш, подросток и взрослый отличаются размером и деталями. Собака виляет хвостом, даёт лапу, наклоняет голову и просит лакомство, поднимая передние лапы.",
+      "Новый друг живёт на странице питомца и рядом с вашим местом за 3D-столом Бункера, Дурака и UNO. Уход и награды такие же, как у других видов.",
+    ],
+    screenshots: [
+      {
+        src: dogPet,
+        caption: "6.17.0 · Собака на трёх стадиях роста — локальная галерея игровых 3D-моделей",
+        alt: "Новый питомец Собака в PartySide: малыш, подросток и взрослый. Чёрная голова, рыжие отметины, светлая грудка, пушистые уши и хвост. Настоящие модели в локальной галерее.",
+        width: 1280,
+        height: 700,
+      },
+    ],
+  },
   {
     id: "release-6-16",
     version: "6.16.0–6.16.2",

@@ -136,8 +136,8 @@ export function PetScreen() {
               </h2>
               {!pet ? (
                 <p>
-                  Из яйца появится один из пяти питомцев — шанс каждого 20%. Уход приносит монеты. В
-                  3D-играх он будет сидеть рядом с вами.
+                  Из яйца появится один из {PET_SPECIES.length} питомцев — у всех равные шансы. Уход
+                  приносит монеты. В 3D-играх он будет сидеть рядом с вами.
                 </p>
               ) : !status?.alive ? (
                 <p>
@@ -310,21 +310,21 @@ export function PetScreen() {
                 </span>
                 <span className="pet-guide-title">
                   <strong>Кто может появиться</strong>
-                  <small>5 видов · равные шансы</small>
+                  <small>{PET_SPECIES.length} видов · равные шансы</small>
                 </span>
                 <FiChevronDown className="pet-guide-chevron" aria-hidden="true" />
               </summary>
               <div className="pet-guide-content">
                 <p>
-                  Каждое новое яйцо получает случайный вид. Шанс каждого — 20%, уход и награды
-                  одинаковые.
+                  Каждое новое яйцо получает случайный вид. Шанс каждого — 1 из {PET_SPECIES.length}
+                  , уход и награды одинаковые.
                 </p>
                 <ul>
                   {PET_SPECIES.map((id) => (
                     <li key={id}>
                       <span aria-hidden="true">{PET_SPECIES_INFO[id].emoji}</span>{" "}
                       {PET_SPECIES_INFO[id].name}
-                      <b>20%</b>
+                      <b>1 из {PET_SPECIES.length}</b>
                     </li>
                   ))}
                 </ul>

@@ -15,6 +15,7 @@ export type PetMotion =
   | "stretch"
   | "groom"
   | "look"
+  | "beg"
   | "flutter";
 
 interface Motion {
@@ -36,6 +37,7 @@ const reactions: Record<PetSpecies, readonly PetMotion[]> = {
   fox: ["twirl", "hop", "wave", "nuzzle"],
   rabbit: ["hop", "twirl", "wave", "nuzzle"],
   owl: ["flutter", "wave", "look", "nuzzle"],
+  dog: ["beg", "wave", "nuzzle", "look"],
 };
 
 const idleDuration: Record<PetMotion, number> = {
@@ -53,6 +55,7 @@ const idleDuration: Record<PetMotion, number> = {
   stretch: 4200,
   groom: 4800,
   look: 3200,
+  beg: 3600,
   flutter: 3200,
 };
 
@@ -111,9 +114,11 @@ export class PetBehavior {
                 ? "Ещё немного ласки? Прижмусь поближе."
                 : kind === "stretch"
                   ? "Лапки вперёд! Хорошо потянуться вместе."
-                  : kind === "look"
-                    ? "Ух ты! Наклоню голову, чтобы рассмотреть вас."
-                    : PET_SPECIES_INFO[this.species].reaction;
+                  : kind === "beg"
+                    ? "Смотрите, как я умею! А лакомство будет?"
+                    : kind === "look"
+                      ? "Ух ты! Наклоню голову, чтобы рассмотреть вас."
+                      : PET_SPECIES_INFO[this.species].reaction;
     return this.reactionText;
   }
 
@@ -134,8 +139,9 @@ export class PetBehavior {
     }
     if (!this.motion && this.time >= this.nextIdleAt) {
       const pool = idleMotions[this.stage] ?? idleMotions[3];
+      const available = this.species === "dog" && this.stage > 0 ? [...pool, "beg" as const] : pool;
       // The first habit makes the stage recognizable; later actions vary at random.
-      const kind = this.lastIdle === null ? pool[0] : this.pick(pool, this.lastIdle);
+      const kind = this.lastIdle === null ? pool[0] : this.pick(available, this.lastIdle);
       this.lastIdle = kind;
       this.motion = { kind, startedAt: this.time, duration: idleDuration[kind] };
     }

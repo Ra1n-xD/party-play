@@ -4,7 +4,7 @@ export const PET_NEGLECT_MS = 7 * 86_400_000;
 export const PET_BOOST_COST = 10;
 export const PET_BOOST_GROWTH = 3;
 export const PET_STAGES = ["Яйцо", "Малыш", "Подросток", "Взрослый"] as const;
-export const PET_SPECIES = ["dragon", "cat", "fox", "rabbit", "owl"] as const;
+export const PET_SPECIES = ["dragon", "cat", "fox", "rabbit", "owl", "dog"] as const;
 export type PetSpecies = (typeof PET_SPECIES)[number];
 export const PET_SPECIES_INFO: Record<
   PetSpecies,
@@ -15,6 +15,7 @@ export const PET_SPECIES_INFO: Record<
   fox: { name: "Лисёнок", emoji: "🦊", reaction: "Фыр-фыр! Смотрите на мой хвост!" },
   rabbit: { name: "Кролик", emoji: "🐰", reaction: "Прыг-прыг! Кто выше?" },
   owl: { name: "Совёнок", emoji: "🦉", reaction: "Ух-ух! Обнимемся крыльями?" },
+  dog: { name: "Собака", emoji: "🐶", reaction: "Гав! Давайте играть — я уже виляю хвостом!" },
 };
 export interface PetState {
   id: string;
