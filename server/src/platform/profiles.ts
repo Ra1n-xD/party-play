@@ -1,3 +1,5 @@
+import { registerPetHandlers } from "./pets.js";
+import { registerDuelHandlers } from "./duels.js";
 import { createHash, randomInt, randomUUID } from "crypto";
 import type { Socket } from "socket.io";
 import {
@@ -10,12 +12,7 @@ import {
   type CaseOpening,
 } from "../../../shared/platform/cosmetics.js";
 import { getCase, getCaseItems, getCaseRarities } from "../../../shared/platform/cases.js";
-import {
-  getDailyRewardStatus,
-  getMoscowDay,
-  nextDailyReward,
-  type DailyReward,
-} from "../../../shared/platform/dailyRewards.js";
+import { getDailyRewardStatus } from "../../../shared/platform/dailyRewards.js";
 import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
 import {
   getUpgradeAvailableCount,
@@ -171,6 +168,8 @@ export function registerProfileHandlers(
   membershipNickname: () => string | null,
 ): void {
   registerLeaderboardHandlers(socket);
+  registerPetHandlers(socket, io);
+  registerDuelHandlers(socket, io);
   const guard = () => guardProfileRequest(socket);
   socket.on("drops:subscribe", () => {
     const key = socket.data.profileKey as string | undefined;
@@ -194,39 +193,20 @@ export function registerProfileHandlers(
       const key = socket.data.profileKey as string | undefined;
       if (!key) throw new Error("Сначала войдите в аккаунт");
       assertProfileSession(socket, key);
-      reply({ ok: true, value: getDailyRewardStatus(profileStore.profiles.get(key)!.dailyReward) });
+      reply({
+        ok: true,
+        value: {
+          ...getDailyRewardStatus(profileStore.profiles.get(key)!.dailyReward),
+          available: null,
+        },
+      });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });
     }
   });
-  socket.on("profile:claim-daily", async (data, reply) => {
-    // Old clients used to auto-claim without a date. They must never grant a bonus.
-    if (typeof reply !== "function") return;
-    try {
-      guard();
-      const key = socket.data.profileKey as string | undefined;
-      if (!key) throw new Error("Сначала войдите в аккаунт");
-      assertProfileSession(socket, key);
-      if (data?.date !== getMoscowDay()) throw new Error("Начался новый день. Обновите бонус");
-      let reward: DailyReward | null = null;
-      if (nextDailyReward(profileStore.profiles.get(key)?.dailyReward)) {
-        await transaction([key], (draft) => {
-          assertProfileSession(socket, key);
-          if (data.date !== getMoscowDay()) throw new Error("Начался новый день. Обновите бонус");
-          const profile = draft.profiles.get(key)!;
-          reward = nextDailyReward(profile.dailyReward);
-          if (!reward) return false;
-          if (!Number.isSafeInteger(profile.coins + reward.coins))
-            throw new Error("Достигнут предел монет");
-          profile.coins += reward.coins;
-          profile.dailyReward = reward;
-        });
-      }
-      if (reward) publishProfile(key, io);
-      reply({ ok: true, value: { profile: profileStore.profiles.get(key)!, reward } });
-    } catch (error) {
-      reply({ ok: false, error: (error as Error).message });
-    }
+  socket.on("profile:claim-daily", (_data, reply) => {
+    if (typeof reply === "function")
+      reply({ ok: false, error: "Ежедневный бонус заменён уходом за питомцем. Обновите страницу" });
   });
   socket.on("profile:equip", async (data, reply) => {
     if (typeof reply !== "function") return;

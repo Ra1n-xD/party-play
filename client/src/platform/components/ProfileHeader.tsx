@@ -1,91 +1,59 @@
 import type { MouseEvent } from "react";
 import { FiLogIn } from "react-icons/fi";
-import { LuGamepad2, LuLayers, LuPackageOpen, LuSparkles, LuTrophy } from "react-icons/lu";
 import { usePlatform } from "../context/PlatformContext";
 import { useProfile } from "../context/ProfileContext";
 import { BrandDice } from "./BrandDice";
-import { DailyBonusWallet } from "./DailyBonusWallet";
+import { CoinAmount } from "./CoinAmount";
 import { ProfileNotifications } from "./ProfileNotifications";
 import { ProfileAccountMenu } from "./ProfileAccountMenu";
+import { usePetCareReminder } from "../usePetCareReminder";
+import { loginHref } from "../authNavigation";
+import { PlatformNavigation, NavigationHeading, type NavigationPage } from "./PlatformNavigation";
 
 interface ProfileHeaderProps {
-  activePage?:
-    | "games"
-    | "collection"
-    | "account"
-    | "cases"
-    | "upgrade"
-    | "updates"
-    | "leaderboard"
-    | "stats";
+  activePage?: NavigationPage;
   onHome?: () => void;
 }
 
 export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderProps) {
   const { profile, loading, connected, busy, logout } = useProfile();
   const { roomCode } = usePlatform();
+  const petNeedsCare = usePetCareReminder();
   const goHome = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!onHome || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     onHome();
   };
   return (
-    <header className={`show-menu-header show-profile-header${profile ? " has-account" : ""}`}>
-      <a className="show-brand" href="/" onClick={goHome} aria-label="PartySide — на главную">
+    <header
+      className={`show-menu-header show-profile-header platform-topbar${profile ? " has-account" : ""}`}
+    >
+      <a
+        className="show-brand platform-mobile-brand"
+        href="/"
+        onClick={goHome}
+        aria-label="PartySide — на главную"
+      >
         <BrandDice className="show-brand-dice" />
         <span className="show-brand-name">partyside</span>
       </a>
-      <nav className="show-profile-navigation" aria-label="Профиль и коллекция">
-        <a
-          href="/"
-          onClick={goHome}
-          aria-current={activePage === "games" ? "page" : undefined}
-          aria-label={roomCode ? "В комнату" : "Игры"}
-          title={roomCode ? "В комнату" : "Игры"}
-        >
-          <LuGamepad2 aria-hidden="true" />
-          <span>{roomCode ? "В комнату" : "Игры"}</span>
-        </a>
-        <a
-          href="/collection"
-          aria-current={activePage === "collection" ? "page" : undefined}
-          aria-label="Коллекция"
-          title="Коллекция"
-        >
-          <LuLayers aria-hidden="true" />
-          <span>Коллекция</span>
-        </a>
-        <a
-          href="/cases"
-          aria-current={activePage === "cases" ? "page" : undefined}
-          aria-label="Кейсы"
-          title="Кейсы"
-        >
-          <LuPackageOpen aria-hidden="true" />
-          <span>Кейсы</span>
-        </a>
-        <a
-          href="/upgrade"
-          aria-current={activePage === "upgrade" ? "page" : undefined}
-          aria-label="Улучшить"
-          title="Улучшить"
-        >
-          <LuSparkles aria-hidden="true" />
-          <span>Улучшить</span>
-        </a>
-        <a
-          href="/leaderboard"
-          aria-current={activePage === "leaderboard" ? "page" : undefined}
-          aria-label="Рейтинг"
-          title="Рейтинг"
-        >
-          <LuTrophy aria-hidden="true" />
-          <span>Рейтинг</span>
-        </a>
-      </nav>
+      <NavigationHeading page={activePage} />
+      <PlatformNavigation
+        activePage={activePage}
+        inRoom={!!roomCode}
+        petNeedsCare={petNeedsCare}
+        onHome={goHome}
+      />
       <div className="show-profile-account">
         {profile ? (
           <div className="show-profile-balance">
+            <a
+              href="/pet"
+              className="coin-wallet"
+              aria-label={`Монет на балансе: ${profile.coins}. Уход за питомцем`}
+            >
+              <CoinAmount amount={profile.coins} label="" />
+            </a>
             <ProfileAccountMenu
               key={profile.id}
               nickname={profile.nickname}
@@ -94,12 +62,20 @@ export function ProfileHeader({ activePage = "games", onHome }: ProfileHeaderPro
               inRoom={!!roomCode}
               onLogout={logout}
             />
-            <DailyBonusWallet key={profile.id} profile={profile} />
           </div>
         ) : loading ? (
           <span className="show-account-loading" role="status" aria-label="Проверяем вход…" />
         ) : (
-          <a className="show-login" href="/login">
+          <a
+            className="show-login"
+            href={loginHref(
+              activePage === "account"
+                ? "/profile"
+                : activePage === "games"
+                  ? "/"
+                  : `/${activePage}`,
+            )}
+          >
             <FiLogIn aria-hidden="true" /> Войти
           </a>
         )}

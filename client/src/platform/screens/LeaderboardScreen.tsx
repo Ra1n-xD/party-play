@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { loginHref } from "../authNavigation";
 import { FiAward, FiChevronLeft, FiChevronRight, FiRefreshCw } from "react-icons/fi";
 import {
   LEADERBOARD_SORTS,
@@ -19,6 +20,10 @@ const metrics: Record<LeaderboardSort, { label: string; description: string }> =
   wins: { label: "Победы", description: "Те, кто знает путь к победе." },
   games: { label: "Партии", description: "Те, кто всегда готов к следующей игре." },
   coins: { label: "Монеты", description: "Самые большие запасы монет прямо сейчас." },
+  collectionValue: {
+    label: "Ценность, ед.",
+    description: "Суммарная ценность коллекции с учётом каждой копии предмета.",
+  },
   collection: { label: "Коллекция", description: "Больше разных персонажей и карт — выше место." },
 };
 const number = (value: number) => value.toLocaleString("ru-RU");
@@ -157,7 +162,8 @@ export function LeaderboardScreen() {
           )}
           {!profile && (
             <p className="leaderboard-join">
-              <a href="/login">Войдите в аккаунт</a>, чтобы ваши результаты попадали в рейтинг.
+              <a href={loginHref("/leaderboard")}>Войдите в аккаунт</a>, чтобы ваши результаты
+              попадали в рейтинг.
             </p>
           )}
           {!connected && (
@@ -214,7 +220,7 @@ export function LeaderboardScreen() {
               <FiAward aria-hidden="true" />
               <h2>Первое место пока свободно</h2>
               <p>Создайте аккаунт и сыграйте первую партию.</p>
-              <a href="/login">Присоединиться →</a>
+              <a href={loginHref("/leaderboard")}>Присоединиться →</a>
             </div>
           )}
           {current && current.totalPages > 1 && (
@@ -253,7 +259,9 @@ export function LeaderboardScreen() {
             </p>
             <p>
               Монеты — текущий баланс. Коллекция — разные предметы без стартовых и повторных
-              экземпляров. При одинаковом результате игроки делят место.
+              экземпляров. Ценность — сумма единиц всех копий без стартовых предметов: обычный — 10,
+              редкий — 30, эпический — 90, легендарный — 270. При одинаковом результате игроки делят
+              место.
             </p>
             <p>
               В версии 6.0.0 аккаунты и рейтинг начаты заново. Данные обновляются каждые 30 секунд.

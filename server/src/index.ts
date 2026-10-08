@@ -12,6 +12,7 @@ import { isDeploymentDraining, setDeploymentDraining } from "./platform/deployme
 import { disposeRoomsForDeployment, getAllRooms } from "./platform/roomManager.js";
 import { attachProfileSession } from "./platform/profileAuth.js";
 import { closeProfileStorage, profileStorageHealthy } from "./platform/profileStorage.js";
+import { restoreDuelDeadlines } from "./platform/duels.js";
 
 const app = express();
 
@@ -182,6 +183,7 @@ const connectionLimiter = createNamespaceConnectionLimiter(
 io.use(connectionLimiter);
 io.use(attachProfileSession);
 
+await restoreDuelDeadlines();
 registerHandlers(io);
 
 const bindHost = process.env.HOST || (isProduction ? "127.0.0.1" : "0.0.0.0");

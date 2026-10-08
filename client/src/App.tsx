@@ -1,3 +1,5 @@
+import { DuelsScreen } from "./platform/screens/DuelsScreen";
+import { PetScreen } from "./platform/screens/PetScreen";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { PlatformOverlays } from "./platform/components/PlatformOverlays";
 import { PlatformProvider, usePlatform } from "./platform/context/PlatformContext";
@@ -22,6 +24,10 @@ import { publicGames } from "./platform/seo/siteMetadata";
 import { RoomLoading } from "./platform/components/RoomLoading";
 import { useBrowserLayoutEffect } from "./platform/useBrowserLayoutEffect";
 import { finishStartup } from "./platform/startup";
+import { GuestAccountScreen, isGuestAccountPath } from "./platform/screens/GuestAccountScreen";
+import { loginReturnPath } from "./platform/authNavigation";
+import { NavigationProvider } from "./platform/context/NavigationContext";
+import "./styles/platform-navigation.css";
 
 function readAppPath() {
   return window.location.pathname.replace(/\/$/, "") || "/";
@@ -50,9 +56,16 @@ function ProfileApp({ initialPath }: { initialPath: string }) {
       )
         return;
       const link = (event.target as HTMLElement).closest("a");
+      const href = link?.getAttribute("href");
+      const destination = href ? new URL(href, window.location.href) : null;
       if (
         !link ||
         link.target ||
+        link.hasAttribute("download") ||
+        !destination ||
+        destination.origin !== window.location.origin ||
+        (destination.search && destination.pathname !== "/login") ||
+        destination.hash ||
         ![
           "/",
           "/login",
@@ -61,14 +74,16 @@ function ProfileApp({ initialPath }: { initialPath: string }) {
           "/cases",
           "/upgrade",
           "/updates",
+          "/duels",
+          "/pet",
           "/leaderboard",
           "/stats",
           ...publicGames.map((game) => `/games/${game.id}`),
-        ].includes(link.getAttribute("href") ?? "")
+        ].includes(destination.pathname)
       )
         return;
       event.preventDefault();
-      history.pushState(null, "", link.getAttribute("href"));
+      history.pushState(null, "", `${destination.pathname}${destination.search}`);
       update();
     };
     document.addEventListener("click", click);
@@ -80,14 +95,17 @@ function ProfileApp({ initialPath }: { initialPath: string }) {
   }, []);
   const previousProfile = useRef(profile);
   useEffect(() => {
-    if ((profile && path === "/login") || (previousProfile.current && !profile)) {
-      history.replaceState(null, "", "/");
-      setPath("/");
+    if (profile && path === "/login") {
+      const destination = loginReturnPath(window.location.search);
+      history.replaceState(null, "", destination);
+      setPath(destination);
+      window.scrollTo(0, 0);
+    } else if (previousProfile.current && !profile && path === "/") {
       window.scrollTo(0, 0);
     }
     previousProfile.current = profile;
   }, [profile, path]);
-  const profilePage = ["/collection", "/profile", "/cases", "/upgrade"].includes(path);
+  const profilePage = isGuestAccountPath(path);
   const gamePage = publicGames.some((game) => `/games/${game.id}` === path);
   const knownPage =
     gamePage ||
@@ -101,20 +119,30 @@ function ProfileApp({ initialPath }: { initialPath: string }) {
       "/leaderboard",
       "/stats",
       "/updates",
+      "/duels",
+      "/pet",
     ].includes(path);
   const metadata = <PageMetadata path={path} />;
-  if (!profile && loading && (path === "/login" || profilePage))
+  if (!profile && loading && path === "/login")
     return (
       <>
         {metadata}
         <RoomLoading message="Проверяем вход…" />
       </>
     );
-  if (!profile && (path === "/login" || profilePage))
+  if (!profile && path === "/login")
     return (
       <>
         {metadata}
         <LoginScreen />
+      </>
+    );
+  if (!profile && isGuestAccountPath(path))
+    return (
+      <>
+        {metadata}
+        <GuestAccountScreen path={path} />
+        <PlatformOverlays />
       </>
     );
   return (
@@ -141,6 +169,10 @@ function ProfileApp({ initialPath }: { initialPath: string }) {
         <NotFoundScreen />
       ) : gamePage ? (
         <PublicPage path={path} />
+      ) : path === "/duels" ? (
+        <DuelsScreen />
+      ) : path === "/pet" ? (
+        <PetScreen />
       ) : path === "/collection" ? (
         <CollectionScreen />
       ) : path === "/profile" ? (
@@ -216,7 +248,9 @@ export default function App({ initialPath }: { initialPath: string }) {
     <>
       <PlatformProvider>
         <ProfileProvider>
-          <ProfileApp initialPath={initialPath} />
+          <NavigationProvider>
+            <ProfileApp initialPath={initialPath} />
+          </NavigationProvider>
         </ProfileProvider>
       </PlatformProvider>
       <div className="app-version">v{__APP_VERSION__}</div>

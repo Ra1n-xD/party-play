@@ -120,6 +120,7 @@
   font-weight: 500;
 }
 .coin-wallet {
+  text-decoration: none;
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -138,104 +139,6 @@
   outline: 2px solid #ffcf67;
   outline-offset: 3px;
 }
-.coin-wallet.has-bonus-hint {
-  border-color: #ffcf67;
-  box-shadow: 0 0 0 4px #ffcf672b;
-}
-.daily-bonus-hint {
-  position: fixed;
-  z-index: 90;
-  width: min(304px, calc(100vw - 32px));
-  padding: 21px;
-  border: 1px solid #ffcf6780;
-  border-radius: 16px;
-  background: #30233f;
-  color: #fff8e8;
-  box-shadow: 0 16px 48px #10091d80;
-  font:
-    14px/1.55 "Golos Text",
-    sans-serif;
-}
-.daily-bonus-hint::before {
-  content: "";
-  position: absolute;
-  left: var(--hint-arrow);
-  top: -7px;
-  width: 12px;
-  height: 12px;
-  border-top: 1px solid #ffcf6780;
-  border-left: 1px solid #ffcf6780;
-  background: #30233f;
-  transform: translateX(-50%) rotate(45deg);
-}
-.daily-bonus-hint.is-above::before {
-  top: auto;
-  bottom: -7px;
-  transform: translateX(-50%) rotate(225deg);
-}
-.daily-bonus-hint-eyebrow {
-  color: #ffcf67;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-}
-.daily-bonus-hint h2 {
-  margin: 10px 0;
-  font:
-    700 17px/1.45 "Unbounded",
-    sans-serif;
-}
-.daily-bonus-hint p {
-  margin: 0 0 14px;
-  color: #d4c8de;
-  font-size: 13px;
-}
-.daily-bonus-hint-reward {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.daily-bonus-hint-reward .coin-icon {
-  width: 22px;
-  height: 22px;
-}
-.daily-bonus-hint-open,
-.daily-bonus-hint-dismiss {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 44px;
-  padding: 10px;
-  border: 0;
-  border-radius: 9px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.daily-bonus-hint-open {
-  background: #d8fc61;
-  color: #242c16;
-  font-weight: 700;
-}
-.daily-bonus-hint-open:hover {
-  background: #e3ff87;
-}
-.daily-bonus-hint-dismiss {
-  margin-top: 5px;
-  background: transparent;
-  color: #d4c8de;
-}
-.daily-bonus-hint-dismiss:hover {
-  background: #ffffff08;
-}
-.daily-bonus-hint button:focus-visible {
-  outline: 2px solid #ffcf67;
-  outline-offset: 3px;
-}
-
 html:has(.show-menu, .profile-login),
 body:has(.show-menu, .profile-login),
 #root:has(.show-menu, .profile-login) {
@@ -1375,6 +1278,23 @@ body:has(.show-menu, .profile-login),
   gap: 10px;
   margin: 22px 0 18px;
 }
+.cases-page {
+  container-type: inline-size;
+}
+/* Use the available page width, including when the navigation panel is expanded. */
+@container (min-width: 701px) and (max-width: 1200px) {
+  .case-selector {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container (max-width: 700px) {
+  .cases-page .case-selector {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .case-choice:first-child {
+    grid-column: 1 / -1;
+  }
+}
 .case-choice {
   position: relative;
   display: grid;
@@ -1396,6 +1316,7 @@ body:has(.show-menu, .profile-login),
   grid-column: 2;
   grid-row: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 13px;
   line-height: 1.25;
 }
@@ -1458,203 +1379,6 @@ body:has(.show-menu, .profile-login),
 }
 .case-result .collection-equip {
   margin-top: 14px;
-}
-.modal.daily-bonus-dialog {
-  width: min(720px, calc(100vw - 28px));
-  max-width: 720px;
-  padding: clamp(20px, 5vw, 30px);
-  border: 1px solid #ffcf6750;
-  border-radius: 22px;
-  background: linear-gradient(145deg, #372747, #251c32);
-  color: #fff8e8;
-  font-family: "Golos Text", sans-serif;
-}
-.daily-bonus-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.daily-bonus-heading > div > span {
-  color: #ffcf67;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-}
-.daily-bonus-heading h2 {
-  margin: 9px 0 0;
-  color: #fff8e8;
-  font-size: clamp(20px, 5vw, 24px);
-}
-.daily-bonus-close {
-  display: grid;
-  place-items: center;
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
-  border: 1px solid #ffffff25;
-  border-radius: 10px;
-  background: #ffffff08;
-  color: #fff8e8;
-  cursor: pointer;
-}
-.daily-bonus-progress {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 26px 0 12px;
-  color: #eed8ae;
-  font-size: 13px;
-  font-weight: 700;
-}
-.daily-bonus-progress > span:last-child {
-  color: #baadca;
-  font-size: 12px;
-  font-weight: 400;
-}
-.daily-bonus-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.daily-bonus-day {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 14px 5px 12px;
-  border: 1px solid #ffffff18;
-  border-radius: 13px;
-  background: #ffffff04;
-  text-align: center;
-}
-.daily-bonus-day-label {
-  color: #c7bbd5;
-  font-size: 11px;
-  font-weight: 600;
-}
-.daily-bonus-day .coin-amount {
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-  font-size: 22px;
-  line-height: 1.2;
-}
-.daily-bonus-day .coin-icon {
-  width: 34px;
-  height: 34px;
-}
-.daily-bonus-day .coin-label {
-  color: #d4c8de;
-  font-size: 10px;
-  font-weight: 400;
-}
-.daily-bonus-day-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  margin-top: auto;
-  color: #b2a5c1;
-  font-size: 10px;
-}
-.daily-bonus-day-state svg {
-  flex: 0 0 12px;
-  width: 12px;
-  height: 12px;
-}
-.daily-bonus-day.is-claimed {
-  border-color: #d8fc613b;
-  background: #d8fc6108;
-}
-.daily-bonus-day.is-claimed .daily-bonus-day-state {
-  color: #d8fc61;
-}
-.daily-bonus-day.is-current {
-  border-color: #ffcf67;
-  background: radial-gradient(ellipse at 50% 10%, #ffcf672b, #ffcf670a);
-  box-shadow: 0 0 0 2px #ffcf6714;
-}
-.daily-bonus-day.is-current .daily-bonus-day-label,
-.daily-bonus-day.is-current .daily-bonus-day-state {
-  color: #ffcf67;
-  font-weight: 800;
-}
-.daily-bonus-day.is-future .coin-amount {
-  opacity: 0.65;
-}
-.daily-bonus-next {
-  margin: 16px 0 0;
-  color: #d4c8de;
-  font-size: 13px;
-  line-height: 1.6;
-}
-.daily-bonus-help {
-  margin: 18px 0;
-  color: #d4c8de;
-  font-size: 13px;
-  line-height: 1.7;
-}
-.daily-bonus-help {
-  margin-bottom: 0;
-  font-size: 12px;
-}
-.daily-bonus-dialog .daily-bonus-claim {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 48px;
-  margin-top: 20px;
-}
-.daily-bonus-claim:not(:disabled) .coin-amount {
-  color: inherit;
-}
-.daily-bonus-wallet {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid #ffffff18;
-  font-size: 13px;
-}
-.daily-bonus-success {
-  margin: 16px 0 0;
-  color: #d8fc61;
-  font-size: 14px;
-}
-.daily-bonus-dialog button:focus-visible {
-  outline: 2px solid #ffcf67;
-  outline-offset: 3px;
-}
-@media (max-width: 620px) {
-  .daily-bonus-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 7px;
-  }
-  .daily-bonus-day {
-    gap: 8px;
-    padding: 12px 3px 10px;
-  }
-}
-@media (max-width: 360px) {
-  .daily-bonus-day {
-    gap: 6px;
-  }
-  .daily-bonus-day-state {
-    flex-direction: column;
-    gap: 2px;
-    min-height: 26px;
-    font-size: 9px;
-  }
 }
 @media (max-width: 900px) {
   .case-selector {

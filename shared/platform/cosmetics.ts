@@ -1,3 +1,4 @@
+import type { PetState } from "./pet.js";
 import { AVATARS, type AvatarId } from "./avatars.js";
 import type { UpgradeAttempt } from "./upgrades.js";
 import { ROOM_REACTIONS, type RoomReactionId } from "./reactions.js";
@@ -176,6 +177,7 @@ export interface ProfileSnapshot {
   recentOpenings: CaseOpening[];
   recentUpgrades?: UpgradeAttempt[];
   dailyReward?: DailyReward | null;
+  pet?: PetState | null;
 }
 /** Unlocked reactions are always available; their last copy is protected in upgrades. */
 export function isCosmeticInUse(profile: ProfileSnapshot, item: Cosmetic): boolean {

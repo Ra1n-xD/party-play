@@ -1,3 +1,5 @@
+import { validDuel, type DuelRecord } from "./duelRecord.js";
+import { validPet } from "../../../shared/platform/pet.js";
 import {
   closeSync,
   copyFileSync,
@@ -38,6 +40,7 @@ export interface StoredSession {
   expiresAt: number;
 }
 interface ProfileStore {
+  duels: Map<string, DuelRecord>;
   profiles: Map<string, ProfileSnapshot>;
   accounts: Map<string, StoredAccount>;
   sessions: Map<string, StoredSession>;
@@ -46,6 +49,7 @@ interface ProfileStore {
 }
 function emptyStore(): ProfileStore {
   return {
+    duels: new Map(),
     profiles: new Map(),
     accounts: new Map(),
     sessions: new Map(),
@@ -64,7 +68,7 @@ const storagePath =
     basename(process.cwd()) === "server" ? ".data/profiles.json" : "server/.data/profiles.json",
   );
 const lockPath = `${storagePath}.lock`;
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 let savedCurrentFormat = false;
 
 // A second Node process must not overwrite the first process's in-memory accounts.
@@ -99,6 +103,7 @@ process.once("exit", () => {
 function serialize(store: ProfileStore): string {
   return JSON.stringify({
     version: STORAGE_VERSION,
+    duels: [...store.duels.values()],
     profiles: [...store.profiles.values()],
     accounts: [...store.accounts.values()],
     sessions: [...store.sessions.values()],
@@ -129,6 +134,7 @@ let recoveryTimer: NodeJS.Timeout | undefined;
 function* serializeChunks(store: ProfileStore): Generator<string> {
   yield `{"version":${STORAGE_VERSION}`;
   const sections: [string, Iterable<unknown>][] = [
+    ["duels", store.duels.values()],
     ["profiles", store.profiles.values()],
     ["accounts", store.accounts.values()],
     ["sessions", store.sessions.values()],
@@ -217,6 +223,7 @@ export async function profileTransaction(
   const result = transactionTail.then(async () => {
     assertProfileStorage();
     const draft: ProfileStore = {
+      duels: new Map(profileStore.duels),
       profiles: new Map(profileStore.profiles),
       accounts: new Map(profileStore.accounts),
       sessions: new Map(profileStore.sessions),
@@ -299,10 +306,10 @@ try {
     }
     writeAtomic(storagePath, serialize(profileStore));
     savedCurrentFormat = true;
-    console.info("Previous accounts reset; new accounts use profile storage version 3.");
+    console.info("Previous accounts reset; new accounts use current profile storage format.");
   } else {
     if (
-      data.version !== STORAGE_VERSION ||
+      (data.version !== STORAGE_VERSION && data.version !== 3) ||
       !Array.isArray(data.profiles) ||
       !Array.isArray(data.accounts) ||
       !Array.isArray(data.sessions) ||
@@ -337,6 +344,11 @@ try {
           throw new Error("Invalid inventory");
       // Existing accounts predate collectible reactions. Grant only the free like.
       profile.inventory["reaction:good-move"] ??= 1;
+      if (profile.pet) {
+        // Pets from 6.11 predate species. Preserve their original dragon appearance.
+        if (profile.pet.species === undefined) profile.pet.species = "dragon";
+        if (!validPet(profile.pet)) throw new Error("Invalid pet");
+      }
       profile.dailyReward ??= null;
       if (
         profile.dailyReward &&
@@ -376,6 +388,16 @@ try {
         throw new Error("Duplicate profile");
       nicknames.add(key);
       loaded.profiles.set(profile.id, profile);
+    }
+    if (data.duels !== undefined && !Array.isArray(data.duels)) throw new Error("Invalid duels");
+    for (const duel of data.duels ?? []) {
+      if (
+        !validDuel(duel) ||
+        loaded.duels.has(duel.id) ||
+        duel.players.some((id: string) => !loaded.profiles.has(id))
+      )
+        throw new Error("Invalid duel");
+      loaded.duels.set(duel.id, duel);
     }
     if (data.upgradeReceipts !== undefined && !Array.isArray(data.upgradeReceipts))
       throw new Error("Invalid upgrade receipts");

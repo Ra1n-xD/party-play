@@ -1,3 +1,5 @@
+import { PetModel } from "./PetModel";
+import { PET_SPECIES_INFO, type PetSpecies } from "../../../../../shared/platform/pet";
 import { getCardSkin, type CardSkinId } from "../../../../../shared/platform/cosmetics";
 import { drawCardBack, drawCardFace } from "../../../platform/cardFaceArtwork";
 import * as THREE from "three";
@@ -102,6 +104,17 @@ export class RoundTableScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(60, 1, 0.08, 60);
+  private readonly companion = new THREE.Group();
+  private petStage: number | null = null;
+  private petSpecies: PetSpecies = "dragon";
+  private petActor: PetModel | null = null;
+  private readonly petHit = document.createElement("button");
+  private readonly petSpeech = document.createElement("span");
+  private readonly petRay = new THREE.Raycaster();
+  private readonly petPointer = new THREE.Vector2();
+  private readonly petCenter = new THREE.Vector3();
+  private readonly petEdge = new THREE.Vector3();
+  private petSpeechUntil = 0;
   private readonly room = new THREE.Group();
   private readonly players = new THREE.Group();
   private readonly pile = new THREE.Group();
@@ -182,6 +195,43 @@ export class RoundTableScene {
     this.performanceLabel.className = "table3d-performance";
     this.performanceLabel.hidden = true;
     this.host.append(this.performanceLabel);
+    this.petHit.type = "button";
+    this.petHit.className = "table3d-pet-hit";
+    this.petHit.hidden = true;
+    this.petSpeech.className = "table3d-pet-speech";
+    this.petSpeech.setAttribute("role", "status");
+    this.petSpeech.hidden = true;
+    this.host.append(this.petHit, this.petSpeech);
+    this.petHit.addEventListener(
+      "click",
+      (event) => {
+        event.stopPropagation();
+        this.reactToPet();
+      },
+      { signal: this.abort.signal },
+    );
+    // Pointer Lock directs clicks to the canvas. Aim at the pet to interact, without
+    // also selecting a hand card through the document's card shortcuts.
+    this.renderer.domElement.addEventListener(
+      "click",
+      (event) => {
+        if (!this.companion.visible || !this.petActor || isTableInputBlocked(event.target)) return;
+        if (document.pointerLockElement === this.renderer.domElement) this.petPointer.set(0, 0);
+        else {
+          const rect = this.renderer.domElement.getBoundingClientRect();
+          this.petPointer.set(
+            ((event.clientX - rect.left) / rect.width) * 2 - 1,
+            (-(event.clientY - rect.top) / rect.height) * 2 + 1,
+          );
+        }
+        this.petRay.setFromCamera(this.petPointer, this.camera);
+        if (!this.petRay.intersectObject(this.petActor.root, true).length) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.reactToPet();
+      },
+      { capture: true, signal: this.abort.signal },
+    );
     this.scene.background = new THREE.Color(0x172521);
     this.scene.fog = new THREE.Fog(0x172521, 12, 28);
     this.scene.add(this.room, this.players, this.pile, this.table);
@@ -637,6 +687,68 @@ export class RoundTableScene {
     this.controls.target.pitch = -0.12;
   }
 
+  setPet(stage: number | null, species: PetSpecies) {
+    if (stage === this.petStage && species === this.petSpecies) return;
+    this.petStage = stage;
+    this.petSpecies = species;
+    this.disposeGroup(this.companion);
+    this.petActor = null;
+    this.petSpeechUntil = 0;
+    if (stage !== null) {
+      this.petActor = new PetModel(stage, species);
+      this.petActor.root.scale.multiplyScalar(this.options.variant === "bunker" ? 0.65 : 0.5);
+      this.companion.add(this.petActor.root);
+      const cushion = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.32, 0.36, 0.12, 24),
+        new THREE.MeshStandardMaterial({ color: "#42675e" }),
+      );
+      cushion.name = "pet-cushion";
+      cushion.position.y = -0.06;
+      this.companion.add(cushion);
+    }
+    this.scene.add(this.companion);
+    this.companion.visible = this.viewerId !== null && stage !== null;
+    this.layoutCompanion();
+    this.petHit.setAttribute("aria-label", `Погладить питомца: ${PET_SPECIES_INFO[species].name}`);
+    this.petHit.title = "Нажмите на питомца";
+  }
+
+  private reactToPet() {
+    if (!this.petActor || !this.companion.visible || this.paused || isTableInputBlocked(null))
+      return;
+    const time = performance.now();
+    this.petSpeech.textContent = this.petActor.react(time);
+    this.petSpeechUntil = time + 2400;
+  }
+
+  private positionPetInteraction(time: number) {
+    this.petCenter.set(0, this.petStage === 0 ? 0.2 : 0.35, 0);
+    this.companion.localToWorld(this.petCenter);
+    this.petEdge.set(0.34, 0, 0).applyQuaternion(this.camera.quaternion).add(this.petCenter);
+    this.petCenter.project(this.camera);
+    this.petEdge.project(this.camera);
+    const visible =
+      this.companion.visible &&
+      !this.paused &&
+      this.petCenter.z > -1 &&
+      this.petCenter.z < 1 &&
+      Math.abs(this.petCenter.x) < 1 &&
+      Math.abs(this.petCenter.y) < 1;
+    this.petHit.hidden = !visible;
+    this.petSpeech.hidden = !visible || time >= this.petSpeechUntil;
+    if (!visible) return;
+    const x = (this.petCenter.x * 0.5 + 0.5) * this.viewportWidth;
+    const y = (-this.petCenter.y * 0.5 + 0.5) * this.viewportHeight;
+    const radius = Math.max(
+      24,
+      (Math.abs(this.petEdge.x - this.petCenter.x) * this.viewportWidth) / 2,
+    );
+    this.petHit.style.cssText = `left:${x - radius}px;top:${y - radius * 1.25}px;width:${radius * 2}px;height:${radius * 2.5}px`;
+    const speechX = this.viewportWidth > 700 ? Math.min(x, this.viewportWidth - 350) : x;
+    this.petSpeech.style.left = `${Math.max(110, Math.min(this.viewportWidth - 110, speechX))}px`;
+    this.petSpeech.style.top = `${Math.max(60, y - radius * 1.3)}px`;
+  }
+
   update(state: RoundTableState) {
     const ownIndex = state.people.findIndex((person) => person.id === state.viewerId);
     this.viewerId = ownIndex >= 0 && !state.people[ownIndex].eliminated ? state.viewerId : null;
@@ -655,6 +767,8 @@ export class RoundTableScene {
     );
     const radius = Math.max(RADIUS, state.people.length * 0.28);
     this.seatRadius = radius + 0.5;
+    this.layoutCompanion();
+    this.companion.visible = this.viewerId !== null && this.petStage !== null;
     this.table.scale.set(radius / RADIUS, 1, radius / RADIUS);
     this.seatedPosition.z = this.seatRadius + (this.options.variant === "bunker" ? 0.85 : 0.1);
     const peopleKey = JSON.stringify([
@@ -871,6 +985,21 @@ export class RoundTableScene {
     }
   }
 
+  private layoutCompanion() {
+    const narrow = this.viewportWidth <= 600;
+    const bunker = this.options.variant === "bunker";
+    const halfView =
+      2.9 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect;
+    const narrowX = Math.min(0.52, Math.max(0.2, halfView - 0.3));
+    this.companion.position.set(
+      narrow ? (bunker ? 0.75 : narrowX) : bunker ? 1.6 : 1.05,
+      TABLE_Y + 0.12,
+      this.seatRadius - (bunker ? (narrow ? 4.1 : 3.5) : narrow ? 2.8 : 1.9),
+    );
+    this.petActor?.root.scale.setScalar(bunker ? 0.65 : narrow ? 0.42 : 0.5);
+    this.companion.getObjectByName("pet-cushion")?.scale.setScalar(narrow && !bunker ? 0.75 : 1);
+  }
+
   private resize() {
     const width = this.host.clientWidth;
     const height = this.host.clientHeight;
@@ -890,6 +1019,7 @@ export class RoundTableScene {
     this.renderer.setSize(width, height);
     this.ownHand.resize(width, height);
     this.layoutPiles();
+    this.layoutCompanion();
   }
 
   private frame(time: number) {
@@ -912,6 +1042,7 @@ export class RoundTableScene {
       (Math.floor(Math.max(0, time - scheduledAt) / FRAME_INTERVAL_MS) + 1) * FRAME_INTERVAL_MS;
     const dt = Math.min((time - this.lastTime) / 1000, 0.05);
     this.lastTime = time;
+    this.petActor?.frame(time, this.reducedMotion.matches, this.paused);
     const smoothing = this.reducedMotion.matches ? 1 : 1 - Math.exp(-14 * dt);
     // Overhead inspection is local; keep the seated head pose for other players.
     if (!this.overview) {
@@ -935,6 +1066,8 @@ export class RoundTableScene {
     }
     this.camera.position.lerp(this.viewPosition, smoothing);
     this.camera.quaternion.slerp(this.viewRotation, smoothing);
+    this.camera.updateMatrixWorld();
+    this.positionPetInteraction(time);
     // Slice away the ceiling and pendant lamps when inspecting the table from above.
     const near = Math.max(0.08, this.camera.position.y - 3.65);
     if (Math.abs(this.camera.near - near) > 0.001) {
@@ -1077,5 +1210,7 @@ export class RoundTableScene {
     this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
     this.performanceLabel.remove();
+    this.petHit.remove();
+    this.petSpeech.remove();
   }
 }

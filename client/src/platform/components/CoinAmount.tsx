@@ -1,15 +1,17 @@
-export function CoinAmount({ amount, label }: { amount: number; label?: string }) {
+export function coinLabel(amount: number) {
   const lastTwo = amount % 100;
   const last = amount % 10;
-  const coinLabel =
-    label ??
-    (lastTwo >= 11 && lastTwo <= 14
-      ? "монет"
-      : last === 1
-        ? "монета"
-        : last >= 2 && last <= 4
-          ? "монеты"
-          : "монет");
+  return lastTwo >= 11 && lastTwo <= 14
+    ? "монет"
+    : last === 1
+      ? "монета"
+      : last >= 2 && last <= 4
+        ? "монеты"
+        : "монет";
+}
+
+export function CoinAmount({ amount, label }: { amount: number; label?: string }) {
+  const resolvedLabel = label ?? coinLabel(amount);
   return (
     <span className="coin-amount">
       <svg className="coin-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -23,7 +25,7 @@ export function CoinAmount({ amount, label }: { amount: number; label?: string }
         <path d="M9 8.5a9 9 0 0 1 7-3" stroke="#fff2bb" strokeWidth="2" strokeLinecap="round" />
       </svg>
       <b>{amount.toLocaleString("ru-RU")}</b>
-      {coinLabel && <span className="coin-label">{coinLabel}</span>}
+      {resolvedLabel && <span className="coin-label">{resolvedLabel}</span>}
     </span>
   );
 }

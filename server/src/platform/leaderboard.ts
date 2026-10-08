@@ -1,3 +1,4 @@
+import { getUpgradeInputValue } from "../../../shared/platform/upgrades.js";
 import type { Socket } from "socket.io";
 import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
 import { BASIC_ITEMS } from "../../../shared/platform/cosmetics.js";
@@ -28,6 +29,11 @@ function ranking(sort: LeaderboardSort): LeaderboardEntry[] {
     wins: profile.wins,
     games: profile.completedGames,
     coins: profile.coins,
+    collectionValue: getUpgradeInputValue(
+      Object.entries(profile.inventory)
+        .filter(([id]) => !BASIC_ITEMS.includes(id))
+        .map(([itemId, count]) => ({ itemId, count })),
+    ),
     collection: Object.keys(profile.inventory).filter((id) => !BASIC_ITEMS.includes(id)).length,
   }));
   entries.sort(
