@@ -15,7 +15,12 @@ const palettes: Record<PetSpecies, PetPalette> = {
   fox: { coat: "#d98558", accent: "#493936", cream: "#fff0d8", blush: "#d89a86" },
   rabbit: { coat: "#eee8dd", accent: "#ae968a", cream: "#fff6eb", blush: "#dea9af" },
   owl: { coat: "#bc9061", accent: "#70513e", cream: "#f6e8c5", blush: "#daa784" },
-  dog: { coat: "#aeb4b5", accent: "#252a30", cream: "#f4eddf", blush: "#ce9a63" },
+  dog: {
+    coat: "#a2a5a6",
+    accent: "#343136",
+    cream: "#f7eddb",
+    blush: "#d7a370",
+  },
 };
 
 /** Smooth, tapered anatomy with a continuous surface, including two-tone tail tips. */
@@ -238,7 +243,8 @@ export class PetModel {
       points: readonly number[][],
       radii: readonly number[],
       split = 1,
-    ) => addMesh(parent, curvedGeometry(points, radii, 12, split), material);
+      radialSegments = 12,
+    ) => addMesh(parent, curvedGeometry(points, radii, radialSegments, split), material);
     const shapeMesh = (
       parent: THREE.Group,
       material: THREE.Material,
@@ -340,22 +346,28 @@ export class PetModel {
           species === "fox" || species === "dog" || species === "dragon" ? 1.04 : 0.94,
         );
       }
+      if (species === "dog") {
+        // The adult has a broad chest and raised shoulders; juveniles keep a larger head/body ratio.
+        torso.scale.set(adult ? 1.25 : 1.03, adult ? 1.38 : 1, adult ? 1.18 : 1.03);
+        this.headRestPosition.y = adult ? 0.99 : 0.68;
+        this.headRestScale.set(adult ? 0.97 : 1.03, adult ? 0.9 : 0.94, adult ? 1.07 : 1);
+      }
       const bodyWidth = isOwl ? 0.33 : species === "rabbit" ? 0.285 : 0.295;
       const body = ball(torso, coat, 0, 0.32, 0, bodyWidth, 0.32, 0.25);
       if (species === "dog") {
         // A deterministic mottled coat stays identical through growth and reconnects.
-        body.geometry = new THREE.SphereGeometry(1, 48, 32);
+        body.geometry = new THREE.SphereGeometry(1, 64, 48);
         const positions = body.geometry.attributes.position;
         const colors: number[] = [];
         const lightCoat = new THREE.Color("#e6e4dc");
-        const darkCoat = new THREE.Color("#30383c");
+        const darkCoat = new THREE.Color("#667176");
         for (let i = 0; i < positions.count; i++) {
           const x = positions.getX(i),
             y = positions.getY(i),
             z = positions.getZ(i);
           const pattern =
-            Math.sin(x * 13 + y * 7 + z * 9) * Math.cos(y * 16 - z * 12) +
-            0.55 * Math.sin(x * 27 - z * 17) * Math.cos(y * 29 + x * 5);
+            Math.sin(x * 8 + y * 5 + z * 6 + Math.sin(z * 11)) * Math.cos(y * 12 - z * 9) +
+            0.4 * Math.sin(x * 21 - z * 14) * Math.cos(y * 22 + x * 5);
           const color = lightCoat
             .clone()
             .lerp(darkCoat, THREE.MathUtils.smoothstep(pattern, -0.35, 0.6));
@@ -366,28 +378,72 @@ export class PetModel {
         merle.vertexColors = true;
         body.material = merle;
       }
-      ball(torso, cream, 0, 0.29, 0.225, isOwl ? 0.22 : 0.19, 0.225, 0.044);
+      if (species !== "dog") ball(torso, cream, 0, 0.29, 0.225, isOwl ? 0.22 : 0.19, 0.225, 0.044);
       this.head.position.copy(this.headRestPosition);
       this.head.scale.copy(this.headRestScale);
       this.pose.add(this.head);
-      const headWidth = stage === 1 ? 0.365 : species === "fox" ? 0.345 : 0.35;
-      const headDepth = species === "dragon" ? 0.27 : 0.285;
-      ball(
+      const headWidth =
+        species === "dog"
+          ? stage === 1
+            ? 0.38
+            : 0.365
+          : stage === 1
+            ? 0.365
+            : species === "fox"
+              ? 0.345
+              : 0.35;
+      const headDepth = species === "dog" ? 0.305 : species === "dragon" ? 0.27 : 0.285;
+      const skull = ball(
         this.head,
         species === "dog" ? accent : coat,
         0,
         0.015,
         0.025,
         headWidth,
-        stage === 1 ? 0.31 : 0.285,
+        species === "dog" ? 0.335 : stage === 1 ? 0.31 : 0.285,
         headDepth,
       );
+      if (species === "dog") {
+        // The photo-inspired tan mask follows a rounded skull, with gentle brow patches.
+        skull.geometry = new THREE.SphereGeometry(1, 56, 36);
+        const vertices = skull.geometry.attributes.position;
+        const colors: number[] = [];
+        const dark = new THREE.Color(palette.accent);
+        const tan = new THREE.Color(palette.blush);
+        for (let i = 0; i < vertices.count; i++) {
+          const x = vertices.getX(i),
+            y = vertices.getY(i),
+            z = vertices.getZ(i);
+          const cheek =
+            THREE.MathUtils.smoothstep(Math.abs(x), 0.12, 0.38) *
+            (1 - THREE.MathUtils.smoothstep(y, 0.03, 0.3));
+          const browDistance =
+            Math.pow((Math.abs(x) - 0.39) / 0.28, 2) + Math.pow((y - 0.46) / 0.19, 2);
+          const brow = 1 - THREE.MathUtils.smoothstep(browDistance, 0.5, 1.25);
+          const front = THREE.MathUtils.smoothstep(z, 0.1, 0.55);
+          const color = dark.clone().lerp(tan, Math.max(cheek, brow) * front);
+          colors.push(color.r, color.g, color.b);
+          vertices.setX(i, x * (0.96 + 0.04 * THREE.MathUtils.smoothstep(y, -0.9, 0.1)));
+        }
+        skull.geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+        skull.geometry.computeVertexNormals();
+        const faceCoat = satin("#ffffff", 0.87);
+        faceCoat.vertexColors = true;
+        skull.material = faceCoat;
+        for (const sign of [-1, 1]) {
+          const haunch = ball(torso, coat, sign * 0.205, 0.18, -0.055, 0.15, 0.18, 0.185);
+          haunch.geometry = body.geometry;
+          haunch.material = body.material;
+        }
+      }
       for (const sign of [-1, 1]) {
         const foot = new THREE.Group();
         foot.position.set(sign * 0.17, 0.075, 0.16);
+        if (species === "dog") foot.position.set(sign * (adult ? 0.295 : 0.24), 0.055, -0.005);
         this.pose.add(foot);
         this.feet.push(foot);
         if (adult) foot.scale.set(species === "rabbit" ? 1.22 : 1.08, 1, 1.14);
+        if (species === "dog") foot.scale.multiply(new THREE.Vector3(0.78, 0.73, 0.86));
         if (isOwl) {
           ball(foot, gold, 0, 0, 0.012, 0.105, 0.055, 0.12);
           for (let toe = -1; toe <= 1; toe++) {
@@ -438,31 +494,49 @@ export class PetModel {
           if (adult) paw.scale.set(0.96, 1.4, 1);
           this.pose.add(paw);
           this.paws.push(paw);
-          ball(paw, species === "dog" ? pink : coat, 0, -0.09, 0, 0.086, 0.15, 0.1);
-          ball(
-            paw,
-            species === "dog" ? pink : species === "fox" ? accent : coat,
-            0,
-            -0.187,
-            0.032,
-            0.085,
-            0.064,
-            0.088,
-          );
           if (species === "dog") {
-            ball(paw, cream, sign * 0.025, -0.05, 0.069, 0.043, 0.092, 0.035);
+            // Front paws reach the floor in a seated, four-legged pose at every growth stage.
+            const legLength = adult ? 0.45 : details ? 0.28 : 0.24;
+            paw.position.set(sign * (adult ? 0.19 : 0.15), legLength + 0.065, 0.2);
+            paw.scale.setScalar(1);
+            curve(
+              paw,
+              pink,
+              [
+                [0, 0.018, -0.015],
+                [0, -legLength * 0.47, 0.012],
+                [0, -legLength + 0.025, 0.065],
+              ],
+              adult ? [0.107, 0.084, 0.073] : [0.088, 0.075, 0.065],
+            );
+            ball(paw, pink, 0, -legLength, 0.09, adult ? 0.105 : 0.093, 0.06, 0.112);
+            for (const toe of [-1, 0, 1])
+              ball(paw, cream, toe * 0.036, -legLength - 0.003, 0.163, 0.022, 0.032, 0.036);
+            curve(
+              paw,
+              cream,
+              [
+                [sign * 0.035, 0.015, -0.025],
+                [sign * 0.06, -legLength * 0.3, -0.045],
+                [sign * 0.06, -legLength * 0.62, -0.025],
+              ],
+              [0.048, 0.05, 0.023],
+            );
             if (details)
-              for (let spot = 0; spot < 3; spot++)
+              for (let spot = 0; spot < 4; spot++)
                 ball(
                   paw,
-                  accent,
-                  sign * (0.006 + spot * 0.015),
-                  -0.005 - spot * 0.047,
-                  0.097,
-                  0.011,
-                  0.018,
+                  coat,
+                  sign * (0.012 + (spot % 2) * 0.015),
+                  -0.065 - spot * 0.059,
+                  0.061,
+                  0.013,
+                  0.019,
                   0.006,
                 );
+          } else {
+            ball(paw, coat, 0, -0.09, 0, 0.086, 0.15, 0.1);
+            ball(paw, species === "fox" ? accent : coat, 0, -0.187, 0.032, 0.085, 0.064, 0.088);
           }
           if (adult && species !== "fox" && species !== "dragon" && species !== "dog") {
             ball(paw, pink, 0, -0.188, 0.111, 0.031, 0.025, 0.009);
@@ -493,37 +567,33 @@ export class PetModel {
         this.head.add(ear);
         this.ears.push(ear);
         if (species === "dog") {
-          ear.position.set(sign * 0.285, 0.19, 0.095);
-          const flop = new THREE.Group();
-          flop.rotation.z = -sign * (Math.PI - (sign === 1 ? 0.4 : 0.24));
-          ear.add(flop);
-          const height = adult ? 0.37 : details ? 0.33 : 0.28;
-          const volume: EarVolume = {
-            width: adult ? 0.155 : 0.13,
-            height,
-            bend: sign * 0.045,
-            depth: 0.07,
-            oval: true,
-          };
-          softEar(flop, accent, volume);
-          earInsert(
-            flop,
-            satin("#4c3f37"),
-            earShape(0.052, height * 0.58, sign * 0.025),
-            volume,
-            0.047,
+          ear.position.set(sign * (adult ? 0.305 : 0.29), adult ? 0.215 : 0.2, 0.01);
+          const height = adult ? 0.395 : details ? 0.29 : 0.25;
+          // Rounded floppy ears have soft tips and no sharp dangling strands.
+          const earMesh = ball(
+            ear,
+            accent,
+            sign * 0.055,
+            -height * 0.31,
+            0.025,
+            adult ? 0.12 : 0.11,
+            height * 0.69,
+            0.075,
           );
-          for (let tuft = 0; tuft < (adult ? 4 : 2); tuft++) {
-            curve(
+          earMesh.rotation.z = sign * (sign === 1 ? 0.43 : 0.14);
+          ball(ear, accent, sign * 0.025, 0.03, 0, 0.112, 0.083, 0.068);
+          for (let lock = 0; lock < (adult ? 4 : 2); lock++) {
+            const fluff = ball(
               ear,
-              tuft === 1 ? coat : accent,
-              [
-                [sign * 0.055, -0.06 - tuft * 0.04, -0.005],
-                [sign * (0.13 + tuft * 0.012), -0.1 - tuft * 0.047, 0.012],
-                [sign * (0.15 + tuft * 0.008), -0.17 - tuft * 0.046, 0.018],
-              ],
-              [0.028, 0.029, 0.001],
+              accent,
+              sign * (0.11 + lock * 0.019),
+              -0.055 - lock * 0.05,
+              -0.009,
+              0.065,
+              0.064,
+              0.051,
             );
+            fluff.rotation.z = sign * -0.25;
           }
         } else if (species === "rabbit") {
           const height = stage === 1 ? 0.365 : adult ? 0.64 : 0.435;
@@ -630,23 +700,19 @@ export class PetModel {
             mask.bezierCurveTo(sign * 0.22, -0.085, sign * 0.21, 0.08, sign * 0.15, 0.115);
             mask.bezierCurveTo(sign * 0.105, 0.015, sign * 0.045, -0.04, sign * 0.025, -0.11);
             shapeMesh(this.head, cream, mask, 0, 0, 0.25, 0.028, 0.015);
-          } else if (species === "dog") {
-            ball(this.head, pink, sign * 0.168, -0.041, 0.253, 0.139, 0.15, 0.058);
-            const brow = ball(this.head, pink, sign * 0.135, 0.173, 0.251, 0.073, 0.041, 0.037);
-            brow.rotation.z = sign * -0.24;
           }
           makeEye(
-            sign * (species === "dragon" ? 0.147 : 0.137),
-            0.055,
+            sign * (species === "dog" ? 0.137 : species === "dragon" ? 0.147 : 0.137),
+            species === "dog" ? 0.058 : 0.055,
             species === "dog"
-              ? 0.302
+              ? 0.311
               : species === "fox"
                 ? 0.292
                 : species === "dragon"
                   ? 0.26
                   : 0.29,
-            stage === 1 ? 0.061 : 0.052,
-            stage === 1 ? 0.081 : 0.069,
+            species === "dog" ? (stage === 1 ? 0.082 : 0.077) : stage === 1 ? 0.061 : 0.052,
+            species === "dog" ? (stage === 1 ? 0.09 : 0.082) : stage === 1 ? 0.081 : 0.069,
           );
           if (species !== "fox" && species !== "dog")
             ball(this.head, pink, sign * 0.225, -0.055, 0.267, 0.048, 0.024, 0.014);
@@ -722,61 +788,95 @@ export class PetModel {
         }
       }
       if (species === "dog") {
-        // Tan eyebrows, a narrow blaze and a cream ruff echo the supplied photographs.
+        // A short muzzle and warm cheeks soften the expression without losing the markings.
         curve(
           this.head,
           cream,
           [
-            [-0.009, 0.287, 0.11],
-            [0.002, 0.257, 0.164],
-            [0.006, 0.206, 0.224],
+            [-0.01, 0.322, 0.147],
+            [0.002, 0.28, 0.211],
+            [0.005, 0.22, 0.259],
           ],
-          [0.012, 0.014, 0.002],
+          [0.008, 0.012, 0.005],
         );
-        ball(this.head, pink, 0, -0.089, 0.285, 0.151, 0.094, 0.138);
-        ball(this.head, cream, 0, -0.151, 0.33, 0.131, 0.055, 0.099);
+        const muzzle = new THREE.Group();
+        muzzle.position.set(0, -0.098, 0.292);
+        muzzle.scale.set(
+          adult ? 1.1 : 1,
+          adult ? 1.05 : 1,
+          stage === 1 ? 0.95 : adult ? 1.34 : 1.08,
+        );
+        this.head.add(muzzle);
+        const warmCream = satin("#e3c797", 0.85);
+        const noseMaterial = satin("#292b32", 0.37);
+        ball(muzzle, warmCream, 0, -0.008, 0.035, 0.155, 0.093, 0.094);
+        ball(muzzle, cream, 0, -0.059, 0.035, 0.128, 0.069, 0.08);
         for (const sign of [-1, 1]) {
-          ball(this.head, cream, sign * 0.06, -0.097, 0.37, 0.082, 0.056, 0.078);
-          curve(
-            torso,
-            cream,
-            [
-              [sign * 0.205, 0.59, 0.095],
-              [sign * 0.265, 0.49, 0.145],
-              [sign * 0.22, 0.365, 0.2],
-            ],
-            [0.07, 0.083, 0.002],
-          );
-          if (details)
-            curve(
+          ball(muzzle, warmCream, sign * 0.063, -0.009, 0.081, 0.094, 0.064, 0.073);
+          ball(this.head, satin("#d4a080"), sign * 0.238, -0.065, 0.264, 0.034, 0.019, 0.01);
+        }
+        const nose = ball(muzzle, noseMaterial, 0, 0.025, 0.144, 0.052, 0.035, 0.032);
+        ball(nose, coat, -0.23, 0.4, 0.84, 0.18, 0.1, 0.06);
+        curve(
+          muzzle,
+          accent,
+          [
+            [-0.086, -0.043, 0.133],
+            [-0.052, -0.067, 0.148],
+            [0, -0.07, 0.149],
+            [0.052, -0.067, 0.148],
+            [0.086, -0.043, 0.133],
+          ],
+          [0.003, 0.004, 0.004, 0.004, 0.003],
+        );
+        ball(muzzle, satin("#e8a0ad"), 0.005, -0.086, 0.145, 0.027, 0.033, 0.013);
+        if (adult) {
+          // Mature cheek feathers are rounded and sit behind the friendly tan muzzle.
+          for (const sign of [-1, 1]) {
+            for (let lock = 0; lock < 3; lock++) {
+              const feather = ball(
+                this.head,
+                cream,
+                sign * (0.283 + lock * 0.018),
+                -0.09 - lock * 0.049,
+                0.13 - lock * 0.018,
+                0.075,
+                0.068,
+                0.084,
+              );
+              feather.rotation.z = sign * -0.32;
+            }
+          }
+        }
+        // Rounded overlapping volumes give the chest a plush outline.
+        ball(torso, cream, 0, 0.405, 0.2, adult ? 0.239 : 0.212, 0.214, adult ? 0.119 : 0.102);
+        ball(torso, cream, 0, 0.555, 0.13, adult ? 0.255 : 0.218, adult ? 0.147 : 0.115, 0.139);
+        for (const sign of [-1, 1]) {
+          for (let tuft = 0; tuft < (adult ? 4 : 2); tuft++) {
+            ball(
               torso,
               cream,
-              [
-                [sign * 0.1, 0.59, 0.18],
-                [sign * 0.145, 0.48, 0.23],
-                [sign * 0.11, 0.345, 0.263],
-              ],
-              [0.066, 0.073, 0.002],
+              sign * (0.105 + tuft * (adult ? 0.051 : 0.047)),
+              adult ? 0.55 - tuft * 0.067 : 0.52 - tuft * 0.064,
+              0.13,
+              adult ? 0.097 : 0.086,
+              adult ? 0.11 : 0.094,
+              0.106,
             );
+          }
         }
-        const nose = ball(this.head, accent, 0, -0.063, 0.428, 0.056, 0.041, 0.032);
-        nose.material = satin("#202429", 0.3);
-        ball(this.head, coat, -0.012, -0.048, 0.455, 0.012, 0.007, 0.003);
-        smile(0, -0.143, 0.415, 0.068);
-        const tongue = ball(this.head, satin("#d98791"), 0.014, -0.172, 0.412, 0.028, 0.042, 0.014);
-        tongue.rotation.z = -0.1;
         if (details) {
           curve(
             torso,
             satin("#344443"),
             [
-              [-0.19, 0.55, 0.181],
-              [0, 0.506, 0.275],
-              [0.19, 0.55, 0.181],
+              [-0.19, 0.55, 0.175],
+              [0, 0.525, 0.278],
+              [0.19, 0.55, 0.175],
             ],
-            [0.017, 0.017, 0.017],
+            [0.014, 0.014, 0.014],
           );
-          const tag = ball(torso, satin("#c8d0cc", 0.35), 0, 0.466, 0.279, 0.029, 0.034, 0.009);
+          const tag = ball(torso, satin("#c8d0cc", 0.35), 0, 0.488, 0.294, 0.024, 0.026, 0.007);
           tag.rotation.z = -0.12;
         }
       } else if (species === "cat" || species === "rabbit") {
@@ -886,7 +986,7 @@ export class PetModel {
         }
       }
       if (adult) {
-        if (species === "cat" || species === "fox" || species === "dog") {
+        if (species === "cat" || species === "fox") {
           // A mature ruff changes the silhouette as well as the colour of the chest.
           for (const sign of [-1, 1]) {
             for (let tuft = 0; tuft < 3; tuft++) {
@@ -898,22 +998,20 @@ export class PetModel {
                   [sign * (0.15 + tuft * 0.07), 0.52 - tuft * 0.035, 0.19],
                   [sign * (0.07 + tuft * 0.13), 0.32 + tuft * 0.035, 0.2],
                 ],
-                [0.06, species === "dog" ? 0.085 : 0.07, 0.001],
+                [0.06, 0.07, 0.001],
               );
             }
-            if (species !== "dog") {
-              for (let tuft = 0; tuft < 2; tuft++) {
-                curve(
-                  this.head,
-                  species === "fox" ? cream : coat,
-                  [
-                    [sign * 0.24, -0.07 - tuft * 0.055, 0.12],
-                    [sign * 0.32, -0.055 - tuft * 0.045, 0.16],
-                    [sign * (0.41 - tuft * 0.04), -0.01 - tuft * 0.13, 0.1],
-                  ],
-                  [0.065, 0.06, 0.001],
-                );
-              }
+            for (let tuft = 0; tuft < 2; tuft++) {
+              curve(
+                this.head,
+                species === "fox" ? cream : coat,
+                [
+                  [sign * 0.24, -0.07 - tuft * 0.055, 0.12],
+                  [sign * 0.32, -0.055 - tuft * 0.045, 0.16],
+                  [sign * (0.41 - tuft * 0.04), -0.01 - tuft * 0.13, 0.1],
+                ],
+                [0.065, 0.06, 0.001],
+              );
             }
           }
         } else if (species === "rabbit") {
@@ -955,30 +1053,60 @@ export class PetModel {
       }
       this.pose.add(this.tail);
       if (species === "dog") {
-        curve(
+        this.tail.position.y = adult ? 0.255 : 0.18;
+        if (adult) this.tail.scale.set(1.3, 1.5, 1.3);
+        const tailCoat = satin("#ffffff", 0.86);
+        tailCoat.vertexColors = true;
+        const plume = curve(
           this.tail,
-          [coat, cream],
+          tailCoat,
           [
             [-0.035, 0, 0],
-            [0.12, 0.005, -0.14],
-            [0.3, 0.085, -0.235],
-            [0.4, 0.21, -0.18],
-            [0.37, 0.3, -0.08],
+            [0.13, -0.015, -0.14],
+            [0.32, 0.045, -0.22],
+            [0.46, 0.15, -0.16],
+            [0.48, 0.24, -0.055],
           ],
-          [0.063, 0.105, adult ? 0.115 : 0.094, 0.085, 0.001],
-          0.64,
+          [
+            0.068,
+            adult ? 0.138 : 0.115,
+            adult ? 0.18 : details ? 0.12 : 0.095,
+            adult ? 0.108 : 0.085,
+            0.028,
+          ],
+          1,
+          24,
         );
-        for (let tuft = 0; tuft < (adult ? 4 : 2); tuft++)
-          curve(
+        ball(this.tail, cream, 0.48, 0.24, -0.055, 0.029, 0.029, 0.029);
+        const vertices = plume.geometry.attributes.position;
+        const colors: number[] = [];
+        const grey = new THREE.Color(palette.coat);
+        const light = new THREE.Color(palette.cream);
+        for (let i = 0; i < vertices.count; i++) {
+          const x = vertices.getX(i),
+            y = vertices.getY(i),
+            z = vertices.getZ(i);
+          const transition = x + Math.sin(y * 23 + z * 18) * 0.035;
+          const color = grey
+            .clone()
+            .lerp(light, THREE.MathUtils.smoothstep(transition, 0.15, 0.43));
+          colors.push(color.r, color.g, color.b);
+        }
+        plume.geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+        for (let tuft = 0; tuft < (adult ? 7 : details ? 4 : 3); tuft++) {
+          const t = tuft / (adult ? 6 : details ? 3 : 2);
+          const fluff = ball(
             this.tail,
-            tuft < 2 ? coat : cream,
-            [
-              [0.1 + tuft * 0.061, 0.012 + tuft * 0.036, -0.15 - tuft * 0.018],
-              [0.16 + tuft * 0.063, -0.03 + tuft * 0.038, -0.27],
-              [0.23 + tuft * 0.05, 0.015 + tuft * 0.043, -0.285],
-            ],
-            [0.036, 0.042, 0.001],
+            t > 0.5 ? cream : coat,
+            0.14 + t * 0.29,
+            0.015 + t * 0.14,
+            -0.2,
+            adult ? 0.1 : 0.077,
+            adult ? 0.089 : 0.07,
+            adult ? 0.114 : 0.09,
           );
+          fluff.rotation.z = t * 0.5;
+        }
       } else if (species === "rabbit") {
         ball(this.tail, cream, 0, 0.015, -0.095, 0.13, 0.12, 0.13);
         if (details)
@@ -1150,7 +1278,14 @@ export class PetModel {
         }
         case "wave": {
           const arm = this.species === "owl" ? this.wings[1] : this.paws[1];
-          if (arm) arm.rotation.z = -(1.9 + Math.sin(cycle * 4) * 0.3) * envelope;
+          if (arm) {
+            arm.rotation.z =
+              this.species === "dog"
+                ? 0.2 * envelope
+                : -(1.9 + Math.sin(cycle * 4) * 0.3) * envelope;
+            if (this.species === "dog")
+              arm.rotation.x = (-1.08 + Math.sin(cycle * 3) * 0.12) * envelope;
+          }
           this.head.rotation.z += 0.15 * envelope;
           this.tail.rotation.y += Math.sin(cycle * 4) * 0.5 * envelope;
           break;
@@ -1246,7 +1381,13 @@ export class PetModel {
       }
     }
     const blink = idle && t % 4.6 < 0.16 ? 0.08 : Math.max(0.06, 1 - closedEyes);
-    this.eyes.forEach(({ mesh, height }) => (mesh.scale.y = height * blink));
+    this.eyes.forEach(({ mesh, height }) => {
+      mesh.scale.y = height * blink;
+      if (this.species === "dog") {
+        // Closed eyes become a thin, soft line rather than protruding dark ovals.
+        mesh.scale.z = THREE.MathUtils.lerp(0.007, 0.035, blink);
+      }
+    });
     this.eyeLights.forEach((light) => {
       light.visible = blink > 0.4;
     });
