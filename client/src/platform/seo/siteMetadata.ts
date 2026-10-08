@@ -38,6 +38,20 @@ export interface PageMetadata {
 
 export const publicPages: PageMetadata[] = [
   {
+    path: "/duels",
+    title: "Дуэли — Найди пару и Морской бой онлайн | PartySide",
+    description:
+      "Дуэли для двух игроков: найдите больше пар или потопите флот соперника. Ставки от 0 монет, весь банк победителю. Правила игр и открытые дуэли PartySide.",
+    indexable: true,
+  },
+  {
+    path: "/pet",
+    title: "Виртуальный питомец — уход и рост | PartySide",
+    description:
+      "Вырастите одного из пяти питомцев PartySide. Уход приносит монеты, лакомства ускоряют рост. Питомец оживает и реагирует на нажатия на своей странице и в 3D-играх.",
+    indexable: true,
+  },
+  {
     path: "/",
     title: "PartySide — онлайн-игры для компании и друзей",
     description:
@@ -69,6 +83,17 @@ export const utilityPages = [
   ["/stats", "Статистика проекта"],
 ] as const;
 
+const utilityDescriptions: Record<string, string> = {
+  "/collection":
+    "Коллекция PartySide: персонажи, рубашки карт и эмоции. Войдите, чтобы выбрать свой игровой образ и сохранить предметы.",
+  "/cases":
+    "Кейсы PartySide с персонажами, картами и эмоциями. Выберите набор и войдите в аккаунт, чтобы пополнить коллекцию.",
+  "/upgrade":
+    "Улучшение предметов PartySide: выберите предметы, цель и оцените вероятность. Войдите, чтобы открыть свою коллекцию.",
+  "/profile":
+    "Профиль PartySide: прогресс, монеты, коллекция и настройки аккаунта. Войдите, чтобы вернуться к своим данным.",
+};
+
 export function getPageMetadata(path: string): PageMetadata {
   const normalized = path.replace(/\/$/, "") || "/";
   const publicPage = publicPages.find((page) => page.path === normalized);
@@ -78,7 +103,7 @@ export function getPageMetadata(path: string): PageMetadata {
     path: normalized,
     title: `${utility?.[1] ?? "Страница не найдена"} | PartySide`,
     description: utility
-      ? "PartySide — игры для своей компании."
+      ? (utilityDescriptions[normalized] ?? "PartySide — игры для своей компании.")
       : "Этой страницы нет в PartySide.",
     indexable: false,
   };
@@ -96,7 +121,7 @@ export function getStructuredData(path: string) {
         "@id": websiteId,
         name: "PartySide",
         url: `${SITE_URL}/`,
-        description: publicPages[0].description,
+        description: publicPages.find((page) => page.path === "/")!.description,
         inLanguage: "ru",
       },
       {

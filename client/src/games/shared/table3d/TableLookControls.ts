@@ -47,6 +47,9 @@ export class TableLookControls {
         // High polling-rate mice can send thousands of events per second. Dialog state is
         // refreshed on DOM/focus changes instead of searching the entire page for each event.
         if (this.coarse.matches || !this.gameplayActive || this.inputBlocked) return;
+        // With a visible cursor the pet is a projected button. Hovering it should
+        // not move the camera away before the player can click it.
+        if (event.target instanceof Element && event.target.closest(".table3d-pet-hit")) return;
         // Esc can temporarily prevent a new Pointer Lock request. Keep the cursor hidden
         // and allow camera motion until the next click/key can capture it again.
         this.move(event.movementX, event.movementY);

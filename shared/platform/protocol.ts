@@ -1,3 +1,5 @@
+import type { DuelDirectory, DuelRequest } from "./duels.js";
+import type { PetAction } from "./pet.js";
 import type {
   ActionCard,
   Attribute,
@@ -70,6 +72,19 @@ export interface SpectatorJoinedPayload {
 
 // Client -> Server
 export interface ClientEvents {
+  "duels:unsubscribe": () => void;
+  "duels:get": (
+    data: { id?: string },
+    reply: (result: ProfileReply<DuelDirectory>) => void,
+  ) => void;
+  "duels:command": (
+    data: DuelRequest,
+    reply: (result: ProfileReply<DuelDirectory>) => void,
+  ) => void;
+  "pet:action": (
+    data: { action: PetAction; petId: string | null; day: string },
+    reply: (result: ProfileReply<ProfileSnapshot>) => void,
+  ) => void;
   "leaderboard:get": (
     query: LeaderboardQuery,
     reply: (result: ProfileReply<LeaderboardSnapshot>) => void,
@@ -175,6 +190,7 @@ export interface ClientEvents {
 
 // Server -> Client
 export interface ServerEvents {
+  "duels:snapshot": (snapshot: DuelDirectory) => void;
   "profile:account-snapshot": (data: ProfileAccountSnapshot) => void;
   "profile:expired": () => void;
   "drops:snapshot": (data: CosmeticDrop[]) => void;

@@ -1,6 +1,12 @@
 import type { AvatarId } from "./avatars.js";
 
-export const LEADERBOARD_SORTS = ["wins", "games", "coins", "collection"] as const;
+export const LEADERBOARD_SORTS = [
+  "wins",
+  "games",
+  "coins",
+  "collection",
+  "collectionValue",
+] as const;
 export type LeaderboardSort = (typeof LEADERBOARD_SORTS)[number];
 export const LEADERBOARD_PAGE_SIZE = 20;
 
@@ -19,6 +25,7 @@ export interface LeaderboardEntry {
   games: number;
   coins: number;
   collection: number;
+  collectionValue: number;
 }
 
 export interface LeaderboardSnapshot extends LeaderboardQuery {

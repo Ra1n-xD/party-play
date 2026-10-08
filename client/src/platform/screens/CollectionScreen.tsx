@@ -1,5 +1,7 @@
+import { getUpgradeInputValue } from "../../../../shared/platform/upgrades";
 import { useState, type CSSProperties } from "react";
 import {
+  BASIC_ITEMS,
   COSMETICS,
   COSMETIC_KIND_NAMES,
   RARITIES,
@@ -28,6 +30,14 @@ export function CollectionScreen() {
         <CoinAmount amount={profile.coins} />
         <span>
           {owned} / {COSMETICS.length} предметов
+        </span>
+        <span>
+          {getUpgradeInputValue(
+            Object.entries(profile.inventory)
+              .filter(([id]) => !BASIC_ITEMS.includes(id))
+              .map(([itemId, count]) => ({ itemId, count })),
+          ).toLocaleString("ru-RU")}{" "}
+          ед. ценности коллекции
         </span>
         <span>
           {profile.completedGames} завершённых партий · {profile.wins} побед

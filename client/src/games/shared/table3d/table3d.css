@@ -1130,3 +1130,39 @@
     white-space: nowrap;
   }
 }
+
+.table3d-pet-hit {
+  position: absolute;
+  z-index: 2;
+  border: 0;
+  border-radius: 45%;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  touch-action: manipulation;
+}
+.table3d-pet-hit:focus-visible {
+  outline: 2px solid #b8f3d8;
+  outline-offset: 3px;
+  background: #91e4c415;
+}
+.table3d-pet-speech {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -100%);
+  max-width: min(220px, calc(100vw - 30px));
+  padding: 9px 13px;
+  border: 1px solid #a1d8c477;
+  border-radius: 14px 14px 3px 14px;
+  background: #172a25ef;
+  color: #e1ffed;
+  font:
+    600 12px/1.4 "Golos Text",
+    sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+.table3d-pet-hit[hidden],
+.table3d-pet-speech[hidden] {
+  display: none;
+}

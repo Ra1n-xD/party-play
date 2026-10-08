@@ -1,7 +1,5 @@
-import { BiDonateHeart } from "react-icons/bi";
-import { FaTelegramPlane } from "react-icons/fa";
-import { FiAlertCircle, FiClock } from "react-icons/fi";
 import { usePlatform } from "../context/PlatformContext";
+import { ProjectLinks } from "./ProjectLinks";
 
 export function MenuFooter({ updatesActive = false }: { updatesActive?: boolean }) {
   const { connected } = usePlatform();
@@ -12,27 +10,7 @@ export function MenuFooter({ updatesActive = false }: { updatesActive?: boolean 
         {connected ? "Готовы к игре" : "Подключаемся к серверу…"}
       </div>
       <nav aria-label="Ссылки проекта">
-        <a href="/updates" aria-current={updatesActive ? "page" : undefined}>
-          <FiClock aria-hidden="true" />
-          Обновления
-        </a>
-        <a href="https://t.me/fronted_engineer" target="_blank" rel="noopener noreferrer">
-          <FaTelegramPlane aria-hidden="true" />
-          Telegram
-        </a>
-        <a href="https://t.me/Ra1n_xD" target="_blank" rel="noopener noreferrer">
-          <FiAlertCircle aria-hidden="true" />
-          Сообщить о проблеме
-        </a>
-        <a
-          className="show-support-link"
-          href="https://www.donationalerts.com/r/fronted_ra1n"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <BiDonateHeart aria-hidden="true" />
-          Поддержать
-        </a>
+        <ProjectLinks updatesActive={updatesActive} />
       </nav>
     </footer>
   );

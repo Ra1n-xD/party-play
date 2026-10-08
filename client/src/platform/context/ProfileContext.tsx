@@ -32,7 +32,6 @@ import type {
 } from "../../../../shared/platform/auth";
 import { PROFILE_SESSION_KEY, readProfileSession, saveProfileSession } from "../profileSession";
 import { getCase, type CaseId, type CaseRequest } from "../../../../shared/platform/cases";
-import type { DailyReward, DailyRewardStatus } from "../../../../shared/platform/dailyRewards";
 const OPENING_KEY = "partyside_pending_case_v2";
 const UPGRADE_KEY = "partyside_pending_upgrade_v2";
 function readPendingUpgrade(name: string): UpgradeRequest | null {
@@ -87,8 +86,6 @@ interface ProfileContextValue {
   pendingCaseId: CaseId | null;
   pendingUpgrade: UpgradeRequest | null;
   upgrade(inputs: UpgradeInput[], targetItemId: string): Promise<UpgradeAttempt | null>;
-  getDailyReward(): Promise<DailyRewardStatus>;
-  claimDailyReward(date: string): Promise<DailyReward | null>;
   clearError(): void;
 }
 const Context = createContext<ProfileContextValue | null>(null);
@@ -298,48 +295,6 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("storage", storage);
     };
   }, [accept, acceptSession, clearProfile]);
-  const getDailyReward = useCallback((): Promise<DailyRewardStatus> => {
-    if (!socket.connected || !ready || !accountId.current)
-      return Promise.reject(new Error("Нет связи. Бонус можно проверить после подключения"));
-    const connectionId = socket.id;
-    const profileId = accountId.current;
-    return new Promise((resolve, reject) => {
-      socket.timeout(8000).emit("profile:daily-status", (timeout, result) => {
-        if (socket.id !== connectionId || accountId.current !== profileId || timeout)
-          return reject(new Error("Не удалось проверить бонус. Попробуйте ещё раз"));
-        if (!result.ok) return reject(new Error(result.error));
-        resolve(result.value);
-      });
-    });
-  }, [ready]);
-  const claimDailyReward = useCallback(
-    (date: string): Promise<DailyReward | null> => {
-      if (!socket.connected || !ready || !accountId.current || requestBusy.current)
-        return Promise.reject(new Error("Дождитесь подключения и завершения текущей операции"));
-      const connectionId = socket.id;
-      const profileId = accountId.current;
-      requestBusy.current = true;
-      setBusy(true);
-      return new Promise((resolve, reject) => {
-        socket.timeout(8000).emit("profile:claim-daily", { date }, (timeout, result) => {
-          if (socket.id !== connectionId)
-            return reject(new Error("Соединение изменилось. Откройте бонус снова"));
-          requestBusy.current = false;
-          setBusy(false);
-          if (accountId.current !== profileId)
-            return reject(new Error("Аккаунт изменился. Откройте бонус снова"));
-          if (timeout)
-            return reject(
-              new Error("Ответ потерялся. Повторите запрос: второй раз бонус не начислится"),
-            );
-          if (!result.ok) return reject(new Error(result.error));
-          accept(result.value.profile);
-          resolve(result.value.reward);
-        });
-      });
-    },
-    [ready, accept],
-  );
   const performLogout = () => {
     if (!socket.connected || !ready || requestBusy.current) return;
     requestBusy.current = true;
@@ -493,8 +448,6 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         pendingCaseId,
         pendingUpgrade,
         upgrade,
-        getDailyReward,
-        claimDailyReward,
         clearError: () => setError(null),
       }}
     >

@@ -1,7 +1,7 @@
 import { bunkerRules } from "../../games/bunker/rules";
 import { durakRules } from "../../games/durak/rules";
 import { unoRules } from "../../games/uno/rules";
-import { BrandDice } from "../components/BrandDice";
+import { ProfileHeader } from "../components/ProfileHeader";
 import { publicGames } from "./siteMetadata";
 import "../../styles/public-pages.css";
 
@@ -15,17 +15,7 @@ export function PublicPage({ path }: { path: string }) {
   return (
     <div className="show-menu public-page">
       <div className="public-page-shell">
-        <header className="public-page-header">
-          <a className="show-brand" href="/" aria-label="PartySide — на главную">
-            <BrandDice className="show-brand-dice" />
-            <span className="show-brand-name">partyside</span>
-          </a>
-          <nav aria-label="Навигация PartySide">
-            <a href="/">Игры</a>
-            <a href="/updates">Обновления</a>
-            <a href="/login">Войти</a>
-          </nav>
-        </header>
+        <ProfileHeader />
         <main>
           <p className="public-eyebrow">PARTYSIDE / ИГРЫ ДЛЯ СВОЕЙ КОМПАНИИ</p>
           <h1>{game.name} онлайн с друзьями</h1>
