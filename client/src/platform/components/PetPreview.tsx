@@ -30,22 +30,40 @@ export default function PetPreview({
     setFailed(false);
     setReaction("");
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 20);
-    camera.position.set(0, 1.15, 3.4);
-    camera.lookAt(0, 0.6, 0);
-    scene.add(new THREE.HemisphereLight(0xe3fff6, 0x45536a, 3));
-    const light = new THREE.DirectionalLight(0xffffff, 3);
-    light.position.set(-2, 3, 4);
+    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 20);
+    camera.position.set(0, 1.3, 3.65);
+    camera.lookAt(0, 0.68, 0);
+    scene.add(new THREE.HemisphereLight(0xfff4e7, 0x56607e, 1.3));
+    const light = new THREE.DirectionalLight(0xfff9e8, 2.4);
+    light.position.set(-3, 4, 5);
+    light.castShadow = true;
+    light.shadow.mapSize.set(1024, 1024);
+    light.shadow.camera.left = light.shadow.camera.bottom = -1.4;
+    light.shadow.camera.right = light.shadow.camera.top = 1.4;
+    light.shadow.camera.near = 0.5;
+    light.shadow.camera.far = 12;
+    light.shadow.normalBias = 0.015;
     scene.add(light);
+    const fill = new THREE.DirectionalLight(0xe0f2ff, 0.5);
+    fill.position.set(3, 1, 2);
+    scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xbdfff0, 0.85);
+    rim.position.set(0, 3, -3);
+    scene.add(rim);
     const pet = new PetModel(stage, species);
     actor.current = pet;
     scene.add(pet.root);
     const base = new THREE.Mesh(
       new THREE.CylinderGeometry(0.65, 0.72, 0.12, 48),
-      new THREE.MeshStandardMaterial({ color: "#334465" }),
+      new THREE.MeshStandardMaterial({ color: "#334465", roughness: 0.85 }),
     );
     base.position.y = -0.06;
+    base.receiveShadow = true;
     scene.add(base);
     element.appendChild(renderer.domElement);
     const resize = () => {
@@ -75,7 +93,9 @@ export default function PetPreview({
       disposePetModel(pet.root);
       base.geometry.dispose();
       base.material.dispose();
+      light.shadow.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     };
   }, [stage, species, interactive]);
