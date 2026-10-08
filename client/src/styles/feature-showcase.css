@@ -104,22 +104,24 @@
 .pet-page .pet-stage-art {
   min-height: calc(310 * var(--show-unit));
   padding: calc(10 * var(--show-unit));
-  background: #d6b8e6;
-  color: #3a2849;
-  border-right: 1px solid #170e2030;
+  overflow: hidden;
+  background: linear-gradient(155deg, #c5dce0, #9bbccb);
+  color: #213a49;
+  border-right: 1px solid #213a4930;
 }
 .pet-page .pet-orbit {
   width: 62%;
   max-width: calc(270 * var(--show-unit));
-  border: 1px solid #543c6c25;
+  background: #7e9fae;
+  border: 1px solid #3d627b70;
   box-shadow:
-    0 0 0 calc(24 * var(--show-unit)) #fff8e812,
-    0 0 0 calc(48 * var(--show-unit)) #fff8e80a;
+    0 0 0 calc(24 * var(--show-unit)) #f2f8fa30,
+    0 0 0 calc(48 * var(--show-unit)) #f2f8fa18;
 }
 .pet-art-spark {
   position: absolute;
   font-size: calc(32 * var(--show-unit));
-  color: #674377;
+  color: #3c6273;
 }
 .pet-art-spark-one {
   top: 20%;
@@ -140,23 +142,23 @@
 .pet-page .pet-reaction {
   min-height: calc(25 * var(--show-unit));
   padding: 0 calc(10 * var(--show-unit));
-  color: #543963;
+  color: #152a38;
   font-size: calc(12 * var(--show-unit));
   line-height: 1.5;
 }
 .pet-page .pet-reaction.is-active {
-  color: #372244;
+  color: #152a38;
 }
 .pet-page .pet-interact:focus-visible {
-  outline-color: #543963;
+  outline-color: #213a49;
 }
 .pet-page .pet-stage-name {
   margin-top: calc(6 * var(--show-unit));
   padding: calc(6 * var(--show-unit)) calc(12 * var(--show-unit));
-  border: 1px solid #543c6c35;
+  border: 1px solid #213a4940;
   border-radius: 30px;
-  background: #fff8e84a;
-  color: #543963;
+  background: #fff5df;
+  color: #213a49;
   text-transform: none;
   letter-spacing: 0;
   font-size: calc(12 * var(--show-unit));
