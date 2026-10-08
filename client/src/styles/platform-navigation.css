@@ -1,4 +1,22 @@
 /* One prerendered navigation tree; CSS adapts the shared header to each screen. */
+:root {
+  --platform-header-gap: calc(24 * var(--platform-unit));
+}
+
+/* The shared header owns the spacing before each screen's first content block. */
+.show-menu .show-profile-header + .feature-main,
+.show-menu .show-profile-header + .show-game-navigation {
+  margin-top: var(--platform-header-gap);
+}
+
+.show-menu
+  .show-profile-header
+  + :is(.show-headline, .leaderboard-content, .platform-stats-content, .updates-content),
+.public-page .show-profile-header + main,
+.show-menu.platform-header + :is(.collection-page, .account-page, .cases-page, .upgrade-page) {
+  padding-top: var(--platform-header-gap);
+}
+
 .show-menu .show-profile-header.platform-topbar {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -265,6 +283,10 @@
 }
 
 @media (max-width: 950px) {
+  :root {
+    --platform-header-gap: 20px;
+  }
+
   #root:has(.platform-header-navigation) {
     --mobile-navigation-space: calc(96px + env(safe-area-inset-bottom, 0px));
     padding-bottom: var(--mobile-navigation-space);
@@ -301,14 +323,21 @@
     padding: 8px 8px 12px;
     border: 2px solid #170e20;
     border-radius: 14px;
-    background: #2e223c;
-    box-shadow: 0 4px 0 #140c1d;
+    background: #e5d6ee;
+    box-shadow:
+      0 4px 0 #140c1d,
+      0 10px 28px #10091c66;
   }
 
   .platform-topbar .platform-nav-control {
     gap: 6px;
     padding-inline: 8px;
     font-size: 12px;
+  }
+
+  .platform-topbar .platform-nav-control:focus-visible {
+    outline-color: #4e345f;
+    outline-offset: 2px;
   }
 
   .platform-nav-group {
