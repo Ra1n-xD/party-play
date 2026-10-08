@@ -1,5 +1,6 @@
 import headerNavigation from "../assets/updates/header-navigation-6.14.0.png";
 import petHome from "../assets/updates/pet-home-6.15.0.png";
+import petHabits from "../assets/updates/pet-habits-6.16.0.jpg";
 import duelLobby from "../assets/updates/duel-lobby-6.15.0.png";
 import groupedBottomNavigation from "../assets/updates/grouped-bottom-navigation-6.14.1.png";
 import petTable from "../assets/updates/pet-table-6.11.0.jpg";
@@ -50,6 +51,29 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-16",
+    version: "6.16.0",
+    date: "2026-10-08",
+    category: "ПИТОМЕЦ",
+    title: "У маленького друга — свои привычки.",
+    summary:
+      "Питомец сам играет, исследует пространство и отдыхает на своей странице и за 3D-столом.",
+    changes: [
+      "Каждая стадия ведёт себя по-своему: яйцо покачивается, малыш учится ходить и подпрыгивает, подросток бегает, а взрослый потягивается, умывается и ложится отдохнуть.",
+      "Нажмите на питомца, чтобы увидеть случайную реакцию: прыжок, поворот, приветствие лапкой, ласку или взмах крыльев. Две реакции подряд не повторяются.",
+      "Те же движения работают в 3D-режиме Бункера, Дурака и UNO. Питомец располагается прямо на столе и остаётся доступен для нажатия во время движения.",
+    ],
+    screenshots: [
+      {
+        src: petHabits,
+        caption: "6.16.0 · Питомец отдыхает за 3D-столом — локальная сборка, QA-профиль",
+        alt: "Взрослый котёнок PartySide сам лёг отдыхать прямо на столе в 3D-режиме UNO. Локальная сборка, тестовая партия с ботом.",
+        width: 1280,
+        height: 800,
+      },
+    ],
+  },
   {
     id: "release-6-15",
     version: "6.15.0",

@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { PET_SPECIES_INFO, type PetSpecies } from "../../../../../shared/platform/pet";
+import { type PetSpecies } from "../../../../../shared/platform/pet";
+import { PetBehavior } from "./PetBehavior";
 
 const colors: Record<PetSpecies, string> = {
   dragon: "#69dfb7",
@@ -18,9 +19,12 @@ export class PetModel {
   private readonly ears: THREE.Group[] = [];
   private readonly wings: THREE.Group[] = [];
   private readonly paws: THREE.Group[] = [];
+  private readonly feet: THREE.Group[] = [];
   private readonly eyes: THREE.Mesh[] = [];
+  private readonly eyeLights: THREE.Mesh[] = [];
   private readonly sparks: THREE.Mesh[] = [];
-  private reactedAt = -Infinity;
+  private readonly behavior: PetBehavior;
+  private readonly bodyScale: number;
   private readonly sparkleMaterial = new THREE.MeshBasicMaterial({
     color: "#ffb8d3",
     transparent: true,
@@ -32,6 +36,8 @@ export class PetModel {
     readonly stage: number,
     readonly species: PetSpecies,
   ) {
+    this.behavior = new PetBehavior(stage, species);
+    this.bodyScale = stage === 1 ? 0.72 : stage === 2 ? 0.87 : 1;
     const coat = new THREE.MeshStandardMaterial({ color: colors[species], roughness: 0.75 });
     const cream = new THREE.MeshStandardMaterial({ color: "#fff0d6", roughness: 0.8 });
     const dark = new THREE.MeshStandardMaterial({ color: "#253047", roughness: 0.35 });
@@ -77,14 +83,18 @@ export class PetModel {
       ball(this.pose, coat, 0.12, 0.25, 0.22, 0.08, 0.06, 0.02);
       ball(this.pose, coat, 0.05, 0.6, 0.14, 0.045, 0.04, 0.02);
     } else {
-      this.pose.scale.setScalar(stage === 1 ? 0.72 : stage === 2 ? 0.87 : 1);
+      this.pose.scale.setScalar(this.bodyScale);
       ball(this.pose, coat, 0, 0.32, 0, 0.31, 0.34, 0.25);
       ball(this.pose, cream, 0, 0.29, 0.22, 0.21, 0.23, 0.06);
       this.head.position.y = 0.68;
       this.pose.add(this.head);
       ball(this.head, coat, 0, 0, 0.025, 0.36, 0.3, 0.29);
       for (const sign of [-1, 1]) {
-        ball(this.pose, species === "owl" ? gold : coat, sign * 0.19, 0.08, 0.18, 0.14, 0.09, 0.19);
+        const foot = new THREE.Group();
+        foot.position.set(sign * 0.19, 0.08, 0.18);
+        this.pose.add(foot);
+        this.feet.push(foot);
+        ball(foot, species === "owl" ? gold : coat, 0, 0, 0, 0.14, 0.09, 0.19);
         const paw = new THREE.Group();
         paw.position.set(sign * 0.29, 0.42, 0.1);
         this.pose.add(paw);
@@ -102,7 +112,9 @@ export class PetModel {
           0.025,
         );
         this.eyes.push(eye);
-        ball(this.head, cream, sign * 0.135, 0.063, species === "owl" ? 0.333 : 0.316, 0.014);
+        this.eyeLights.push(
+          ball(this.head, cream, sign * 0.135, 0.063, species === "owl" ? 0.333 : 0.316, 0.014),
+        );
         if (species !== "owl")
           ball(this.head, pink, sign * 0.235, -0.055, 0.262, 0.058, 0.025, 0.018);
         const ear = new THREE.Group();
@@ -174,56 +186,174 @@ export class PetModel {
   }
 
   react(time: number): string {
-    if (time - this.reactedAt > 450) this.reactedAt = time;
-    return this.stage === 0
-      ? "Тук-тук! Малыш шевелится внутри."
-      : PET_SPECIES_INFO[this.species].reaction;
+    return this.behavior.react(time);
+  }
+
+  getInteractionCenter(target: THREE.Vector3): THREE.Vector3 {
+    return this.pose.localToWorld(target.set(0, this.stage === 0 ? 0.35 : 0.5, 0));
+  }
+
+  getInteractionRadius(): number {
+    return 0.4 * this.bodyScale * this.root.scale.x;
   }
 
   frame(time: number, reducedMotion: boolean, paused = false) {
-    const t = time / 1000;
-    const elapsed = (time - this.reactedAt) / 2000;
-    const active = elapsed >= 0 && elapsed < 1;
-    const u = active ? elapsed : 0;
-    const energy = active && !reducedMotion && !paused ? Math.sin(u * Math.PI) : 0;
-    const idle = reducedMotion || paused ? 0 : 1;
-    const bounce = Math.abs(Math.sin(u * Math.PI * (this.species === "rabbit" ? 4 : 2)));
-    this.pose.position.y =
-      idle * Math.sin(t * 2.2) * 0.009 + energy * bounce * (this.stage === 0 ? 0.065 : 0.18);
-    this.pose.rotation.z =
-      this.stage === 0 ? Math.sin(t * 2) * 0.045 * idle + energy * Math.sin(u * 20) * 0.16 : 0;
-    this.pose.rotation.y =
-      Math.sin(t * 0.65) * 0.09 * idle +
-      (this.species === "fox" ? energy * Math.sin(u * Math.PI * 2) * 0.9 : 0);
-    this.head.rotation.z = Math.sin(t * 0.8) * 0.045 * idle;
-    this.head.rotation.x = Math.sin(t) * 0.035 * idle + energy * Math.sin(u * 16) * 0.12;
-    const blink = idle && t % 4.6 < 0.16 ? 0.08 : 1;
-    this.eyes.forEach((eye) => {
-      eye.scale.y = 0.064 * blink;
-    });
-    this.tail.rotation.y = Math.sin(t * 2.6) * (0.18 * idle + energy * 0.6);
+    this.behavior.frame(time, reducedMotion, paused);
+    if (paused) return;
+    const t = this.behavior.time / 1000;
+    const idle = reducedMotion ? 0 : 1;
+    this.pose.position.set(0, Math.sin(t * 2.2) * 0.009 * idle, 0);
+    this.pose.rotation.set(
+      0,
+      Math.sin(t * 0.65) * 0.09 * idle,
+      this.stage === 0 ? Math.sin(t * 2) * 0.045 * idle : 0,
+    );
+    this.pose.scale.setScalar(this.bodyScale);
+    this.head.position.set(0, 0.68, 0);
+    this.head.scale.setScalar(1);
+    this.head.rotation.set(Math.sin(t) * 0.035 * idle, 0, Math.sin(t * 0.8) * 0.045 * idle);
+    this.tail.rotation.y = Math.sin(t * 2.6) * 0.18 * idle;
     this.ears.forEach((ear, i) => {
-      ear.rotation.z =
-        (i === 0 ? -1 : 1) * (0.12 + Math.sin(t * 1.6) * 0.035 * idle + energy * 0.15);
+      ear.rotation.z = (i === 0 ? -1 : 1) * (0.12 + Math.sin(t * 1.6) * 0.035 * idle);
     });
     this.wings.forEach((wing, i) => {
-      wing.rotation.z =
-        (i === 0 ? -1 : 1) *
-        (Math.sin(t * 1.8) * 0.08 * idle + energy * (0.6 + Math.sin(u * 28) * 0.4));
+      wing.rotation.z = (i === 0 ? -1 : 1) * Math.sin(t * 1.8) * 0.08 * idle;
     });
-    this.paws.forEach((paw, i) => {
-      paw.rotation.z =
-        this.species === "cat" && i === 1
-          ? -energy * (1.7 + Math.sin(u * 28) * 0.3)
-          : energy * (i ? -0.35 : 0.35);
+    this.paws.forEach((paw) => paw.rotation.set(0, 0, 0));
+    this.feet.forEach((foot) => foot.rotation.set(0, 0, 0));
+    let closedEyes = 0;
+    const motion = this.behavior.motion;
+    if (motion) {
+      const u = THREE.MathUtils.clamp(
+        (this.behavior.time - motion.startedAt) / motion.duration,
+        0,
+        1,
+      );
+      const envelope =
+        THREE.MathUtils.smoothstep(u, 0, 0.18) * (1 - THREE.MathUtils.smoothstep(u, 0.82, 1));
+      const cycle = u * Math.PI * 2;
+      switch (motion.kind) {
+        case "egg-rock":
+          this.pose.rotation.z += Math.sin(cycle * 2) * 0.22 * envelope;
+          this.pose.position.y += 0.04 * envelope;
+          break;
+        case "egg-tap":
+          this.pose.scale.y *= 1 + Math.sin(cycle * 5) * 0.07 * envelope;
+          this.pose.position.y += Math.abs(Math.sin(cycle * 3)) * 0.035 * envelope;
+          break;
+        case "egg-roll":
+          this.pose.position.x = Math.sin(cycle) * 0.18 * envelope;
+          this.pose.rotation.z += -Math.sin(cycle) * 0.42 * envelope;
+          this.pose.position.y += 0.07 * envelope;
+          break;
+        case "hop": {
+          const hop = Math.max(0, Math.sin(u * Math.PI * (this.stage === 1 ? 4 : 6))) * envelope;
+          this.pose.position.y += hop * (this.stage === 1 ? 0.18 : 0.28);
+          this.pose.scale.y *= 1 - 0.1 * envelope + 0.15 * hop;
+          this.head.rotation.x -= 0.12 * envelope;
+          this.paws.forEach((paw) => (paw.rotation.x = -0.3 * envelope));
+          break;
+        }
+        case "wave":
+          if (this.paws[1]) this.paws[1].rotation.z = -(1.9 + Math.sin(cycle * 4) * 0.3) * envelope;
+          this.head.rotation.z += 0.15 * envelope;
+          this.tail.rotation.y += Math.sin(cycle * 4) * 0.5 * envelope;
+          break;
+        case "twirl":
+          this.pose.rotation.y += Math.PI * 2 * THREE.MathUtils.smoothstep(u, 0, 1);
+          this.pose.position.y += Math.abs(Math.sin(cycle * 2)) * 0.055 * envelope;
+          this.paws.forEach((paw, i) => (paw.rotation.z = (i ? -0.45 : 0.45) * envelope));
+          this.feet.forEach(
+            (foot, i) => (foot.rotation.x = Math.sin(cycle * 5 + i * Math.PI) * 0.35 * envelope),
+          );
+          break;
+        case "nuzzle":
+          this.pose.position.z = 0.18 * envelope;
+          this.pose.rotation.x = -0.08 * envelope;
+          this.head.rotation.x -= 0.18 * envelope;
+          this.head.rotation.z += Math.sin(cycle) * 0.2 * envelope;
+          closedEyes = envelope * 0.85;
+          break;
+        case "look":
+          this.head.rotation.z += Math.sin(cycle) * 0.4 * envelope;
+          this.head.rotation.y = Math.sin(cycle * 1.5) * 0.3 * envelope;
+          break;
+        case "flutter":
+          this.pose.position.y += 0.12 * envelope;
+          this.wings.forEach(
+            (wing, i) =>
+              (wing.rotation.z = (i ? 1 : -1) * (0.45 + Math.sin(cycle * 8) * 0.5) * envelope),
+          );
+          this.paws.forEach((paw, i) => (paw.rotation.z = (i ? -0.35 : 0.35) * envelope));
+          break;
+        case "toddle":
+        case "scamper":
+        case "stroll": {
+          const running = motion.kind === "scamper";
+          const steps = running ? 12 : motion.kind === "toddle" ? 7 : 5;
+          const travel = (running ? 0.35 : motion.kind === "toddle" ? 0.18 : 0.24) * envelope;
+          this.pose.position.x = Math.sin(cycle) * travel;
+          this.pose.position.z = (Math.cos(cycle) - 1) * travel * 0.55;
+          this.pose.position.y +=
+            Math.abs(Math.sin(u * Math.PI * steps)) * (running ? 0.07 : 0.025) * envelope;
+          this.pose.rotation.y += Math.sin(cycle + 0.8) * 0.8 * envelope;
+          this.head.rotation.x += Math.sin(cycle * steps) * 0.06 * envelope;
+          this.feet.forEach(
+            (foot, i) =>
+              (foot.rotation.x = Math.sin(u * Math.PI * steps + i * Math.PI) * 0.65 * envelope),
+          );
+          this.paws.forEach(
+            (paw, i) =>
+              (paw.rotation.x = -Math.sin(u * Math.PI * steps + i * Math.PI) * 0.5 * envelope),
+          );
+          break;
+        }
+        case "nap":
+          this.pose.scale.y *= 1 - 0.4 * envelope;
+          this.head.scale.y = 1 / (1 - 0.4 * envelope);
+          this.head.position.y -= 0.2 * envelope;
+          this.head.position.z = 0.08 * envelope;
+          this.head.rotation.x += 0.22 * envelope;
+          this.paws.forEach((paw) => (paw.rotation.x = -0.8 * envelope));
+          closedEyes = envelope;
+          break;
+        case "stretch":
+          this.pose.scale.y *= 1 + 0.12 * envelope;
+          this.head.position.y += 0.06 * envelope;
+          this.head.rotation.x -= 0.25 * envelope;
+          this.paws.forEach((paw) => (paw.rotation.x = -0.95 * envelope));
+          this.feet.forEach((foot) => (foot.rotation.x = -0.25 * envelope));
+          break;
+        case "groom":
+          this.head.position.y -= 0.1 * envelope;
+          this.head.rotation.x += 0.45 * envelope;
+          this.head.rotation.z -= 0.12 * envelope;
+          if (this.paws[1]) {
+            this.paws[1].rotation.z = -1.45 * envelope;
+            this.paws[1].rotation.x = (-0.7 + Math.sin(cycle * 6) * 0.15) * envelope;
+          }
+          closedEyes = envelope * 0.75;
+          break;
+      }
+    }
+    const blink = idle && t % 4.6 < 0.16 ? 0.08 : Math.max(0.06, 1 - closedEyes);
+    this.eyes.forEach((eye) => (eye.scale.y = 0.064 * blink));
+    this.eyeLights.forEach((light) => {
+      light.visible = blink > 0.4;
     });
+    const elapsed = (this.behavior.time - this.behavior.reactionStartedAt) / 2000;
+    const active = elapsed >= 0 && elapsed < 1;
+    const u = active ? elapsed : 0;
     this.sparkleMaterial.opacity = active ? Math.sin(u * Math.PI) * 0.85 : 0;
     this.sparks.forEach((spark, i) => {
       spark.visible = active;
       spark.position.set(
-        (i - 1) * 0.32,
-        (this.stage === 0 ? 0.75 : 1.2) + (reducedMotion ? 0 : u * 0.3) + (i % 2) * 0.15,
-        0.2,
+        this.pose.position.x + (i - 1) * 0.32,
+        this.pose.position.y +
+          (this.stage === 0 ? 0.75 : 1.2) +
+          (reducedMotion ? 0 : u * 0.3) +
+          (i % 2) * 0.15,
+        this.pose.position.z + 0.2,
       );
       spark.scale.setScalar(0.35);
       spark.rotation.z = (i - 1) * -0.15;
