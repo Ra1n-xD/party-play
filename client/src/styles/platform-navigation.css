@@ -313,20 +313,34 @@
     position: fixed;
     z-index: 80;
     left: 50%;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     transform: translateX(-50%);
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
-    width: min(calc(100% - 24px), 600px);
+    width: min(calc(100% - 24px), 560px);
     margin: 0;
-    padding: 8px 8px 12px;
-    border: 2px solid #170e20;
+    padding: 6px 6px 10px;
+    border: 1px solid #f6eaffcc;
     border-radius: 14px;
-    background: #e5d6ee;
+    background: transparent;
     box-shadow:
-      0 4px 0 #140c1d,
-      0 10px 28px #10091c66;
+      inset 0 1px 0 #ffffffb3,
+      0 4px 0 #140c1d66,
+      0 16px 36px #10091c99;
+  }
+
+  /* Blur a separate layer so dropdowns can blur the page beyond the tray's bounds. */
+  .platform-header-navigation::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
+    background: #e5d6eeb8;
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(24px) saturate(1.4);
+    pointer-events: none;
   }
 
   .platform-topbar .platform-nav-control {
@@ -356,7 +370,40 @@
     width: 100%;
     max-width: 100%;
     max-height: min(420px, calc(100dvh - var(--mobile-navigation-space) - 24px));
+    border: 1px solid #f6eaffcc;
+    background: #eee4f2e0;
+    -webkit-backdrop-filter: blur(28px) saturate(1.4);
+    backdrop-filter: blur(28px) saturate(1.4);
+    box-shadow:
+      inset 0 1px 0 #ffffffe6,
+      0 2px 0 #140c1d33,
+      0 18px 44px #10091c99;
     transform-origin: bottom center;
+  }
+
+  .platform-nav-dropdown a {
+    color: #30243c;
+  }
+
+  .platform-nav-item-icon {
+    border-color: #695a8733;
+    background: #ffffff70;
+  }
+
+  .platform-nav-item-copy small,
+  .platform-nav-arrow {
+    color: #6d587d;
+  }
+
+  .platform-nav-dropdown a:is(:hover, :focus-visible, [aria-current="page"]) {
+    background: #463353;
+    color: var(--show-accent);
+  }
+
+  .platform-nav-dropdown
+    a:is(:hover, :focus-visible, [aria-current="page"])
+    :is(.platform-nav-item-copy small, .platform-nav-arrow) {
+    color: #e8d9f0;
   }
 }
 
@@ -368,7 +415,7 @@
 
 @media (max-width: 600px) {
   #root:has(.platform-header-navigation) {
-    --mobile-navigation-space: calc(112px + env(safe-area-inset-bottom, 0px));
+    --mobile-navigation-space: calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
   .show-menu:is(.is-main-menu, .is-game-menu) .show-menu-shell {
@@ -376,39 +423,53 @@
   }
 
   .show-menu .show-profile-header.platform-topbar {
-    gap: 16px 10px;
-    padding-bottom: 20px;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    padding-bottom: 10px;
   }
 
   .platform-topbar .platform-header-brand {
-    gap: 8px;
-    font-size: 18px;
+    gap: 6px;
+    font-size: 16px;
   }
 
   .platform-topbar .platform-header-brand .show-brand-dice {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
   }
 
   .platform-topbar .show-profile-account {
-    max-width: min(56vw, 260px);
+    max-width: 100%;
   }
 
-  .platform-topbar.has-account .platform-header-brand .show-brand-name {
-    display: none;
+  .platform-topbar .show-profile-balance {
+    gap: 6px;
+  }
+
+  .platform-topbar .show-account-trigger {
+    min-height: 36px;
+    padding-block: 4px;
+  }
+
+  .platform-topbar .show-profile-nickname {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-wrap: wrap;
   }
 
   .platform-header-navigation {
-    gap: 8px;
+    gap: 7px;
   }
 
   .platform-topbar .platform-nav-control {
     flex-direction: column;
-    gap: 5px;
-    min-height: 64px;
-    padding: 9px 2px;
+    gap: 4px;
+    min-height: 56px;
+    padding: 7px 2px;
     border-radius: 9px;
-    font-size: 11px;
+    font-size: 10.5px;
   }
 
   .platform-nav-chevron {

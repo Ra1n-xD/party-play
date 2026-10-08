@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { loginHref } from "../authNavigation";
-import { FiAward, FiChevronLeft, FiChevronRight, FiRefreshCw } from "react-icons/fi";
+import { FiAward, FiChevronDown, FiChevronLeft, FiChevronRight, FiRefreshCw } from "react-icons/fi";
 import {
   LEADERBOARD_SORTS,
   type LeaderboardEntry,
@@ -150,6 +150,25 @@ export function LeaderboardScreen() {
               </button>
             ))}
           </nav>
+          <label className="leaderboard-mobile-sort">
+            <span>Сортировать по</span>
+            <span className="leaderboard-select-wrap">
+              <select
+                value={sort}
+                onChange={(event) => {
+                  const metric = LEADERBOARD_SORTS.find((value) => value === event.target.value);
+                  if (metric) chooseSort(metric);
+                }}
+              >
+                {LEADERBOARD_SORTS.map((metric) => (
+                  <option key={metric} value={metric}>
+                    {metrics[metric].label}
+                  </option>
+                ))}
+              </select>
+              <FiChevronDown aria-hidden="true" />
+            </span>
+          </label>
           {current?.self && profile && (
             <div className="leaderboard-self">
               <span>

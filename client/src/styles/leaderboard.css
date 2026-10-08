@@ -58,15 +58,16 @@
 }
 .leaderboard-sorts {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
   margin: 28px 0 20px;
 }
-.leaderboard-sorts button {
+.leaderboard-page .leaderboard-sorts button {
   border: 1px solid #fff8e830;
-  border-radius: 12px;
-  padding: 12px 22px;
-  min-height: 46px;
+  border-radius: 9px;
+  padding: 7px 12px;
+  min-height: 34px;
+  font-size: 12px;
   font-weight: 700;
   background: #ffffff08;
 }
@@ -74,6 +75,42 @@
   background: var(--show-accent);
   color: var(--show-base);
   border-color: var(--show-accent);
+}
+.leaderboard-mobile-sort {
+  display: none;
+}
+.leaderboard-select-wrap {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.leaderboard-select-wrap select {
+  appearance: none;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 40px 10px 14px;
+  border: 1px solid #695a87;
+  border-radius: 10px;
+  background: #45324f;
+  color: var(--show-ink);
+  font:
+    700 14px/1.4 "Golos Text",
+    sans-serif;
+  cursor: pointer;
+}
+.leaderboard-select-wrap select:focus-visible {
+  outline: 2px solid var(--show-accent);
+  outline-offset: 3px;
+}
+.leaderboard-select-wrap > svg {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  color: var(--show-muted);
+  pointer-events: none;
 }
 .leaderboard-self {
   display: flex;
@@ -251,12 +288,14 @@
     padding: 16px 0 28px;
   }
   .leaderboard-sorts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    display: none;
   }
-  .leaderboard-sorts button {
-    padding-inline: 12px;
+  .leaderboard-mobile-sort {
+    display: grid;
+    gap: 8px;
+    margin: 20px 0;
+    color: var(--show-muted);
+    font-size: 12px;
   }
   .leaderboard-table,
   .leaderboard-table tbody {
