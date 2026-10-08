@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { FiChevronDown, FiGrid, FiHeart } from "react-icons/fi";
+import { FiCheck, FiChevronDown, FiClock, FiGrid, FiHeart, FiZap } from "react-icons/fi";
 import {
   PET_BOOST_COST,
   PET_BOOST_GROWTH,
@@ -16,6 +16,7 @@ import { ProfileHeader } from "../components/ProfileHeader";
 import { MenuFooter } from "../components/MenuFooter";
 import { CoinAmount, coinLabel } from "../components/CoinAmount";
 import "../../styles/duels-pet.css";
+import "../../styles/feature-showcase.css";
 import { loginHref } from "../authNavigation";
 const PetPreview = lazy(() => import("../components/PetPreview"));
 export function PetScreen() {
@@ -64,17 +65,28 @@ export function PetScreen() {
       );
   };
   return (
-    <div className="show-menu feature-page">
+    <div className="show-menu feature-page pet-page">
       <div className="show-menu-shell">
         <ProfileHeader activePage="pet" />
         <main className="feature-main pet-main">
           <header className="feature-heading">
-            <h1>Питомец</h1>
-            <p>Ваш напарник за игровым столом.</p>
+            <div>
+              <h1>Питомец</h1>
+              <p>Растите друга. Встречайтесь за игровым столом.</p>
+            </div>
+            <span className="feature-heading-badge">
+              <FiHeart aria-hidden="true" /> 2–5 монет за уход
+            </span>
           </header>
           <section className="pet-home feature-panel">
             <div className={`pet-stage-art${status && !status.alive ? " is-lost" : ""}`}>
               <div className="pet-orbit" />
+              <span className="pet-art-spark pet-art-spark-one" aria-hidden="true">
+                ✦
+              </span>
+              <span className="pet-art-spark pet-art-spark-two" aria-hidden="true">
+                ✧
+              </span>
               {now ? (
                 <Suspense fallback={<div className="pet-preview pet-fallback">🥚</div>}>
                   <PetPreview
@@ -97,6 +109,24 @@ export function PetScreen() {
               </span>
             </div>
             <div className="pet-care-panel">
+              <span
+                className={`pet-care-status${status?.alive && status.canCare ? " is-due" : ""}`}
+              >
+                {status?.alive ? (
+                  status.canCare ? (
+                    <FiHeart aria-hidden="true" />
+                  ) : (
+                    <FiCheck aria-hidden="true" />
+                  )
+                ) : (
+                  <FiHeart aria-hidden="true" />
+                )}
+                {status?.alive
+                  ? status.canCare
+                    ? "Пора позаботиться"
+                    : "Сегодня всё хорошо"
+                  : "Здесь начинается дружба"}
+              </span>
               <h2>
                 {!pet
                   ? "Познакомьтесь с вашим питомцем"
@@ -118,12 +148,19 @@ export function PetScreen() {
                 <>
                   <div className="pet-growth">
                     <span>
-                      Рост <strong>{pet.growth} / 30</strong>
+                      <span>Рост питомца</span>{" "}
+                      <strong>
+                        {pet.growth}
+                        <small> / 30</small>
+                      </strong>
                     </span>
                     <progress value={pet.growth} max={30} aria-label="Рост питомца" />
                   </div>
                   <div className="pet-care-reward">
-                    <span>{status.canCare ? "За сегодняшний уход" : "За следующий уход"}</span>
+                    <span>
+                      <FiHeart aria-hidden="true" />
+                      {status.canCare ? "За сегодняшний уход" : "За следующий уход"}
+                    </span>
                     <CoinAmount amount={status.reward} />
                   </div>
                   <p className="feature-note">
@@ -134,6 +171,7 @@ export function PetScreen() {
                   <p
                     className={`pet-neglect${status.expiresAt - now < 2 * 86400000 ? " is-urgent" : ""}`}
                   >
+                    <FiClock aria-hidden="true" />
                     До гибели без ухода:{" "}
                     {Math.min(168, Math.max(1, Math.ceil((status.expiresAt - now) / 3600000)))} ч.
                   </p>
@@ -153,19 +191,19 @@ export function PetScreen() {
                 </button>
               ) : (
                 <>
-                  <button
-                    className="btn btn-primary"
-                    disabled={busy || !connected || !status?.canCare}
-                    onClick={() => action("care")}
-                  >
-                    {busy
-                      ? "Сохраняем…"
-                      : status?.canCare
-                        ? "Покормить и поиграть"
-                        : "Сегодня питомец ухожен"}
-                  </button>
-                  {status?.stage !== 3 && (
-                    <>
+                  <div className="pet-actions">
+                    <button
+                      className="btn btn-primary"
+                      disabled={busy || !connected || !status?.canCare}
+                      onClick={() => action("care")}
+                    >
+                      {busy
+                        ? "Сохраняем…"
+                        : status?.canCare
+                          ? "Покормить и поиграть"
+                          : "Сегодня питомец ухожен"}
+                    </button>
+                    {status?.stage !== 3 && (
                       <button
                         className="btn btn-secondary"
                         disabled={
@@ -173,10 +211,18 @@ export function PetScreen() {
                         }
                         onClick={() => action("boost")}
                       >
-                        Лакомство · +{PET_BOOST_GROWTH} роста за {PET_BOOST_COST} монет
+                        <FiZap aria-hidden="true" />
+                        <span>
+                          Лакомство{" "}
+                          <small>
+                            +{PET_BOOST_GROWTH} роста · {PET_BOOST_COST} монет
+                          </small>
+                        </span>
                       </button>
-                      <small>Раз в сутки. Лакомство ускоряет рост, но не заменяет уход.</small>
-                    </>
+                    )}
+                  </div>
+                  {status?.stage !== 3 && (
+                    <small>Лакомство — раз в сутки. Ускоряет рост, но не заменяет уход.</small>
                   )}
                 </>
               )}
@@ -198,14 +244,31 @@ export function PetScreen() {
               {PET_STAGES.map((name, i) => (
                 <article
                   key={name}
-                  className={status?.alive && status.stage === i ? "is-current" : ""}
+                  className={
+                    status?.alive
+                      ? status.stage === i
+                        ? "is-current"
+                        : status.stage > i
+                          ? "is-complete"
+                          : ""
+                      : ""
+                  }
+                  aria-current={status?.alive && status.stage === i ? "step" : undefined}
                 >
-                  <span>0{i + 1}</span>
-                  <h3>{name}</h3>
-                  <p>{["0–2", "3–9", "10–29", "30"][i]} роста</p>
-                  <small>
-                    {i + 2} {coinLabel(i + 2)} за уход
-                  </small>
+                  <span className="pet-milestone-number">
+                    {status?.alive && status.stage > i ? (
+                      <FiCheck aria-hidden="true" />
+                    ) : (
+                      `0${i + 1}`
+                    )}
+                  </span>
+                  <div>
+                    <h3>{name}</h3>
+                    <p>{["0–2", "3–9", "10–29", "30"][i]} роста</p>
+                    <small>
+                      {i + 2} {coinLabel(i + 2)} за уход
+                    </small>
+                  </div>
                 </article>
               ))}
             </aside>
