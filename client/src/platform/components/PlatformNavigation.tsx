@@ -62,7 +62,7 @@ const groups = [
       {
         page: "collection",
         href: "/collection",
-        label: "Предметы",
+        label: "Мои предметы",
         description: "Ваши карты, столы и персонажи",
         icon: LuLayers,
       },

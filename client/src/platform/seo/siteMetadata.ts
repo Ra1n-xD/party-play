@@ -75,7 +75,7 @@ export const publicPages: PageMetadata[] = [
 
 export const utilityPages = [
   ["/login", "Вход и регистрация"],
-  ["/collection", "Коллекция"],
+  ["/collection", "Мои предметы"],
   ["/profile", "Профиль игрока"],
   ["/cases", "Кейсы"],
   ["/upgrade", "Улучшение предметов"],
@@ -85,7 +85,7 @@ export const utilityPages = [
 
 const utilityDescriptions: Record<string, string> = {
   "/collection":
-    "Коллекция PartySide: персонажи, рубашки карт и эмоции. Войдите, чтобы выбрать свой игровой образ и сохранить предметы.",
+    "Мои предметы в PartySide: персонажи, рубашки карт и эмоции. Войдите, чтобы увидеть количество предметов и выбрать свой игровой образ.",
   "/cases":
     "Кейсы PartySide с персонажами, картами и эмоциями. Выберите набор и войдите в аккаунт, чтобы пополнить коллекцию.",
   "/upgrade":

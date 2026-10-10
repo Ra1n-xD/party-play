@@ -615,6 +615,25 @@ body:has(.show-menu, .profile-login),
   color: #bcb0cc;
   font-size: 11px;
 }
+.collection-item-count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 6px;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  background: #ffffff05;
+  color: #bcb0cc;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.collection-item-count strong {
+  color: #fff8e8;
+  font-weight: 700;
+}
 .collection-equip {
   width: 100%;
   border: 1px solid #ffffff25;
