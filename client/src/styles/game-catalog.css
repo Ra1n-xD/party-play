@@ -491,9 +491,8 @@
   }
   .show-menu.is-main-menu .show-menu-shell {
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
-    height: calc(100svh - 36 * var(--show-unit));
-    min-height: 0;
+    grid-template-rows: auto auto 1fr auto;
+    min-height: calc(100svh - 36 * var(--show-unit));
   }
   .show-menu.is-main-menu .show-catalog-layout {
     grid-template-rows: minmax(0, 1fr);
@@ -502,13 +501,11 @@
     max-height: calc(580 * var(--show-unit));
   }
   .show-catalog-entry {
-    height: 100%;
+    height: auto;
   }
   .show-menu.is-main-menu .show-entry-panel {
+    flex-shrink: 0;
     min-height: 0;
-    max-height: 100%;
-    overflow-y: auto;
-    scrollbar-width: thin;
   }
   .show-menu.is-main-menu .show-headline {
     padding: calc(40 * var(--show-unit)) 0 calc(32 * var(--show-unit));
