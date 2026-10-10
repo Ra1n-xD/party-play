@@ -14,12 +14,14 @@ export type DuelAction =
   | { type: "ready" }
   | { type: "fire"; cell: number };
 export type DuelRequest =
-  | { type: "create"; requestId: string; gameId: DuelGameId; stake: number }
-  | { type: "join"; id: string; revision: number; stake: number }
+  | { type: "create"; requestId: string; gameId: DuelGameId; stake: number; isPrivate?: boolean }
+  | { type: "join"; id: string; revision: number; stake: number; code?: string }
   | { type: "play"; id: string; revision: number; action: DuelAction }
   | { type: "leave"; id: string; revision: number };
 export interface DuelSummary {
   id: string;
+  code: string;
+  isPrivate: boolean;
   gameId: DuelGameId;
   stake: number;
   players: { id: string; name: string }[];

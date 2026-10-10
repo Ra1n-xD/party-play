@@ -5,7 +5,10 @@ import {
   FiCheck,
   FiChevronDown,
   FiClock,
+  FiCopy,
+  FiGlobe,
   FiLayers,
+  FiLock,
   FiUsers,
 } from "react-icons/fi";
 import { loginHref } from "../authNavigation";
@@ -28,6 +31,11 @@ import { MenuFooter } from "../components/MenuFooter";
 import { CoinAmount, coinLabel } from "../components/CoinAmount";
 import { AccessibleModal } from "../components/AccessibleModal";
 import { duelRegistry } from "../duelRegistry";
+import {
+  ROOM_CODE_LENGTH,
+  normalizeRoomCode,
+  sanitizeRoomCodeInput,
+} from "../../../../shared/roomCode";
 import "../../styles/duels-pet.css";
 import "../../styles/feature-showcase.css";
 
@@ -314,7 +322,12 @@ function Match({
 export function DuelsScreen() {
   const { profile, connected } = useProfile();
   const [data, setData] = useState<DuelDirectory | null>(null);
-  const [id, setId] = useState<string | undefined>();
+  const [selection, setSelection] = useState<{ id?: string; code?: string }>({});
+  const { id, code: viewCode } = selection;
+  const setId = (id?: string, code?: string) => setSelection({ id, code });
+  const [codeInput, setCodeInput] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [gameId, setGameId] = useState<DuelGameId>("memory");
   const [stake, setStake] = useState("0");
   const [busy, setBusy] = useState(false);
@@ -339,6 +352,7 @@ export function DuelsScreen() {
     if (requested) setId(requested);
   }, []);
   useEffect(() => {
+    setCopied(false);
     if (id && id !== "list") window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [id]);
   useEffect(() => {
@@ -349,7 +363,7 @@ export function DuelsScreen() {
     const refresh = () => {
       if (inFlight || busyRef.current) return;
       inFlight = true;
-      socket.timeout(8000).emit("duels:get", { id }, (timeout, result) => {
+      socket.timeout(8000).emit("duels:get", { id, code: viewCode }, (timeout, result) => {
         inFlight = false;
         if (epoch.current !== current || busyRef.current) return;
         if (timeout) {
@@ -360,7 +374,9 @@ export function DuelsScreen() {
           setError(result.error);
           return;
         }
-        if (id === undefined && result.value.selected) setId(result.value.selected.id);
+        if (id === undefined && result.value.selected)
+          setId(result.value.selected.id, result.value.selected.code);
+        setError("");
         offset.current = result.value.serverNow - Date.now();
         setData((previous) =>
           previous && previous.serverNow > result.value.serverNow ? previous : result.value,
@@ -383,7 +399,7 @@ export function DuelsScreen() {
       socket.off("duels:snapshot", pushed);
       socket.emit("duels:unsubscribe");
     };
-  }, [profile?.id, connected, id]);
+  }, [profile?.id, connected, id, viewCode]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now() + offset.current), 250);
     return () => window.clearInterval(timer);
@@ -411,12 +427,36 @@ export function DuelsScreen() {
       }
       pendingCreate.current = null;
       offset.current = result.value.serverNow - Date.now();
-      if (result.value.selected) setId(result.value.selected.id);
+      if (result.value.selected) setId(result.value.selected.id, result.value.selected.code);
       setData((previous) =>
         previous && previous.serverNow > result.value.serverNow ? previous : result.value,
       );
       setNow(result.value.serverNow);
       setConfirm(null);
+    });
+  };
+  const openByCode = () => {
+    const code = normalizeRoomCode(codeInput);
+    if (!profile || !connected || !code || busyRef.current) return;
+    const actorId = profile.id;
+    const current = epoch.current;
+    busyRef.current = true;
+    setBusy(true);
+    setError("");
+    socket.timeout(8000).emit("duels:get", { code }, (timeout, result) => {
+      if (accountId.current !== actorId) return;
+      busyRef.current = false;
+      setBusy(false);
+      if (epoch.current !== current) return;
+      if (timeout) {
+        setError("Нет ответа сервера. Попробуйте открыть дуэль ещё раз");
+        return;
+      }
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      if (result.value.selected) setId(result.value.selected.id, result.value.selected.code);
     });
   };
   const duel = data?.selected;
@@ -445,7 +485,12 @@ export function DuelsScreen() {
                 <h2>Готовы принять вызов?</h2>
                 <p>Войдите, чтобы сыграть за монеты или устроить дружескую партию со ставкой 0.</p>
               </div>
-              <a className="btn btn-primary" href={loginHref("/duels")}>
+              <a
+                className="btn btn-primary"
+                href={loginHref(
+                  id && id !== "list" ? `/duels?duel=${encodeURIComponent(id)}` : "/duels",
+                )}
+              >
                 Войти и сыграть
               </a>
             </div>
@@ -471,6 +516,11 @@ export function DuelsScreen() {
                   Банк <CoinAmount amount={duel.stake * duel.players.length} />
                 </span>
               </div>
+              <p className="duel-access-note">
+                {duel.isPrivate ? <FiLock aria-hidden="true" /> : <FiGlobe aria-hidden="true" />}
+                {duel.isPrivate ? "Приватная дуэль · вход только по коду" : "Открытая дуэль"}
+                <strong>{duel.code}</strong>
+              </p>
               {duel.phase === "waiting" ? (
                 <div className="duel-wait">
                   <span aria-hidden="true">◎</span>
@@ -480,17 +530,29 @@ export function DuelsScreen() {
                     монеты вернутся.
                   </p>
                   <label>
-                    Ссылка на дуэль
+                    Код этой дуэли
                     <input
+                      className="duel-invite-code"
                       readOnly
-                      value={
-                        typeof window === "undefined"
-                          ? ""
-                          : `${location.origin}/duels?duel=${duel.id}`
-                      }
+                      value={duel.code}
                       onFocus={(e) => e.target.select()}
                     />
                   </label>
+                  <button
+                    className="btn btn-secondary duel-copy-code"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(duel.code);
+                        setCopied(true);
+                      } catch {
+                        setError("Не удалось скопировать. Выделите код и скопируйте его вручную");
+                      }
+                    }}
+                  >
+                    {copied ? <FiCheck aria-hidden="true" /> : <FiCopy aria-hidden="true" />}
+                    {copied ? "Код скопирован" : "Скопировать код"}
+                  </button>
+                  <p className="feature-note">Другу нужно открыть «Дуэли» и ввести эти 4 буквы.</p>
                   {!own && (
                     <button
                       className="btn btn-primary"
@@ -551,6 +613,7 @@ export function DuelsScreen() {
                     onClick={() => {
                       setGameId(duel.gameId);
                       setStake(String(duel.stake));
+                      setIsPrivate(duel.isPrivate);
                       setId("list");
                     }}
                   >
@@ -624,6 +687,40 @@ export function DuelsScreen() {
                     </>
                   ) : (
                     <>
+                      <fieldset className="duel-access-options" disabled={busy}>
+                        <legend>Доступ к дуэли</legend>
+                        {[
+                          {
+                            private: false,
+                            title: "Открытая",
+                            hint: "Видна всем в списке",
+                            Icon: FiGlobe,
+                          },
+                          {
+                            private: true,
+                            title: "Приватная",
+                            hint: "Только по коду",
+                            Icon: FiLock,
+                          },
+                        ].map(({ private: privateAccess, title, hint, Icon }) => (
+                          <label
+                            key={title}
+                            className={isPrivate === privateAccess ? "is-selected" : ""}
+                          >
+                            <input
+                              type="radio"
+                              name="duel-access"
+                              checked={isPrivate === privateAccess}
+                              onChange={() => setIsPrivate(privateAccess)}
+                            />
+                            <Icon aria-hidden="true" />
+                            <span>
+                              <strong>{title}</strong>
+                              <small>{hint}</small>
+                            </span>
+                          </label>
+                        ))}
+                      </fieldset>
                       <label>
                         Ставка каждого, монет
                         <input
@@ -667,6 +764,7 @@ export function DuelsScreen() {
                             requestId: pendingCreate.current,
                             gameId,
                             stake: Number(stake),
+                            isPrivate,
                           });
                         }}
                       >
@@ -683,6 +781,39 @@ export function DuelsScreen() {
               )}
               {profile && (
                 <section className="feature-panel duel-open">
+                  <form
+                    className="duel-code-entry"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      openByCode();
+                    }}
+                  >
+                    <h2>
+                      <FiLock aria-hidden="true" /> Дуэль по коду
+                    </h2>
+                    <label htmlFor="duel-code">Код дуэли · 4 латинские буквы</label>
+                    <div className="duel-code-controls">
+                      <input
+                        id="duel-code"
+                        className="duel-invite-code"
+                        value={codeInput}
+                        placeholder="ABCD"
+                        maxLength={ROOM_CODE_LENGTH}
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        spellCheck={false}
+                        onChange={(e) => setCodeInput(sanitizeRoomCodeInput(e.target.value))}
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={busy || !connected || !normalizeRoomCode(codeInput)}
+                      >
+                        Открыть
+                      </button>
+                    </div>
+                    <small>Введите код от друга, затем подтвердите ставку.</small>
+                  </form>
                   <h2>
                     <FiUsers aria-hidden="true" />
                     Открытые дуэли
@@ -698,9 +829,7 @@ export function DuelsScreen() {
                     <div className="duel-empty">
                       <FiUsers aria-hidden="true" />
                       <strong>Первый вызов за вами</strong>
-                      <p>
-                        Создайте дуэль и отправьте ссылку другу — или дождитесь соперника здесь.
-                      </p>
+                      <p>Создайте дуэль и отправьте код другу — или дождитесь соперника здесь.</p>
                       <span>Дружеская партия? Выбирайте ставку 0.</span>
                     </div>
                   ) : (
@@ -778,6 +907,10 @@ export function DuelsScreen() {
                   Дуэли проходят между двумя аккаунтами, без ботов. Зрители могут наблюдать за
                   открытыми действиями.
                 </p>
+                <p>
+                  У каждой дуэли есть код из 4 латинских букв. Открытые дуэли видны в общем списке;
+                  приватные доступны только участникам и тем, кому вы передали код.
+                </p>
               </details>
             </details>
           </div>
@@ -813,6 +946,7 @@ export function DuelsScreen() {
                     id: confirm.id,
                     revision: confirm.revision,
                     stake: confirm.stake,
+                    code: confirm.code,
                   });
               }}
             >

@@ -19,20 +19,46 @@ import type { DuelRecord } from "./duelRecord.js";
 import type { IOServer } from "./gameModule.js";
 import { isDeploymentDraining } from "./deploymentState.js";
 import { getSocketClientIdentity } from "../clientIdentity.js";
+import { generateRoomCode } from "../utils.js";
+import { normalizeRoomCode } from "../../../shared/roomCode.js";
+
+function newDuelCode(used: ReadonlySet<string>): string {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const code = generateRoomCode();
+    if (!used.has(code)) return code;
+  }
+  throw new Error("Не удалось создать код дуэли. Попробуйте позже");
+}
 
 /** A server outage must not turn into a timeout defeat before clients can reconnect. */
 export async function restoreDuelDeadlines(): Promise<void> {
-  if (![...profileStore.duels.values()].some((d) => d.phase !== "finished")) return;
+  if (
+    ![...profileStore.duels.values()].some(
+      (d) => d.phase !== "finished" || d.code === undefined || d.isPrivate === undefined,
+    )
+  )
+    return;
   await profileTransaction([], (draft) => {
     const now = Date.now();
+    const codes = new Set([...draft.duels.values()].flatMap((d) => (d.code ? [d.code] : [])));
     for (const previous of draft.duels.values()) {
-      if (previous.phase === "finished") continue;
+      if (previous.phase === "finished" && previous.code && previous.isPrivate !== undefined)
+        continue;
       const d = structuredClone(previous);
-      d.deadline =
-        now +
-        (d.phase === "waiting" ? DUEL_WAIT_MS : d.phase === "setup" ? DUEL_SETUP_MS : DUEL_TURN_MS);
-      if (d.game?.kind === "memory" && d.game.open.length === 2) d.game.revealUntil = now + 1800;
-      d.revision++;
+      d.code ??= newDuelCode(codes);
+      codes.add(d.code);
+      d.isPrivate ??= false;
+      if (d.phase !== "finished") {
+        d.deadline =
+          now +
+          (d.phase === "waiting"
+            ? DUEL_WAIT_MS
+            : d.phase === "setup"
+              ? DUEL_SETUP_MS
+              : DUEL_TURN_MS);
+        if (d.game?.kind === "memory" && d.game.open.length === 2) d.game.revealUntil = now + 1800;
+        d.revision++;
+      }
       draft.duels.set(d.id, d);
     }
   });
@@ -56,6 +82,8 @@ function guard(socket: Socket) {
 function summary(d: DuelRecord): DuelSummary {
   return {
     id: d.id,
+    code: d.code!,
+    isPrivate: d.isPrivate === true,
     gameId: d.gameId,
     stake: d.stake,
     phase: d.phase,
@@ -100,14 +128,22 @@ function projection(d: DuelRecord, viewer: string): DuelSnapshot {
         : null,
   };
 }
-function directory(key: string, id?: string): DuelDirectory {
+function directory(key: string, id?: string, code?: string): DuelDirectory {
   assertProfileStorage();
   const all = [...profileStore.duels.values()].sort((a, b) => b.createdAt - a.createdAt);
   const mine = all.filter((d) => d.players.includes(key));
-  const selected = id ? profileStore.duels.get(id) : mine.find((d) => d.phase !== "finished");
+  const selected = id
+    ? profileStore.duels.get(id)
+    : code
+      ? all.find((d) => d.code === code)
+      : mine.find((d) => d.phase !== "finished");
+  if ((code || (id && id !== "list")) && !selected)
+    throw new Error("Дуэль не найдена. Проверьте код");
+  if (selected?.isPrivate && !selected.players.includes(key) && selected.code !== code)
+    throw new Error("Для приватной дуэли нужен код приглашения");
   return {
     rooms: all
-      .filter((d) => d.phase !== "finished")
+      .filter((d) => d.phase !== "finished" && !d.isPrivate)
       .slice(0, 50)
       .map(summary),
     mine: mine.slice(0, 10).map(summary),
@@ -155,7 +191,10 @@ function publishDuels(io: IOServer) {
     try {
       const key = viewer.data.profileKey as string;
       assertProfileSession(viewer, key);
-      viewer.emit("duels:snapshot", directory(key, viewer.data.duelViewId ?? undefined));
+      viewer.emit(
+        "duels:snapshot",
+        directory(key, viewer.data.duelViewId ?? undefined, viewer.data.duelViewCode ?? undefined),
+      );
     } catch {
       viewer.data.duelSubscribed = false;
     }
@@ -212,9 +251,14 @@ export function registerDuelHandlers(socket: Socket<ClientEvents, ServerEvents>,
       guard(socket);
       const key = socket.data.profileKey as string;
       assertProfileSession(socket, key);
+      const id = typeof data?.id === "string" ? data.id : undefined;
+      const code = data?.code === undefined ? undefined : normalizeRoomCode(data.code);
+      if (code === null) throw new Error("Введите код из 4 латинских букв");
+      const value = directory(key, id, code);
       socket.data.duelSubscribed = true;
-      socket.data.duelViewId = typeof data?.id === "string" ? data.id : null;
-      reply({ ok: true, value: directory(key, socket.data.duelViewId ?? undefined) });
+      socket.data.duelViewId = value.selected?.id ?? id ?? null;
+      socket.data.duelViewCode = code ?? null;
+      reply({ ok: true, value });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });
     }
@@ -247,7 +291,8 @@ export function registerDuelHandlers(socket: Socket<ClientEvents, ServerEvents>,
             !DUEL_GAMES.includes(data.gameId) ||
             !Number.isSafeInteger(data.stake) ||
             data.stake < 0 ||
-            data.stake > DUEL_MAX_STAKE
+            data.stake > DUEL_MAX_STAKE ||
+            (data.isPrivate !== undefined && typeof data.isPrivate !== "boolean")
           )
             throw new Error("Некорректная игра или ставка");
           const profile = draft.profiles.get(key)!;
@@ -255,6 +300,10 @@ export function registerDuelHandlers(socket: Socket<ClientEvents, ServerEvents>,
           profile.coins -= data.stake;
           draft.duels.set(id, {
             id,
+            code: newDuelCode(
+              new Set([...draft.duels.values()].flatMap((d) => (d.code ? [d.code] : []))),
+            ),
+            isPrivate: data.isPrivate === true,
             gameId: data.gameId,
             stake: data.stake,
             players: [key],
@@ -269,6 +318,12 @@ export function registerDuelHandlers(socket: Socket<ClientEvents, ServerEvents>,
           return;
         }
         if (!previous) throw new Error("Дуэль не найдена");
+        if (
+          previous.isPrivate &&
+          !previous.players.includes(key) &&
+          (data.type !== "join" || normalizeRoomCode(data.code) !== previous.code)
+        )
+          throw new Error("Для приватной дуэли нужен код приглашения");
         const d = structuredClone(previous);
         if (expire(draft, d, now)) {
           draft.duels.set(id, d);
@@ -338,10 +393,12 @@ export function registerDuelHandlers(socket: Socket<ClientEvents, ServerEvents>,
         d.revision++;
         draft.duels.set(id, d);
       });
+      socket.data.duelViewId = id;
+      socket.data.duelViewCode = profileStore.duels.get(id)?.code ?? null;
       publishProfiles(io, profileStore.duels.get(id)?.players ?? [key]);
       publishDuels(io);
       assertProfileSession(socket, key);
-      reply({ ok: true, value: directory(key, id) });
+      reply({ ok: true, value: directory(key, id, socket.data.duelViewCode ?? undefined) });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });
     }

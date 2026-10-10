@@ -1,35 +1,38 @@
 # Replace __CLIENT_DIST__ with the actual absolute client/dist path.
 # Obtain the certificate for both hosts before enabling this file.
+# Apply only after the planned migration and an inventory of VPN/HTTPS listeners.
+# Add this vhost alongside existing sites; preserve VPN hosts and certificates.
+# If another service owns port 443, resolve routing before enabling these listeners.
 server {
     listen 80;
     listen [::]:80;
-    server_name partyside.fun www.partyside.fun;
+    server_name partyside.ru www.partyside.ru;
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/letsencrypt;
         try_files $uri =404;
     }
     location / {
-        return 301 https://partyside.fun$request_uri;
+        return 301 https://partyside.ru$request_uri;
     }
 }
 
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
-    server_name www.partyside.fun;
-    ssl_certificate /etc/letsencrypt/live/partyside.fun/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/partyside.fun/privkey.pem;
+    server_name www.partyside.ru;
+    ssl_certificate /etc/letsencrypt/live/partyside.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/partyside.ru/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    return 301 https://partyside.fun$request_uri;
+    return 301 https://partyside.ru$request_uri;
 }
 
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
-    server_name partyside.fun;
-    ssl_certificate /etc/letsencrypt/live/partyside.fun/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/partyside.fun/privkey.pem;
+    server_name partyside.ru;
+    ssl_certificate /etc/letsencrypt/live/partyside.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/partyside.ru/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
 
     add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss:; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
@@ -48,10 +51,10 @@ server {
 
     # Match the original request only, never an internal 404/index rewrite.
     if ($request_uri ~ "^/index\.html(?:\?|$)") {
-        return 301 https://partyside.fun/$is_args$args;
+        return 301 https://partyside.ru/$is_args$args;
     }
     if ($request_uri ~ "^/([^?]+)\.html(?:\?|$)") {
-        return 301 https://partyside.fun/$1$is_args$args;
+        return 301 https://partyside.ru/$1$is_args$args;
     }
     # Do not redirect /socket.io/ or ACME endpoints.
     rewrite ^(/games/[a-z0-9-]+|/updates|/login|/collection|/profile|/cases|/upgrade|/leaderboard|/stats)/$ $1 permanent;
