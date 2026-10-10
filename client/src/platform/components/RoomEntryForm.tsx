@@ -2,6 +2,7 @@ import { useId, type FormEvent } from "react";
 import { FiArrowRight, FiEye, FiRefreshCw } from "react-icons/fi";
 import { ROOM_CODE_LENGTH, sanitizeRoomCodeInput } from "../../../../shared/roomCode";
 import type { RoomVisibility } from "../../../../shared/platform/publicRooms";
+import { usePlatform } from "../context/PlatformContext";
 
 export type RoomEntryMode = "join" | "create";
 
@@ -42,10 +43,15 @@ export function RoomEntryForm({
   onReconnect,
   onModeChange,
 }: RoomEntryFormProps) {
+  const { deploymentDraining } = usePlatform();
   const id = useId();
   const creating = mode === "create";
   const canSubmit =
-    connected && !pending && !!name.trim() && (creating || code.length === ROOM_CODE_LENGTH);
+    connected &&
+    !pending &&
+    !(creating && deploymentDraining) &&
+    !!name.trim() &&
+    (creating || code.length === ROOM_CODE_LENGTH);
 
   return (
     <section

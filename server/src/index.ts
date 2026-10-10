@@ -13,6 +13,7 @@ import { disposeRoomsForDeployment, getAllRooms } from "./platform/roomManager.j
 import { attachProfileSession } from "./platform/profileAuth.js";
 import { closeProfileStorage, profileStorageHealthy } from "./platform/profileStorage.js";
 import { restoreDuelDeadlines } from "./platform/duels.js";
+import { getPendingGameRewardCount } from "./platform/profiles.js";
 
 const app = express();
 
@@ -138,12 +139,20 @@ app.get("/deployz", (req, res) => {
     return;
   }
   const retainedRooms = getAllRooms().size;
-  const safe = ready && !shuttingDown && isDeploymentDraining() && retainedRooms === 0;
+  const pendingGameRewards = getPendingGameRewardCount();
+  const safe =
+    ready &&
+    !shuttingDown &&
+    isDeploymentDraining() &&
+    retainedRooms === 0 &&
+    pendingGameRewards === 0 &&
+    profileStorageHealthy;
   res.set("Cache-Control", "no-store");
   res.status(safe ? 200 : 409).json({
     status: safe ? "drained" : isDeploymentDraining() ? "busy" : "open",
     retainedRooms,
-    deploymentMode: "stop-rooms",
+    pendingGameRewards,
+    deploymentMode: "wait-games",
   });
 });
 
@@ -155,13 +164,24 @@ app.post("/deployz/drain", (req, res) => {
   const retainedRooms = getAllRooms().size;
   if (!ready || shuttingDown) {
     res.set("Cache-Control", "no-store");
-    res.status(409).json({ status: "busy", retainedRooms, deploymentMode: "stop-rooms" });
+    res.status(409).json({ status: "busy", retainedRooms, deploymentMode: "wait-games" });
     return;
   }
-  setDeploymentDraining(true);
+  const timeoutSeconds = req.body?.timeoutSeconds ?? 1_020;
+  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 120 || timeoutSeconds > 3_720) {
+    res.status(400).json({ error: "Invalid deployment timeout" });
+    return;
+  }
+  setDeploymentDraining(true, timeoutSeconds * 1_000);
   const stoppedRooms = disposeRoomsForDeployment();
   res.set("Cache-Control", "no-store");
-  res.json({ status: "drained", retainedRooms: 0, stoppedRooms, deploymentMode: "stop-rooms" });
+  const remainingRooms = getAllRooms().size;
+  res.json({
+    status: remainingRooms === 0 ? "drained" : "waiting",
+    retainedRooms: remainingRooms,
+    stoppedRooms,
+    deploymentMode: "wait-games",
+  });
 });
 
 app.post("/deployz/resume", (req, res) => {

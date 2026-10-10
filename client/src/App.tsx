@@ -18,6 +18,7 @@ import { UpdatesScreen } from "./platform/screens/UpdatesScreen";
 import { ProfileHeader } from "./platform/components/ProfileHeader";
 import "./styles/profiles.css";
 import { AppUpdateNotice } from "./platform/components/AppUpdateNotice";
+import { DeploymentBanner } from "./platform/components/DeploymentBanner";
 import { PageMetadata } from "./platform/seo/PageMetadata";
 import { PublicPage } from "./platform/seo/PublicPage";
 import { publicGames } from "./platform/seo/siteMetadata";
@@ -246,12 +247,13 @@ export default function App({ initialPath }: { initialPath: string }) {
   return (
     <>
       <PlatformProvider>
+        <DeploymentBanner />
         <ProfileProvider>
           <ProfileApp initialPath={initialPath} />
         </ProfileProvider>
+        <AppUpdateNotice />
       </PlatformProvider>
       <div className="app-version">v{__APP_VERSION__}</div>
-      <AppUpdateNotice />
     </>
   );
 }

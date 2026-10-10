@@ -16,6 +16,7 @@ import {
 import { CONFIG } from "../config.js";
 import { AVATARS, DEFAULT_AVATAR_ID, type AvatarId } from "../../../shared/platform/avatars.js";
 import type { CardSkinId } from "../../../shared/platform/cosmetics.js";
+import { isDeploymentDraining } from "./deploymentState.js";
 
 export interface Player {
   id: string;
@@ -147,10 +148,14 @@ export function disposeRoomIfVacant(room: Room): boolean {
   return disposeRoom(room, "empty");
 }
 
+export function disposeRoomForDeployment(room: Room): boolean {
+  return room.lifecycle !== "playing" && disposeRoom(room, "deployment");
+}
+
 export function disposeRoomsForDeployment(): number {
   let disposed = 0;
   for (const room of Array.from(rooms.values())) {
-    if (disposeRoom(room, "deployment")) disposed++;
+    if (disposeRoomForDeployment(room)) disposed++;
   }
   return disposed;
 }
@@ -164,6 +169,7 @@ export function disposeInactiveRooms(now = Date.now()): number {
       roomLastActivity.delete(code);
       continue;
     }
+    if (isDeploymentDraining() && room.lifecycle === "playing") continue;
     const hasConnectedParticipant =
       Array.from(room.players.values()).some(
         (player) =>

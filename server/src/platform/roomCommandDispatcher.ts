@@ -16,6 +16,7 @@ import { equipProfileItem } from "./profiles.js";
 import { assertProfileSession } from "./profileAuth.js";
 import { guardProfileRequest } from "./profileRateLimit.js";
 import { isAvatarId } from "../../../shared/platform/avatars.js";
+import { DEPLOYMENT_WAIT_MESSAGE, isDeploymentDraining } from "./deploymentState.js";
 
 const MAX_PROCESSED_COMMANDS = 128;
 type AnyPlatformCommand = AnyRoomCommandEnvelope["command"];
@@ -128,6 +129,12 @@ async function applyCommand(
   const module = getServerGameModule(room.gameId);
   if (!module) {
     return { success: false, code: "INVALID_COMMAND", error: "Игра недоступна" };
+  }
+  if (
+    isDeploymentDraining() &&
+    (command.type === "room:start" || command.type === "room:play-again")
+  ) {
+    return { success: false, code: "CONFLICT", error: DEPLOYMENT_WAIT_MESSAGE };
   }
 
   switch (command.type) {

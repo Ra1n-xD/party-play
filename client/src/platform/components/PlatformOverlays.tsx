@@ -3,28 +3,6 @@ import { usePlatform } from "../context/PlatformContext";
 import { ReconnectPauseOverlay } from "./ReconnectPauseOverlay";
 import { AccessibleModal } from "./AccessibleModal";
 
-function DeploymentNotice() {
-  const { deploymentNotice, dismissDeploymentNotice } = usePlatform();
-  if (!deploymentNotice) return null;
-
-  return (
-    <AccessibleModal
-      labelledBy="deployment-notice-title"
-      onClose={dismissDeploymentNotice}
-      panelClassName="deployment-notice"
-    >
-      <span className="deployment-notice-mark" aria-hidden="true">
-        ↻
-      </span>
-      <h2 id="deployment-notice-title">Обновляем игру</h2>
-      <p>{deploymentNotice}</p>
-      <button type="button" className="btn btn-primary" onClick={dismissDeploymentNotice}>
-        Понятно
-      </button>
-    </AccessibleModal>
-  );
-}
-
 function AdminPauseOverlay() {
   const { snapshot } = usePlatform();
   const [dismissed, setDismissed] = useState(false);
@@ -89,7 +67,6 @@ export function PlatformOverlays() {
       {snapshot && <ReconnectPauseOverlay snapshot={snapshot} />}
       <AdminPauseOverlay />
       <HostChangeNotice />
-      <DeploymentNotice />
     </>
   );
 }

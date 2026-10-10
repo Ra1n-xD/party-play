@@ -14,19 +14,22 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 95
 
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
         env:
           PARTYSIDE_PROJECT_DIR: ${{ vars.VPS_PROJECT_DIR }}
+          PARTYSIDE_DEPLOY_WAIT_SECONDS: ${{ vars.VPS_DEPLOY_WAIT_SECONDS }}
+          PARTYSIDE_ALLOW_LEGACY_DEPLOY: ${{ vars.VPS_ALLOW_LEGACY_DEPLOY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           fingerprint: ${{ secrets.VPS_HOST_FINGERPRINT }}
-          command_timeout: 30m
-          envs: PARTYSIDE_PROJECT_DIR
+          command_timeout: 90m
+          envs: PARTYSIDE_PROJECT_DIR,PARTYSIDE_DEPLOY_WAIT_SECONDS,PARTYSIDE_ALLOW_LEGACY_DEPLOY
           script: |
             set -eu
             if [ -z "${PARTYSIDE_PROJECT_DIR:-}" ]; then
