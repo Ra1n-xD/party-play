@@ -24,7 +24,7 @@ export function AccountScreen() {
             {profile.completedGames} завершённых партий · {profile.wins} побед
           </span>
           <a href="/collection" className="profile-text-button">
-            Коллекция: {owned} / {COSMETICS.length}
+            Мои предметы: {owned} / {COSMETICS.length} видов
           </a>
         </section>
         {account?.testParticipant && <TestAccountNotice />}

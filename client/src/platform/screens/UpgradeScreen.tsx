@@ -89,7 +89,9 @@ function ItemCard({
       style={{ "--rarity-color": RARITIES[item.rarity].color } as CSSProperties}
     >
       <span className="cosmetic-rarity">{RARITIES[item.rarity].name}</span>
-      <CosmeticPreview item={item} />
+      <div className="upgrade-item-preview">
+        <CosmeticPreview item={item} />
+      </div>
       <strong>{item.name}</strong>
       <small>{COSMETIC_KIND_NAMES[item.kind]}</small>
       {children}

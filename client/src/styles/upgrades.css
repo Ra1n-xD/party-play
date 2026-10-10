@@ -292,8 +292,17 @@
   margin-top: 12px;
 }
 .upgrade-item {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   text-align: center;
+}
+.upgrade-item-preview {
+  display: grid;
+  height: 130px;
+  flex-shrink: 0;
+  place-items: center;
+  min-width: 0;
 }
 .upgrade-item > strong {
   display: block;
@@ -356,6 +365,7 @@
 }
 .upgrade-catalog-item {
   position: relative;
+  display: flex;
   min-width: 0;
   padding: 14px 10px 10px;
   border: 1px solid #ffffff18;
@@ -380,26 +390,49 @@
   cursor: default;
 }
 .upgrade-catalog-item .cosmetic-rarity {
+  min-height: 16px;
   font-size: 8px;
   letter-spacing: 0.7px;
 }
 .upgrade-catalog-item .cosmetic-deck {
-  margin-block: -5px;
   zoom: 0.82;
 }
+.upgrade-catalog-item > .upgrade-item {
+  flex: 1;
+}
+.upgrade-catalog-item .upgrade-item-preview {
+  height: 112px;
+}
 .upgrade-catalog-item .cosmetic-avatar {
-  height: 97px;
+  height: 112px;
 }
 .upgrade-catalog-item .cosmetic-avatar .avatar-portrait {
   width: 75px;
   height: 75px;
+}
+.upgrade-catalog-item .cosmetic-reaction {
+  height: 112px;
+}
+.upgrade-catalog-item .cosmetic-reaction .reaction-icon {
+  width: 70px;
+  height: 70px;
+}
+.upgrade-catalog-item .upgrade-item > strong {
+  min-height: 2.8em;
+  overflow-wrap: anywhere;
+}
+.upgrade-catalog-item .upgrade-item > small {
+  min-height: 14px;
+  margin-bottom: 13px;
 }
 .upgrade-item-meta {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 4px;
-  margin-top: 13px;
+  align-items: baseline;
+  min-height: 35px;
+  margin-top: auto;
   padding-top: 9px;
   border-top: 1px solid #ffffff15;
   color: var(--upgrade-muted);

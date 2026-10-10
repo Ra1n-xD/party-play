@@ -17,11 +17,12 @@ export function CollectionScreen() {
   const [tab, setTab] = useState<CosmeticKind>("avatar");
   if (!profile) return null;
   const owned = COSMETICS.filter((item) => profile.inventory[item.id]).length;
+  const totalCopies = COSMETICS.reduce((sum, item) => sum + (profile.inventory[item.id] ?? 0), 0);
   return (
     <main className="collection-page">
       <div className="collection-heading">
         <div>
-          <h1>Коллекция</h1>
+          <h1>Мои предметы</h1>
           <p>Персонажи, карты и эмоции для вашего вечера за столом.</p>
         </div>
       </div>
@@ -29,8 +30,9 @@ export function CollectionScreen() {
         <strong>{profile.nickname}</strong>
         <CoinAmount amount={profile.coins} />
         <span>
-          {owned} / {COSMETICS.length} предметов
+          Собрано видов: {owned} из {COSMETICS.length}
         </span>
+        <span>Всего предметов: {totalCopies.toLocaleString("ru-RU")} шт.</span>
         <span>
           {getUpgradeInputValue(
             Object.entries(profile.inventory)
@@ -65,12 +67,12 @@ export function CollectionScreen() {
               key={item.id}
               style={{ "--rarity-color": rarity.color } as CSSProperties}
             >
-              <span className="cosmetic-rarity">
-                {rarity.name}
-                {count > 1 ? ` · ×${count}` : ""}
-              </span>
+              <span className="cosmetic-rarity">{rarity.name}</span>
               <CosmeticPreview item={item} />
               <h2>{item.name}</h2>
+              <p className="collection-item-count">
+                <span>В наличии:</span> <strong>{count.toLocaleString("ru-RU")} шт.</strong>
+              </p>
               <button
                 className="collection-equip"
                 onClick={() => equip(item.id)}
