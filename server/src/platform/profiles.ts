@@ -381,9 +381,16 @@ interface ProfileRound {
   retry?: NodeJS.Timeout;
 }
 const rounds = new WeakMap<Room, ProfileRound>();
+const pendingGameRewards = new Set<ProfileRound>();
+
+export function getPendingGameRewardCount(): number {
+  return pendingGameRewards.size;
+}
+
 async function payRound(round: ProfileRound, io: IOServer): Promise<void> {
   if (round.paid || round.paying || !round.rewardKeys) return;
   round.paying = true;
+  pendingGameRewards.add(round);
   const keys = round.rewardKeys;
   try {
     await transaction([...keys], (draft) => {
@@ -400,6 +407,7 @@ async function payRound(round: ProfileRound, io: IOServer): Promise<void> {
       draft.rewardedMatches.add(round.id);
     });
     round.paid = true;
+    pendingGameRewards.delete(round);
     clearTimeout(round.retry);
     for (const key of keys) publishProfile(key, io);
   } catch {

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { usePlatform } from "../context/PlatformContext";
 
 /** A suspended phone tab may keep an old JS bundle through several deployments. */
 export function AppUpdateNotice() {
+  const { deploymentDraining } = usePlatform();
   const [available, setAvailable] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
@@ -51,7 +53,7 @@ export function AppUpdateNotice() {
       window.removeEventListener("pageshow", check);
     };
   }, []);
-  if (!available || dismissed) return null;
+  if (!available || dismissed || deploymentDraining) return null;
   return (
     <aside className="app-update-notice" role="status">
       <span>Доступна новая версия игры</span>

@@ -37,6 +37,7 @@ import type {
   PlatformCommand,
 } from "../../../../shared/platform/room";
 import { socket } from "../../socket";
+import { DEPLOYMENT_WAIT_MESSAGE } from "../../../../shared/platform/deployment";
 import {
   clearReconnectSession,
   readReconnectSession,
@@ -142,8 +143,7 @@ interface PlatformContextValue {
   isSpectator: boolean;
   snapshot: AnyRoomSnapshot | null;
   error: string | null;
-  deploymentNotice: string | null;
-  dismissDeploymentNotice: () => void;
+  deploymentDraining: boolean;
   reconnectState: ReconnectState;
   reconnectableSeats: ReconnectableSeat[];
   reconnectableSeatsRoomCode: string | null;
@@ -241,7 +241,8 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   const [isSpectator, setIsSpectator] = useState(false);
   const [snapshot, setSnapshot] = useState<AnyRoomSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [deploymentNotice, setDeploymentNotice] = useState<string | null>(null);
+  const [deploymentDraining, setDeploymentDraining] = useState(false);
+  const deploymentDrainingRef = useRef(false);
   const [reconnectState, setReconnectState] = useState<ReconnectState>("idle");
   const [reconnectableSeats, setReconnectableSeats] = useState<ReconnectableSeat[]>([]);
   const [reconnectableSeatsRoomCode, setReconnectableSeatsRoomCode] = useState<string | null>(null);
@@ -499,6 +500,13 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
   const enqueueRoomCommand = useCallback(
     <G extends GameId>(gameId: G, command: PlatformCommand<G>): boolean => {
+      if (
+        deploymentDrainingRef.current &&
+        (command.type === "room:start" || command.type === "room:play-again")
+      ) {
+        setTimedError(DEPLOYMENT_WAIT_MESSAGE);
+        return false;
+      }
       const current = snapshotRef.current;
       if (
         !current ||
@@ -520,7 +528,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       flushCommandQueue();
       return true;
     },
-    [flushCommandQueue],
+    [flushCommandQueue, setTimedError],
   );
 
   useEffect(() => {
@@ -570,6 +578,15 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       explicitLeaveSuppressedRef.current = false;
       lastRejoinSocketIdRef.current = null;
       resetRoomUi();
+    };
+
+    const returnHomeForDeployment = () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      setError(null);
+      deploymentDrainingRef.current = true;
+      setDeploymentDraining(true);
+      window.history.replaceState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     };
 
     const emitStoredRejoin = (savedSession: ReconnectSession): boolean => {
@@ -878,6 +895,10 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       setSessionPending(false);
       if (terminal) {
         clearStoredSession();
+        if (code === "ROOM_NOT_FOUND" && deploymentDrainingRef.current) {
+          returnHomeForDeployment();
+          return;
+        }
       } else {
         setReconnectState("reconnecting");
       }
@@ -887,12 +908,15 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     const handleKicked: ServerEvents["room:kicked"] = ({ message, reason }) => {
       clearStoredSession();
       if (reason === "deployment") {
-        if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-        setError(null);
-        setDeploymentNotice(message);
+        returnHomeForDeployment();
         return;
       }
       setTimedError(message);
+    };
+
+    const handleDeployment: ServerEvents["platform:deployment"] = ({ draining }) => {
+      deploymentDrainingRef.current = draining;
+      setDeploymentDraining(draining);
     };
 
     const handleSnapshot: ServerEvents["room:snapshot"] = (nextSnapshot) => {
@@ -1118,6 +1142,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     socket.on("room:error", handleRoomError);
     socket.on("room:reconnectError", handleReconnectError);
     socket.on("room:kicked", handleKicked);
+    socket.on("platform:deployment", handleDeployment);
     socket.on("room:snapshot", handleSnapshot);
     socket.on("room:commandResult", handleCommandResult);
     socket.on("game:event", handleGameEvent);
@@ -1159,6 +1184,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       socket.off("room:error", handleRoomError);
       socket.off("room:reconnectError", handleReconnectError);
       socket.off("room:kicked", handleKicked);
+      socket.off("platform:deployment", handleDeployment);
       socket.off("room:snapshot", handleSnapshot);
       socket.off("room:commandResult", handleCommandResult);
       socket.off("game:event", handleGameEvent);
@@ -1191,6 +1217,10 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
   const createRoom = useCallback(
     (gameId: GameId, name: string, visibility: RoomVisibility = "private"): boolean => {
+      if (deploymentDrainingRef.current) {
+        setTimedError(DEPLOYMENT_WAIT_MESSAGE);
+        return false;
+      }
       if (
         !ensureSocketConnected() ||
         membershipRequestPendingRef.current ||
@@ -1212,7 +1242,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       socket.emit("room:create", { gameId, playerName: name, visibility });
       return true;
     },
-    [armControlRequest, ensureSocketConnected],
+    [armControlRequest, ensureSocketConnected, setTimedError],
   );
 
   const subscribePublicRooms = useCallback((gameId: GameId) => {
@@ -1658,7 +1688,6 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
   }, [armControlRequest, ensureSocketConnected, pendingSeatClaim?.requestId]);
 
   const clearError = useCallback(() => setError(null), []);
-  const dismissDeploymentNotice = useCallback(() => setDeploymentNotice(null), []);
   const clearHostChangeNotice = useCallback(() => setHostChangeNotice(null), []);
 
   return (
@@ -1674,8 +1703,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         isSpectator,
         snapshot,
         error,
-        deploymentNotice,
-        dismissDeploymentNotice,
+        deploymentDraining,
         reconnectState,
         reconnectableSeats,
         reconnectableSeatsRoomCode,

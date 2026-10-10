@@ -1,4 +1,5 @@
 import type { DuelDirectory, DuelRequest } from "./duels.js";
+import type { DeploymentStatus } from "./deployment.js";
 import type { PetAction } from "./pet.js";
 import type {
   ActionCard,
@@ -190,6 +191,7 @@ export interface ClientEvents {
 
 // Server -> Client
 export interface ServerEvents {
+  "platform:deployment": (status: DeploymentStatus) => void;
   "duels:snapshot": (snapshot: DuelDirectory) => void;
   "profile:account-snapshot": (data: ProfileAccountSnapshot) => void;
   "profile:expired": () => void;

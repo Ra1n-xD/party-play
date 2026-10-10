@@ -14,6 +14,7 @@ import {
 } from "../../../shared/types.js";
 import {
   createRoom,
+  disposeRoomForDeployment,
   disposeRoomIfVacant,
   joinRoom,
   joinRoomAsSpectator,
@@ -32,7 +33,12 @@ import {
   hasAccountInRoom,
   ACCOUNT_ALREADY_IN_ROOM,
 } from "./roomManager.js";
-import { DEPLOYMENT_STOP_MESSAGE, isDeploymentDraining } from "./deploymentState.js";
+import {
+  DEPLOYMENT_ROOM_CLOSED_MESSAGE,
+  DEPLOYMENT_WAIT_MESSAGE,
+  isDeploymentDraining,
+  setDeploymentStatusPublisher,
+} from "./deploymentState.js";
 import { bunkerModule, executeBunkerCommand } from "../games/bunker/module.js";
 import { asBunkerRoom } from "../games/bunker/runtime.js";
 import { CONFIG } from "../config.js";
@@ -257,7 +263,7 @@ function attachRoomDisposalHandler(room: Room, io: IOServer): void {
         (claim) => claim.socketId,
       );
       io.to([disposedRoom.code, ...claimantSocketIds]).emit("room:kicked", {
-        message: DEPLOYMENT_STOP_MESSAGE,
+        message: DEPLOYMENT_ROOM_CLOSED_MESSAGE,
         reason: "deployment",
       });
     }
@@ -267,7 +273,7 @@ function attachRoomDisposalHandler(room: Room, io: IOServer): void {
       disposedRoom,
       io,
       reason === "deployment"
-        ? DEPLOYMENT_STOP_MESSAGE
+        ? DEPLOYMENT_ROOM_CLOSED_MESSAGE
         : reason === "inactive"
           ? "Комната закрыта из-за неактивности"
           : "Комната закрыта",
@@ -654,13 +660,21 @@ function resolveSeatClaimCommand(
 
 export function registerHandlers(io: IOServer): void {
   installGameLifecycleHooks();
+  setDeploymentStatusPublisher((status) => io.emit("platform:deployment", status));
   setRoomPreparingHook(syncLobbyProfileCosmetics);
   setRoomPublishedHook((room, publishedIo) => {
     syncPublishedRoomWithPublicDirectory(room, publishedIo);
     syncPublishedRoomWithProjectStats(room, publishedIo);
     syncRoomProfileRewards(room, publishedIo);
+    if (isDeploymentDraining() && room.lifecycle !== "playing") {
+      // Finish the current command and reward calculation before removing its runtime.
+      void executeInRoom(room.code, () => {
+        if (isDeploymentDraining()) disposeRoomForDeployment(room);
+      });
+    }
   });
   io.on("connection", (socket: IOSocket) => {
+    socket.emit("platform:deployment", { draining: isDeploymentDraining() });
     registerProfileHandlers(socket, io, () => {
       const info = socketRoomMap.get(socket.id);
       if (!info) return null;
@@ -688,11 +702,11 @@ export function registerHandlers(io: IOServer): void {
         socket.emit("room:error", { message: "Дождитесь завершения операции с аккаунтом" });
         return;
       }
-      if (isDeploymentDraining() && membershipEvents.includes(event)) {
-        socket.emit("room:kicked", {
-          message: DEPLOYMENT_STOP_MESSAGE,
-          reason: "deployment",
-        });
+      if (
+        isDeploymentDraining() &&
+        ["room:create", "game:start", "game:playAgain"].includes(event)
+      ) {
+        socket.emit("room:error", { message: DEPLOYMENT_WAIT_MESSAGE });
         return;
       }
       const nameEvents = [
