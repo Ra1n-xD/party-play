@@ -390,14 +390,17 @@ try {
       loaded.profiles.set(profile.id, profile);
     }
     if (data.duels !== undefined && !Array.isArray(data.duels)) throw new Error("Invalid duels");
+    const duelCodes = new Set<string>();
     for (const duel of data.duels ?? []) {
       if (
         !validDuel(duel) ||
         loaded.duels.has(duel.id) ||
+        (duel.code !== undefined && duelCodes.has(duel.code)) ||
         duel.players.some((id: string) => !loaded.profiles.has(id))
       )
         throw new Error("Invalid duel");
       loaded.duels.set(duel.id, duel);
+      if (duel.code !== undefined) duelCodes.add(duel.code);
     }
     if (data.upgradeReceipts !== undefined && !Array.isArray(data.upgradeReceipts))
       throw new Error("Invalid upgrade receipts");

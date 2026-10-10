@@ -1,4 +1,4 @@
-export const SITE_URL = "https://partyside.fun";
+export const SITE_URL = "https://partyside.ru";
 export const SOCIAL_IMAGE = `${SITE_URL}/social-card.png`;
 export const HOME_TAGLINE = "Онлайн-игры для своей компании — в браузере, без установки.";
 
@@ -41,7 +41,7 @@ export const publicPages: PageMetadata[] = [
     path: "/duels",
     title: "Дуэли — Найди пару и Морской бой онлайн | PartySide",
     description:
-      "Дуэли для двух игроков: найдите больше пар или потопите флот соперника. Ставки от 0 монет, весь банк победителю. Правила игр и открытые дуэли PartySide.",
+      "Дуэли для двух игроков: найдите больше пар или потопите флот соперника. Ставки от 0 монет, весь банк победителю. Открытые и приватные дуэли по коду из 4 букв на PartySide.",
     indexable: true,
   },
   {

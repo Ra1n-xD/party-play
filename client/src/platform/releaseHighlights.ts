@@ -5,6 +5,8 @@ import petModels from "../assets/updates/pet-models-6.16.2.jpg";
 import dogPet from "../assets/updates/dog-pet-6.17.0.jpg";
 import petGrowth from "../assets/updates/pet-growth-6.17.1.jpg";
 import dogGrowth from "../assets/updates/dog-growth-6.17.5.jpg";
+import duelCodes from "../assets/updates/duel-code-lobby-6.18.0.jpg";
+import privateDuel from "../assets/updates/duel-private-6.18.0.jpg";
 import duelLobby from "../assets/updates/duel-lobby-6.15.0.png";
 import groupedBottomNavigation from "../assets/updates/grouped-bottom-navigation-6.14.1.png";
 import petTable from "../assets/updates/pet-table-6.11.0.jpg";
@@ -55,6 +57,35 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-18",
+    version: "6.18.0",
+    date: "2026-10-08",
+    category: "ДУЭЛИ",
+    title: "Вызов другу — по четырём буквам.",
+    summary: "Приглашайте в дуэль по короткому коду и выбирайте, кто увидит ваш вызов.",
+    changes: [
+      "У каждой дуэли теперь есть код из 4 латинских букв. Скопируйте его другу: в разделе «Дуэли» он введёт код, увидит ставку и сможет принять вызов.",
+      "При создании выберите открытую или приватную дуэль. Приватные вызовы не появляются в общем списке; доступ к ним получают участники и игроки, которым вы передали код.",
+      "Код и выбранный доступ сохраняются при переподключении и обновлении сервера. Ставки и правила игр остаются прежними.",
+    ],
+    screenshots: [
+      {
+        src: duelCodes,
+        caption: "6.18.0 · Выбор доступа и вход по коду — локальная сборка, QA-профиль",
+        alt: "Страница Дуэли с выбором открытого или приватного доступа и полем для четырёхбуквенного кода. Локальная сборка и тестовые данные.",
+        width: 1280,
+        height: 800,
+      },
+      {
+        src: privateDuel,
+        caption: "6.18.0 · Приватное приглашение на телефоне — локальная сборка, QA-профиль",
+        alt: "Мобильная приватная дуэль ожидает соперника: показаны четырёхбуквенный код и кнопка его копирования. Локальная сборка и тестовые данные.",
+        width: 390,
+        height: 844,
+      },
+    ],
+  },
   {
     id: "release-6-17",
     version: "6.17.0–6.17.5",

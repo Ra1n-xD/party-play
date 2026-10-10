@@ -74,7 +74,7 @@ export interface SpectatorJoinedPayload {
 export interface ClientEvents {
   "duels:unsubscribe": () => void;
   "duels:get": (
-    data: { id?: string },
+    data: { id?: string; code?: string },
     reply: (result: ProfileReply<DuelDirectory>) => void,
   ) => void;
   "duels:command": (

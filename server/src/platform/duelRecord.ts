@@ -2,8 +2,12 @@ import type { DuelGameId, DuelSummary } from "../../../shared/platform/duels.js"
 import type { MemoryState } from "../games/memory/engine.js";
 import type { BattleshipState } from "../games/battleship/engine.js";
 import { validFleet } from "../../../shared/games/battleship/rules.js";
+import { normalizeRoomCode } from "../../../shared/roomCode.js";
 export interface DuelRecord {
   id: string;
+  // Older records acquire these fields atomically before the server starts accepting clients.
+  code?: string;
+  isPrivate?: boolean;
   gameId: DuelGameId;
   stake: number;
   players: string[];
@@ -19,6 +23,9 @@ export function validDuel(d: DuelRecord): boolean {
   if (
     !d ||
     typeof d.id !== "string" ||
+    (d.code !== undefined &&
+      (typeof d.code !== "string" || normalizeRoomCode(d.code) !== d.code)) ||
+    (d.isPrivate !== undefined && typeof d.isPrivate !== "boolean") ||
     !["memory", "battleship"].includes(d.gameId) ||
     !Number.isSafeInteger(d.stake) ||
     d.stake < 0 ||

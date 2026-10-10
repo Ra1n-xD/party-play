@@ -1,21 +1,73 @@
-# Переход на PartySide и partyside.fun
+# Переход на partyside.ru
 
-Версия 6.8.0 готовит сайт к `https://partyside.fun`. Покупка домена и выполнение
-команд ниже — отдельные действия на сервере. Локальное переименование не меняет
-DNS, GitHub, запущенный сервис или пользовательские данные.
+Версия 6.18.1 готовит сайт к `https://partyside.ru`. Перенос на окончательный
+сервер запланирован после **30 октября 2026 года**. До переноса подготовка
+остаётся локальной: действующий сервер, DNS, VPN и пользовательские данные
+не меняются. Сборка содержит canonical `.ru`; публикуйте её при переключении
+сайта. Push в `main` запускает автодеплой, поэтому публикацию этого релиза
+нужно согласовать с переносом и настройками GitHub Actions.
+
+## План переноса после 30 октября 2026 года
+
+1. Проверить старый и окончательный VPS: версию приложения, systemd-сервис,
+   рабочую папку, реальные пути профилей и статистики, владельца файлов,
+   nginx, сертификаты, SSH-доступ и занятые порты. Зафиксировать работу VPN,
+   его HTTPS-ссылок и реального клиентского подключения до изменений.
+2. На окончательном VPS сохранить конфигурацию VPN и обслуживающего его HTTPS.
+   Если nginx уже обслуживает VPN, добавить отдельный vhost `partyside.ru`
+   с отдельным сертификатом. Сохранить существующие `server_name`, пути ссылок,
+   клиентские ключи и порты. Если 443 слушает Xray или другой сервис, сначала
+   определить совместимую схему маршрутизации; шаблон ниже нельзя включать
+   поверх занятого порта. Не заменять глобальный nginx-конфиг или правила VPN.
+3. Подготовить зависимости, код и сборку по [DEPLOY.md](DEPLOY.md).
+   До восстановления рабочих данных сервис не запускать. На время переноса
+   приостановить workflow деплоя и исключить параллельную публикацию релизов.
+4. Подготовить DNS, временный vhost и сертификат по шагам 1 и 5 ниже; установку
+   полного nginx-шаблона из шага 5 отложить до пункта 6 этого плана.
+   До окончательного запуска vhost отдаёт 503, сохраняя доступ к ACME challenge. Результат проверки
+   HTTPS и доступности нового IP из нужных сетей должен предшествовать редиректу
+   старого сайта. Старый адрес приложения и адреса VPN пока не переключать.
+5. В окно обслуживания завершить партии и остановить старый сервис приложения.
+   После штатной остановки сделать окончательную защищённую копию `.env`,
+   `server/.data/` и внешних хранилищ. Передать её по SSH на окончательный VPS,
+   исключив `*.lock`; проверить контрольные суммы, владельца и права.
+   Не запускать два независимых рабочих сервера с копиями одного хранилища.
+6. На новом VPS сохранить настройки перенесённого `.env`, добавить
+   `https://partyside.ru` в `CORS_ORIGINS` по шагу 3 и проверить пути данных.
+   Запустить сервис с восстановленными файлами, проверить `/readyz`, затем
+   включить рабочий vhost. Проверить вход прежним аккаунтом, коллекцию,
+   питомца, дуэли, обычные комнаты, зрителей, ботов и переподключение.
+   Повторно проверить HTTPS-ссылки и клиентское подключение VPN.
+7. После проверок включить постоянный редирект старого сайта по шагу 6.
+   Старый Node-процесс оставить выключенным и исключить его автозапуск.
+   Сохранить старый домен, сертификат и редиректы минимум год. Старый VPS
+   держать для отката; отключать его после переноса старого vhost/сертификата
+   на окончательный сервер, обновления DNS и прекращения трафика на старый IP.
+8. В GitHub Actions обновить `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`,
+   `VPS_HOST_FINGERPRINT` и при необходимости `VPS_PROJECT_DIR`. Fingerprint
+   сверить через доверенную консоль провайдера. Возобновить автодеплой после
+   проверки нового сервера; выполнить отправку sitemap и переезд в поисковиках
+   по шагу 7. При откате после новых игровых операций сначала сохранить
+   актуальные данные нового VPS: старую копию поверх них не восстанавливать.
+
+Шаги ниже описывают настройки домена для выбранной установки. При новом VPS
+переменные `partyside_project_dir`, `partyside_app_user` и `partyside_service`
+должны указывать на новую установку; резервная копия старого сервера остаётся
+отдельно. Шаг 4 для обновления уже работающего приложения пропускается при
+первой установке на новом VPS.
 
 ## 1. DNS и порты
 
 У регистратора создайте `A` для `@` → IP **сервера приложения** и `CNAME` для
-`www` → `partyside.fun`. `AAAA` добавляйте только для работающего IPv6 этого
+`www` → `partyside.ru`. `AAAA` добавляйте только для работающего IPv6 этого
 сервера. Если переезжаете на другой IP, сначала проверьте доступ к нему из нужных
 сетей и перенесите приложение с файлами профилей и статистики.
 
 На VPS с Ubuntu/Debian от root, после распространения DNS:
 
 ```bash
-dig +short A partyside.fun
-dig +short A www.partyside.fun
+dig +short A partyside.ru
+dig +short A www.partyside.ru
 ss -tlnp '( sport = :80 or sport = :443 )'
 ```
 
@@ -58,14 +110,16 @@ systemctl cat "$partyside_service" > "$partyside_backup_dir/service.txt"
 остальных переменных при переходе не меняются. Не запускайте второй Node-процесс
 с тем же хранилищем.
 
-Релиз должен быть опубликован в `origin/main` вашим обычным процессом. Push в main
-уже запускает автодеплой. Планируйте публикацию и переход в окно без активных
-комнат; при HTTP 409 от `/deployz/drain` игроки и зрители должны выйти из комнат.
-Не обходите этот запрет и не перезапускайте сервис во время партии.
+Релиз публикуется обычным процессом только в согласованное окно переноса.
+Push в `main` запускает автодеплой: до публикации проверьте, на какой VPS указывают
+secrets workflow. Текущий `/deployz/drain` останавливает существующие комнаты;
+он не ждёт завершения партий. На старых версиях возможен HTTP 409 при наличии
+комнат. Не обходите gate; перед переносом завершите партии и остановите сервис
+штатно, затем снимите окончательную копию данных.
 
 ## 3. Разрешить новый origin, сохранив старые настройки
 
-Команда добавляет только `https://partyside.fun` к `CORS_ORIGINS`, не меняя
+Команда добавляет только `https://partyside.ru` к `CORS_ORIGINS`, не меняя
 пользователя, пути, порт или остальные переменные. Запись атомарная, права и
 владелец `.env` сохраняются. Секреты не выводятся.
 
@@ -81,8 +135,8 @@ if len(matches) != 1:
     raise SystemExit('Expected exactly one CORS_ORIGINS; edit this setting manually')
 origins = matches[0].group(1).strip().strip('\"\'')
 values = [value.strip() for value in origins.split(',') if value.strip()]
-if 'https://partyside.fun' not in values:
-    values.append('https://partyside.fun')
+if 'https://partyside.ru' not in values:
+    values.append('https://partyside.ru')
 updated = pattern.sub(lambda _: 'CORS_ORIGINS=' + ','.join(values), source)
 metadata = p.stat()
 fd, name = tempfile.mkstemp(prefix='.partyside-env-', dir=p.parent)
@@ -100,7 +154,8 @@ PY
 ```
 
 Не удаляйте пока старый origin: существующие вкладки должны доиграть партии.
-Перезапуск произойдёт только через обычный деплой с проверкой комнат.
+Для существующей установки перезапуск выполняется в окно обслуживания через
+обычный деплой. Для нового VPS origin добавляется до первого запуска сервиса.
 
 ## 4. Обновить приложение обычным безопасным деплоем
 
@@ -144,8 +199,8 @@ curl --fail --silent --show-error http://127.0.0.1:3001/readyz
 test ! -e /etc/nginx/sites-available/partyside
 test ! -e /etc/nginx/sites-enabled/partyside
 partyside_nginx_dump=$(nginx -T 2>/dev/null)
-if printf '%s\n' "$partyside_nginx_dump" | grep -Eq 'server_name.*partyside\.fun'; then
-  echo 'partyside.fun already has a vhost; adapt it instead of creating a duplicate' >&2
+if printf '%s\n' "$partyside_nginx_dump" | grep -Eq 'server_name.*partyside\.ru'; then
+  echo 'partyside.ru already has a vhost; adapt it instead of creating a duplicate' >&2
   exit 1
 fi
 unset partyside_nginx_dump
@@ -156,7 +211,7 @@ cat > /etc/nginx/sites-available/partyside <<'NGINX'
 server {
     listen 80;
     listen [::]:80;
-    server_name partyside.fun www.partyside.fun;
+    server_name partyside.ru www.partyside.ru;
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/letsencrypt;
         try_files $uri =404;
@@ -167,7 +222,7 @@ NGINX
 ln -s /etc/nginx/sites-available/partyside /etc/nginx/sites-enabled/partyside
 nginx -t
 systemctl reload nginx
-certbot certonly --webroot -w /var/www/letsencrypt -d partyside.fun -d www.partyside.fun
+certbot certonly --webroot -w /var/www/letsencrypt -d partyside.ru -d www.partyside.ru
 ```
 
 В шаблоне приложения предполагается Node на `127.0.0.1:3001`. Если действующий
@@ -193,7 +248,7 @@ certbot renew --dry-run
 Шаблон обслуживает готовые HTML-страницы вместо общего SPA fallback, отдаёт
 настоящий HTTP 404 для неизвестных адресов, сохраняет WebSocket-прокси и заголовки
 безопасности, включает gzip и кеширование хешированных ресурсов. HTTP и `www`
-перенаправляются на `https://partyside.fun`.
+перенаправляются на `https://partyside.ru`.
 
 Если статика находится под `/root`, проверьте доступ nginx к каталогам через
 `namei -l "$partyside_project_dir/client/dist/index.html"`. Не открывайте весь
@@ -213,7 +268,7 @@ location ^~ /.well-known/acme-challenge/ {
     try_files $uri =404;
 }
 location / {
-    return 301 https://partyside.fun$request_uri;
+    return 301 https://partyside.ru$request_uri;
 }
 ```
 
@@ -228,7 +283,7 @@ systemctl reload nginx
 ```
 
 Сохраняйте старый домен и редиректы минимум год. Браузер не переносит
-`localStorage` между доменами: на `partyside.fun` потребуется снова войти
+`localStorage` между доменами: на `partyside.ru` потребуется снова войти
 существующим никнеймом и паролем. Аккаунты, монеты и коллекции хранятся на сервере
 и сохраняются. Гостевые токены комнаты не передаются через URL; активные партии
 нужно закончить до смены домена.
@@ -236,26 +291,26 @@ systemctl reload nginx
 ## 7. Проверка и отправка в поиск
 
 ```bash
-curl -I http://partyside.fun/games/uno
-curl -I https://www.partyside.fun/games/uno
-curl --fail --silent --show-error https://partyside.fun/readyz
-curl --fail --silent --show-error https://partyside.fun/robots.txt
-curl --fail --silent --show-error https://partyside.fun/sitemap.xml
-curl -I https://partyside.fun/games/bunker
-curl -I https://partyside.fun/this-page-does-not-exist
-curl --silent --show-error https://partyside.fun/games/durak | head -45
+curl -I http://partyside.ru/games/uno
+curl -I https://www.partyside.ru/games/uno
+curl --fail --silent --show-error https://partyside.ru/readyz
+curl --fail --silent --show-error https://partyside.ru/robots.txt
+curl --fail --silent --show-error https://partyside.ru/sitemap.xml
+curl -I https://partyside.ru/games/bunker
+curl -I https://partyside.ru/this-page-does-not-exist
+curl --silent --show-error https://partyside.ru/games/durak | head -45
 ```
 
 Ожидается: 301 для HTTP/www, 200 для готовности и публичных страниц, 404 для
 неизвестного адреса. В исходном HTML — текст правил, уникальный title,
-description и canonical `https://partyside.fun/games/durak`.
+description и canonical `https://partyside.ru/games/durak`.
 Проверьте старый URL с реальным hostname: 301 на тот же путь нового сайта.
 В браузере проверьте вход старым аккаунтом, создание/подключение к комнате,
 зрителя, ботов, переподключение и повтор партии.
 
 Добавьте домен в [Google Search Console](https://search.google.com/search-console)
 и [Яндекс Вебмастер](https://webmaster.yandex.ru/), подтвердите владение через DNS
-и отправьте `https://partyside.fun/sitemap.xml`. Проверьте главную и три страницы
+и отправьте `https://partyside.ru/sitemap.xml`. Проверьте главную и три страницы
 игр через инструменты проверки URL. В Search Console для подтверждённых старого
 и нового сайтов используйте «Изменение адреса», если старый сайт поддерживает
 такой переезд. В Яндексе используйте инструмент переезда сайта.
