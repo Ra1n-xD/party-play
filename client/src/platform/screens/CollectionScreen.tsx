@@ -60,11 +60,6 @@ export function CollectionScreen() {
           </button>
         ))}
       </nav>
-      {tab === "battleship" && (
-        <p className="collection-fleet-note">
-          Выбранный флот появится в следующем морском бое. Новые скины — в кейсах и улучшениях.
-        </p>
-      )}
       <div className="collection-grid">
         {COSMETICS.filter((item) => item.kind === tab).map((item) => {
           const count = profile.inventory[item.id] ?? 0;

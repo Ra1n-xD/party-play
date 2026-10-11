@@ -197,11 +197,6 @@
   width: 40px;
   height: 48px;
 }
-.collection-fleet-note {
-  color: #bcb0cc;
-  font-size: 13px;
-  line-height: 1.5;
-}
 @media (max-width: 700px) {
   .upgrade-selected-item > .cosmetic-fleet {
     display: none;
