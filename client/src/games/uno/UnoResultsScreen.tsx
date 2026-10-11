@@ -17,7 +17,7 @@ function formatCardCount(count: number): string {
 }
 
 export function UnoResultsScreen({ snapshot }: UnoResultsScreenProps) {
-  const { connected, commandPending, error, leaveRoom, playAgain } = usePlatform();
+  const { connected, commandPending, leaveRoom, playAgain } = usePlatform();
   const game = snapshot.game;
   if (!game) {
     return (
@@ -116,11 +116,6 @@ export function UnoResultsScreen({ snapshot }: UnoResultsScreenProps) {
           </button>
         ) : null}
       </section>
-      {error && (
-        <div className="error-toast" role="alert">
-          {error}
-        </div>
-      )}
     </main>
   );
 }

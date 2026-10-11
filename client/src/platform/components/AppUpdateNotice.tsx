@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { usePlatform } from "../context/PlatformContext";
+import { NotificationDialog } from "./NotificationDialog";
 
 /** A suspended phone tab may keep an old JS bundle through several deployments. */
 export function AppUpdateNotice() {
@@ -55,14 +56,12 @@ export function AppUpdateNotice() {
   }, []);
   if (!available || dismissed || deploymentDraining) return null;
   return (
-    <aside className="app-update-notice" role="status">
-      <span>Доступна новая версия игры</span>
-      <button type="button" onClick={() => location.reload()}>
-        Обновить
-      </button>
-      <button type="button" onClick={() => setDismissed(true)}>
-        Позже
-      </button>
-    </aside>
+    <NotificationDialog
+      title="Доступна новая версия"
+      kind="info"
+      message="На сайте появились обновления. Обновите страницу, чтобы загрузить новую версию, или закройте это окно и продолжайте играть."
+      onClose={() => setDismissed(true)}
+      action={{ label: "Обновить", onClick: () => location.reload() }}
+    />
   );
 }

@@ -29,6 +29,7 @@ import { useProfile } from "../context/ProfileContext";
 import { ProfileHeader } from "../components/ProfileHeader";
 import { MenuFooter } from "../components/MenuFooter";
 import { CoinAmount, coinLabel } from "../components/CoinAmount";
+import { NotificationDialog } from "../components/NotificationDialog";
 import { AccessibleModal } from "../components/AccessibleModal";
 import { duelRegistry } from "../duelRegistry";
 import { BattleshipBoard as Sea } from "../../games/battleship/BattleshipBoard";
@@ -227,7 +228,6 @@ function Match({
               )}
             </div>
           )}
-          {error && <p role="alert">{error}</p>}
           <div className={`sea-tabs${setup ? " is-setup" : ""}`} aria-label="Выбор поля">
             {[0, 1].map((i) => (
               <button
@@ -301,6 +301,14 @@ function Match({
           </div>
         </>
       )}
+      {error && (
+        <NotificationDialog
+          title="Не удалось разместить корабль"
+          message={error}
+          kind="error"
+          onClose={() => setError("")}
+        />
+      )}
     </>
   );
 }
@@ -313,7 +321,7 @@ export function DuelsScreen() {
   const setId = (id?: string, code?: string) => setSelection({ id, code });
   const [codeInput, setCodeInput] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copyNotice, setCopyNotice] = useState(false);
   const [gameId, setGameId] = useState<DuelGameId>("memory");
   const [stake, setStake] = useState("0");
   const [busy, setBusy] = useState(false);
@@ -338,7 +346,7 @@ export function DuelsScreen() {
     if (requested) setId(requested);
   }, []);
   useEffect(() => {
-    setCopied(false);
+    setCopyNotice(false);
     if (id && id !== "list") window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [id]);
   useEffect(() => {
@@ -362,7 +370,6 @@ export function DuelsScreen() {
         }
         if (id === undefined && result.value.selected)
           setId(result.value.selected.id, result.value.selected.code);
-        setError("");
         offset.current = result.value.serverNow - Date.now();
         setData((previous) =>
           previous && previous.serverNow > result.value.serverNow ? previous : result.value,
@@ -481,16 +488,6 @@ export function DuelsScreen() {
               </a>
             </div>
           )}
-          {profile && !connected && (
-            <p role="status">
-              Соединение потеряно. Вернём дуэль после подключения. Таймер продолжает идти.
-            </p>
-          )}
-          {error && (
-            <p role="alert" className="feature-error">
-              {error}
-            </p>
-          )}
           {duel ? (
             <section className="feature-panel duel-match">
               <div className="duel-match-heading">
@@ -531,7 +528,7 @@ export function DuelsScreen() {
                         onClick={async () => {
                           try {
                             await navigator.clipboard.writeText(duel.code);
-                            setCopied(true);
+                            setCopyNotice(true);
                           } catch {
                             setError(
                               "Не удалось скопировать. Выделите код и скопируйте его вручную",
@@ -539,8 +536,7 @@ export function DuelsScreen() {
                           }
                         }}
                       >
-                        {copied ? <FiCheck aria-hidden="true" /> : <FiCopy aria-hidden="true" />}
-                        {copied ? "Код скопирован" : "Скопировать код"}
+                        <FiCopy aria-hidden="true" /> Скопировать код
                       </button>
                     </div>
                     <p className="feature-note">
@@ -965,8 +961,18 @@ export function DuelsScreen() {
               Назад
             </button>
           </div>
-          {error && <p role="alert">{error}</p>}
         </AccessibleModal>
+      )}
+      {(error || copyNotice) && (
+        <NotificationDialog
+          title={error ? "Не удалось выполнить действие" : "Код скопирован"}
+          message={error || "Отправьте код другу: он сможет ввести его в разделе «Дуэли»."}
+          kind={error ? "error" : "success"}
+          onClose={() => {
+            setError("");
+            setCopyNotice(false);
+          }}
+        />
       )}
     </div>
   );

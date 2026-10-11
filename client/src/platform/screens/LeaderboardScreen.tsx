@@ -12,6 +12,7 @@ import { useProfile } from "../context/ProfileContext";
 import { AvatarPortrait } from "../components/AvatarPortrait";
 import { CoinAmount } from "../components/CoinAmount";
 import { MenuFooter } from "../components/MenuFooter";
+import { NotificationDialog } from "../components/NotificationDialog";
 import { ProfileHeader } from "../components/ProfileHeader";
 import "../../styles/show-menu.css";
 import "../../styles/leaderboard.css";
@@ -79,7 +80,6 @@ export function LeaderboardScreen() {
     if (!connected) return;
     let active = true;
     setPending(true);
-    setError(null);
     const timeout = window.setTimeout(() => {
       if (!active) return;
       active = false;
@@ -185,16 +185,6 @@ export function LeaderboardScreen() {
               попадали в рейтинг.
             </p>
           )}
-          {!connected && (
-            <p className="leaderboard-message" role="status">
-              Нет связи с сервером. Рейтинг обновится после подключения.
-            </p>
-          )}
-          {error && (
-            <p className="leaderboard-message is-error" role="alert">
-              {error}
-            </p>
-          )}
           {!current && !error && connected && (
             <p className="leaderboard-message" role="status">
               Загружаем рейтинг…
@@ -289,6 +279,15 @@ export function LeaderboardScreen() {
         </main>
         <MenuFooter />
       </div>
+      {error && (
+        <NotificationDialog
+          title="Рейтинг недоступен"
+          message={error}
+          kind="error"
+          onClose={() => setError(null)}
+          action={{ label: "Повторить", onClick: () => setRefresh((value) => value + 1) }}
+        />
+      )}
     </div>
   );
 }

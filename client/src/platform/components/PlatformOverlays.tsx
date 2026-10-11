@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { usePlatform } from "../context/PlatformContext";
 import { ReconnectPauseOverlay } from "./ReconnectPauseOverlay";
 import { AccessibleModal } from "./AccessibleModal";
+import { NotificationDialog } from "./NotificationDialog";
 
 function AdminPauseOverlay() {
   const { snapshot } = usePlatform();
@@ -47,15 +48,12 @@ function HostChangeNotice() {
   if (!hostChangeNotice || hostChangeNotice.hostId !== viewerSeatId) return null;
 
   return (
-    <div className="host-change-notice" role="status">
-      <div>
-        <strong>Вам переданы права хоста</strong>
-        <span>Теперь вы управляете восстановлением комнаты.</span>
-      </div>
-      <button type="button" onClick={clearHostChangeNotice} aria-label="Закрыть уведомление">
-        ×
-      </button>
-    </div>
+    <NotificationDialog
+      title="Вам переданы права хоста"
+      kind="info"
+      message="Теперь вы управляете восстановлением комнаты."
+      onClose={clearHostChangeNotice}
+    />
   );
 }
 

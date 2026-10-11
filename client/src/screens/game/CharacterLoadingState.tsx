@@ -1,8 +1,4 @@
-interface CharacterLoadingStateProps {
-  error: string | null;
-}
-
-export function CharacterLoadingState({ error }: CharacterLoadingStateProps) {
+export function CharacterLoadingState() {
   return (
     <main className="screen command-game-screen gs-loading-state" aria-live="polite">
       <div className="gs-loading-card">
@@ -10,11 +6,6 @@ export function CharacterLoadingState({ error }: CharacterLoadingStateProps) {
         <h1>Готовим вашего персонажа</h1>
         <p>Карты появятся сразу после получения данных от сервера.</p>
       </div>
-      {error && (
-        <div className="error-toast" role="alert">
-          {error}
-        </div>
-      )}
     </main>
   );
 }

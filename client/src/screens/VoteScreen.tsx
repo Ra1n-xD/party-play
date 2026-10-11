@@ -380,8 +380,6 @@ export function VoteScreen({
 
       {is3D && voteTools}
 
-      {error && <div className="error-toast">{error}</div>}
-
       {isCurrentHost && hasLiveConnection && (
         <HostControlDialog
           open={adminOpen}

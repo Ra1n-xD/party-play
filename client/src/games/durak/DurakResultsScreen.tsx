@@ -23,7 +23,7 @@ function formatCardCount(count: number): string {
 }
 
 export function DurakResultsScreen({ snapshot }: DurakResultsScreenProps) {
-  const { connected, commandPending, error, leaveRoom, playAgain } = usePlatform();
+  const { connected, commandPending, leaveRoom, playAgain } = usePlatform();
   const game = snapshot.game;
   if (!game) {
     return (
@@ -140,12 +140,6 @@ export function DurakResultsScreen({ snapshot }: DurakResultsScreenProps) {
           </button>
         ) : null}
       </section>
-
-      {error && (
-        <div className="error-toast" role="alert">
-          {error}
-        </div>
-      )}
     </main>
   );
 }

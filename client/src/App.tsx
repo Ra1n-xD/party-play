@@ -30,6 +30,7 @@ import { loginReturnPath } from "./platform/authNavigation";
 import "./styles/platform-navigation.css";
 import { ReleaseNewsProvider } from "./platform/context/ReleaseNewsContext";
 import { ReleaseAnnouncement } from "./platform/components/ReleaseAnnouncement";
+import { GlobalNotifications } from "./platform/components/GlobalNotifications";
 
 function readAppPath() {
   return window.location.pathname.replace(/\/$/, "") || "/";
@@ -263,6 +264,7 @@ export default function App({ initialPath }: { initialPath: string }) {
         <ProfileProvider>
           <ReleaseNewsProvider>
             <ProfileApp initialPath={initialPath} />
+            <GlobalNotifications />
           </ReleaseNewsProvider>
         </ProfileProvider>
         <AppUpdateNotice />

@@ -1,0 +1,148 @@
+.notification-dialog-overlay {
+  z-index: 18000;
+  padding: 20px;
+  background: #140e22c4;
+  backdrop-filter: blur(7px);
+}
+
+body .modal.notification-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 100%);
+  max-width: 460px;
+  max-height: calc(100svh - 40px);
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+}
+
+.notification-dialog-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 0;
+}
+
+.notification-dialog-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid #c8b7ce;
+  border-radius: 14px;
+  background: #ece1f1;
+  color: #69408a;
+}
+
+.notification-dialog-icon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.notification-dialog.is-error .notification-dialog-icon {
+  border-color: #dfb3b5;
+  background: #f9e4df;
+  color: #a43643;
+}
+
+.notification-dialog.is-success .notification-dialog-icon {
+  border-color: #bfce98;
+  background: #e9f2cb;
+  color: #36624b;
+}
+
+.notification-dialog-close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--dialog-line);
+  border-radius: 10px;
+  background: var(--dialog-surface);
+  color: var(--dialog-ink);
+  cursor: pointer;
+}
+
+.notification-dialog-close svg {
+  width: 22px;
+  height: 22px;
+}
+
+.notification-dialog-close:hover {
+  background: #e9dded;
+}
+
+.notification-dialog-body {
+  min-height: 0;
+  padding: 18px 22px 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+body .modal.notification-dialog h2 {
+  margin: 0 0 12px;
+  font-size: clamp(1.15rem, 3.6vw, 1.45rem);
+}
+
+.notification-dialog-body p {
+  margin: 0;
+  color: var(--dialog-muted);
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.notification-dialog-actions {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px 22px 22px;
+  border-top: 1px solid var(--dialog-line);
+  background: #f4ecd970;
+}
+
+.notification-dialog-actions .btn {
+  min-width: 120px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .notification-dialog-overlay {
+    padding: 12px;
+  }
+
+  body .modal.notification-dialog {
+    max-height: calc(100svh - 24px);
+  }
+
+  .notification-dialog-header {
+    padding: 16px 18px 0;
+  }
+
+  .notification-dialog-body {
+    padding: 16px 18px 20px;
+  }
+
+  .notification-dialog-actions {
+    padding: 14px 18px 18px;
+  }
+
+  .notification-dialog-actions .btn {
+    flex: 1 1 120px;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .notification-dialog-overlay {
+    background: #140e22f2;
+    backdrop-filter: none;
+  }
+}

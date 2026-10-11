@@ -18,11 +18,13 @@ interface AccessibleModalProps {
   children: ReactNode;
   overlayClassName?: string;
   panelClassName?: string;
+  priority?: number;
 }
 
 interface ModalLayer {
   overlay: HTMLElement;
   panel: HTMLElement;
+  priority: number;
 }
 
 const modalLayers: ModalLayer[] = [];
@@ -71,6 +73,7 @@ export function AccessibleModal({
   children,
   overlayClassName = "",
   panelClassName = "",
+  priority = 0,
 }: AccessibleModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -91,8 +94,9 @@ export function AccessibleModal({
 
     const previousActiveElement =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const layer = { overlay, panel };
+    const layer = { overlay, panel, priority };
     modalLayers.push(layer);
+    modalLayers.sort((first, second) => first.priority - second.priority);
     syncModalLayers();
 
     const focusFrame = requestAnimationFrame(() => {
@@ -150,7 +154,7 @@ export function AccessibleModal({
         (firstFocusable ?? topLayer.panel).focus({ preventScroll: true });
       }
     };
-  }, []);
+  }, [priority]);
 
   return (
     <div

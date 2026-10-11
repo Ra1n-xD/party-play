@@ -7,6 +7,7 @@ import {
   type RoomVisibility,
 } from "../../../../shared/platform/publicRooms";
 import { AccessibleModal } from "../components/AccessibleModal";
+import { NotificationDialog } from "../components/NotificationDialog";
 import { ProfileHeader } from "../components/ProfileHeader";
 import { MenuFooter } from "../components/MenuFooter";
 import { GameMenuArtwork } from "../components/GameMenuArtwork";
@@ -68,7 +69,6 @@ export function HomeScreen() {
     publicRoomError,
     pendingSeatClaim,
     sessionPending,
-    error,
   } = usePlatform();
   const [name, setName] = useState(profile?.nickname ?? "");
   useEffect(() => {
@@ -88,6 +88,10 @@ export function HomeScreen() {
   const [createVisibility, setCreateVisibility] = useState<RoomVisibility>("private");
   const [publicRoomsGameId, setPublicRoomsGameId] = useState<RegisteredClientGameId | null>(null);
   const [publicRoomName, setPublicRoomName] = useState(profile?.nickname ?? "");
+  const [publicRoomNotice, setPublicRoomNotice] = useState<{
+    message: string;
+    gameId: RegisteredClientGameId;
+  } | null>(null);
   const [directoryClock, setDirectoryClock] = useState(0);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const initialRender = useRef(true);
@@ -106,6 +110,17 @@ export function HomeScreen() {
     subscribePublicRooms(publicRoomsGameId);
     return () => unsubscribePublicRooms(publicRoomsGameId);
   }, [publicRoomsGameId, subscribePublicRooms, unsubscribePublicRooms]);
+
+  useEffect(() => {
+    if (
+      !publicRoomsGameId ||
+      !publicRoomError ||
+      (publicRoomError.gameId && publicRoomError.gameId !== publicRoomsGameId)
+    )
+      return;
+    setPublicRoomNotice({ message: publicRoomError.message, gameId: publicRoomsGameId });
+    clearPublicRoomError();
+  }, [publicRoomsGameId, publicRoomError, clearPublicRoomError]);
 
   useEffect(() => {
     if (!publicRoomsGameId) return;
@@ -195,15 +210,14 @@ export function HomeScreen() {
       code={joinCode}
       connected={connected}
       pending={sessionPending}
-      error={error}
       visibility={createVisibility}
       onNameChange={(value) => {
         setName(value);
-        if (error) clearError();
+        clearError();
       }}
       onCodeChange={(value) => {
         setJoinCode(value);
-        if (error) clearError();
+        clearError();
       }}
       onVisibilityChange={setCreateVisibility}
       onSubmit={selectedGame && entryMode === "create" ? handleCreate : handleJoin}
@@ -390,26 +404,6 @@ export function HomeScreen() {
             Выберите свободное лобби или подключитесь зрителем к уже начавшейся партии.
           </p>
 
-          {!connected && selectedDirectory && (
-            <div className="platform-public-state is-stale" role="status">
-              Показаны последние полученные данные. Действия временно недоступны.
-            </div>
-          )}
-
-          {publicRoomError &&
-            (!publicRoomError.gameId || publicRoomError.gameId === publicRoomsGameId) && (
-              <div className="platform-public-state is-error" role="alert">
-                <span>{publicRoomError.message}</span>
-                <button
-                  type="button"
-                  onClick={() => subscribePublicRooms(publicRoomsGameId)}
-                  disabled={!connected}
-                >
-                  Повторить загрузку
-                </button>
-              </div>
-            )}
-
           {!selectedDirectory ? (
             <div className="platform-public-state" role="status" aria-live="polite">
               {connected ? "Загружаем открытые комнаты…" : "Данные временно недоступны"}
@@ -489,6 +483,25 @@ export function HomeScreen() {
         >
           <ReconnectScreen onBack={() => setRecoveryOpen(false)} />
         </AccessibleModal>
+      )}
+      {publicRoomNotice && (
+        <NotificationDialog
+          title="Не удалось обновить список комнат"
+          kind="error"
+          message={publicRoomNotice.message}
+          onClose={() => setPublicRoomNotice(null)}
+          action={
+            connected
+              ? {
+                  label: "Повторить загрузку",
+                  onClick: () => {
+                    subscribePublicRooms(publicRoomNotice.gameId);
+                    setPublicRoomNotice(null);
+                  },
+                }
+              : undefined
+          }
+        />
       )}
     </main>
   );

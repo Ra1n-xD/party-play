@@ -111,7 +111,6 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     connected,
     reconnectState,
     commandPending,
-    error,
     hostSeatClaims,
     leaveRoom,
     sendGameCommand,
@@ -994,11 +993,6 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
               Закрыть
             </button>
           </div>
-          {error && (
-            <div className="uno-inline-error" role="alert">
-              {error}
-            </div>
-          )}
           <ReconnectHostControls
             players={recoverySeats}
             claims={hostSeatClaims}
@@ -1009,11 +1003,6 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
             disabled={!canManage}
           />
         </AccessibleModal>
-      )}
-      {error && !managementOpen && (
-        <div className="error-toast" role="alert">
-          {error}
-        </div>
       )}
       <CardDragLayer
         session={session}

@@ -36,7 +36,6 @@ export function GameScreen({
     revealActionCard,
     endGame,
     leaveRoom,
-    error,
     adminShuffleAll,
     adminSwapAttribute,
     adminReplaceAttribute,
@@ -173,7 +172,7 @@ export function GameScreen({
 
   if (!gameState) return null;
   if (!isSpectator && !myCharacter) {
-    return <CharacterLoadingState error={error} />;
+    return <CharacterLoadingState />;
   }
 
   const view = buildGameScreenViewModel({ gameState, playerId, isSpectator, myCharacter });
@@ -461,12 +460,6 @@ export function GameScreen({
             </button>
           </div>
         </AccessibleModal>
-      )}
-
-      {error && (
-        <div className="error-toast" role="alert">
-          {error}
-        </div>
       )}
     </main>
   );

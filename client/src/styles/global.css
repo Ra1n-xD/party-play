@@ -41,6 +41,7 @@
 
 html {
   font-size: 16px;
+  scrollbar-gutter: stable;
   -webkit-text-size-adjust: 100%;
   background: var(--bg-primary);
   overscroll-behavior-y: none;

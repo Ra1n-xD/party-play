@@ -23,7 +23,6 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
     resetSeatRecovery,
     requestSeatClaim,
     cancelSeatClaim,
-    error,
   } = usePlatform();
   const [roomCode, setRoomCode] = useState("");
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -201,11 +200,6 @@ export function ReconnectScreen({ onBack }: ReconnectScreenProps) {
         </div>
       )}
 
-      {error && (
-        <div className="reconnect-inline-error" role="alert">
-          {error}
-        </div>
-      )}
       <button
         type="button"
         className="btn btn-text"

@@ -75,12 +75,6 @@ export function StatsScreen() {
             </div>
           ) : (
             <>
-              {!connected && (
-                <div className="platform-stats-state is-stale" role="status">
-                  Показаны последние полученные данные.
-                </div>
-              )}
-
               <section className="platform-stats-section" aria-labelledby="stats-total-title">
                 <div className="platform-stats-section-heading">
                   <div>

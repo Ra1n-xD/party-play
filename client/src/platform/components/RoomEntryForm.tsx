@@ -14,7 +14,6 @@ interface RoomEntryFormProps {
   code: string;
   connected: boolean;
   pending: boolean;
-  error: string | null;
   visibility: RoomVisibility;
   onNameChange: (name: string) => void;
   onCodeChange: (code: string) => void;
@@ -33,7 +32,6 @@ export function RoomEntryForm({
   code,
   connected,
   pending,
-  error,
   visibility,
   onNameChange,
   onCodeChange,
@@ -125,11 +123,6 @@ export function RoomEntryForm({
             ))}
           </fieldset>
         )}
-        {error && (
-          <p className="show-entry-error" role="alert">
-            {error}
-          </p>
-        )}
         <button className="show-primary" type="submit" disabled={!canSubmit}>
           {pending ? "Подключаемся…" : creating ? "Создать комнату" : "Подключиться"}
           {!pending && <FiArrowRight aria-hidden="true" />}
@@ -157,11 +150,6 @@ export function RoomEntryForm({
             <FiRefreshCw aria-hidden="true" /> Вернуться в игру
           </button>
         </div>
-      )}
-      {!connected && (
-        <p className="show-connection-note" role="status">
-          Нет связи с сервером. Ждём подключения…
-        </p>
       )}
       {onModeChange && (
         <div className="show-entry-bottom">

@@ -6,11 +6,12 @@ import {
   PASSWORD_MIN_LENGTH,
   normalizeEmail,
 } from "../../../../shared/platform/auth";
+import { NotificationDialog } from "./NotificationDialog";
 import { useProfile } from "../context/ProfileContext";
 import { normalizeNickname } from "../../../../shared/platform/cosmetics";
 
 export function ProfileEditor() {
-  const { profile, account, updateAccount, busy, connected, error, clearError } = useProfile();
+  const { profile, account, updateAccount, busy, connected, clearError } = useProfile();
   const [nickname, setNickname] = useState(profile?.nickname ?? "");
   const [email, setEmail] = useState(account?.email ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -172,16 +173,6 @@ export function ProfileEditor() {
             </div>
           </div>
         )}
-        {(validation || error) && (
-          <p className="profile-error" role="alert">
-            {validation || error}
-          </p>
-        )}
-        {saved && (
-          <p className="profile-save-success" role="status">
-            Изменения сохранены.
-          </p>
-        )}
         <div className="profile-editor-actions">
           <button
             className="profile-primary"
@@ -196,12 +187,17 @@ export function ProfileEditor() {
             {busy ? "Сохраняем…" : "Сохранить изменения"}
           </button>
         </div>
-        {!connected && (
-          <p className="profile-field-hint" role="status">
-            Нет связи с сервером. Дождитесь подключения, чтобы сохранить изменения.
-          </p>
-        )}
       </form>
+      {(validation || saved) && (
+        <NotificationDialog
+          message={validation || "Изменения сохранены."}
+          kind={validation ? "error" : "success"}
+          onClose={() => {
+            setValidation(null);
+            setSaved(false);
+          }}
+        />
+      )}
     </section>
   );
 }

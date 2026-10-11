@@ -13,6 +13,7 @@ import { getMoscowDay } from "../../../../shared/platform/dailyRewards";
 import { socket } from "../../socket";
 import { useProfile } from "../context/ProfileContext";
 import { ProfileHeader } from "../components/ProfileHeader";
+import { NotificationDialog } from "../components/NotificationDialog";
 import { MenuFooter } from "../components/MenuFooter";
 import { CoinAmount, coinLabel } from "../components/CoinAmount";
 import "../../styles/duels-pet.css";
@@ -226,19 +227,6 @@ export function PetScreen() {
                   )}
                 </>
               )}
-              {message && (
-                <p role="status" className="pet-success">
-                  {message}
-                </p>
-              )}
-              {error && (
-                <p role="alert" className="feature-error">
-                  {error}
-                </p>
-              )}
-              {profile && !connected && (
-                <p role="status">Нет связи с сервером. Дождитесь подключения.</p>
-              )}
             </div>
             <aside className="pet-milestones" aria-label="Стадии роста">
               {PET_STAGES.map((name, i) => (
@@ -338,6 +326,17 @@ export function PetScreen() {
         </main>
         <MenuFooter />
       </div>
+      {(error || message) && (
+        <NotificationDialog
+          title={error ? "Не удалось выполнить действие" : "Питомец доволен"}
+          message={error || message}
+          kind={error ? "error" : "success"}
+          onClose={() => {
+            setError("");
+            setMessage("");
+          }}
+        />
+      )}
     </div>
   );
 }

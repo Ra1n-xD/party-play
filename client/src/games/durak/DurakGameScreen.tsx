@@ -1307,11 +1307,6 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
               Закрыть
             </button>
           </div>
-          {error && (
-            <div className="durak-inline-error" role="alert">
-              {error}
-            </div>
-          )}
           <ReconnectHostControls
             players={recoverySeats}
             claims={hostSeatClaims}
@@ -1324,11 +1319,6 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
         </AccessibleModal>
       )}
 
-      {error && !managementOpen && (
-        <div className="error-toast" role="alert">
-          {error}
-        </div>
-      )}
       <CardDragLayer
         session={session}
         announcement={announcement}

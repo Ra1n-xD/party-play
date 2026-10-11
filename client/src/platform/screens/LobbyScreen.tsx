@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { FiArrowLeft, FiCheck, FiCopy, FiEdit2, FiUsers } from "react-icons/fi";
 import "../../styles/show-menu.css";
 import { AccessibleModal } from "../components/AccessibleModal";
+import { NotificationDialog } from "../components/NotificationDialog";
 import { ReconnectHostControls, type RecoverySeat } from "../components/ReconnectHostControls";
 import { useProfile } from "../context/ProfileContext";
 import { usePlatform } from "../context/PlatformContext";
@@ -34,9 +35,11 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
     resolveSeatClaim,
     kickPlayer,
     transferHost,
-    error,
   } = usePlatform();
-  const [copied, setCopied] = useState(false);
+  const [copyNotice, setCopyNotice] = useState<{
+    kind: "success" | "error";
+    message: string;
+  } | null>(null);
   const [managementOpen, setManagementOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
 
@@ -90,10 +93,12 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
   const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(snapshot.roomCode);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      setCopyNotice({ kind: "success", message: "Код комнаты скопирован." });
     } catch {
-      setCopied(false);
+      setCopyNotice({
+        kind: "error",
+        message: "Не удалось скопировать код. Выделите его и скопируйте вручную.",
+      });
     }
   };
 
@@ -106,11 +111,6 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
             Ко всем играм
           </button>
           <span className="show-lobby-brand">PARTYSIDE</span>
-          {!connected && (
-            <span className="show-server-status" role="status">
-              Восстанавливаем связь
-            </span>
-          )}
         </header>
 
         <div className="show-lobby-heading">
@@ -213,7 +213,7 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
             <button type="button" className="show-lobby-code" onClick={copyCode}>
               <strong>{snapshot.roomCode}</strong>
               <span aria-live="polite">
-                <FiCopy aria-hidden="true" /> {copied ? "Скопировано!" : "Скопировать код"}
+                <FiCopy aria-hidden="true" /> Скопировать код
               </span>
             </button>
             {settingsPanel && <div className="show-lobby-settings">{settingsPanel}</div>}
@@ -264,11 +264,6 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
                 </button>
               )}
             </div>
-            {error && (
-              <p className="show-entry-error" role="alert">
-                {error}
-              </p>
-            )}
           </aside>
         </div>
         <footer className="show-menu-footer">
@@ -312,11 +307,6 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
               Закрыть
             </button>
           </div>
-          {error && (
-            <div className="error-toast" role="alert">
-              {error}
-            </div>
-          )}
           <ReconnectHostControls
             compact
             players={recoverySeats}
@@ -327,6 +317,14 @@ export function LobbyScreen({ extraInfo, settingsPanel }: LobbyScreenProps) {
             disabled={!canMutateRoom}
           />
         </AccessibleModal>
+      )}
+      {copyNotice && (
+        <NotificationDialog
+          title={copyNotice.kind === "success" ? "Код скопирован" : "Не удалось скопировать код"}
+          kind={copyNotice.kind}
+          message={copyNotice.message}
+          onClose={() => setCopyNotice(null)}
+        />
       )}
     </div>
   );

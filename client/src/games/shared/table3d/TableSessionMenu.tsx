@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { AccessibleModal } from "../../../platform/components/AccessibleModal";
+import { NotificationDialog } from "../../../platform/components/NotificationDialog";
 import { GameRulesModal } from "../../../platform/components/GameRulesModal";
 import { usePlatform } from "../../../platform/context/PlatformContext";
 import { clientGameRegistry, type RegisteredClientGameId } from "../../../platform/gameRegistry";
@@ -157,7 +158,7 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
       />,
       document.body,
     );
-  return createPortal(
+  const menu = (
     <AccessibleModal
       key={page}
       labelledBy="table-session-title"
@@ -178,11 +179,6 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
       </h2>
       {page === "main" && (
         <>
-          {error && (
-            <p className="table3d-menu-error" role="alert">
-              {error}
-            </p>
-          )}
           <div className="table3d-menu-actions" ref={buttons}>
             <button type="button" className="is-primary" onClick={() => resume()}>
               <span>Продолжить</span>
@@ -315,7 +311,20 @@ export const TableSessionMenu = forwardRef<TableMenuHandle, Props>(function Tabl
           </div>
         </>
       )}
-    </AccessibleModal>,
+    </AccessibleModal>
+  );
+  return createPortal(
+    <>
+      {menu}
+      {error && (
+        <NotificationDialog
+          title="Не удалось захватить управление мышью"
+          kind="error"
+          message={error}
+          onClose={() => setError(null)}
+        />
+      )}
+    </>,
     document.body,
   );
 });

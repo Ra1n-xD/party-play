@@ -9,10 +9,11 @@ import {
 import { INITIAL_COINS } from "../../../../shared/platform/cosmetics";
 import { useProfile } from "../context/ProfileContext";
 import { CoinAmount } from "../components/CoinAmount";
+import { NotificationDialog } from "../components/NotificationDialog";
 import { TestAccountNotice } from "../components/TestAccountNotice";
 
 export function LoginScreen() {
-  const { login, register, busy, connected, error, clearError } = useProfile();
+  const { login, register, busy, connected, clearError } = useProfile();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -172,11 +173,6 @@ export function LoginScreen() {
                 />
               </>
             )}
-            {(validation || error) && (
-              <p className="profile-error" role="alert">
-                {validation || error}
-              </p>
-            )}
             <button
               className="profile-primary"
               disabled={
@@ -191,7 +187,6 @@ export function LoginScreen() {
                   ? "Создать аккаунт →"
                   : "Войти →"}
             </button>
-            {!connected && <p role="status">Подключаемся к серверу…</p>}
           </form>
           <a className="profile-guest-link" href="/">
             Играть без аккаунта
@@ -206,6 +201,9 @@ export function LoginScreen() {
           <TestAccountNotice showEmailWarning />
         </aside>
       </section>
+      {validation && (
+        <NotificationDialog message={validation} kind="error" onClose={() => setValidation(null)} />
+      )}
     </main>
   );
 }

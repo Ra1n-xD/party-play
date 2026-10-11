@@ -1,19 +1,22 @@
+import { useEffect, useState } from "react";
 import { DEPLOYMENT_WAIT_MESSAGE } from "../../../../shared/platform/deployment";
 import { usePlatform } from "../context/PlatformContext";
+import { NotificationDialog } from "./NotificationDialog";
 
 export function DeploymentBanner() {
   const { deploymentDraining } = usePlatform();
-  if (!deploymentDraining) return null;
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    if (!deploymentDraining) setDismissed(false);
+  }, [deploymentDraining]);
+  if (!deploymentDraining || dismissed) return null;
 
   return (
-    <aside className="deployment-banner" role="status">
-      <span className="deployment-banner-icon" aria-hidden="true">
-        ↻
-      </span>
-      <div>
-        <strong>Скоро обновление</strong>
-        <p>{DEPLOYMENT_WAIT_MESSAGE}</p>
-      </div>
-    </aside>
+    <NotificationDialog
+      title="Скоро обновление"
+      kind="info"
+      message={DEPLOYMENT_WAIT_MESSAGE}
+      onClose={() => setDismissed(true)}
+    />
   );
 }
