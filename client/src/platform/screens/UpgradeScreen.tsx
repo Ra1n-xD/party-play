@@ -159,11 +159,16 @@ export function UpgradeScreen() {
   const inactive = phase !== "idle" || !!pendingUpgrade;
   const visibleProfile =
     phase === "request" || phase === "spin" ? (previewProfile ?? profile) : profile;
-  const owned = CASE_ITEMS.filter((item) => visibleProfile.inventory[item.id]).sort(
-    compareCosmetics,
-  );
+  const owned = CASE_ITEMS.filter(
+    (item) => item.rarity !== "legendary" && visibleProfile.inventory[item.id],
+  ).sort(compareCosmetics);
+  const hasOnlyLegendary =
+    !owned.length &&
+    CASE_ITEMS.some((item) => item.rarity === "legendary" && visibleProfile.inventory[item.id]);
   const filteredOwned = owned.filter((item) => inputFilter === "all" || item.kind === inputFilter);
-  const filtered = CASE_ITEMS.filter((item) => filter === "all" || item.kind === filter);
+  const filtered = CASE_ITEMS.filter(
+    (item) => item.rarity !== "common" && (filter === "all" || item.kind === filter),
+  );
   const targets = filtered
     .filter(
       (item) =>
@@ -438,7 +443,8 @@ export function UpgradeScreen() {
           </div>
           <p className="upgrade-catalog-note">
             Можно отдать последнюю копию, в том числе используемый скин или эмоцию. Если выбранный
-            скин закончится, включится базовый. Базовые предметы не участвуют в улучшении.
+            скин закончится, включится базовый. Базовые и легендарные предметы нельзя использовать
+            как ставку.
           </p>
           <TypeFilters
             value={inputFilter}
@@ -477,7 +483,13 @@ export function UpgradeScreen() {
           ) : (
             <div className="upgrade-empty">
               <FiPlus aria-hidden="true" />
-              <h3>{owned.length ? "Нет предметов этого типа" : "Пока нечего улучшать"}</h3>
+              <h3>
+                {owned.length
+                  ? "Нет предметов этого типа"
+                  : hasOnlyLegendary
+                    ? "Только легендарные предметы"
+                    : "Пока нечего улучшать"}
+              </h3>
               {owned.length ? (
                 <button
                   type="button"
@@ -489,6 +501,12 @@ export function UpgradeScreen() {
                 </button>
               ) : (
                 <>
+                  {hasOnlyLegendary && (
+                    <p>
+                      Легендарные предметы имеют максимальную редкость и не могут быть ставкой для
+                      улучшения.
+                    </p>
+                  )}
                   <p>Откройте кейс, чтобы пополнить коллекцию.</p>
                   <a href="/cases" className="profile-primary">
                     К кейсам <FiArrowUpRight aria-hidden="true" />
