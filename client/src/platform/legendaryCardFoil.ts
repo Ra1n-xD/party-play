@@ -15,7 +15,7 @@ const crownPath =
 const frameShapes: FoilShape[] = [
   {
     path: "M 23 7 H 233 Q 249 7 249 23 V 337 Q 249 353 233 353 H 23 Q 7 353 7 337 V 23 Q 7 7 23 7 Z",
-    width: 6,
+    width: 8,
   },
   {
     path: "M 26 17 H 230 Q 239 17 239 26 V 334 Q 239 343 230 343 H 26 Q 17 343 17 334 V 26 Q 17 17 26 17 Z",
@@ -27,7 +27,7 @@ const frameShapes: FoilShape[] = [
 
 function star(x: number, y: number): FoilShape {
   return {
-    path: `M ${x} ${y - 5} Q ${x + 1} ${y - 1} ${x + 5} ${y} Q ${x + 1} ${y + 1} ${x} ${y + 5} Q ${x - 1} ${y + 1} ${x - 5} ${y} Q ${x - 1} ${y - 1} ${x} ${y - 5} Z`,
+    path: `M ${x} ${y - 8} Q ${x + 1.5} ${y - 1.5} ${x + 8} ${y} Q ${x + 1.5} ${y + 1.5} ${x} ${y + 8} Q ${x - 1.5} ${y + 1.5} ${x - 8} ${y} Q ${x - 1.5} ${y - 1.5} ${x} ${y - 8} Z`,
     fill: true,
   };
 }

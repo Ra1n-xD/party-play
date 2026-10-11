@@ -174,7 +174,7 @@ export function AvatarPortrait({ avatarId }: { avatarId: AvatarId }) {
             </clipPath>
             <linearGradient id={`${effectId}-glint`} x1="0" x2="1" y1="0" y2="0">
               <stop offset="0" stopColor="#c7f2ff" stopOpacity="0" />
-              <stop offset=".55" stopColor="#e2f9ff" stopOpacity=".65" />
+              <stop offset=".55" stopColor="#e2f9ff" stopOpacity=".9" />
               <stop offset="1" stopColor="#c7f2ff" stopOpacity="0" />
             </linearGradient>
           </defs>
@@ -182,14 +182,24 @@ export function AvatarPortrait({ avatarId }: { avatarId: AvatarId }) {
             <ellipse cx="60" cy="58" rx="35" ry="38" fill="#c7e8f0" opacity=".045" />
             <path
               className="astronaut-visor-glint"
-              d="M16 17h19l70 81H86Z"
+              d="M10 17h31l70 81H80Z"
               fill={`url(#${effectId}-glint)`}
             />
           </g>
+          <ellipse
+            className="astronaut-visor-rim"
+            cx="60"
+            cy="58"
+            rx="36.5"
+            ry="39.5"
+            fill="none"
+            stroke="#8eefff"
+            strokeWidth="2"
+          />
           <g className="astronaut-telemetry">
-            <rect x="51" y="101" width="4" height="5" rx="1" fill="#8ee7e8" />
-            <rect x="58" y="101" width="4" height="5" rx="1" fill="#f4cf7b" />
-            <rect x="65" y="101" width="4" height="5" rx="1" fill="#a8dfc2" />
+            <rect x="50" y="100" width="5" height="7" rx="1" fill="#8ee7e8" />
+            <rect x="57.5" y="100" width="5" height="7" rx="1" fill="#f4cf7b" />
+            <rect x="65" y="100" width="5" height="7" rx="1" fill="#a8dfc2" />
           </g>
         </>
       )}

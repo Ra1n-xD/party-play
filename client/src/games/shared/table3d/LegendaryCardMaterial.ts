@@ -29,19 +29,27 @@ export function addLegendaryCardFoil(
       "#include <map_fragment>",
       `#include <map_fragment>
        #ifdef USE_MAP
-         float foilPhase = fract(legendaryFoilTime / 8.0);
-         float foilTravel = smoothstep(0.18, 0.58, foilPhase);
+         float foilTravel = fract(legendaryFoilTime / 3.6);
          float foilPosition = vMapUv.x * 0.6 + (1.0 - vMapUv.y) * 0.4;
-         float foilDistance = (foilPosition - mix(-0.25, 1.25, foilTravel)) * 12.0;
+         float foilDistance = (foilPosition - mix(-0.3, 1.3, foilTravel)) * 8.0;
          float foilBand = exp(-foilDistance * foilDistance);
          float foilDecoration = texture2D(legendaryFoilMask, vMapUv).a;
-         float foilStrength = foilDecoration * foilBand * 0.4 * legendaryFoilEnabled;
+         float foilStrength = foilDecoration * foilBand * 0.85 * legendaryFoilEnabled;
          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 0.91, 0.65), foilStrength);
-         float gemGlint = pow(max(0.0, sin(legendaryFoilTime * 0.9)), 10.0);
+         float gemGlint = pow(0.5 + 0.5 * sin(legendaryFoilTime * 2.618), 3.0);
          float gemDecoration = texture2D(legendarySparkMask, vMapUv).a;
-         diffuseColor.rgb += vec3(0.32, 0.27, 0.15) * gemDecoration * gemGlint * legendaryFoilEnabled;
+         diffuseColor.rgb += vec3(0.6, 0.45, 0.2) * gemDecoration * gemGlint * legendaryFoilEnabled;
+       #endif`,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <emissivemap_fragment>",
+      `#include <emissivemap_fragment>
+       #ifdef USE_MAP
+         totalEmissiveRadiance += vec3(0.9, 0.57, 0.18)
+           * (foilDecoration * foilBand * 0.5 + gemDecoration * gemGlint * 0.75)
+           * legendaryFoilEnabled;
        #endif`,
     );
   };
-  material.customProgramCacheKey = () => "partyside-legendary-card-foil-v1";
+  material.customProgramCacheKey = () => "partyside-legendary-card-foil-v2";
 }

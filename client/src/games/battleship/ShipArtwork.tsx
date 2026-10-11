@@ -331,17 +331,18 @@ function DragonShip({ skin, length, width }: ShipDetails) {
           className="ship-ocean-wave"
           d={`M 4 7 Q ${width * 0.2} 2 ${width * 0.36} 7 T ${width * 0.7} 7 T ${width - 3} 7 M 3 37 Q ${width * 0.24} 42 ${width * 0.39} 37 T ${width * 0.72} 37 T ${width - 2} 37`}
           stroke="#6be8dc"
-          strokeWidth="2.1"
+          strokeWidth="2.8"
           fill="none"
         />
         <path
           className="ship-ocean-wave ship-ocean-wave--foam"
           d={`M 8 4 Q ${width * 0.22} 1 ${width * 0.34} 4 M ${width * 0.65} 40 Q ${width * 0.8} 43 ${width - 6} 40 M 3 16 Q 0 22 3 27`}
           stroke="#d8fff1"
-          strokeWidth="1.3"
+          strokeWidth="1.8"
           fill="none"
         />
         <path
+          className="ship-ocean-wake"
           d={`M 7 13 Q ${width * 0.5} 2 ${width - 7} 19 Q ${width + 1} 22 ${width - 8} 30 Q ${width * 0.5} 43 7 31 Z`}
           fill="#70e4d2"
           opacity=".1"
