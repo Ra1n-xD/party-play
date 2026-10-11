@@ -59,6 +59,14 @@ The site's **«Обновления»** page (`/updates`) is a curated product h
 - For visual changes, reuse or capture a real screenshot when it helps explain the update. Store it in `client/src/assets/updates/`, provide accurate dimensions, caption and alt text, and label demo data or reconstructed historical views. Do not substitute unrelated or generated images for product screenshots.
 - Check `/updates` on desktop and mobile, including the new entry, version navigation, and image enlargement when images were added. In the final response, state that release notes were updated, or briefly explain why the change did not warrant a highlight. Adding an entry does not authorize deployment.
 
+### Major Update Announcements
+
+- For a major player-facing update (a new game, new collectible items, or another substantial capability), add `announcement.sections` to the relevant entry in `client/src/platform/releaseHighlights.ts`. This canonical entry supplies both the first-visit modal and unread navigation dots; do not maintain separate announcement copy. Use only the affected sections: `games`, `duels`, `collection`, `cases`, `upgrade`, `pet`, or `leaderboard`.
+- Keep a unique stable release `id`: it is the acknowledgement key. Routine fixes and follow-up polish must not create another announcement or reset acknowledgements. For a distinct major release, create a new entry and ID. The newest entry with `announcement` is shown once per browser, to guests and signed-in players, after startup recovery. Do not interrupt a restored ordinary game room or the login form.
+- The announcement can be dismissed only with its visible, keyboard-accessible close cross. Backdrop clicks and Escape must not close it. Keep focus inside the modal and the cross visible while its content scrolls. Mark it read only after explicitly closing it.
+- Use the same red-dot style as the pet reminder on affected desktop/mobile navigation items and their parent groups. Dismissal of the modal does not clear all dots: each disappears after visiting that section. Preserve the independent pet-care reminder.
+- Read/write acknowledgement storage only after hydration, tolerate unavailable/corrupt storage, and synchronize open tabs. Verify first visit, close-cross-only behavior, reload, section dots, guests/accounts, desktop/mobile, and capture real screenshots for the report. The existing stale-client reload notice is a separate mechanism.
+
 ## Security & Configuration
 
 Keep `.env*`, credentials, and `server/.data/` untracked. Never expose private game state or session tokens in public payloads. Pushes to `main` trigger deployment; deploy only when explicitly requested.

@@ -344,6 +344,9 @@ try {
           throw new Error("Invalid inventory");
       // Existing accounts predate collectible reactions. Grant only the free like.
       profile.inventory["reaction:good-move"] ??= 1;
+      // Older profiles get the starter fleet without changing existing progress.
+      profile.inventory["battleship:classic"] ??= 1;
+      profile.equipped.battleship ??= "classic";
       if (profile.pet) {
         // Pets from 6.11 predate species. Preserve their original dragon appearance.
         if (profile.pet.species === undefined) profile.pet.species = "dragon";
@@ -364,7 +367,7 @@ try {
         for (const id of BASIC_ITEMS) profile.inventory[id] = 1;
         normalizedProfiles++;
       }
-      for (const kind of ["avatar", "durak", "uno"] as const)
+      for (const kind of ["avatar", "durak", "uno", "battleship"] as const)
         if (!profile.inventory[`${kind}:${profile.equipped[kind]}`])
           throw new Error("Invalid equipped item");
       if (

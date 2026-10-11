@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type MouseEvent } from "react";
 import type { IconType } from "react-icons";
+import { useReleaseNews } from "../context/ReleaseNewsContext";
 import {
   LuArrowUpRight,
   LuChevronDown,
@@ -97,6 +98,7 @@ export function PlatformNavigation({
   petNeedsCare,
   onHome,
 }: PlatformNavigationProps) {
+  const { hasNews } = useReleaseNews();
   const navigationRef = useRef<HTMLElement>(null);
   const hoverOpenedRef = useRef<HTMLDetailsElement | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
@@ -150,6 +152,7 @@ export function PlatformNavigation({
       {groups.map((group) => {
         const Icon = group.icon;
         const active = group.items.some((item) => item.page === activePage);
+        const unread = group.items.some((item) => hasNews(item.page));
         const dropdownId = `${navigationId}-${group.id}`;
         return (
           <details
@@ -188,6 +191,7 @@ export function PlatformNavigation({
               className="platform-nav-control"
               data-active={active || undefined}
               aria-controls={dropdownId}
+              aria-label={unread ? `${group.label} — есть обновления` : undefined}
               onClick={(event) => {
                 const details = event.currentTarget.parentElement as HTMLDetailsElement;
                 closeGroups(details);
@@ -206,6 +210,7 @@ export function PlatformNavigation({
             >
               <span className="platform-nav-icon">
                 <Icon aria-hidden="true" />
+                {unread && <i className="release-news-dot" aria-hidden="true" />}
               </span>
               <span className="platform-nav-label">{group.label}</span>
               <LuChevronDown className="platform-nav-chevron" aria-hidden="true" />
@@ -219,6 +224,7 @@ export function PlatformNavigation({
                     key={item.page}
                     href={item.href}
                     aria-current={activePage === item.page ? "page" : undefined}
+                    aria-label={hasNews(item.page) ? `${item.label} — есть обновления` : undefined}
                     onClick={(event) => {
                       if (item.page === "games") onHome(event);
                       closeGroups();
@@ -226,6 +232,7 @@ export function PlatformNavigation({
                   >
                     <span className="platform-nav-item-icon">
                       <ItemIcon aria-hidden="true" />
+                      {hasNews(item.page) && <i className="release-news-dot" aria-hidden="true" />}
                     </span>
                     <span className="platform-nav-item-copy">
                       <strong>{returnToRoom ? "В комнату" : item.label}</strong>
@@ -243,13 +250,25 @@ export function PlatformNavigation({
         className="platform-nav-control"
         href="/pet"
         aria-current={activePage === "pet" ? "page" : undefined}
-        aria-label={petNeedsCare ? "Питомец — пора покормить и поиграть" : undefined}
-        title={petNeedsCare ? "Питомец — пора покормить и поиграть" : undefined}
+        aria-label={
+          petNeedsCare
+            ? `Питомец — пора покормить и поиграть${hasNews("pet") ? "; есть обновления" : ""}`
+            : hasNews("pet")
+              ? "Питомец — есть обновления"
+              : undefined
+        }
+        title={
+          petNeedsCare
+            ? "Питомец — пора покормить и поиграть"
+            : hasNews("pet")
+              ? "Питомец — есть обновления"
+              : undefined
+        }
         onClick={() => closeGroups()}
       >
         <span className="platform-nav-icon">
           <LuPawPrint aria-hidden="true" />
-          {petNeedsCare && <i className="pet-care-dot" aria-hidden="true" />}
+          {(petNeedsCare || hasNews("pet")) && <i className="pet-care-dot" aria-hidden="true" />}
         </span>
         <span className="platform-nav-label">Питомец</span>
       </a>
@@ -257,10 +276,12 @@ export function PlatformNavigation({
         className="platform-nav-control"
         href="/leaderboard"
         aria-current={activePage === "leaderboard" ? "page" : undefined}
+        aria-label={hasNews("leaderboard") ? "Рейтинг — есть обновления" : undefined}
         onClick={() => closeGroups()}
       >
         <span className="platform-nav-icon">
           <LuTrophy aria-hidden="true" />
+          {hasNews("leaderboard") && <i className="release-news-dot" aria-hidden="true" />}
         </span>
         <span className="platform-nav-label">Рейтинг</span>
       </a>

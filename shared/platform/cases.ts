@@ -30,6 +30,13 @@ export const CASES = [
   },
   { id: "uno", name: "Кейс «UNO»", description: "Рубашки для UNO", kind: "uno", cost: 5 },
   {
+    id: "battleship",
+    name: "Кейс «Морской бой»",
+    description: "Оформления флота",
+    kind: "battleship",
+    cost: 5,
+  },
+  {
     id: "reaction",
     name: "Кейс «Эмоции»",
     description: "Жесты и реакции",

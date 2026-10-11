@@ -28,6 +28,7 @@ const CASE_PRESENTATION = {
   avatar: { color: "#d9b3e8" },
   durak: { color: "#f2be9f" },
   uno: { color: "#bcd780" },
+  battleship: { color: "#91bed0" },
   reaction: { color: "#ffcf67" },
 };
 function randomItem(items: Cosmetic[]) {

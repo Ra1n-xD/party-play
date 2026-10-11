@@ -3,6 +3,7 @@ import type { MemoryState } from "../games/memory/engine.js";
 import type { BattleshipState } from "../games/battleship/engine.js";
 import { validFleet } from "../../../shared/games/battleship/rules.js";
 import { normalizeRoomCode } from "../../../shared/roomCode.js";
+import { isShipSkinId } from "../../../shared/games/battleship/skins.js";
 export interface DuelRecord {
   id: string;
   // Older records acquire these fields atomically before the server starts accepting clients.
@@ -63,6 +64,10 @@ export function validDuel(d: DuelRecord): boolean {
     );
   }
   return (
+    (d.game.shipSkins === undefined ||
+      (Array.isArray(d.game.shipSkins) &&
+        d.game.shipSkins.length === 2 &&
+        d.game.shipSkins.every(isShipSkinId))) &&
     d.game.ships.length === 2 &&
     d.game.ships.every(validFleet) &&
     d.game.shots.length === 2 &&

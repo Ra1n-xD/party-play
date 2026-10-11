@@ -4,6 +4,7 @@ import type { UpgradeAttempt } from "./upgrades.js";
 import { ROOM_REACTIONS, type RoomReactionId } from "./reactions.js";
 import type { CaseId } from "./cases.js";
 import type { DailyReward } from "./dailyRewards.js";
+import { SHIP_SKINS, type ShipSkinId } from "../games/battleship/skins.js";
 
 export const RARITIES = {
   basic: { name: "Базовый", color: "#9da7b5" },
@@ -13,7 +14,7 @@ export const RARITIES = {
   legendary: { name: "Легендарный", color: "#ffc35d" },
 } as const;
 export type Rarity = keyof typeof RARITIES;
-export type CosmeticKind = "avatar" | "durak" | "uno" | "reaction";
+export type CosmeticKind = "avatar" | "durak" | "uno" | "reaction" | "battleship";
 export const CARD_SKINS = [
   {
     id: "classic",
@@ -78,6 +79,7 @@ export interface Cosmetic {
   rarity: Rarity;
   avatarId?: AvatarId;
   cardSkinId?: CardSkinId;
+  shipSkinId?: ShipSkinId;
   reactionId?: RoomReactionId;
 }
 const avatarRarities: Record<AvatarId, Rarity> = {
@@ -93,6 +95,15 @@ const avatarRarities: Record<AvatarId, Rarity> = {
   astronaut: "legendary",
 };
 export const COSMETICS: Cosmetic[] = [
+  ...SHIP_SKINS.map(
+    (skin): Cosmetic => ({
+      id: `battleship:${skin.id}`,
+      kind: "battleship",
+      name: skin.name,
+      rarity: skin.rarity,
+      shipSkinId: skin.id,
+    }),
+  ),
   ...ROOM_REACTIONS.map(
     (reaction): Cosmetic => ({
       id: `reaction:${reaction.id}`,
@@ -124,12 +135,19 @@ export const COSMETICS: Cosmetic[] = [
   ),
 ];
 export const CASE_ITEMS = COSMETICS.filter((item) => item.rarity !== "basic");
-export const BASIC_ITEMS = ["avatar:human", "durak:classic", "uno:classic", "reaction:good-move"];
+export const BASIC_ITEMS = [
+  "avatar:human",
+  "durak:classic",
+  "uno:classic",
+  "reaction:good-move",
+  "battleship:classic",
+];
 export const COSMETIC_KIND_NAMES: Record<CosmeticKind, string> = {
   avatar: "Персонажи",
   durak: "Карты Дурака",
   uno: "Карты UNO",
   reaction: "Эмоции",
+  battleship: "Корабли",
 };
 const rarityOrder = Object.keys(RARITIES);
 const kindOrder = Object.keys(COSMETIC_KIND_NAMES);
@@ -173,7 +191,7 @@ export interface ProfileSnapshot {
   completedGames: number;
   wins: number;
   inventory: Record<string, number>;
-  equipped: { avatar: AvatarId; durak: CardSkinId; uno: CardSkinId };
+  equipped: { avatar: AvatarId; durak: CardSkinId; uno: CardSkinId; battleship?: ShipSkinId };
   recentOpenings: CaseOpening[];
   recentUpgrades?: UpgradeAttempt[];
   dailyReward?: DailyReward | null;
@@ -183,6 +201,6 @@ export interface ProfileSnapshot {
 export function isCosmeticInUse(profile: ProfileSnapshot, item: Cosmetic): boolean {
   return item.kind === "reaction"
     ? (profile.inventory[item.id] ?? 0) > 0
-    : `${item.kind}:${profile.equipped[item.kind]}` === item.id;
+    : `${item.kind}:${profile.equipped[item.kind] ?? "classic"}` === item.id;
 }
 export type ProfileReply<T> = { ok: true; value: T } | { ok: false; error: string };

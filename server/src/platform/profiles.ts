@@ -142,6 +142,7 @@ export async function equipProfileItem(
         throw new Error("Сменить скин можно после завершения партии");
     }
     if (item.kind === "avatar") current.equipped.avatar = item.avatarId!;
+    else if (item.kind === "battleship") current.equipped.battleship = item.shipSkinId!;
     else current.equipped[item.kind] = item.cardSkinId!;
     changed = true;
   });

@@ -1293,7 +1293,7 @@ body:has(.show-menu, .profile-login),
 
 .case-selector {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin: 22px 0 18px;
 }
@@ -1311,7 +1311,7 @@ body:has(.show-menu, .profile-login),
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .case-choice:first-child {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
 }
 .case-choice {
@@ -1410,7 +1410,7 @@ body:has(.show-menu, .profile-login),
     gap: 8px;
   }
   .case-choice:first-child {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
   .case-choice {
     grid-template-columns: 28px minmax(0, 1fr);

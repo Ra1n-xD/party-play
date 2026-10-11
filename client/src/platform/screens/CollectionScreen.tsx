@@ -1,5 +1,5 @@
 import { getUpgradeInputValue } from "../../../../shared/platform/upgrades";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   BASIC_ITEMS,
   COSMETICS,
@@ -15,6 +15,10 @@ import { CoinAmount } from "../components/CoinAmount";
 export function CollectionScreen() {
   const { profile, equip, busy, connected } = useProfile();
   const [tab, setTab] = useState<CosmeticKind>("avatar");
+  useEffect(() => {
+    const kind = new URLSearchParams(window.location.search).get("kind");
+    if (kind && Object.hasOwn(COSMETIC_KIND_NAMES, kind)) setTab(kind as CosmeticKind);
+  }, []);
   if (!profile) return null;
   const owned = COSMETICS.filter((item) => profile.inventory[item.id]).length;
   const totalCopies = COSMETICS.reduce((sum, item) => sum + (profile.inventory[item.id] ?? 0), 0);
@@ -23,7 +27,7 @@ export function CollectionScreen() {
       <div className="collection-heading">
         <div>
           <h1>Мои предметы</h1>
-          <p>Персонажи, карты и эмоции для вашего вечера за столом.</p>
+          <p>Персонажи, карты, корабли и эмоции для вашего вечера за столом.</p>
         </div>
       </div>
       <section className="profile-summary">
@@ -56,6 +60,11 @@ export function CollectionScreen() {
           </button>
         ))}
       </nav>
+      {tab === "battleship" && (
+        <p className="collection-fleet-note">
+          Выбранный флот появится в следующем морском бое. Новые скины — в кейсах и улучшениях.
+        </p>
+      )}
       <div className="collection-grid">
         {COSMETICS.filter((item) => item.kind === tab).map((item) => {
           const count = profile.inventory[item.id] ?? 0;

@@ -14,6 +14,16 @@ export function CaseIcon({ caseId }: { caseId: CaseId }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
+      {caseId === "battleship" && (
+        <>
+          <path d="M5 30h39L35 43H14Z" fill="#241d28" stroke="none" />
+          <path d="M5 27h38L34 39H14Z" fill="#91bed0" />
+          <path d="M11 26V16h12v10m0-1V11h10v15" fill="#e4eee3" />
+          <path d="M27 11V5m0 1h9l-4 5h-5" fill="#eeb263" />
+          <path d="M16 20h3m8-5h3m-14 16h16" />
+          <path d="M3 42q5-5 10 0t10 0t10 0t10 0" stroke="#75c2d5" />
+        </>
+      )}
       {caseId === "avatar" && (
         <>
           <rect x="12" y="8" width="31" height="36" rx="5" fill="#241d28" stroke="none" />

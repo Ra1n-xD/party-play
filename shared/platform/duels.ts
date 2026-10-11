@@ -1,3 +1,4 @@
+import type { ShipSkinId } from "../games/battleship/skins.js";
 export const DUEL_GAMES = ["memory", "battleship"] as const;
 export type DuelGameId = (typeof DUEL_GAMES)[number];
 export const DUEL_TURN_MS = 90_000;
@@ -43,6 +44,7 @@ export interface DuelSnapshot extends DuelSummary {
   battleship: {
     boards: ("unknown" | "miss" | "hit" | "sunk")[][];
     ownShips: number[][] | null;
+    shipSkins?: ShipSkinId[];
     ready: boolean[];
   } | null;
 }

@@ -123,6 +123,7 @@ function projection(d: DuelRecord, viewer: string): DuelSnapshot {
         ? {
             boards: [seaBoard(game, 0), seaBoard(game, 1)],
             ownShips: own >= 0 ? game.ships[own] : null,
+            shipSkins: game.shipSkins ?? ["classic", "classic"],
             ready: [...game.ready],
           }
         : null,
@@ -341,7 +342,14 @@ export function registerDuelHandlers(socket: Socket<ClientEvents, ServerEvents>,
           if (profile.coins < d.stake) throw new Error("Не хватает монет");
           profile.coins -= d.stake;
           d.players.push(key);
-          d.game = d.gameId === "memory" ? createMemory() : createBattleship();
+          d.game =
+            d.gameId === "memory"
+              ? createMemory()
+              : createBattleship(
+                  d.players.map(
+                    (playerId) => draft.profiles.get(playerId)?.equipped.battleship ?? "classic",
+                  ),
+                );
           d.phase = d.gameId === "memory" ? "playing" : "setup";
           d.deadline = now + (d.phase === "setup" ? DUEL_SETUP_MS : DUEL_TURN_MS);
         } else {

@@ -31,6 +31,9 @@ import { MenuFooter } from "../components/MenuFooter";
 import { CoinAmount, coinLabel } from "../components/CoinAmount";
 import { AccessibleModal } from "../components/AccessibleModal";
 import { duelRegistry } from "../duelRegistry";
+import { BattleshipBoard as Sea } from "../../games/battleship/BattleshipBoard";
+import { ShipArtwork } from "../../games/battleship/ShipArtwork";
+import { getShipSkin } from "../../../../shared/games/battleship/skins";
 import {
   ROOM_CODE_LENGTH,
   normalizeRoomCode,
@@ -46,49 +49,6 @@ const stateLabel = {
   playing: "Игра идёт",
   finished: "Завершена",
 };
-function Sea({
-  board,
-  ships,
-  onCell,
-  disabled,
-  label,
-}: {
-  board: string[];
-  ships?: number[][] | null;
-  onCell?: (cell: number) => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  return (
-    <div className="sea-grid" role="group" aria-label={label}>
-      {board.map((value, i) => {
-        const ship = ships?.some((s) => s.includes(i));
-        const status =
-          value === "unknown"
-            ? ship
-              ? "корабль"
-              : "неизвестно"
-            : value === "miss"
-              ? "мимо"
-              : value === "sunk"
-                ? "потоплен"
-                : "попадание";
-        return (
-          <button
-            key={i}
-            type="button"
-            className={`sea-cell is-${value}${ship ? " has-ship" : ""}`}
-            disabled={disabled || !onCell || value !== "unknown"}
-            onClick={() => onCell?.(i)}
-            aria-label={`${label}, ${"АБВГДЕЖЗИК"[i % 10]}${Math.floor(i / 10) + 1}: ${status}`}
-          >
-            {value === "hit" || value === "sunk" ? "×" : value === "miss" ? "·" : ship ? "▪" : ""}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 function Match({
   duel,
   ownId,
@@ -197,6 +157,11 @@ function Match({
       )}
       {sea && (
         <>
+          {own >= 0 && (
+            <p className="fleet-appearance">
+              Ваш флот: <strong>{getShipSkin(sea.shipSkins?.[own]).name}</strong>
+            </p>
+          )}
           {setup && (
             <div className="fleet-tools">
               <button
@@ -287,6 +252,7 @@ function Match({
                     label="Ваше поле"
                     board={sea.boards[own]}
                     ships={draft ?? sea.ownShips}
+                    skinId={sea.shipSkins?.[own]}
                     disabled={!setup || !draft || busy}
                     onCell={place}
                   />
@@ -296,6 +262,7 @@ function Match({
                   <Sea
                     label="Поле соперника"
                     board={sea.boards[1 - own]}
+                    skinId={sea.shipSkins?.[1 - own]}
                     disabled={busy || !yourTurn || duel.phase !== "playing"}
                     onCell={(cell) => play({ type: "fire", cell })}
                   />
@@ -305,14 +272,33 @@ function Match({
               sea.boards.map((board, i) => (
                 <section key={i}>
                   <h3>{duel.players[i].name}</h3>
-                  <Sea label={`Поле ${duel.players[i].name}`} board={board} disabled />
+                  <Sea
+                    label={`Поле ${duel.players[i].name}`}
+                    board={board}
+                    skinId={sea.shipSkins?.[i]}
+                    disabled
+                  />
                 </section>
               ))
             )}
           </div>
-          <p className="feature-note">
-            ▪ корабль · × попадание · точка — промах. Потопленные корабли отмечены красным.
-          </p>
+          <div className="sea-legend" aria-label="Обозначения на поле">
+            <span>
+              <ShipArtwork length={2} /> корабль
+            </span>
+            <span>
+              <i aria-hidden="true">×</i> попадание
+            </span>
+            <span>
+              <i className="legend-sunk" aria-hidden="true">
+                ×
+              </i>{" "}
+              потоплен
+            </span>
+            <span>
+              <i aria-hidden="true">•</i> промах
+            </span>
+          </div>
         </>
       )}
     </>
@@ -519,40 +505,52 @@ export function DuelsScreen() {
               <p className="duel-access-note">
                 {duel.isPrivate ? <FiLock aria-hidden="true" /> : <FiGlobe aria-hidden="true" />}
                 {duel.isPrivate ? "Приватная дуэль · вход только по коду" : "Открытая дуэль"}
-                <strong>{duel.code}</strong>
+                {duel.phase !== "waiting" && <strong>{duel.code}</strong>}
               </p>
               {duel.phase === "waiting" ? (
                 <div className="duel-wait">
-                  <span aria-hidden="true">◎</span>
+                  <span className="duel-wait-icon" aria-hidden="true">
+                    <FiUsers />
+                  </span>
                   <h3>Ждём соперника</h3>
-                  <p>
-                    Ставка каждого: <CoinAmount amount={duel.stake} />. Ожидание до 10 минут, затем
-                    монеты вернутся.
+                  <p className="duel-wait-stake">
+                    Ставка <CoinAmount amount={duel.stake} />
                   </p>
-                  <label>
-                    Код этой дуэли
-                    <input
-                      className="duel-invite-code"
-                      readOnly
-                      value={duel.code}
-                      onFocus={(e) => e.target.select()}
-                    />
-                  </label>
-                  <button
-                    className="btn btn-secondary duel-copy-code"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(duel.code);
-                        setCopied(true);
-                      } catch {
-                        setError("Не удалось скопировать. Выделите код и скопируйте его вручную");
-                      }
-                    }}
-                  >
-                    {copied ? <FiCheck aria-hidden="true" /> : <FiCopy aria-hidden="true" />}
-                    {copied ? "Код скопирован" : "Скопировать код"}
-                  </button>
-                  <p className="feature-note">Другу нужно открыть «Дуэли» и ввести эти 4 буквы.</p>
+                  <div className="duel-invitation">
+                    <label htmlFor="duel-invite">Код приглашения</label>
+                    <div className="duel-invitation-controls">
+                      <input
+                        id="duel-invite"
+                        className="duel-invite-code"
+                        readOnly
+                        value={duel.code}
+                        onFocus={(e) => e.target.select()}
+                      />
+                      <button
+                        className="btn btn-secondary duel-copy-code"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(duel.code);
+                            setCopied(true);
+                          } catch {
+                            setError(
+                              "Не удалось скопировать. Выделите код и скопируйте его вручную",
+                            );
+                          }
+                        }}
+                      >
+                        {copied ? <FiCheck aria-hidden="true" /> : <FiCopy aria-hidden="true" />}
+                        {copied ? "Код скопирован" : "Скопировать код"}
+                      </button>
+                    </div>
+                    <p className="feature-note">
+                      Другу нужно открыть «Дуэли» и ввести эти 4 буквы.
+                    </p>
+                  </div>
+                  <p className="duel-wait-time">
+                    <FiClock aria-hidden="true" /> Ожидание до 10 минут. Если никто не
+                    присоединится, ставка вернётся.
+                  </p>
                   {!own && (
                     <button
                       className="btn btn-primary"
@@ -722,20 +720,22 @@ export function DuelsScreen() {
                         ))}
                       </fieldset>
                       <label>
-                        Ставка каждого, монет
+                        Ставка (монет)
                         <input
                           type="number"
                           min="0"
                           max={Math.min(profile.coins, DUEL_MAX_STAKE)}
                           step="1"
+                          inputMode="numeric"
                           value={stake}
-                          onChange={(e) => setStake(e.target.value)}
+                          onFocus={(e) => {
+                            if (e.target.value === "0") e.target.select();
+                          }}
+                          onChange={(e) => setStake(e.target.value.replace(/^0+(?=\d)/, ""))}
+                          onBlur={() => setStake((value) => value.trim() || "0")}
                         />
                       </label>
                       <div className="duel-stake-summary">
-                        <span>
-                          На балансе <CoinAmount amount={profile.coins} label="" />
-                        </span>
                         <span>
                           Банк победителя{" "}
                           <strong>
@@ -775,6 +775,15 @@ export function DuelsScreen() {
                       <small>
                         Ставка спишется при создании. До входа соперника её можно вернуть.
                       </small>
+                      {gameId === "battleship" && (
+                        <div className="fleet-appearance">
+                          <span>
+                            Ваш флот:{" "}
+                            <strong>{getShipSkin(profile.equipped.battleship).name}</strong>
+                          </span>
+                          <a href="/collection?kind=battleship">Выбрать скин</a>
+                        </div>
+                      )}
                     </>
                   )}
                 </section>
@@ -858,7 +867,7 @@ export function DuelsScreen() {
               )}
             </div>
           )}
-          <div className="duel-info-panels">
+          <div className={`duel-info-panels${duel ? " is-room" : ""}`}>
             {!duel && !!data?.mine.length && (
               <details className="feature-panel duel-history">
                 <summary>Ваши последние дуэли</summary>

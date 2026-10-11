@@ -4,9 +4,17 @@ import { AvatarPortrait } from "./AvatarPortrait";
 import { CardFaceArtwork } from "./CardFaceArtwork";
 import { RoyalCardBackArtwork } from "./RoyalCardBackArtwork";
 import { ReactionIcon } from "./ReactionIcon";
+import { ShipArtwork } from "../../games/battleship/ShipArtwork";
 import "../../styles/reactions.css";
 
 export function CosmeticPreview({ item }: { item: Cosmetic }) {
+  if (item.shipSkinId)
+    return (
+      <div className="cosmetic-fleet" aria-hidden="true">
+        <ShipArtwork skinId={item.shipSkinId} length={4} />
+        <ShipArtwork skinId={item.shipSkinId} length={2} />
+      </div>
+    );
   if (item.reactionId)
     return (
       <div className={`cosmetic-reaction${item.rarity === "legendary" ? " is-legendary" : ""}`}>

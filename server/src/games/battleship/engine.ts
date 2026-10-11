@@ -1,15 +1,20 @@
 import { randomInt } from "node:crypto";
 import { randomFleet } from "../../../../shared/games/battleship/rules.js";
+import type { ShipSkinId } from "../../../../shared/games/battleship/skins.js";
 export interface BattleshipState {
   kind: "battleship";
   ships: number[][][];
   shots: number[][];
   ready: boolean[];
   turn: number;
+  shipSkins?: ShipSkinId[];
 }
-export function createBattleship(): BattleshipState {
+export function createBattleship(
+  shipSkins: ShipSkinId[] = ["classic", "classic"],
+): BattleshipState {
   return {
     kind: "battleship",
+    shipSkins,
     ships: [randomFleet(randomInt), randomFleet(randomInt)],
     shots: [[], []],
     ready: [false, false],

@@ -158,7 +158,12 @@
   height: 100%;
 }
 
-.platform-nav-icon .pet-care-dot {
+.platform-nav-item-icon {
+  position: relative;
+}
+.platform-nav-icon .pet-care-dot,
+.platform-nav-icon .release-news-dot,
+.platform-nav-item-icon .release-news-dot {
   position: absolute;
   top: calc(-3 * var(--show-unit));
   right: calc(-4 * var(--show-unit));

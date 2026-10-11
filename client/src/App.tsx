@@ -28,6 +28,8 @@ import { finishStartup } from "./platform/startup";
 import { GuestAccountScreen, isGuestAccountPath } from "./platform/screens/GuestAccountScreen";
 import { loginReturnPath } from "./platform/authNavigation";
 import "./styles/platform-navigation.css";
+import { ReleaseNewsProvider } from "./platform/context/ReleaseNewsContext";
+import { ReleaseAnnouncement } from "./platform/components/ReleaseAnnouncement";
 
 function readAppPath() {
   return window.location.pathname.replace(/\/$/, "") || "/";
@@ -35,7 +37,7 @@ function readAppPath() {
 
 function ProfileApp({ initialPath }: { initialPath: string }) {
   const { profile, loading } = useProfile();
-  const { startupReady } = usePlatform();
+  const { startupReady, roomCode, sessionPending } = usePlatform();
   const [path, setPath] = useState(initialPath);
   useEffect(() => {
     if (startupReady) finishStartup();
@@ -122,7 +124,17 @@ function ProfileApp({ initialPath }: { initialPath: string }) {
       "/duels",
       "/pet",
     ].includes(path);
-  const metadata = <PageMetadata path={path} />;
+  const metadata = (
+    <>
+      <PageMetadata path={path} />
+      <ReleaseAnnouncement
+        path={path}
+        enabled={
+          startupReady && !loading && !roomCode && !sessionPending && knownPage && path !== "/login"
+        }
+      />
+    </>
+  );
   if (!profile && loading && path === "/login")
     return (
       <>
@@ -249,7 +261,9 @@ export default function App({ initialPath }: { initialPath: string }) {
       <PlatformProvider>
         <DeploymentBanner />
         <ProfileProvider>
-          <ProfileApp initialPath={initialPath} />
+          <ReleaseNewsProvider>
+            <ProfileApp initialPath={initialPath} />
+          </ReleaseNewsProvider>
         </ProfileProvider>
         <AppUpdateNotice />
       </PlatformProvider>

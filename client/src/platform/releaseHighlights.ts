@@ -1,4 +1,5 @@
 import headerNavigation from "../assets/updates/header-navigation-6.14.0.png";
+import fleetSkins from "../assets/updates/fleet-skins-6.19.0.jpg";
 import petHome from "../assets/updates/pet-home-6.15.0.png";
 import petHabits from "../assets/updates/pet-habits-6.16.0.jpg";
 import petModels from "../assets/updates/pet-models-6.16.2.jpg";
@@ -45,6 +46,15 @@ export interface ReleaseScreenshot {
   height: number;
 }
 
+export type ReleaseSection =
+  | "games"
+  | "duels"
+  | "collection"
+  | "cases"
+  | "upgrade"
+  | "pet"
+  | "leaderboard";
+
 interface ReleaseHighlight {
   id: string;
   version: string;
@@ -54,9 +64,34 @@ interface ReleaseHighlight {
   summary: string;
   changes: string[];
   screenshots: ReleaseScreenshot[];
+  /** Opt in only for major player-facing capabilities, never routine fixes. */
+  announcement?: { sections: ReleaseSection[] };
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-19",
+    version: "6.19.0",
+    date: "2026-10-11",
+    category: "МОРСКОЙ БОЙ",
+    title: "У вашего флота — свой характер.",
+    announcement: { sections: ["duels", "collection", "cases", "upgrade"] },
+    summary: "В морском бое появились цельные корабли и коллекционные оформления флота.",
+    changes: [
+      "Вместо отдельных клеток — корабли с корпусом, палубой и надстройками. Попадания видны поверх корабля; соперник и зрители видят его силуэт только после потопления.",
+      "Стальной флот есть у всех. Береговая охрана, Полярный конвой, Корсары и Золотая армада выпадают из общего кейса и нового кейса «Морской бой» за 5 монет.",
+      "Выбирайте оформление во вкладке «Корабли» в «Моих предметах» или получайте его через улучшения. Скин применяется к следующей дуэли и сохраняется на всю партию.",
+    ],
+    screenshots: [
+      {
+        src: fleetSkins,
+        width: 1228,
+        height: 306,
+        caption: "6.19.0 · Пять оформлений флота — локальная сборка, демонстрационная коллекция",
+        alt: "Стальной флот, Береговая охрана, Полярный конвой, Корсары и Золотая армада во вкладке Корабли. Реальная локальная сборка с демонстрационными предметами.",
+      },
+    ],
+  },
   {
     id: "release-6-18",
     version: "6.18.0",

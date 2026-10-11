@@ -51,7 +51,7 @@ function TypeFilters({
 }) {
   return (
     <nav className="upgrade-filters" aria-label={label}>
-      {(["all", "avatar", "durak", "uno", "reaction"] as const).map((kind) => (
+      {(["all", "avatar", "durak", "uno", "battleship", "reaction"] as const).map((kind) => (
         <button
           type="button"
           key={kind}
@@ -67,7 +67,9 @@ function TypeFilters({
                 ? "Дурак"
                 : kind === "uno"
                   ? "UNO"
-                  : "Эмоции"}
+                  : kind === "battleship"
+                    ? "Корабли"
+                    : "Эмоции"}
         </button>
       ))}
     </nav>
