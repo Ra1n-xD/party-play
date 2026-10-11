@@ -2,6 +2,8 @@
   display: block;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  pointer-events: none;
 }
 .cosmetic-fleet {
   position: relative;
@@ -200,5 +202,79 @@
 @media (max-width: 700px) {
   .upgrade-selected-item > .cosmetic-fleet {
     display: none;
+  }
+}
+
+/* Decorative motion stays under the hull and inside its occupied cells. */
+.ship-ocean-wave {
+  stroke-dasharray: 12 5;
+  animation: ship-wave-drift 3.6s linear infinite;
+  opacity: 0.7;
+}
+.ship-ocean-wave--foam {
+  stroke-dasharray: 5 8;
+  animation-duration: 4.8s;
+  animation-direction: reverse;
+  opacity: 0.8;
+}
+.ship-dragon-fin,
+.ship-dragon-sail {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ship-dragon-breathe 4.4s ease-in-out infinite;
+}
+.ship-dragon-sail {
+  transform-origin: center bottom;
+  animation-delay: -1.3s;
+}
+.ship-ghost-sail {
+  animation: ship-ghost-shimmer 5s ease-in-out infinite;
+}
+.sea-vessel.is-sunk .ship-ocean {
+  opacity: 0.25;
+}
+.sea-vessel.is-sunk .ship-ocean-wave,
+.sea-vessel.is-sunk .ship-dragon-fin,
+.sea-vessel.is-sunk .ship-dragon-sail,
+.sea-vessel.is-sunk .ship-ghost-sail {
+  animation: none;
+}
+@keyframes ship-wave-drift {
+  0% {
+    stroke-dashoffset: 0;
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    stroke-dashoffset: -34;
+    opacity: 0.55;
+  }
+}
+@keyframes ship-dragon-breathe {
+  0%,
+  100% {
+    transform: rotate(-1.5deg);
+  }
+  50% {
+    transform: rotate(1.5deg);
+  }
+}
+@keyframes ship-ghost-shimmer {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ship-ocean-wave,
+  .ship-dragon-fin,
+  .ship-dragon-sail,
+  .ship-ghost-sail {
+    animation: none;
   }
 }
