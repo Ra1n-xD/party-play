@@ -1,10 +1,4 @@
-import {
-  getCosmetic,
-  isCosmeticInUse,
-  type Cosmetic,
-  type ProfileSnapshot,
-  type Rarity,
-} from "./cosmetics.js";
+import { getCosmetic, type Cosmetic, type ProfileSnapshot, type Rarity } from "./cosmetics.js";
 
 export const UPGRADE_VALUES: Record<Rarity, number> = {
   // Kept for completed attempts made before basic items became singletons.
@@ -41,11 +35,10 @@ export type UpgradeReply =
   | { ok: true; value: { profile: ProfileSnapshot; attempt: UpgradeAttempt } }
   | { ok: false; error: string; retryable?: boolean };
 
-/** Keep starter access, equipped cosmetics and unlocked reactions available. */
+/** Every owned copy of a collectible can be spent, including an equipped or last copy. */
 export function getUpgradeAvailableCount(profile: ProfileSnapshot, item: Cosmetic): number {
   if (item.rarity === "basic") return 0;
-  const protectedCopy = isCosmeticInUse(profile, item) ? 1 : 0;
-  return Math.max(0, (profile.inventory[item.id] ?? 0) - protectedCopy);
+  return Math.max(0, profile.inventory[item.id] ?? 0);
 }
 
 export function getUpgradeInputValue(inputs: readonly UpgradeInput[]): number {

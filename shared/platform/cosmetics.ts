@@ -197,7 +197,7 @@ export interface ProfileSnapshot {
   dailyReward?: DailyReward | null;
   pet?: PetState | null;
 }
-/** Unlocked reactions are always available; their last copy is protected in upgrades. */
+/** Owned reactions are available immediately; other cosmetics use an equipped slot. */
 export function isCosmeticInUse(profile: ProfileSnapshot, item: Cosmetic): boolean {
   return item.kind === "reaction"
     ? (profile.inventory[item.id] ?? 0) > 0

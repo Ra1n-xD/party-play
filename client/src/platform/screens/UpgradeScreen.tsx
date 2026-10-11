@@ -437,8 +437,8 @@ export function UpgradeScreen() {
             </span>
           </div>
           <p className="upgrade-catalog-note">
-            Базовые предметы не участвуют в улучшении. Используемые скины и последняя копия каждой
-            эмоции защищены.
+            Можно отдать последнюю копию, в том числе используемый скин или эмоцию. Если выбранный
+            скин закончится, включится базовый. Базовые предметы не участвуют в улучшении.
           </p>
           <TypeFilters
             value={inputFilter}
@@ -462,13 +462,7 @@ export function UpgradeScreen() {
                   >
                     <ItemCard item={item}>
                       <div className="upgrade-item-meta">
-                        <span>
-                          {count
-                            ? `Доступно: ${count}`
-                            : item.kind === "reaction"
-                              ? "Последняя копия защищена"
-                              : "Используется"}
-                        </span>
+                        <span>Доступно: {count}</span>
                         <strong>
                           {selected
                             ? `Выбрано: ${selected}`

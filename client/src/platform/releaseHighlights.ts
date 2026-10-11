@@ -39,6 +39,7 @@ import legendaryCards from "../assets/updates/cards-4.5.2.png";
 import accountRegistration from "../assets/updates/auth-5.0.0.png";
 import profileSettings from "../assets/updates/profile-6.10.0.jpg";
 import mobileNavigation from "../assets/updates/mobile-navigation-6.10.0.jpg";
+import upgradeAllCopies from "../assets/updates/upgrade-all-copies-6.21.0.jpg";
 
 export interface ReleaseScreenshot {
   src: string;
@@ -71,6 +72,30 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-21",
+    version: "6.21.0",
+    date: "2026-10-11",
+    category: "УЛУЧШЕНИЯ",
+    title: "Каждая копия может стать ставкой.",
+    announcement: { sections: ["upgrade", "collection"] },
+    summary:
+      "В улучшениях можно использовать все копии коллекционных предметов, включая последние и выбранные для игры.",
+    changes: [
+      "Последний экземпляр персонажа, карт, корабля или эмоции теперь можно поставить в улучшении. Используемые скины тоже доступны для ставки.",
+      "Выбранные предметы расходуются при любом результате. Если последняя копия используемого скина потрачена, автоматически включается базовый; потраченная эмоция исчезает из доступных.",
+      "Базовые предметы остаются доступными для игры и не участвуют в улучшениях. За попытку по-прежнему можно отдать от 1 до 5 предметов.",
+    ],
+    screenshots: [
+      {
+        src: upgradeAllCopies,
+        width: 390,
+        height: 844,
+        caption: "6.21.0 · Последние копии доступны для ставки — локальная сборка, QA-профиль",
+        alt: "Мобильные улучшения с пояснением о последних копиях и переходе на базовый скин. Реальная локальная сборка с тестовым инвентарём.",
+      },
+    ],
+  },
   {
     id: "release-6-20",
     version: "6.20.0–6.20.1",

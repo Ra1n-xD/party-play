@@ -117,6 +117,20 @@ function publishProfile(key: string, io: IOServer): void {
   const profile = profileStore.profiles.get(key);
   if (profile) io.to(profileRoom(key)).emit("profile:snapshot", profile);
 }
+function publishProfileCosmetics(key: string, io: IOServer): void {
+  for (const room of getAllRooms().values()) {
+    // A game may have started while the disk write was in flight. Keep its chosen cosmetics.
+    if (room.lifecycle === "playing") continue;
+    let affected = false;
+    for (const player of room.players.values()) {
+      if (player.profileKey === key && !player.kicked && !player.voluntarilyLeft) {
+        applyProfileToPlayer(player);
+        affected = true;
+      }
+    }
+    if (affected) getServerGameModule(room.gameId)?.publish(room, io);
+  }
+}
 export async function equipProfileItem(
   key: string,
   itemId: string,
@@ -148,18 +162,7 @@ export async function equipProfileItem(
   });
   if (!changed) return profileStore.profiles.get(key)!;
   publishProfile(key, io);
-  for (const room of getAllRooms().values()) {
-    // A game may have started while the disk write was in flight. Keep its chosen cosmetics.
-    if (room.lifecycle === "playing") continue;
-    let affected = false;
-    for (const player of room.players.values()) {
-      if (player.profileKey === key && !player.kicked && !player.voluntarilyLeft) {
-        applyProfileToPlayer(player);
-        affected = true;
-      }
-    }
-    if (affected) getServerGameModule(room.gameId)?.publish(room, io);
-  }
+  publishProfileCosmetics(key, io);
   return profileStore.profiles.get(key)!;
 }
 
@@ -315,6 +318,7 @@ export function registerProfileHandlers(
         throw new UpgradeRejectedError("Выберите от 1 до 5 предметов и более ценную цель");
       let attempt!: UpgradeAttempt;
       let created = false;
+      let equippedChanged = false;
       await transaction([key], (draft) => {
         assertProfileSession(socket, key);
         const current = draft.profiles.get(key)!;
@@ -326,9 +330,7 @@ export function registerProfileHandlers(
         for (const input of data.inputs) {
           const item = getCosmetic(input.itemId)!;
           if (getUpgradeAvailableCount(current, item) < input.count)
-            throw new UpgradeRejectedError(
-              "Предметов недостаточно. Используемый экземпляр и последняя копия эмоции защищены",
-            );
+            throw new UpgradeRejectedError("Предметов недостаточно для выбранной ставки");
         }
         const roll = randomInt(10_000);
         attempt = {
@@ -342,7 +344,16 @@ export function registerProfileHandlers(
         };
         for (const input of attempt.inputs) {
           current.inventory[input.itemId] -= input.count;
-          if (!current.inventory[input.itemId]) delete current.inventory[input.itemId];
+          if (!current.inventory[input.itemId]) {
+            delete current.inventory[input.itemId];
+            const item = getCosmetic(input.itemId)!;
+            if (item.kind !== "reaction" && isCosmeticInUse(current, item)) {
+              if (item.kind === "avatar") current.equipped.avatar = "human";
+              else if (item.kind === "battleship") current.equipped.battleship = "classic";
+              else current.equipped[item.kind] = "classic";
+              equippedChanged = true;
+            }
+          }
         }
         if (attempt.success) {
           const count = (current.inventory[attempt.targetItemId] ?? 0) + 1;
@@ -354,7 +365,10 @@ export function registerProfileHandlers(
         draft.upgradeReceipts.set(receiptKey, { profileId: key, attempt });
         created = true;
       });
-      if (created) publishProfile(key, io);
+      if (created) {
+        publishProfile(key, io);
+        if (equippedChanged) publishProfileCosmetics(key, io);
+      }
       if (created && attempt.success)
         publishDrop(
           makeDrop(
