@@ -5,6 +5,8 @@ import { HAND_CARD_EDGE_Y, limbBetween, roundedPart } from "./AvatarParts";
 import { makeArticulatedHand } from "./AvatarHand";
 import { FirstPersonReactions, type FirstPersonGrip } from "./FirstPersonReactions";
 import type { RoomReactionId } from "../../../../../shared/platform/reactions";
+import type { AvatarId } from "../../../../../shared/platform/avatars";
+import { makeAstronautTelemetry, type AvatarLegendaryEffectsRig } from "./AstronautEffects";
 
 export interface CardFace {
   skinId?: CardSkinId;
@@ -66,6 +68,9 @@ export class FirstPersonHand {
   private enabled = true;
   private overview = false;
   private hitAreasDirty = true;
+  private readonly telemetry: AvatarLegendaryEffectsRig[] = [];
+  private telemetrySeconds = 0;
+  private lastTelemetryFrame: number | null = null;
 
   constructor(
     host: HTMLElement,
@@ -111,13 +116,14 @@ export class FirstPersonHand {
     this.onFocus(this.hand[(index + direction + this.hand.length) % this.hand.length].id);
   }
 
-  private makeGrip(skin: number, shirt: number) {
-    const key = `${skin}:${shirt}`;
+  private makeGrip(skin: number, shirt: number, avatarId?: AvatarId) {
+    const key = `${skin}:${shirt}:${avatarId ?? ""}`;
     if (this.gripKey === key) return;
     this.gripKey = key;
     this.disposeObject(this.grip);
     this.grip.clear();
     this.grips.length = 0;
+    this.telemetry.length = 0;
     const sleeveMaterial = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.9 });
     const cuffMaterial = new THREE.MeshStandardMaterial({ color: 0xeee9dc, roughness: 0.85 });
     for (const side of [-1, 1]) {
@@ -145,16 +151,25 @@ export class FirstPersonHand {
       const cuff = roundedPart([0.1, 0.058, 0.082], cuffMaterial, 0.015);
       cuff.position.copy(wrist);
       anchor.add(cuff);
+      if (avatarId === "astronaut") {
+        this.telemetry.push(makeAstronautTelemetry(anchor, [0, -0.155, 0], 0.015, 0.028));
+      }
     }
   }
 
-  update(hand: TableHandCard[], skin: number, shirt: number, ownerId: string | null) {
+  update(
+    hand: TableHandCard[],
+    skin: number,
+    shirt: number,
+    ownerId: string | null,
+    avatarId?: AvatarId,
+  ) {
     if (this.ownerId !== ownerId) this.reactions.reset();
     this.ownerId = ownerId;
     this.hand = hand;
     this.inputs.hidden = hand.length === 0;
     this.grip.visible = hand.length > 0;
-    if (ownerId) this.makeGrip(skin, shirt);
+    if (ownerId) this.makeGrip(skin, shirt, avatarId);
     const ids = new Set(hand.map((card) => card.id));
     this.cards.forEach((entry, id) => {
       if (ids.has(id)) return;
@@ -305,6 +320,11 @@ export class FirstPersonHand {
     paused: boolean,
     reducedMotion: boolean,
   ) {
+    if (this.lastTelemetryFrame !== null && !paused && !reducedMotion) {
+      this.telemetrySeconds += Math.min(80, Math.max(0, time - this.lastTelemetryFrame)) / 1000;
+    }
+    this.lastTelemetryFrame = time;
+    this.telemetry.forEach((rig) => rig.frame(this.telemetrySeconds, reducedMotion));
     let moved = this.hitAreasDirty;
     this.cards.forEach((entry) => {
       if (!entry.pivot.visible) return;

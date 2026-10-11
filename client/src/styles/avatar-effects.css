@@ -1,0 +1,57 @@
+/* Decoration stays inside the existing portrait and never changes its hit area. */
+.avatar-portrait .astronaut-visor-glint {
+  animation: astronaut-visor-sweep 8.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.avatar-portrait .astronaut-telemetry rect {
+  animation: astronaut-telemetry-glow 4.2s ease-in-out infinite;
+  opacity: 0.5;
+}
+
+.avatar-portrait .astronaut-telemetry rect:nth-child(2) {
+  animation-delay: -0.8s;
+}
+
+.avatar-portrait .astronaut-telemetry rect:nth-child(3) {
+  animation-delay: -1.6s;
+}
+
+@keyframes astronaut-visor-sweep {
+  0% {
+    transform: translateX(-66px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.62;
+  }
+  62%,
+  100% {
+    transform: translateX(66px);
+    opacity: 0;
+  }
+}
+
+@keyframes astronaut-telemetry-glow {
+  0%,
+  60%,
+  100% {
+    opacity: 0.5;
+  }
+  25% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-portrait .astronaut-visor-glint {
+    animation: none;
+    transform: translateX(-16px);
+    opacity: 0.25;
+  }
+
+  .avatar-portrait .astronaut-telemetry rect {
+    animation: none;
+    opacity: 0.75;
+  }
+}

@@ -572,6 +572,8 @@ body:has(.show-menu, .profile-login),
   gap: 16px;
 }
 .collection-item {
+  display: flex;
+  flex-direction: column;
   position: relative;
   border: 1px solid #ffffff18;
   border-bottom: 3px solid var(--rarity-color);
@@ -633,6 +635,35 @@ body:has(.show-menu, .profile-login),
 .collection-item-count strong {
   color: #fff8e8;
   font-weight: 700;
+}
+.collection-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+}
+.collection-sound-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 8px;
+  border: 1px solid #ffc35d50;
+  border-radius: 8px;
+  background: #ffc35d0e;
+  color: #ffe0a0;
+  font:
+    600 12px "Golos Text",
+    sans-serif;
+  cursor: pointer;
+}
+.collection-sound-preview:hover {
+  background: #ffc35d22;
+}
+.collection-sound-preview:focus-visible {
+  outline: 2px solid #d8fc61;
+  outline-offset: 3px;
 }
 .collection-equip {
   width: 100%;

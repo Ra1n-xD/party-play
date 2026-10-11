@@ -1,0 +1,62 @@
+.legendary-card-foil,
+.legendary-card-sparks {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  border-radius: inherit;
+  pointer-events: none;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+}
+.legendary-card-foil {
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    #fff0ba66 44%,
+    #fff8dccc 50%,
+    #ffe7a566 56%,
+    transparent 65%
+  );
+  background-size: 300% 300%;
+  background-position: 150% 150%;
+  opacity: 0.7;
+  animation: legendary-card-foil-pass 8s ease-in-out infinite;
+}
+.legendary-card-sparks {
+  background: #fff1bb;
+  opacity: 0.15;
+  animation: legendary-card-gem-glint 7s ease-in-out infinite;
+  animation-delay: -2s;
+}
+@keyframes legendary-card-foil-pass {
+  0%,
+  18% {
+    background-position: 150% 150%;
+  }
+  58%,
+  100% {
+    background-position: -50% -50%;
+  }
+}
+@keyframes legendary-card-gem-glint {
+  0%,
+  32%,
+  66%,
+  100% {
+    opacity: 0.1;
+  }
+  48% {
+    opacity: 0.7;
+  }
+}
+/* Selection and flight continue to move the card itself; foil is purely decorative. */
+@media (prefers-reduced-motion: reduce) {
+  .legendary-card-foil,
+  .legendary-card-sparks {
+    animation: none;
+    opacity: 0;
+  }
+}

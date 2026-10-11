@@ -2,6 +2,8 @@ import { PetModel } from "./PetModel";
 import { PET_SPECIES_INFO, type PetAppearance } from "../../../../../shared/platform/pet";
 import { getCardSkin, type CardSkinId } from "../../../../../shared/platform/cosmetics";
 import { drawCardBack, drawCardFace } from "../../../platform/cardFaceArtwork";
+import { drawCardFoilMask, type CardFoilSide } from "../../../platform/legendaryCardFoil";
+import { addLegendaryCardFoil, type LegendaryCardClock } from "./LegendaryCardMaterial";
 import * as THREE from "three";
 import { makeRoomEnvironment } from "./RoomEnvironment";
 import { CARD_HEIGHT, makeCardGeometry, type CardMesh } from "./CardGeometry";
@@ -123,6 +125,10 @@ export class RoundTableScene {
   private readonly table = new THREE.Group();
   private readonly cards = new Map<string, MovingCard>();
   private readonly textures = new Map<string, THREE.CanvasTexture>();
+  private readonly legendaryCardClock: LegendaryCardClock = {
+    time: { value: 0 },
+    enabled: { value: 1 },
+  };
   private readonly seatPositions = new Map<string, THREE.Vector3>();
   private readonly avatars = new Map<string, TableAvatarAnimator>();
   private readonly cardArms = new Map<string, ReturnType<typeof makeSeatedArm>>();
@@ -490,6 +496,20 @@ export class RoundTableScene {
     return texture;
   }
 
+  private cardFoilMask(side: CardFoilSide, layer: "foil" | "sparks") {
+    const key = `legendary-mask:${side}:${layer}`;
+    const cached = this.textures.get(key);
+    if (cached) return cached;
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 360;
+    drawCardFoilMask(canvas.getContext("2d")!, side, layer);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = Math.min(this.renderer.capabilities.getMaxAnisotropy(), 8);
+    this.textures.set(key, texture);
+    return texture;
+  }
+
   private makeCard(
     rank = "",
     suit = "",
@@ -506,6 +526,18 @@ export class RoundTableScene {
       map: this.cardTexture("", "", false, undefined, skinId),
       roughness: 0.85,
     });
+    if (getCardSkin(skinId).id === "royal") {
+      for (const [material, side] of [
+        [face, rank ? "face" : "back"],
+        [back, "back"],
+      ] as const)
+        addLegendaryCardFoil(
+          material,
+          this.legendaryCardClock,
+          this.cardFoilMask(side, "foil"),
+          this.cardFoilMask(side, "sparks"),
+        );
+    }
     const mesh = new THREE.Mesh(makeCardGeometry(), [edge, edge, face, back]);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -542,7 +574,7 @@ export class RoundTableScene {
       for (const z of [-0.28, 0.27])
         this.box(group, [0.055, 0.72, 0.055], 0x997847, [side * 0.35, 0.36, z]);
     const holdsCards = this.options.variant !== "bunker" && person.count > 0;
-    const { body, head, leftArm, rightArm, hand, face, legs } = makeSeatedAvatar(
+    const { body, head, leftArm, rightArm, hand, face, legs, legendaryEffects } = makeSeatedAvatar(
       person.avatarId,
       holdsCards,
     );
@@ -563,6 +595,7 @@ export class RoundTableScene {
       index * 1.7,
       face,
       legs,
+      legendaryEffects,
     );
     animator.setEliminated(Boolean(person.eliminated), person.eliminatedAt, true);
     this.avatars.set(person.id, animator);
@@ -805,6 +838,7 @@ export class RoundTableScene {
       ownAvatar.skin,
       ownAvatar.outfit,
       this.viewerId,
+      ownAvatar.id,
     );
     this.labelHost.style.setProperty(
       "--table3d-dossier-width",
@@ -1070,6 +1104,8 @@ export class RoundTableScene {
       (Math.floor(Math.max(0, time - scheduledAt) / FRAME_INTERVAL_MS) + 1) * FRAME_INTERVAL_MS;
     const dt = Math.min((time - this.lastTime) / 1000, 0.05);
     this.lastTime = time;
+    this.legendaryCardClock.enabled.value = this.reducedMotion.matches ? 0 : 1;
+    if (!this.reducedMotion.matches && !this.paused) this.legendaryCardClock.time.value += dt;
     for (const { actor } of this.companions.values())
       actor.frame(time, this.reducedMotion.matches, this.paused);
     const smoothing = this.reducedMotion.matches ? 1 : 1 - Math.exp(-14 * dt);

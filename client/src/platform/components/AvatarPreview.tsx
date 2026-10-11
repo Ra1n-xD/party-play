@@ -34,7 +34,7 @@ export default function AvatarPreview({ avatarId }: { avatarId: AvatarId }) {
     fill.position.set(-3, 2, -3);
     scene.add(fill);
     const figure = new THREE.Group();
-    const { body } = makeSeatedAvatar(avatarId, false);
+    const { body, legendaryEffects } = makeSeatedAvatar(avatarId, false);
     figure.add(body);
     const seat = roundedPart(
       [1, 0.18, 0.9],
@@ -51,19 +51,69 @@ export default function AvatarPreview({ avatarId }: { avatarId: AvatarId }) {
     const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 20);
     camera.position.set(0, 2.05, 5.4);
     camera.lookAt(0, 1.5, 0);
-    const render = () => {
+    const render = () => renderer.render(scene, camera);
+    const resize = () => {
       const { width, height } = container.getBoundingClientRect();
       if (!width || !height) return;
       renderer.setSize(width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.render(scene, camera);
+      render();
     };
-    // The lobby renders only on selection/resize; it never keeps a second animation loop running.
-    const observer = new ResizeObserver(render);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let visible = false;
+    let frame: number | null = null;
+    let previousTime: number | null = null;
+    let seconds = 0;
+    const canAnimate = () =>
+      legendaryEffects &&
+      visible &&
+      !document.hidden &&
+      document.hasFocus() &&
+      !reducedMotion.matches;
+    const animate = (time: number) => {
+      frame = null;
+      if (!canAnimate()) return;
+      if (previousTime !== null) seconds += Math.min(80, Math.max(0, time - previousTime)) / 1000;
+      previousTime = time;
+      legendaryEffects?.frame(seconds, false);
+      render();
+      frame = requestAnimationFrame(animate);
+    };
+    const syncAnimation = () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = null;
+      previousTime = null;
+      legendaryEffects?.frame(seconds, reducedMotion.matches);
+      render();
+      if (canAnimate()) frame = requestAnimationFrame(animate);
+    };
+    // Other avatars still render only on selection/resize. Only the visible legendary
+    // preview has a loop, and it stops for background tabs and reduced motion.
+    const visibilityObserver = legendaryEffects
+      ? new IntersectionObserver(([entry]) => {
+          visible = entry.isIntersecting;
+          syncAnimation();
+        })
+      : null;
+    visibilityObserver?.observe(container);
+    if (legendaryEffects) {
+      document.addEventListener("visibilitychange", syncAnimation);
+      window.addEventListener("focus", syncAnimation);
+      window.addEventListener("blur", syncAnimation);
+      reducedMotion.addEventListener("change", syncAnimation);
+      legendaryEffects.frame(0, reducedMotion.matches);
+    }
+    const observer = new ResizeObserver(resize);
     observer.observe(container);
-    render();
+    resize();
     return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      visibilityObserver?.disconnect();
+      document.removeEventListener("visibilitychange", syncAnimation);
+      window.removeEventListener("focus", syncAnimation);
+      window.removeEventListener("blur", syncAnimation);
+      reducedMotion.removeEventListener("change", syncAnimation);
       observer.disconnect();
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();

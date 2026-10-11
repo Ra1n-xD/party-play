@@ -7,6 +7,7 @@ import {
 import type { AvatarFaceRig } from "./AvatarFace";
 import type { makeSeatedArm } from "./AvatarParts";
 import { AVATAR_STAND_RISE, AVATAR_STAND_FORWARD, type AvatarLegRig } from "./AvatarLegs";
+import type { AvatarLegendaryEffectsRig } from "./AstronautEffects";
 
 export const AVATAR_EXIT_DURATION_MS = 2200;
 const HIP_HEIGHT = 0.92;
@@ -57,6 +58,7 @@ export class TableAvatarAnimator {
     private readonly idlePhase = 0,
     private readonly face?: AvatarFaceRig,
     private readonly legs?: AvatarLegRig,
+    private readonly legendaryEffects?: AvatarLegendaryEffectsRig,
   ) {}
 
   get heightOffset() {
@@ -108,6 +110,7 @@ export class TableAvatarAnimator {
       this.idleTime += Math.min(elapsed, 80);
     }
     this.poseDirty = false;
+    this.legendaryEffects?.frame(this.idleTime / 1000 + this.idlePhase, reducedMotion);
     this.lookYaw += (yaw - this.lookYaw) * smoothing;
     this.lookPitch += (pitch - this.lookPitch) * smoothing;
     this.body.position.set(0, HIP_HEIGHT, 0);

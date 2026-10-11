@@ -11,7 +11,7 @@ import {
 import { CosmeticPreview } from "../components/CosmeticPreview";
 import { useProfile } from "../context/ProfileContext";
 import { useCollectionAudio } from "../useCollectionAudio";
-import { CoinAmount } from "../components/CoinAmount";
+import { CoinAmount, coinLabel } from "../components/CoinAmount";
 import { DropFeed } from "../components/DropFeed";
 import { CaseIcon } from "../components/CaseIcon";
 import {
@@ -206,7 +206,7 @@ export function CasesScreen() {
               type="button"
               key={entry.id}
               aria-pressed={caseId === entry.id}
-              aria-label={`${entry.name}. ${entry.description}. ${entry.cost} ${entry.cost === 1 ? "монета" : "монет"}`}
+              aria-label={`${entry.name}. ${entry.description}. ${entry.cost} ${coinLabel(entry.cost)}`}
               title={entry.description}
               className={`case-choice${caseId === entry.id ? " is-active" : ""}`}
               style={{ "--case-icon-color": color } as CSSProperties}

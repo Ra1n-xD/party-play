@@ -5,6 +5,9 @@ import { makeSeatedArm, roundedPart } from "./AvatarParts";
 import { mergeRigidParts } from "./mergeRigidParts";
 import { makeAvatarLegs } from "./AvatarLegs";
 import { faceSurfaceDepth } from "./AvatarSculpt";
+import { makeAstronautEffects, type AvatarLegendaryEffectsRig } from "./AstronautEffects";
+
+export type { AvatarLegendaryEffectsRig } from "./AstronautEffects";
 
 type Point = [number, number, number];
 const faces = new WeakMap<THREE.Group, AvatarFaceRig>();
@@ -525,7 +528,10 @@ export function makeSeatedAvatar(avatarId: AvatarId, holdingCards: boolean) {
   const hand = new THREE.Group();
   hand.name = "hand";
   leftArm.grip.add(hand);
+  const legendaryEffects: AvatarLegendaryEffectsRig | undefined = space
+    ? makeAstronautEffects(head, model)
+    : undefined;
   mergeRigidParts(head);
   mergeRigidParts(model);
-  return { body, head, face: faces.get(head)!, leftArm, rightArm, hand, legs };
+  return { body, head, face: faces.get(head)!, leftArm, rightArm, hand, legs, legendaryEffects };
 }

@@ -16,6 +16,16 @@ export const DEFAULT_ROOM_REACTION: RoomReactionId = "good-move";
 export const LAUGH_AUDIO_START_SECONDS = 0.55;
 export const LAUGH_BEATS_SECONDS = [0.72, 0.88, 1.12, 1.32, 1.7, 2.14, 2.36] as const;
 
+export const ROOM_REACTION_SOUNDS = {
+  laugh: { startSeconds: LAUGH_AUDIO_START_SECONDS, volume: 0.65 },
+  mog: { startSeconds: 0.22, volume: 0.48 },
+} as const;
+export type RoomReactionSoundId = keyof typeof ROOM_REACTION_SOUNDS;
+
+export function hasRoomReactionSound(id: RoomReactionId): id is RoomReactionSoundId {
+  return Object.hasOwn(ROOM_REACTION_SOUNDS, id);
+}
+
 export function ownsRoomReaction(
   id: RoomReactionId,
   inventory?: Readonly<Record<string, number>> | null,

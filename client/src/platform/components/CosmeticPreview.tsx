@@ -23,7 +23,7 @@ export function CosmeticPreview({ item }: { item: Cosmetic }) {
           {item.reactionId === "laugh"
             ? "Смех стоя · со звуком"
             : item.reactionId === "mog"
-              ? "Жест вдоль челюсти"
+              ? "Жест вдоль челюсти · со звуком"
               : "Эмоция за столом"}
         </span>
       </div>

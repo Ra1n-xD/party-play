@@ -1,15 +1,23 @@
+import { useId } from "react";
 import { getAvatar, type AvatarId } from "../../../../shared/platform/avatars";
+import "../../styles/avatar-effects.css";
 
 const hex = (color: number) => `#${color.toString(16).padStart(6, "0")}`;
 
 export function AvatarPortrait({ avatarId }: { avatarId: AvatarId }) {
+  const effectId = useId();
   const avatar = getAvatar(avatarId);
   const { id } = avatar;
   const skin = hex(avatar.skin);
   const accent = hex(avatar.accent);
   const human = id === "human" || id === "astronaut";
   return (
-    <svg viewBox="0 0 120 120" aria-hidden="true" focusable="false" className="avatar-portrait">
+    <svg
+      viewBox="0 0 120 120"
+      aria-hidden="true"
+      focusable="false"
+      className={`avatar-portrait${id === "astronaut" ? " is-astronaut" : ""}`}
+    >
       <circle cx="60" cy="61" r="51" fill="#fff4d5" opacity=".12" />
       <path d="M17 120v-10c0-24 16-36 43-36s43 12 43 36v10" fill={hex(avatar.outfit)} />
       <path d="m47 80 13 28 13-28" fill="#f8eed8" />
@@ -157,6 +165,33 @@ export function AvatarPortrait({ avatarId }: { avatarId: AvatarId }) {
       )}
       {(id === "robot" || id === "astronaut") && (
         <rect x="48" y="96" width="24" height="16" rx="3" fill="#243541" />
+      )}
+      {id === "astronaut" && (
+        <>
+          <defs>
+            <clipPath id={`${effectId}-visor`}>
+              <ellipse cx="60" cy="58" rx="35" ry="38" />
+            </clipPath>
+            <linearGradient id={`${effectId}-glint`} x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stopColor="#c7f2ff" stopOpacity="0" />
+              <stop offset=".55" stopColor="#e2f9ff" stopOpacity=".65" />
+              <stop offset="1" stopColor="#c7f2ff" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <g clipPath={`url(#${effectId}-visor)`}>
+            <ellipse cx="60" cy="58" rx="35" ry="38" fill="#c7e8f0" opacity=".045" />
+            <path
+              className="astronaut-visor-glint"
+              d="M16 17h19l70 81H86Z"
+              fill={`url(#${effectId}-glint)`}
+            />
+          </g>
+          <g className="astronaut-telemetry">
+            <rect x="51" y="101" width="4" height="5" rx="1" fill="#8ee7e8" />
+            <rect x="58" y="101" width="4" height="5" rx="1" fill="#f4cf7b" />
+            <rect x="65" y="101" width="4" height="5" rx="1" fill="#a8dfc2" />
+          </g>
+        </>
       )}
     </svg>
   );

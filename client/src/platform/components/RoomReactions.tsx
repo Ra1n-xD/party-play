@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from "react-dom";
 import {
   ROOM_REACTIONS,
+  hasRoomReactionSound,
   ownsRoomReaction,
   type RoomReactionId,
 } from "../../../../shared/platform/reactions";
@@ -215,7 +216,7 @@ export function RoomReactions() {
           setPopoverOpen((open) => !open);
           if (popoverOpen) restoreFocus();
         }
-      } else if (popoverOpen && /^(Digit|Numpad)[1-7]$/.test(event.code)) {
+      } else if (popoverOpen && /^(Digit|Numpad)[1-9]$/.test(event.code)) {
         event.preventDefault();
         const reaction = availableReactions[Number(event.code.slice(-1)) - 1];
         if (reaction) chooseReaction(reaction.id);
@@ -248,7 +249,7 @@ export function RoomReactions() {
             <span className="room-reaction-message-copy">
               <strong>{event.senderName}</strong>
               <span>{reaction.label}</span>
-              {reaction.id === "laugh" && (
+              {hasRoomReactionSound(reaction.id) && (
                 <button
                   type="button"
                   className="room-reaction-sound"

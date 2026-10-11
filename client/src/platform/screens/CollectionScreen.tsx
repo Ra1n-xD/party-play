@@ -1,3 +1,6 @@
+import { FiVolume2 } from "react-icons/fi";
+import { hasRoomReactionSound } from "../../../../shared/platform/reactions";
+import { useReactionAudioPreview } from "../useReactionAudio";
 import { getUpgradeInputValue } from "../../../../shared/platform/upgrades";
 import { useEffect, useState, type CSSProperties } from "react";
 import {
@@ -14,6 +17,7 @@ import { CoinAmount } from "../components/CoinAmount";
 
 export function CollectionScreen() {
   const { profile, equip, busy, connected } = useProfile();
+  const sound = useReactionAudioPreview();
   const [tab, setTab] = useState<CosmeticKind>("avatar");
   useEffect(() => {
     const kind = new URLSearchParams(window.location.search).get("kind");
@@ -54,7 +58,10 @@ export function CollectionScreen() {
           <button
             key={kind}
             aria-pressed={tab === kind}
-            onClick={() => setTab(kind as CosmeticKind)}
+            onClick={() => {
+              sound.stop();
+              setTab(kind as CosmeticKind);
+            }}
           >
             {name}
           </button>
@@ -77,19 +84,31 @@ export function CollectionScreen() {
               <p className="collection-item-count">
                 <span>В наличии:</span> <strong>{count.toLocaleString("ru-RU")} шт.</strong>
               </p>
-              <button
-                className="collection-equip"
-                onClick={() => equip(item.id)}
-                disabled={!count || selected || busy || !connected}
-              >
-                {selected
-                  ? item.kind === "reaction"
-                    ? "✓ Доступна в игре"
-                    : "✓ Выбран"
-                  : count
-                    ? "Выбрать"
-                    : "В кейсе"}
-              </button>
+              <div className="collection-item-actions">
+                {item.reactionId && hasRoomReactionSound(item.reactionId) && (
+                  <button
+                    type="button"
+                    className="collection-sound-preview"
+                    aria-label={`Послушать звук: ${item.name}`}
+                    onClick={() => sound.play(item.reactionId!)}
+                  >
+                    <FiVolume2 aria-hidden="true" /> Послушать звук
+                  </button>
+                )}
+                <button
+                  className="collection-equip"
+                  onClick={() => equip(item.id)}
+                  disabled={!count || selected || busy || !connected}
+                >
+                  {selected
+                    ? item.kind === "reaction"
+                      ? "✓ Доступна в игре"
+                      : "✓ Выбран"
+                    : count
+                      ? "Выбрать"
+                      : "В кейсе"}
+                </button>
+              </div>
             </article>
           );
         })}
