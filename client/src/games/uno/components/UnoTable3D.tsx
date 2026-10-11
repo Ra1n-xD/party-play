@@ -38,6 +38,7 @@ export default function UnoTable3D(props: Props) {
         avatarId: getAvatar(snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.avatarId)
           .id,
         cardSkinId: snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.cardSkins.uno,
+        pet: snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.pet,
         name: player.name,
         count: player.cardCount,
         active: player.isCurrentActor && !props.paused,

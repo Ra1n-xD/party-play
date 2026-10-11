@@ -13,7 +13,11 @@ import { assertProfileSession, profileRoom } from "./profileAuth.js";
 import { guardProfileRequest } from "./profileRateLimit.js";
 import type { IOServer } from "./gameModule.js";
 
-export function registerPetHandlers(socket: Socket<ClientEvents, ServerEvents>, io: IOServer) {
+export function registerPetHandlers(
+  socket: Socket<ClientEvents, ServerEvents>,
+  io: IOServer,
+  onPetChanged: (profileId: string) => void,
+) {
   socket.on("pet:action", async (data, reply) => {
     if (typeof reply !== "function") return;
     try {
@@ -66,6 +70,7 @@ export function registerPetHandlers(socket: Socket<ClientEvents, ServerEvents>, 
       assertProfileSession(socket, key);
       const profile = profileStore.profiles.get(key)!;
       io.to(profileRoom(key)).emit("profile:snapshot", profile);
+      onPetChanged(key);
       reply({ ok: true, value: profile });
     } catch (error) {
       reply({ ok: false, error: (error as Error).message });

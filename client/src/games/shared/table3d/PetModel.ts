@@ -191,6 +191,7 @@ export class PetModel {
   constructor(
     readonly stage: number,
     readonly species: PetSpecies,
+    private readonly roamScale = 1,
   ) {
     this.behavior = new PetBehavior(stage, species);
     this.bodyScale = stage === 1 ? 0.72 : stage === 2 ? 0.87 : 1;
@@ -1380,6 +1381,8 @@ export class PetModel {
           break;
       }
     }
+    this.pose.position.x *= this.roamScale;
+    this.pose.position.z *= this.roamScale;
     const blink = idle && t % 4.6 < 0.16 ? 0.08 : Math.max(0.06, 1 - closedEyes);
     this.eyes.forEach(({ mesh, height }) => {
       mesh.scale.y = height * blink;

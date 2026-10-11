@@ -1,4 +1,3 @@
-import { useTablePet } from "../../../platform/useTablePet";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RoundTableScene, type RoundTableState, type TableSceneOptions } from "./RoundTableScene";
 import { useTablePresence } from "./useTablePresence";
@@ -29,7 +28,6 @@ interface Props {
 }
 
 export default function RoundTableView(props: Props) {
-  const { stage: petStage, species: petSpecies } = useTablePet();
   const host = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
   const scene = useRef<RoundTableScene | null>(null);
@@ -74,9 +72,6 @@ export default function RoundTableView(props: Props) {
       scene.current = null;
     };
   }, []);
-  useEffect(() => {
-    scene.current?.setPet(petStage, petSpecies);
-  }, [petStage, petSpecies]);
   useEffect(() => {
     scene.current?.update(props.state);
   }, [props.state]);

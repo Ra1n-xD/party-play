@@ -111,6 +111,7 @@ export default function BunkerTable3D(props: Props) {
       people: (game?.players ?? []).map((player) => ({
         id: player.id,
         avatarId: snapshot?.seats.find((seat) => seat.seatId === player.id)?.avatarId ?? "human",
+        pet: snapshot?.seats.find((seat) => seat.seatId === player.id)?.pet,
         name: player.name,
         count: 0,
         active: game?.currentTurnPlayerId === player.id && !game.paused,

@@ -103,7 +103,11 @@ import {
   isProfileAccountUpdating,
 } from "./profileAuth.js";
 import { profileStore } from "./profileStorage.js";
-import { setRoomPreparingHook, setRoomPublishedHook } from "./statePublisher.js";
+import {
+  clearRoomPetExpiry,
+  setRoomPreparingHook,
+  setRoomPublishedHook,
+} from "./statePublisher.js";
 
 type IOServer = Server<ClientEvents, ServerEvents>;
 type IOSocket = Socket<ClientEvents, ServerEvents>;
@@ -257,6 +261,7 @@ function installGameLifecycleHooks(): void {
 
 function attachRoomDisposalHandler(room: Room, io: IOServer): void {
   setRoomDisposalHandler(room, (disposedRoom, reason) => {
+    clearRoomPetExpiry(disposedRoom);
     if (reason === "deployment") {
       const claimantSocketIds = Array.from(
         disposedRoom.pendingSeatClaims.values(),

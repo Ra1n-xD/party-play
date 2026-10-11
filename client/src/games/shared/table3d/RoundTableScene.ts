@@ -1,5 +1,5 @@
 import { PetModel } from "./PetModel";
-import { PET_SPECIES_INFO, type PetSpecies } from "../../../../../shared/platform/pet";
+import { PET_SPECIES_INFO, type PetAppearance } from "../../../../../shared/platform/pet";
 import { getCardSkin, type CardSkinId } from "../../../../../shared/platform/cosmetics";
 import { drawCardBack, drawCardFace } from "../../../platform/cardFaceArtwork";
 import * as THREE from "three";
@@ -34,6 +34,7 @@ export interface TablePerson {
   id: string;
   avatarId: AvatarId;
   cardSkinId?: CardSkinId;
+  pet?: PetAppearance | null;
   name: string;
   count: number;
   active: boolean;
@@ -94,6 +95,9 @@ export interface TableSceneOptions {
 
 const TABLE_Y = 1.44;
 const RADIUS = 3.05;
+// Pets occupy the wooden border outside the felt, including their idle movement.
+const PET_BORDER_WIDTH = 0.65;
+const PET_SCALE = 0.42;
 const TABLE_CARD_SCALE = 0.82;
 const FPS_LIMIT = 120;
 const FRAME_INTERVAL_MS = 1000 / FPS_LIMIT;
@@ -104,9 +108,7 @@ export class RoundTableScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(60, 1, 0.08, 60);
-  private readonly companion = new THREE.Group();
-  private petStage: number | null = null;
-  private petSpecies: PetSpecies = "dragon";
+  private readonly companions = new Map<string, { group: THREE.Group; actor: PetModel }>();
   private petActor: PetModel | null = null;
   private readonly petHit = document.createElement("button");
   private readonly petSpeech = document.createElement("span");
@@ -215,7 +217,7 @@ export class RoundTableScene {
     this.renderer.domElement.addEventListener(
       "click",
       (event) => {
-        if (!this.companion.visible || !this.petActor || isTableInputBlocked(event.target)) return;
+        if (!this.petActor || isTableInputBlocked(event.target)) return;
         if (document.pointerLockElement === this.renderer.domElement) this.petPointer.set(0, 0);
         else {
           const rect = this.renderer.domElement.getBoundingClientRect();
@@ -402,10 +404,11 @@ export class RoundTableScene {
 
     this.cylinder(this.table, 0.58, 1.25, 0x352720, [0, 0.62, 0]);
     this.cylinder(this.table, 1.2, 0.12, 0x352720, [0, 0.1, 0]);
-    const wood = this.cylinder(this.table, RADIUS, 0.22, 0xffffff, [0, TABLE_Y - 0.12, 0]);
+    const outerRadius = RADIUS + PET_BORDER_WIDTH;
+    const wood = this.cylinder(this.table, outerRadius, 0.22, 0xffffff, [0, TABLE_Y - 0.12, 0]);
     (wood.material as THREE.MeshStandardMaterial).map = this.surfaceTexture("wood");
-    this.ring(this.table, RADIUS - 0.02, 0.035, 0xb5925b, TABLE_Y - 0.11);
-    this.ring(this.table, RADIUS - 0.12, 0.115, 0x352b26, TABLE_Y + 0.008);
+    this.ring(this.table, outerRadius - 0.02, 0.035, 0xb5925b, TABLE_Y - 0.11);
+    this.ring(this.table, outerRadius - 0.12, 0.115, 0x352b26, TABLE_Y + 0.008);
     const felt = this.cylinder(this.table, RADIUS - 0.29, 0.025, 0xffffff, [0, TABLE_Y + 0.013, 0]);
     (felt.material as THREE.MeshStandardMaterial).map = this.surfaceTexture("felt");
     if (this.options.variant === "uno")
@@ -423,9 +426,9 @@ export class RoundTableScene {
     for (let i = 0; i < 48; i++) {
       const angle = (i * Math.PI) / 24;
       this.sphere(this.table, [0.018, 0.012, 0.018], 0xb6975c, [
-        Math.sin(angle) * (RADIUS - 0.12),
+        Math.sin(angle) * (outerRadius - 0.12),
         TABLE_Y + 0.118,
-        Math.cos(angle) * (RADIUS - 0.12),
+        Math.cos(angle) * (outerRadius - 0.12),
       ]);
     }
     const badge = new THREE.Mesh(
@@ -687,35 +690,82 @@ export class RoundTableScene {
     this.controls.target.pitch = -0.12;
   }
 
-  setPet(stage: number | null, species: PetSpecies) {
-    if (stage === this.petStage && species === this.petSpecies) return;
-    this.petStage = stage;
-    this.petSpecies = species;
-    this.disposeGroup(this.companion);
+  private updatePets(state: RoundTableState, radius: number) {
+    const previousOwnPet = this.petActor;
     this.petActor = null;
-    this.petSpeechUntil = 0;
-    if (stage !== null) {
-      this.petActor = new PetModel(stage, species);
-      this.petActor.root.scale.multiplyScalar(this.options.variant === "bunker" ? 0.65 : 0.5);
-      this.companion.add(this.petActor.root);
+    const visibleIds = new Set<string>();
+    const viewerIndex = state.people.findIndex((person) => person.id === state.viewerId);
+    state.people.forEach((person, index) => {
+      if (!person.pet || person.eliminated) return;
+      visibleIds.add(person.id);
+      const { stage, species } = person.pet;
+      let companion = this.companions.get(person.id);
+      if (companion && (companion.actor.stage !== stage || companion.actor.species !== species)) {
+        this.scene.remove(companion.group);
+        this.disposeGroup(companion.group);
+        this.companions.delete(person.id);
+        companion = undefined;
+      }
+      if (!companion) {
+        const group = new THREE.Group();
+        const actor = new PetModel(stage, species, 0.35);
+        actor.root.scale.setScalar(PET_SCALE);
+        group.add(actor.root);
+        this.scene.add(group);
+        companion = { group, actor };
+        this.companions.set(person.id, companion);
+      }
+      const relative =
+        viewerIndex < 0
+          ? index + 0.5
+          : (index - viewerIndex + state.people.length) % state.people.length;
+      const angle =
+        (relative / state.people.length) *
+        Math.PI *
+        2 *
+        (this.options.variant === "bunker" ? 1 : -1);
+      const petAngle = angle - Math.min(0.38, (Math.PI / state.people.length) * 0.7);
+      companion.group.position.set(
+        Math.sin(petAngle) * (radius + 0.28),
+        TABLE_Y + 0.04,
+        Math.cos(petAngle) * (radius + 0.28),
+      );
+      companion.group.rotation.y = angle + Math.PI;
+    });
+    for (const [id, companion] of this.companions) {
+      if (visibleIds.has(id)) continue;
+      this.scene.remove(companion.group);
+      this.disposeGroup(companion.group);
+      this.companions.delete(id);
     }
-    this.scene.add(this.companion);
-    this.companion.visible = this.viewerId !== null && stage !== null;
-    this.layoutCompanion();
-    this.petHit.setAttribute("aria-label", `Погладить питомца: ${PET_SPECIES_INFO[species].name}`);
-    this.petHit.title = "Нажмите на питомца";
+    this.petActor = this.viewerId ? (this.companions.get(this.viewerId)?.actor ?? null) : null;
+    if (this.petActor !== previousOwnPet) this.petSpeechUntil = 0;
+    if (!this.petActor || this.petActor !== previousOwnPet) {
+      this.petHit.hidden = true;
+      this.petSpeech.hidden = true;
+    }
+    if (this.petActor) {
+      this.petHit.setAttribute(
+        "aria-label",
+        `Погладить питомца: ${PET_SPECIES_INFO[this.petActor.species].name}`,
+      );
+      this.petHit.title = "Нажмите на питомца";
+    }
   }
 
   private reactToPet() {
-    if (!this.petActor || !this.companion.visible || this.paused || isTableInputBlocked(null))
-      return;
+    if (!this.petActor || this.paused || isTableInputBlocked(null)) return;
     const time = performance.now();
     this.petSpeech.textContent = this.petActor.react(time);
     this.petSpeechUntil = time + 2400;
   }
 
   private positionPetInteraction(time: number) {
-    if (!this.petActor) return;
+    if (!this.petActor) {
+      this.petHit.hidden = true;
+      this.petSpeech.hidden = true;
+      return;
+    }
     this.petActor.getInteractionCenter(this.petCenter);
     this.petEdge
       .set(this.petActor.getInteractionRadius(), 0, 0)
@@ -724,7 +774,6 @@ export class RoundTableScene {
     this.petCenter.project(this.camera);
     this.petEdge.project(this.camera);
     const visible =
-      this.companion.visible &&
       !this.paused &&
       this.petCenter.z > -1 &&
       this.petCenter.z < 1 &&
@@ -762,9 +811,8 @@ export class RoundTableScene {
       `${Math.max(88, Math.min(174, (174 * 8) / state.people.length))}px`,
     );
     const radius = Math.max(RADIUS, state.people.length * 0.28);
-    this.seatRadius = radius + 0.5;
-    this.layoutCompanion();
-    this.companion.visible = this.viewerId !== null && this.petStage !== null;
+    this.seatRadius = radius + 1.05;
+    this.updatePets(state, radius);
     this.table.scale.set(radius / RADIUS, 1, radius / RADIUS);
     this.seatedPosition.z = this.seatRadius + (this.options.variant === "bunker" ? 0.85 : 0.1);
     const peopleKey = JSON.stringify([
@@ -981,20 +1029,6 @@ export class RoundTableScene {
     }
   }
 
-  private layoutCompanion() {
-    const narrow = this.viewportWidth <= 600;
-    const bunker = this.options.variant === "bunker";
-    const halfView =
-      2.9 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect;
-    const narrowX = Math.min(0.52, Math.max(0.2, halfView - 0.3));
-    this.companion.position.set(
-      narrow ? (bunker ? 0.75 : narrowX) : bunker ? 1.6 : 0.9,
-      TABLE_Y + 0.04,
-      this.seatRadius - (bunker ? (narrow ? 4.1 : 3.5) : narrow ? 2.8 : 2.15),
-    );
-    this.petActor?.root.scale.setScalar(bunker ? 0.65 : narrow ? 0.42 : 0.5);
-  }
-
   private resize() {
     const width = this.host.clientWidth;
     const height = this.host.clientHeight;
@@ -1014,7 +1048,6 @@ export class RoundTableScene {
     this.renderer.setSize(width, height);
     this.ownHand.resize(width, height);
     this.layoutPiles();
-    this.layoutCompanion();
   }
 
   private frame(time: number) {
@@ -1037,7 +1070,8 @@ export class RoundTableScene {
       (Math.floor(Math.max(0, time - scheduledAt) / FRAME_INTERVAL_MS) + 1) * FRAME_INTERVAL_MS;
     const dt = Math.min((time - this.lastTime) / 1000, 0.05);
     this.lastTime = time;
-    this.petActor?.frame(time, this.reducedMotion.matches, this.paused);
+    for (const { actor } of this.companions.values())
+      actor.frame(time, this.reducedMotion.matches, this.paused);
     const smoothing = this.reducedMotion.matches ? 1 : 1 - Math.exp(-14 * dt);
     // Overhead inspection is local; keep the seated head pose for other players.
     if (!this.overview) {
@@ -1048,12 +1082,12 @@ export class RoundTableScene {
       this.controls.target.pitch = this.pitch;
     }
     if (this.overview) {
-      const halfWidth = this.options.variant === "bunker" ? this.seatRadius : 2.8;
-      const halfDepth = this.options.variant === "bunker" ? this.seatRadius : 2.55;
+      const halfWidth = this.seatRadius;
+      const halfDepth = this.seatRadius;
       const height =
         Math.max(halfDepth, halfWidth / this.camera.aspect) /
         Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-      this.viewPosition.set(0, TABLE_Y + height, this.options.variant === "bunker" ? 0 : 0.6);
+      this.viewPosition.set(0, TABLE_Y + height, 0);
       this.viewRotation.setFromEuler(this.viewEuler.set(-Math.PI / 2, 0, 0, "YXZ"));
     } else {
       this.viewPosition.copy(this.seatedPosition);
@@ -1199,6 +1233,8 @@ export class RoundTableScene {
     this.textures.forEach((texture) => texture.dispose());
     this.textures.clear();
     this.avatars.clear();
+    this.companions.clear();
+    this.petActor = null;
     this.seenReactions.clear();
     this.labels.forEach(({ node }) => node.remove());
     this.renderer.dispose();

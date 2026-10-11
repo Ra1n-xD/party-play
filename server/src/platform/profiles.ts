@@ -168,7 +168,12 @@ export function registerProfileHandlers(
   membershipNickname: () => string | null,
 ): void {
   registerLeaderboardHandlers(socket);
-  registerPetHandlers(socket, io);
+  registerPetHandlers(socket, io, (key) => {
+    for (const room of getAllRooms().values()) {
+      if ([...room.players.values()].some((player) => player.profileKey === key))
+        getServerGameModule(room.gameId)?.publish(room, io);
+    }
+  });
   registerDuelHandlers(socket, io);
   const guard = () => guardProfileRequest(socket);
   socket.on("drops:subscribe", () => {

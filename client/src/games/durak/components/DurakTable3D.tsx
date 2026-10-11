@@ -1,4 +1,3 @@
-import { useTablePet } from "../../../platform/useTablePet";
 import { useEffect, useRef, useState } from "react";
 import { usePlatform } from "../../../platform/context/PlatformContext";
 import { getAvatar } from "../../../../../shared/platform/avatars";
@@ -53,7 +52,6 @@ export default function DurakTable3D({
   onSelectCard,
 }: Props) {
   const { snapshot } = usePlatform();
-  const { stage: petStage, species: petSpecies } = useTablePet();
   const host = useRef<HTMLDivElement>(null);
   const labels = useRef<HTMLDivElement>(null);
   const scene = useRef<RoundTableScene | null>(null);
@@ -109,9 +107,6 @@ export default function DurakTable3D({
   }, []);
 
   useEffect(() => {
-    scene.current?.setPet(petStage, petSpecies);
-  }, [petStage, petSpecies]);
-  useEffect(() => {
     scene.current?.setPaused(paused);
   }, [paused]);
 
@@ -125,6 +120,7 @@ export default function DurakTable3D({
         avatarId: getAvatar(snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.avatarId)
           .id,
         cardSkinId: snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.cardSkins.durak,
+        pet: snapshot?.seats.find((seat) => seat.seatId === player.seatId)?.pet,
         name: player.name,
         count: player.cardCount,
         active: player.isCurrentActor && !paused,

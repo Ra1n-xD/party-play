@@ -6,6 +6,11 @@ export const PET_BOOST_GROWTH = 3;
 export const PET_STAGES = ["Яйцо", "Малыш", "Подросток", "Взрослый"] as const;
 export const PET_SPECIES = ["dragon", "cat", "fox", "rabbit", "owl", "dog"] as const;
 export type PetSpecies = (typeof PET_SPECIES)[number];
+/** Only the visible appearance is shared with other players. */
+export interface PetAppearance {
+  species: PetSpecies;
+  stage: number;
+}
 export const PET_SPECIES_INFO: Record<
   PetSpecies,
   { name: string; emoji: string; reaction: string }

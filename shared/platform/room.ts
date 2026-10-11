@@ -6,6 +6,7 @@ import type {
 } from "./gameContract.js";
 import type { AvatarId } from "./avatars.js";
 import type { CardSkinId } from "./cosmetics.js";
+import type { PetAppearance } from "./pet.js";
 
 export type SeatId = string;
 export type ParticipantId = string;
@@ -20,6 +21,7 @@ export interface PublicSeat {
   name: string;
   avatarId: AvatarId;
   cardSkins: { durak: CardSkinId; uno: CardSkinId };
+  pet?: PetAppearance | null;
   occupantKind: "human" | "bot";
   controllerKind: "human" | "bot" | "none";
   temporaryBot: boolean;
