@@ -1,7 +1,7 @@
 .game-view-preference {
   display: grid;
-  gap: 8px;
-  padding: 12px 10px;
+  gap: 6px;
+  padding: 10px;
   color: inherit;
   font-size: 13px;
 }
@@ -12,10 +12,12 @@
 
 .game-view-preference-toggle {
   display: flex;
-  gap: 4px;
-  padding: 4px;
+  width: 112px;
+  max-width: 100%;
+  gap: 2px;
+  padding: 3px;
   border: 1px solid #ffffff25;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #170e2040;
 }
 
@@ -24,13 +26,15 @@
   flex: 1;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 8px;
+  width: auto;
+  min-height: 30px;
+  padding: 4px 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 5px;
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }
