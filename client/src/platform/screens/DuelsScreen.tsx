@@ -26,6 +26,7 @@ import {
 import { FLEET, randomFleet, validFleet } from "../../../../shared/games/battleship/rules";
 import { socket } from "../../socket";
 import { useProfile } from "../context/ProfileContext";
+import { useGameView } from "../context/GameViewPreferenceContext";
 import { ProfileHeader } from "../components/ProfileHeader";
 import { MenuFooter } from "../components/MenuFooter";
 import { CoinAmount, coinLabel } from "../components/CoinAmount";
@@ -35,6 +36,10 @@ import { duelRegistry } from "../duelRegistry";
 import { BattleshipBoard as Sea } from "../../games/battleship/BattleshipBoard";
 import { ShipArtwork } from "../../games/battleship/ShipArtwork";
 import { getShipSkin } from "../../../../shared/games/battleship/skins";
+import { memorySymbols as symbols, visibleMemoryCards } from "../../games/memory/presentation";
+import { sunkShips } from "../../games/battleship/presentation";
+import { DuelTable3D } from "../../games/shared/duel3d/DuelTable3D";
+import type { DuelTableModel } from "../../games/shared/duel3d/duelTableModel";
 import {
   ROOM_CODE_LENGTH,
   normalizeRoomCode,
@@ -43,7 +48,6 @@ import {
 import "../../styles/duels-pet.css";
 import "../../styles/feature-showcase.css";
 
-const symbols = ["🍒", "🍋", "🍇", "🍀", "🌙", "⭐", "🔥", "💎", "🎲", "🎵", "🌸", "🦋"];
 const stateLabel = {
   waiting: "Ищет соперника",
   setup: "Расстановка",
@@ -68,9 +72,65 @@ function Match({
   const [vertical, setVertical] = useState(false);
   const [seaView, setSeaView] = useState(1);
   const [error, setError] = useState("");
+  const [is3D, setIs3D] = useGameView();
+  const view = is3D ? "3d" : "2d";
+  const [failed3d, setFailed3d] = useState(false);
+  const changeView = (next: "2d" | "3d") => {
+    setIs3D(next === "3d");
+    setFailed3d(false);
+  };
+  const fallback = () => {
+    setIs3D(false);
+    setFailed3d(true);
+  };
   const sea = duel.battleship;
   const yourTurn = duel.turnId === ownId;
   const setup = duel.phase === "setup" && own >= 0 && !sea?.ready[own];
+  const memoryCards = duel.memory ? visibleMemoryCards(duel.memory, now) : [];
+  const canFlip =
+    !busy && yourTurn && duel.phase === "playing" && now >= (duel.memory?.revealUntil ?? 0);
+  const boardIndex = own >= 0 ? ((setup ? 0 : seaView) === 0 ? own : 1 - own) : seaView;
+  const ownBoard = own >= 0 && boardIndex === own;
+  const canPlace = setup && !!draft && !busy;
+  const canFire = own >= 0 && !ownBoard && !busy && yourTurn && duel.phase === "playing";
+  const board = sea?.boards[boardIndex];
+  const ships = board
+    ? ownBoard
+      ? ((setup ? (draft ?? sea?.ownShips) : sea?.ownShips) ?? [])
+      : sunkShips(board)
+    : [];
+  const tableModel: DuelTableModel = {
+    kind: duel.gameId,
+    boardKey: `${duel.id}:${boardIndex}`,
+    opponent: duel.players[own >= 0 ? 1 - own : 1] ?? { name: "Соперник" },
+    companions: (own === 1 ? [...duel.players].reverse() : duel.players).flatMap((player) =>
+      player.pet
+        ? [
+            {
+              ownerId: player.id,
+              ownerName: player.name,
+              isOwn: player.id === ownId,
+              pet: player.pet,
+            },
+          ]
+        : [],
+    ),
+    skinId: sea?.shipSkins?.[boardIndex],
+    ships,
+    cells: duel.memory
+      ? memoryCards.map((value, i) => ({
+          value,
+          matched: duel.memory!.matched[i],
+          disabled: !canFlip || value !== null,
+          label: `Карта ${i + 1}: ${value === null ? "закрыта" : symbols[value]}`,
+        }))
+      : (board ?? []).map((status, i) => ({
+          value: null,
+          status,
+          disabled: status !== "unknown" || !(ownBoard ? canPlace : canFire),
+          label: `${ownBoard ? "Ваше поле" : own >= 0 ? "Поле соперника" : `Поле ${duel.players[boardIndex].name}`}, ${"АБВГДЕЖЗИК"[i % 10]}${Math.floor(i / 10) + 1}: ${status === "unknown" ? (ships.some((ship) => ship.includes(i)) ? "корабль" : "неизвестно") : status === "miss" ? "мимо" : status === "sunk" ? "потоплен" : "попадание"}`,
+        })),
+  };
   const place = (cell: number) => {
     if (!draft || draft.length >= FLEET.length) return;
     const length = FLEET[draft.length];
@@ -116,6 +176,29 @@ function Match({
       {own < 0 && (
         <p className="feature-note">Вы наблюдаете. Закрытые карты и корабли игроков скрыты.</p>
       )}
+      <div className="duel-view-switch" role="group" aria-label="Вид дуэли">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          aria-pressed={view === "2d"}
+          onClick={() => changeView("2d")}
+        >
+          2D
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          aria-pressed={view === "3d"}
+          onClick={() => changeView("3d")}
+        >
+          3D · За столом
+        </button>
+      </div>
+      {failed3d && (
+        <p className="feature-note" role="status">
+          Не удалось открыть 3D. Партия продолжается в 2D.
+        </p>
+      )}
       {duel.phase !== "finished" && (
         <p className="duel-turn" role="status">
           {duel.phase === "setup"
@@ -126,27 +209,22 @@ function Match({
           <span>· {Math.max(0, Math.ceil((duel.deadline - now) / 1000))} сек</span>
         </p>
       )}
-      {duel.memory && (
+      {duel.memory && view === "3d" && (
+        <DuelTable3D
+          model={tableModel}
+          onCell={(cell) => play({ type: "flip", cell })}
+          onFallback={fallback}
+        />
+      )}
+      {duel.memory && view === "2d" && (
         <div className="memory-grid" aria-label="Поле: 12 пар">
-          {duel.memory.cards.map((value, i) => {
-            const card =
-              duel.memory!.matched[i] ||
-              duel.memory!.open.length < 2 ||
-              now < duel.memory!.revealUntil
-                ? value
-                : null;
+          {memoryCards.map((card, i) => {
             return (
               <button
                 type="button"
                 key={i}
                 className={`memory-card${duel.memory!.matched[i] ? " is-matched" : ""}${card !== null ? " is-open" : ""}`}
-                disabled={
-                  busy ||
-                  !yourTurn ||
-                  card !== null ||
-                  now < duel.memory!.revealUntil ||
-                  duel.phase !== "playing"
-                }
+                disabled={!canFlip || card !== null}
                 onClick={() => play({ type: "flip", cell: i })}
                 aria-label={`Карта ${i + 1}: ${card === null ? "закрыта" : symbols[card]}`}
               >
@@ -228,7 +306,10 @@ function Match({
               )}
             </div>
           )}
-          <div className={`sea-tabs${setup ? " is-setup" : ""}`} aria-label="Выбор поля">
+          <div
+            className={`sea-tabs${setup ? " is-setup" : ""}${view === "3d" ? " is-3d" : ""}`}
+            aria-label="Выбор поля"
+          >
             {[0, 1].map((i) => (
               <button
                 key={i}
@@ -241,47 +322,55 @@ function Match({
               </button>
             ))}
           </div>
-          <div
-            className={`sea-boards show-board-${setup ? 0 : seaView}${setup ? "" : " has-tabs"}`}
-          >
-            {own >= 0 ? (
-              <>
-                <section>
-                  <h3>Ваш флот</h3>
-                  <Sea
-                    label="Ваше поле"
-                    board={sea.boards[own]}
-                    ships={draft ?? sea.ownShips}
-                    skinId={sea.shipSkins?.[own]}
-                    disabled={!setup || !draft || busy}
-                    onCell={place}
-                  />
-                </section>
-                <section>
-                  <h3>Поле соперника</h3>
-                  <Sea
-                    label="Поле соперника"
-                    board={sea.boards[1 - own]}
-                    skinId={sea.shipSkins?.[1 - own]}
-                    disabled={busy || !yourTurn || duel.phase !== "playing"}
-                    onCell={(cell) => play({ type: "fire", cell })}
-                  />
-                </section>
-              </>
-            ) : (
-              sea.boards.map((board, i) => (
-                <section key={i}>
-                  <h3>{duel.players[i].name}</h3>
-                  <Sea
-                    label={`Поле ${duel.players[i].name}`}
-                    board={board}
-                    skinId={sea.shipSkins?.[i]}
-                    disabled
-                  />
-                </section>
-              ))
-            )}
-          </div>
+          {view === "3d" ? (
+            <DuelTable3D
+              model={tableModel}
+              onCell={(cell) => (ownBoard ? place(cell) : play({ type: "fire", cell }))}
+              onFallback={fallback}
+            />
+          ) : (
+            <div
+              className={`sea-boards show-board-${setup ? 0 : seaView}${setup ? "" : " has-tabs"}`}
+            >
+              {own >= 0 ? (
+                <>
+                  <section>
+                    <h3>Ваш флот</h3>
+                    <Sea
+                      label="Ваше поле"
+                      board={sea.boards[own]}
+                      ships={setup ? (draft ?? sea.ownShips) : sea.ownShips}
+                      skinId={sea.shipSkins?.[own]}
+                      disabled={!setup || !draft || busy}
+                      onCell={place}
+                    />
+                  </section>
+                  <section>
+                    <h3>Поле соперника</h3>
+                    <Sea
+                      label="Поле соперника"
+                      board={sea.boards[1 - own]}
+                      skinId={sea.shipSkins?.[1 - own]}
+                      disabled={busy || !yourTurn || duel.phase !== "playing"}
+                      onCell={(cell) => play({ type: "fire", cell })}
+                    />
+                  </section>
+                </>
+              ) : (
+                sea.boards.map((board, i) => (
+                  <section key={i}>
+                    <h3>{duel.players[i].name}</h3>
+                    <Sea
+                      label={`Поле ${duel.players[i].name}`}
+                      board={board}
+                      skinId={sea.shipSkins?.[i]}
+                      disabled
+                    />
+                  </section>
+                ))
+              )}
+            </div>
+          )}
           <div className="sea-legend" aria-label="Обозначения на поле">
             <span>
               <ShipArtwork length={2} /> корабль
@@ -466,7 +555,7 @@ export function DuelsScreen() {
           <header className="feature-heading" hidden={!!duel}>
             <div>
               <h1>Дуэли</h1>
-              <p>Бросьте вызов другу. Весь банк — победителю.</p>
+              <p>Бросьте вызов другу в 2D или за 3D-столом. Весь банк — победителю.</p>
             </div>
             <span className="feature-heading-badge">
               <FiUsers aria-hidden="true" /> Ставка от 0 монет

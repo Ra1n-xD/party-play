@@ -21,6 +21,7 @@ import { isDeploymentDraining } from "./deploymentState.js";
 import { getSocketClientIdentity } from "../clientIdentity.js";
 import { generateRoomCode } from "../utils.js";
 import { normalizeRoomCode } from "../../../shared/roomCode.js";
+import { petStatus } from "../../../shared/platform/pet.js";
 
 function newDuelCode(used: ReadonlySet<string>): string {
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -79,7 +80,10 @@ function guard(socket: Socket) {
     limits.set(key, bucket);
   }
 }
+// Only appearance is public. Expiry is tracked locally so idle tables also lose expired pets.
+let nextPetExpiry = Infinity;
 function summary(d: DuelRecord): DuelSummary {
+  const now = Date.now();
   return {
     id: d.id,
     code: d.code!,
@@ -91,10 +95,18 @@ function summary(d: DuelRecord): DuelSummary {
     deadline: d.deadline,
     winnerId: d.winnerId,
     reason: d.reason,
-    players: d.players.map((id) => ({
-      id,
-      name: profileStore.profiles.get(id)?.nickname ?? "Игрок",
-    })),
+    players: d.players.map((id) => {
+      const profile = profileStore.profiles.get(id);
+      const pet = profile?.pet;
+      const status = pet ? petStatus(pet, now) : null;
+      if (status?.alive) nextPetExpiry = Math.min(nextPetExpiry, status.expiresAt);
+      return {
+        id,
+        name: profile?.nickname ?? "Игрок",
+        avatarId: profile?.equipped.avatar ?? "human",
+        pet: pet && status?.alive ? { species: pet.species, stage: status.stage } : null,
+      };
+    }),
   };
 }
 function projection(d: DuelRecord, viewer: string): DuelSnapshot {
@@ -186,7 +198,8 @@ function expire(draft: Store, d: DuelRecord, now: number): boolean {
   } else if (d.game) finish(draft, d, d.players[1 - d.game.turn], "Время хода истекло.");
   return true;
 }
-function publishDuels(io: IOServer) {
+export function publishDuels(io: IOServer) {
+  nextPetExpiry = Infinity;
   for (const viewer of io.sockets.sockets.values()) {
     if (!viewer.data.duelSubscribed) continue;
     try {
@@ -218,7 +231,10 @@ export function registerDuelHandlers(socket: Socket<ClientEvents, ServerEvents>,
       const due = [...profileStore.duels.values()].filter(
         (d) => d.phase !== "finished" && d.deadline <= Date.now(),
       );
-      if (!due.length) return;
+      if (!due.length) {
+        if (nextPetExpiry <= Date.now()) publishDuels(io);
+        return;
+      }
       running = true;
       try {
         const ids = [...new Set(due.flatMap((d) => d.players))];

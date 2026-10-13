@@ -1,5 +1,5 @@
 import { registerPetHandlers } from "./pets.js";
-import { registerDuelHandlers } from "./duels.js";
+import { publishDuels, registerDuelHandlers } from "./duels.js";
 import { createHash, randomInt, randomUUID } from "crypto";
 import type { Socket } from "socket.io";
 import {
@@ -118,6 +118,7 @@ function publishProfile(key: string, io: IOServer): void {
   if (profile) io.to(profileRoom(key)).emit("profile:snapshot", profile);
 }
 function publishProfileCosmetics(key: string, io: IOServer): void {
+  publishDuels(io);
   for (const room of getAllRooms().values()) {
     // A game may have started while the disk write was in flight. Keep its chosen cosmetics.
     if (room.lifecycle === "playing") continue;
@@ -173,6 +174,7 @@ export function registerProfileHandlers(
 ): void {
   registerLeaderboardHandlers(socket);
   registerPetHandlers(socket, io, (key) => {
+    publishDuels(io);
     for (const room of getAllRooms().values()) {
       if ([...room.players.values()].some((player) => player.profileKey === key))
         getServerGameModule(room.gameId)?.publish(room, io);

@@ -1,4 +1,6 @@
 import legendaryTable from "../assets/updates/legendary-table-6.20.0.jpg";
+import duelTable from "../assets/updates/duel-table-6.24.0.jpg";
+import duelMemory from "../assets/updates/duel-memory-6.24.0.jpg";
 import headerNavigation from "../assets/updates/header-navigation-6.14.0.png";
 import fleetSkins from "../assets/updates/fleet-skins-6.19.0.jpg";
 import fairytaleFleet from "../assets/updates/fleet-fairytale-6.19.2.jpg";
@@ -72,6 +74,36 @@ interface ReleaseHighlight {
 }
 
 export const releaseHighlights: ReleaseHighlight[] = [
+  {
+    id: "release-6-24-duel-tables",
+    version: "6.24.0",
+    date: "2026-10-13",
+    category: "ДУЭЛИ В 3D",
+    title: "Соперник — по другую сторону стола.",
+    announcement: { sections: ["duels"] },
+    summary: "«Найди пару» и «Морской бой» получили уютную 3D-комнату с видом за столом.",
+    changes: [
+      "Открывайте объёмные карты, расставляйте миниатюрный флот и стреляйте по клеткам прямо на столе. Напротив сидит выбранный персонаж соперника.",
+      "На столе живут питомцы обоих игроков — со своим видом и возрастом. Сохраняются выбранные персонажи и оформления кораблей; своего питомца можно погладить.",
+      "Осматривайте стол, включайте вид сверху или переключайтесь между 2D и 3D в той же партии. Режим доступен на компьютере, телефоне и для зрителей.",
+    ],
+    screenshots: [
+      {
+        src: duelMemory,
+        width: 1280,
+        height: 1077,
+        caption: "6.24.0 · «Найди пару» в 3D — локальная сборка, QA-профили",
+        alt: "Дуэль «Найди пару» за столом: открытая карта, объёмные рубашки и персонаж напротив. Локальная сборка с тестовыми игроками.",
+      },
+      {
+        src: duelTable,
+        width: 1280,
+        height: 1208,
+        caption: "6.24.0 · Морской бой за 3D-столом — локальная сборка, QA-профили",
+        alt: "Настоящая партия морского боя в 3D: миниатюрный флот, аватар соперника и переключатель вида. Локальная сборка с тестовыми игроками.",
+      },
+    ],
+  },
   {
     id: "release-6-23",
     version: "6.23.0",

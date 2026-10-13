@@ -1,4 +1,6 @@
 import type { ShipSkinId } from "../games/battleship/skins.js";
+import type { AvatarId } from "./avatars.js";
+import type { PetAppearance } from "./pet.js";
 export const DUEL_GAMES = ["memory", "battleship"] as const;
 export type DuelGameId = (typeof DUEL_GAMES)[number];
 export const DUEL_TURN_MS = 90_000;
@@ -25,7 +27,7 @@ export interface DuelSummary {
   isPrivate: boolean;
   gameId: DuelGameId;
   stake: number;
-  players: { id: string; name: string }[];
+  players: { id: string; name: string; avatarId?: AvatarId; pet?: PetAppearance | null }[];
   phase: "waiting" | "setup" | "playing" | "finished";
   revision: number;
   deadline: number;
