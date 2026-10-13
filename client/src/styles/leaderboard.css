@@ -171,6 +171,10 @@
   font-weight: 500;
   color: var(--show-muted);
 }
+.leaderboard-pet-label {
+  display: inline-block;
+  max-width: 80px;
+}
 .leaderboard-table th:nth-child(2),
 .leaderboard-table th:first-child,
 .leaderboard-table td:first-child {

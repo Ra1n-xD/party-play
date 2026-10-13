@@ -5,8 +5,8 @@ export const LEADERBOARD_SORTS = [
   "games",
   "coins",
   "collection",
-  "collectionValue",
   "petDays",
+  "collectionValue",
 ] as const;
 export type LeaderboardSort = (typeof LEADERBOARD_SORTS)[number];
 export const LEADERBOARD_PAGE_SIZE = 20;

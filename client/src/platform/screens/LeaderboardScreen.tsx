@@ -210,7 +210,11 @@ export function LeaderboardScreen() {
                         key={metric}
                         aria-sort={sort === metric ? "descending" : undefined}
                       >
-                        {metrics[metric].label}
+                        <span
+                          className={metric === "petDays" ? "leaderboard-pet-label" : undefined}
+                        >
+                          {metrics[metric].label}
+                        </span>
                       </th>
                     ))}
                   </tr>
