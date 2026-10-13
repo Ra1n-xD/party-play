@@ -6,6 +6,7 @@ export const LEADERBOARD_SORTS = [
   "coins",
   "collection",
   "collectionValue",
+  "petDays",
 ] as const;
 export type LeaderboardSort = (typeof LEADERBOARD_SORTS)[number];
 export const LEADERBOARD_PAGE_SIZE = 20;
@@ -26,6 +27,8 @@ export interface LeaderboardEntry {
   coins: number;
   collection: number;
   collectionValue: number;
+  /** Full days since adoption of the current living pet; zero without a living pet. */
+  petDays: number;
 }
 
 export interface LeaderboardSnapshot extends LeaderboardQuery {

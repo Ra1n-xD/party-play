@@ -209,7 +209,7 @@
   color: #eab18c;
 }
 .leaderboard-player {
-  width: 38%;
+  width: 28%;
 }
 .leaderboard-player > span {
   display: inline-block;
@@ -283,7 +283,7 @@
 .leaderboard-empty p {
   color: var(--show-muted);
 }
-@media (max-width: 760px) {
+@media (max-width: 1024px) {
   .leaderboard-content {
     padding: 16px 0 28px;
   }

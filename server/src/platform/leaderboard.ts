@@ -2,6 +2,7 @@ import { getUpgradeInputValue } from "../../../shared/platform/upgrades.js";
 import type { Socket } from "socket.io";
 import type { ClientEvents, ServerEvents } from "../../../shared/types.js";
 import { BASIC_ITEMS } from "../../../shared/platform/cosmetics.js";
+import { petStatus } from "../../../shared/platform/pet.js";
 import {
   LEADERBOARD_PAGE_SIZE,
   LEADERBOARD_SORTS,
@@ -11,31 +12,48 @@ import {
 import { assertProfileStorage, profileStore, profileStoreRevision } from "./profileStorage.js";
 
 let cachedRevision = -1;
+let cacheExpiresAt = 0;
 const rankings = new Map<LeaderboardSort, LeaderboardEntry[]>();
 
-function ranking(sort: LeaderboardSort): LeaderboardEntry[] {
+function ranking(sort: LeaderboardSort, now: number): LeaderboardEntry[] {
   assertProfileStorage();
-  if (cachedRevision !== profileStoreRevision) {
+  if (cachedRevision !== profileStoreRevision || now >= cacheExpiresAt) {
     rankings.clear();
     cachedRevision = profileStoreRevision;
+    cacheExpiresAt = Infinity;
   }
   const cached = rankings.get(sort);
   if (cached) return cached;
-  const entries: LeaderboardEntry[] = [...profileStore.profiles.values()].map((profile) => ({
-    id: profile.id,
-    nickname: profile.nickname,
-    avatarId: profile.equipped.avatar,
-    rank: 0,
-    wins: profile.wins,
-    games: profile.completedGames,
-    coins: profile.coins,
-    collectionValue: getUpgradeInputValue(
-      Object.entries(profile.inventory)
-        .filter(([id]) => !BASIC_ITEMS.includes(id))
-        .map(([itemId, count]) => ({ itemId, count })),
-    ),
-    collection: Object.keys(profile.inventory).filter((id) => !BASIC_ITEMS.includes(id)).length,
-  }));
+  const entries: LeaderboardEntry[] = [...profileStore.profiles.values()].map((profile) => {
+    const pet = profile.pet;
+    const status = pet ? petStatus(pet, now) : null;
+    const petDays =
+      pet && status?.alive ? Math.max(0, Math.floor((now - pet.bornAt) / 86_400_000)) : 0;
+    if (pet && status?.alive) {
+      // Age and death can change without a profile write, including in cached non-pet sorts.
+      cacheExpiresAt = Math.min(
+        cacheExpiresAt,
+        status.expiresAt,
+        pet.bornAt + (petDays + 1) * 86_400_000,
+      );
+    }
+    return {
+      id: profile.id,
+      nickname: profile.nickname,
+      avatarId: profile.equipped.avatar,
+      rank: 0,
+      wins: profile.wins,
+      games: profile.completedGames,
+      coins: profile.coins,
+      collectionValue: getUpgradeInputValue(
+        Object.entries(profile.inventory)
+          .filter(([id]) => !BASIC_ITEMS.includes(id))
+          .map(([itemId, count]) => ({ itemId, count })),
+      ),
+      collection: Object.keys(profile.inventory).filter((id) => !BASIC_ITEMS.includes(id)).length,
+      petDays,
+    };
+  });
   entries.sort(
     (a, b) =>
       b[sort] - a[sort] || a.nickname.localeCompare(b.nickname, "ru") || a.id.localeCompare(b.id),
@@ -65,7 +83,7 @@ export function registerLeaderboardHandlers(socket: Socket<ClientEvents, ServerE
       ) {
         throw new Error("Некорректные параметры рейтинга");
       }
-      const entries = ranking(query.sort);
+      const entries = ranking(query.sort, now);
       const totalPages = Math.max(1, Math.ceil(entries.length / LEADERBOARD_PAGE_SIZE));
       const page = Math.min(query.page, totalPages);
       reply({
