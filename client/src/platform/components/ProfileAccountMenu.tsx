@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { FiChevronDown, FiLogOut, FiUser } from "react-icons/fi";
+import { GameViewPreference } from "./GameViewPreference";
 
 interface ProfileAccountMenuProps {
   nickname: string;
@@ -101,6 +102,7 @@ export function ProfileAccountMenu({
             >
               <FiUser aria-hidden="true" /> Профиль
             </a>
+            <GameViewPreference />
             <button
               type="button"
               className="show-account-logout"

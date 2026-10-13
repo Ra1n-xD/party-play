@@ -1,0 +1,53 @@
+.game-view-preference {
+  display: grid;
+  gap: 8px;
+  padding: 12px 10px;
+  color: inherit;
+  font-size: 13px;
+}
+
+.game-view-preference > span {
+  font-weight: 700;
+}
+
+.game-view-preference-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #ffffff25;
+  border-radius: 10px;
+  background: #170e2040;
+}
+
+.game-view-preference .game-view-preference-toggle button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.game-view-preference .game-view-preference-toggle button[aria-pressed="true"] {
+  background: #d8fc61;
+  color: #170e20;
+}
+
+.game-view-preference-toggle button:focus-visible {
+  outline: 2px solid #d8fc61;
+  outline-offset: 2px;
+}
+
+.game-view-preference > p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.75;
+}

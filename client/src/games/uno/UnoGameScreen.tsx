@@ -20,6 +20,7 @@ import { GameDockTools } from "../../screens/game/GameDockTools";
 import { CardDragLayer } from "../shared/CardDragLayer";
 import { getCardSkin } from "../../../../shared/platform/cosmetics";
 import { GameViewToggle } from "../shared/GameViewToggle";
+import { useGameView } from "../../platform/context/GameViewPreferenceContext";
 import { CardTurnClock } from "../shared/CardTurnClock";
 import { CardPlayerSeat } from "../shared/CardPlayerSeat";
 import { HandSortButton, type HandSortMode } from "../shared/HandSortButton";
@@ -121,7 +122,7 @@ export function UnoGameScreen({ snapshot, animateInitialDeal = false }: UnoGameS
     setAdminPause,
   } = usePlatform();
   const game = snapshot.game;
-  const [is3D, setIs3D] = useState(true);
+  const [is3D, setIs3D] = useGameView();
   const screenRef = useTableActionDock(is3D && Boolean(game));
   const [cursorVisible, setCursorVisible] = useState(false);
   const [focusedCardId, setFocusedCardId] = useState<string | null>(null);

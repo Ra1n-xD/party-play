@@ -31,6 +31,7 @@ import "./styles/platform-navigation.css";
 import { ReleaseNewsProvider } from "./platform/context/ReleaseNewsContext";
 import { ReleaseAnnouncement } from "./platform/components/ReleaseAnnouncement";
 import { GlobalNotifications } from "./platform/components/GlobalNotifications";
+import { GameViewPreferenceProvider } from "./platform/context/GameViewPreferenceContext";
 
 function readAppPath() {
   return window.location.pathname.replace(/\/$/, "") || "/";
@@ -262,10 +263,12 @@ export default function App({ initialPath }: { initialPath: string }) {
       <PlatformProvider>
         <DeploymentBanner />
         <ProfileProvider>
-          <ReleaseNewsProvider>
-            <ProfileApp initialPath={initialPath} />
-            <GlobalNotifications />
-          </ReleaseNewsProvider>
+          <GameViewPreferenceProvider>
+            <ReleaseNewsProvider>
+              <ProfileApp initialPath={initialPath} />
+              <GlobalNotifications />
+            </ReleaseNewsProvider>
+          </GameViewPreferenceProvider>
         </ProfileProvider>
         <AppUpdateNotice />
       </PlatformProvider>

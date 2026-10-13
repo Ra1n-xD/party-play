@@ -9,6 +9,7 @@ import {
   type CSSProperties,
 } from "react";
 import { FiSettings } from "react-icons/fi";
+import { useGameView } from "../../platform/context/GameViewPreferenceContext";
 import type {
   DurakCard as DurakCardData,
   DurakLegalAction,
@@ -336,7 +337,7 @@ export function DurakGameScreen({ snapshot, animateInitialDeal = false }: DurakG
     setAdminPause,
   } = usePlatform();
   const game = snapshot.game;
-  const [is3D, setIs3D] = useState(true);
+  const [is3D, setIs3D] = useGameView();
   const screenRef = useTableActionDock(is3D && Boolean(game));
   const [cursorVisible, setCursorVisible] = useState(false);
   const [focusedCardId, setFocusedCardId] = useState<string | null>(null);

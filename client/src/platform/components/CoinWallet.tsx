@@ -155,10 +155,6 @@ export function CoinWallet({ coins }: { coins: number }) {
                 </li>
               </ul>
             </div>
-            <p className="coin-help-note">
-              В дуэлях награда за обычную партию не начисляется. Улучшения используют предметы, а не
-              монеты.
-            </p>
           </section>
         </div>
       )}

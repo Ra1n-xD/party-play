@@ -1,4 +1,5 @@
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect } from "react";
+import { useGameView } from "../../platform/context/GameViewPreferenceContext";
 import type { AttributeType } from "../../../../shared/games/bunker/types";
 import { BunkerAttributeIcon } from "./BunkerAttributeIcon";
 import { GameScreen } from "../../screens/GameScreen";
@@ -120,7 +121,7 @@ function VoteEventNotice({
 }
 
 function BunkerView() {
-  const [is3D, setIs3D] = useState(true);
+  const [is3D, setIs3D] = useGameView();
   const { snapshot } = usePlatform();
   const { gameState, currentOverlay } = useBunkerGame();
   const isVoteScreen =

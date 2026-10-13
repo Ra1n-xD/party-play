@@ -98,13 +98,6 @@
   margin-bottom: calc(2 * var(--show-unit));
   font-size: calc(13 * var(--show-unit));
 }
-.coin-help-note {
-  margin: calc(18 * var(--show-unit)) 0 0;
-  padding-top: calc(12 * var(--show-unit));
-  border-top: 1px dashed #786b8040;
-  color: #786b80;
-  font-size: calc(11 * var(--show-unit));
-}
 @keyframes coin-help-enter {
   from {
     opacity: 0;

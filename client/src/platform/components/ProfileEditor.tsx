@@ -9,6 +9,7 @@ import {
 import { NotificationDialog } from "./NotificationDialog";
 import { useProfile } from "../context/ProfileContext";
 import { normalizeNickname } from "../../../../shared/platform/cosmetics";
+import { GameViewPreference } from "./GameViewPreference";
 
 export function ProfileEditor() {
   const { profile, account, updateAccount, busy, connected, clearError } = useProfile();
@@ -67,6 +68,7 @@ export function ProfileEditor() {
       <header>
         <h2 id="profile-editor-title">Редактирование профиля</h2>
       </header>
+      <GameViewPreference />
       <form onSubmit={submit} onChange={() => setSaved(false)}>
         <div className="profile-editor-fields">
           <div className="profile-editor-field">
