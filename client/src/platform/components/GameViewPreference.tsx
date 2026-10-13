@@ -18,7 +18,6 @@ export function GameViewPreference() {
           </button>
         ))}
       </div>
-      <p>Для Бункера, Дурака и UNO. Сохраняется в этом браузере.</p>
     </div>
   );
 }

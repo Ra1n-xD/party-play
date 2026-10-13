@@ -44,10 +44,3 @@
   outline: 2px solid #d8fc61;
   outline-offset: 2px;
 }
-
-.game-view-preference > p {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  opacity: 0.75;
-}
