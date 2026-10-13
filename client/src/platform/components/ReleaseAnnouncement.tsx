@@ -25,7 +25,7 @@ export function ReleaseAnnouncement({ path, enabled }: { path: string; enabled: 
     if (section) visit(section);
   }, [ready, dismissed, enabled, path, visit]);
   if (!announcedRelease || !ready || dismissed || !enabled) return null;
-  const screenshot = announcedRelease.screenshots[0];
+  const screenshot = announcedRelease.screenshot;
   return (
     <AccessibleModal
       labelledBy="release-announcement-title"

@@ -70,27 +70,25 @@ export function UpdatesScreen() {
                 исходникам отмечены отдельно. Название PartyPlay на архивных скриншотах и в ранних
                 записях относится к проекту до переименования в PartySide.
               </p>
-              {releaseHighlights.map((release, index) => (
-                <article className="updates-release" key={release.id} id={release.id}>
-                  <header className="updates-release-meta">
-                    <span className="updates-version">v{release.version}</span>
-                    <time dateTime={release.date}>{formatDate(release.date)}</time>
-                  </header>
-                  <span className="updates-eyebrow">{release.category}</span>
-                  <h2>{release.title}</h2>
-                  <p className="updates-summary">{release.summary}</p>
-                  <ul>
-                    {release.changes.map((change) => (
-                      <li key={change}>{change}</li>
-                    ))}
-                  </ul>
-                  {release.screenshots.length > 0 && (
-                    <div className="updates-gallery">
-                      {release.screenshots.map((shot) => (
-                        <figure
-                          key={shot.src}
-                          className={shot.height > shot.width ? "is-portrait" : undefined}
-                        >
+              {releaseHighlights.map((release, index) => {
+                const shot = release.screenshot;
+                return (
+                  <article className="updates-release" key={release.id} id={release.id}>
+                    <header className="updates-release-meta">
+                      <span className="updates-version">v{release.version}</span>
+                      <time dateTime={release.date}>{formatDate(release.date)}</time>
+                    </header>
+                    <span className="updates-eyebrow">{release.category}</span>
+                    <h2>{release.title}</h2>
+                    <p className="updates-summary">{release.summary}</p>
+                    <ul>
+                      {release.changes.map((change) => (
+                        <li key={change}>{change}</li>
+                      ))}
+                    </ul>
+                    {shot && (
+                      <div className="updates-gallery">
+                        <figure className={shot.height > shot.width ? "is-portrait" : undefined}>
                           <button
                             type="button"
                             className="updates-screenshot"
@@ -111,11 +109,11 @@ export function UpdatesScreen() {
                           </button>
                           <figcaption>{shot.caption}</figcaption>
                         </figure>
-                      ))}
-                    </div>
-                  )}
-                </article>
-              ))}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           </div>
         </main>
