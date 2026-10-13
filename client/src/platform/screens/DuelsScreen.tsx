@@ -103,13 +103,14 @@ function Match({
     kind: duel.gameId,
     boardKey: `${duel.id}:${boardIndex}`,
     opponent: duel.players[own >= 0 ? 1 - own : 1] ?? { name: "Соперник" },
-    companions: (own === 1 ? [...duel.players].reverse() : duel.players).flatMap((player) =>
+    companions: duel.players.flatMap((player, index) =>
       player.pet
         ? [
             {
               ownerId: player.id,
               ownerName: player.name,
               isOwn: player.id === ownId,
+              seat: index === (own >= 0 ? own : 0) ? ("near" as const) : ("far" as const),
               pet: player.pet,
             },
           ]

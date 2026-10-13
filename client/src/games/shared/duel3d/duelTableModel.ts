@@ -18,5 +18,11 @@ export interface DuelTableModel {
   ships?: number[][];
   skinId?: ShipSkinId;
   opponent: { name: string; avatarId?: AvatarId };
-  companions: { ownerId: string; ownerName: string; isOwn: boolean; pet: PetAppearance }[];
+  companions: {
+    ownerId: string;
+    ownerName: string;
+    isOwn: boolean;
+    seat: "near" | "far";
+    pet: PetAppearance;
+  }[];
 }

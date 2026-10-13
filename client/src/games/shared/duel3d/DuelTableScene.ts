@@ -5,7 +5,7 @@ import { makeSeatedAvatar, type AvatarLegendaryEffectsRig } from "../table3d/Ava
 import { roundedPart } from "../table3d/AvatarParts";
 import { PetModel } from "../table3d/PetModel";
 import { PET_SPECIES_INFO, PET_STAGES } from "../../../../../shared/platform/pet";
-import { makeDuelShip } from "./ShipModel";
+import { makeDuelShip, type DuelShipRig } from "./ShipModel";
 import type { DuelTableModel } from "./duelTableModel";
 
 type Triple = [number, number, number];
@@ -61,6 +61,7 @@ export class DuelTableScene {
   private model: DuelTableModel | null = null;
   private targets: Target[] = [];
   private cards: Card[] = [];
+  private ships: DuelShipRig[] = [];
   private frame = 0;
   private lastFrame = 0;
   private disposed = false;
@@ -354,13 +355,14 @@ export class DuelTableScene {
         m.skinId,
         cells.every((c) => m.cells[c].status === "sunk"),
       );
-      ship.position.set(
+      ship.root.position.set(
         ((first % 10) + (vertical ? 0 : (cells.length - 1) / 2) - 4.5) * 0.74,
         0.2,
         (Math.floor(first / 10) + (vertical ? (cells.length - 1) / 2 : 0) - 4.5) * 0.74,
       );
-      if (vertical) ship.rotation.y = -Math.PI / 2;
-      this.table.add(ship);
+      if (vertical) ship.root.rotation.y = -Math.PI / 2;
+      this.table.add(ship.root);
+      this.ships.push(ship);
     }
   }
   update(model: DuelTableModel) {
@@ -385,11 +387,13 @@ export class DuelTableScene {
       this.petLabels.replaceChildren();
       this.petSpeech.hidden = true;
       this.petSpeechUntil = 0;
-      this.pets = model.companions.map((companion, index) => {
+      this.pets = model.companions.map((companion) => {
         const actor = new PetModel(companion.pet.stage, companion.pet.species, 0.25);
-        actor.root.scale.setScalar(1.25);
-        // The rear wooden border is visible on narrow screens and clear of both game boards.
-        actor.root.position.set(index === 0 ? -2.7 : 2.7, -0.14, -5.35);
+        const near = companion.seat === "near";
+        actor.root.scale.setScalar(near ? 1.05 : 1.25);
+        // Seats follow owners even when only one player has a pet or the viewer spectates.
+        // Both borders stay clear of the board and its clickable cells on narrow screens.
+        actor.root.position.set(near ? -1.6 : 2.7, -0.14, near ? 5.15 : -5.35);
         this.companions.add(actor.root);
         const label = document.createElement(companion.isOwn ? "button" : "span");
         const description = `${PET_SPECIES_INFO[companion.pet.species].name}, ${PET_STAGES[companion.pet.stage]} · ${companion.ownerName}`;
@@ -424,6 +428,7 @@ export class DuelTableScene {
       this.labels.replaceChildren();
       this.targets = [];
       this.cards = [];
+      this.ships = [];
       this.effects = [];
       if (model.kind === "memory") this.makeMemory();
       else this.makeSea();
@@ -547,7 +552,9 @@ export class DuelTableScene {
   private render = (time: number) => {
     this.frame = 0;
     if (this.disposed) return;
-    const animated = !this.reduced && (!!this.pets.length || !!this.avatarEffects);
+    const animated =
+      !this.reduced &&
+      (!!this.pets.length || !!this.avatarEffects || this.ships.some((ship) => ship.animated));
     if (animated && time - this.lastFrame < 1000 / 30) {
       this.requestFrame();
       return;
@@ -556,6 +563,7 @@ export class DuelTableScene {
     this.lastFrame = time;
     this.animationTime += dt;
     this.avatarEffects?.frame(this.animationTime, this.reduced);
+    for (const ship of this.ships) ship.frame(this.animationTime, this.reduced);
     for (const { actor } of this.pets) actor.frame(time, this.reduced);
     this.petSpeech.hidden = time >= this.petSpeechUntil;
     let moving = false;
